@@ -4,6 +4,7 @@ import { PlanService } from '../../src/domain/services/plan-service.js';
 import { RequirementService } from '../../src/domain/services/requirement-service.js';
 import { SolutionService } from '../../src/domain/services/solution-service.js';
 import { PhaseService } from '../../src/domain/services/phase-service.js';
+import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { LinkingService } from '../../src/domain/services/linking-service.js';
 import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import * as fs from 'fs/promises';
@@ -16,6 +17,7 @@ describe('QueryService', () => {
   let requirementService: RequirementService;
   let solutionService: SolutionService;
   let phaseService: PhaseService;
+  let artifactService: ArtifactService;
   let linkingService: LinkingService;
   let storage: FileStorage;
   let testDir: string;
@@ -29,6 +31,7 @@ describe('QueryService', () => {
     requirementService = new RequirementService(storage, planService);
     solutionService = new SolutionService(storage, planService);
     phaseService = new PhaseService(storage, planService);
+    artifactService = new ArtifactService(storage, planService);
     linkingService = new LinkingService(storage);
     queryService = new QueryService(storage, planService, linkingService);
 
@@ -420,6 +423,128 @@ describe('QueryService', () => {
       expect(result.format).toBe('markdown');
       expect(result.content).toContain('## Solutions');
       expect(result.content).toContain('Solution Without Tradeoffs');
+    });
+
+    it('should include artifacts in markdown', async () => {
+      await artifactService.addArtifact({
+        planId,
+        artifact: {
+          title: 'User Service Implementation',
+          description: 'Service for user management',
+          artifactType: 'code',
+          content: {
+            language: 'typescript',
+            sourceCode: 'export class UserService { }',
+            filename: 'user-service.ts',
+          },
+          fileTable: [
+            { path: 'src/services/user-service.ts', action: 'create', description: 'Main service file' },
+          ],
+        },
+      });
+
+      const result = await queryService.exportPlan({
+        planId,
+        format: 'markdown',
+      });
+
+      expect(result.content).toContain('## Artifacts');
+      expect(result.content).toContain('User Service Implementation');
+      expect(result.content).toContain('typescript');
+      expect(result.content).toContain('user-service.ts');
+    });
+
+    it('should include artifact file table in markdown', async () => {
+      await artifactService.addArtifact({
+        planId,
+        artifact: {
+          title: 'Database Migration',
+          description: 'Add users table',
+          artifactType: 'migration',
+          content: {
+            language: 'sql',
+            sourceCode: 'CREATE TABLE users (id INT PRIMARY KEY);',
+          },
+          fileTable: [
+            { path: 'migrations/001_users.sql', action: 'create', description: 'User table migration' },
+            { path: 'src/models/user.ts', action: 'create', description: 'User model' },
+            { path: 'src/types.ts', action: 'modify', description: 'Add user type' },
+          ],
+        },
+      });
+
+      const result = await queryService.exportPlan({
+        planId,
+        format: 'markdown',
+      });
+
+      expect(result.content).toContain('## Artifacts');
+      expect(result.content).toContain('Database Migration');
+      expect(result.content).toContain('**Files**:');
+      expect(result.content).toContain('migrations/001_users.sql');
+      expect(result.content).toContain('[create]');
+      expect(result.content).toContain('[modify]');
+    });
+  });
+
+  describe('search_entities with artifacts', () => {
+    it('should search in artifact content', async () => {
+      await artifactService.addArtifact({
+        planId,
+        artifact: {
+          title: 'Authentication Handler',
+          description: 'JWT authentication',
+          artifactType: 'code',
+          content: {
+            language: 'typescript',
+            sourceCode: 'function verifyJwtToken(token: string) { }',
+            filename: 'auth-handler.ts',
+          },
+        },
+      });
+
+      const result = await queryService.searchEntities({
+        planId,
+        query: 'verifyJwtToken',
+      });
+
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(result.results.some((r) => r.entity.type === 'artifact')).toBe(true);
+    });
+
+    it('should filter search by artifact type', async () => {
+      await artifactService.addArtifact({
+        planId,
+        artifact: {
+          title: 'Config File',
+          description: 'App configuration',
+          artifactType: 'config',
+          content: {
+            language: 'yaml',
+            sourceCode: 'database: localhost',
+          },
+        },
+      });
+
+      await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Config Requirement',
+          description: 'Need config support',
+          source: { type: 'user-request' },
+          priority: 'high',
+          category: 'functional',
+          acceptanceCriteria: [],
+        },
+      });
+
+      const result = await queryService.searchEntities({
+        planId,
+        query: 'config',
+        entityTypes: ['artifact'],
+      });
+
+      expect(result.results.every((r) => r.entityType === 'artifact')).toBe(true);
     });
   });
 });

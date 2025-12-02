@@ -4,6 +4,8 @@
 
 const VALID_EFFORT_UNITS = ['hours', 'days', 'weeks', 'story-points'] as const;
 const VALID_CONFIDENCE_LEVELS = ['low', 'medium', 'high'] as const;
+const VALID_ARTIFACT_TYPES = ['code', 'config', 'migration', 'documentation', 'test', 'script', 'other'] as const;
+const VALID_FILE_ACTIONS = ['create', 'modify', 'delete'] as const;
 
 export function validateEffortEstimate(effort: unknown, fieldName = 'effortEstimate'): void {
   if (effort === undefined || effort === null) {
@@ -77,6 +79,58 @@ export function validateTags(tags: unknown[]): void {
     if (typeof tag.value !== 'string') {
       throw new Error(
         `Invalid tag at index ${i}: 'value' must be a string`
+      );
+    }
+  }
+}
+
+export function validateCodeExamples(examples: unknown[]): void {
+  if (!Array.isArray(examples)) {
+    return;
+  }
+
+  for (let i = 0; i < examples.length; i++) {
+    const ex = examples[i] as Record<string, unknown>;
+
+    if (typeof ex.language !== 'string' || !ex.language) {
+      throw new Error(
+        `Invalid codeExample at index ${i}: 'language' must be a non-empty string`
+      );
+    }
+
+    if (typeof ex.code !== 'string') {
+      throw new Error(
+        `Invalid codeExample at index ${i}: 'code' must be a string`
+      );
+    }
+  }
+}
+
+export function validateArtifactType(artifactType: unknown): void {
+  if (!VALID_ARTIFACT_TYPES.includes(artifactType as typeof VALID_ARTIFACT_TYPES[number])) {
+    throw new Error(
+      `Invalid artifactType: must be one of: ${VALID_ARTIFACT_TYPES.join(', ')}`
+    );
+  }
+}
+
+export function validateFileTable(fileTable: unknown[]): void {
+  if (!Array.isArray(fileTable)) {
+    return;
+  }
+
+  for (let i = 0; i < fileTable.length; i++) {
+    const entry = fileTable[i] as Record<string, unknown>;
+
+    if (typeof entry.path !== 'string' || !entry.path) {
+      throw new Error(
+        `Invalid fileTable entry at index ${i}: 'path' must be a non-empty string`
+      );
+    }
+
+    if (!VALID_FILE_ACTIONS.includes(entry.action as typeof VALID_FILE_ACTIONS[number])) {
+      throw new Error(
+        `Invalid fileTable entry at index ${i}: 'action' must be one of: ${VALID_FILE_ACTIONS.join(', ')}`
       );
     }
   }

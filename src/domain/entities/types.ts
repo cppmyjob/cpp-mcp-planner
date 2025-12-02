@@ -1,6 +1,6 @@
 // Base types for all entities
 
-export type EntityType = 'requirement' | 'solution' | 'decision' | 'phase';
+export type EntityType = 'requirement' | 'solution' | 'decision' | 'phase' | 'artifact';
 
 export interface Tag {
   key: string;
@@ -115,6 +115,14 @@ export interface Decision extends Entity {
 // Phase types
 export type PhaseStatus = 'planned' | 'in_progress' | 'completed' | 'blocked' | 'skipped';
 
+// Code example for phases
+export interface CodeExample {
+  language: string;
+  filename?: string;
+  code: string;
+  description?: string;
+}
+
 export interface Milestone {
   id: string;
   title: string;
@@ -162,6 +170,51 @@ export interface Phase extends Entity {
   // Progress Tracking
   milestones?: Milestone[];
   blockers?: Blocker[];
+
+  // Implementation details
+  implementationNotes?: string;
+  codeExamples?: CodeExample[];
+}
+
+// Artifact types - for storing generated content (code, configs, docs)
+export type ArtifactType =
+  | 'code'           // Generated source code
+  | 'config'         // Configuration files (JSON, YAML, etc.)
+  | 'migration'      // Database migrations (SQL, etc.)
+  | 'documentation'  // Generated documentation (markdown, etc.)
+  | 'test'           // Test files and test data
+  | 'script'         // Build scripts, automation scripts
+  | 'other';         // Any other generated content
+
+export type ArtifactStatus = 'draft' | 'reviewed' | 'approved' | 'implemented' | 'outdated';
+
+export interface FileEntry {
+  path: string;
+  action: 'create' | 'modify' | 'delete';
+  description?: string;
+}
+
+export interface Artifact extends Entity {
+  type: 'artifact';
+  title: string;
+  description: string;
+  artifactType: ArtifactType;
+  status: ArtifactStatus;
+
+  // Content - structured storage for generated content
+  content: {
+    language?: string;         // Programming language or format (typescript, sql, yaml, etc.)
+    sourceCode?: string;       // The actual generated code/content
+    filename?: string;         // Suggested filename
+  };
+
+  // File table - list of files to be created/modified
+  fileTable?: FileEntry[];
+
+  // Context - what this artifact relates to
+  relatedPhaseId?: string;     // The phase this artifact belongs to
+  relatedSolutionId?: string;  // The solution this artifact implements
+  relatedRequirementIds?: string[]; // Requirements this artifact addresses
 }
 
 // Link types
@@ -173,7 +226,8 @@ export type RelationType =
   | 'alternative_to'  // Solution → Solution
   | 'supersedes'      // Decision → Decision
   | 'references'      // Any → ContextReference (future)
-  | 'derived_from';   // Requirement → Requirement
+  | 'derived_from'    // Requirement → Requirement
+  | 'has_artifact';   // Phase/Solution → Artifact
 
 export interface Link {
   id: string;
@@ -203,6 +257,7 @@ export interface PlanManifest {
     totalSolutions: number;
     totalDecisions: number;
     totalPhases: number;
+    totalArtifacts: number;
     completionPercentage: number;
   };
 }
@@ -214,6 +269,7 @@ export interface Plan {
     solutions: Solution[];
     decisions: Decision[];
     phases: Phase[];
+    artifacts: Artifact[];
   };
   links: Link[];
 }

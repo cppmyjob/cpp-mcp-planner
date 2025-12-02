@@ -104,3 +104,29 @@ export async function createTestDecision(
     },
   });
 }
+
+export async function createTestArtifact(
+  ctx: TestContext,
+  overrides: Partial<{
+    title: string;
+    description: string;
+    artifactType: 'code' | 'config' | 'migration' | 'documentation' | 'test' | 'script' | 'other';
+    language: string;
+    sourceCode: string;
+    filename: string;
+  }> = {}
+) {
+  return ctx.services.artifactService.addArtifact({
+    planId: ctx.planId,
+    artifact: {
+      title: overrides.title || 'Test Artifact',
+      description: overrides.description || 'Test artifact description',
+      artifactType: overrides.artifactType || 'code',
+      content: {
+        language: overrides.language || 'typescript',
+        sourceCode: overrides.sourceCode || 'export class TestService {}',
+        filename: overrides.filename || 'test-service.ts',
+      },
+    },
+  });
+}

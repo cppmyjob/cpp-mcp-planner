@@ -8,6 +8,7 @@ import type {
   Solution,
   Decision,
   Phase,
+  Artifact,
   Link,
   Tag,
 } from '../entities/types.js';
@@ -120,6 +121,7 @@ export class QueryService {
       ...entities.solutions,
       ...entities.decisions,
       ...entities.phases,
+      ...entities.artifacts,
     ];
 
     const query = input.query.toLowerCase();
@@ -322,6 +324,7 @@ export class QueryService {
       ...entities.solutions.map((s) => s.id),
       ...entities.decisions.map((d) => d.id),
       ...entities.phases.map((p) => p.id),
+      ...entities.artifacts.map((a) => a.id),
     ]);
     for (const link of links) {
       if (!allIds.has(link.sourceId)) {
@@ -432,6 +435,18 @@ export class QueryService {
           deliverables: phase.deliverables.join(' '),
         };
       }
+      case 'artifact': {
+        const art = entity as Artifact;
+        return {
+          ...base,
+          title: art.title,
+          description: art.description,
+          content: art.content.sourceCode || '',
+          filename: art.content.filename || '',
+        };
+      }
+      default:
+        return base;
     }
   }
 
@@ -442,6 +457,7 @@ export class QueryService {
       solutions: Solution[];
       decisions: Decision[];
       phases: Phase[];
+      artifacts: Artifact[];
     }
   ): string {
     const lines: string[] = [];
@@ -512,6 +528,49 @@ export class QueryService {
         }
       }
       lines.push('');
+    }
+
+    // Artifacts
+    if (entities.artifacts.length > 0) {
+      lines.push('## Artifacts');
+      lines.push('');
+      for (const artifact of entities.artifacts) {
+        const statusBadge = artifact.status !== 'draft' ? ` [${artifact.status.toUpperCase()}]` : '';
+        lines.push(`### ${artifact.title}${statusBadge}`);
+        lines.push('');
+        lines.push(artifact.description);
+        lines.push('');
+        lines.push(`**Type**: ${artifact.artifactType}`);
+        if (artifact.content.language) {
+          lines.push(` | **Language**: ${artifact.content.language}`);
+        }
+        if (artifact.content.filename) {
+          lines.push(` | **File**: ${artifact.content.filename}`);
+        }
+        lines.push('');
+
+        // File table
+        if (artifact.fileTable && artifact.fileTable.length > 0) {
+          lines.push('**Files**:');
+          for (const file of artifact.fileTable) {
+            const desc = file.description ? ` - ${file.description}` : '';
+            lines.push(`- \`${file.path}\` [${file.action}]${desc}`);
+          }
+          lines.push('');
+        }
+
+        // Source code (truncated if too long)
+        if (artifact.content.sourceCode) {
+          const maxLength = 500;
+          const code = artifact.content.sourceCode.length > maxLength
+            ? artifact.content.sourceCode.substring(0, maxLength) + '\n... (truncated)'
+            : artifact.content.sourceCode;
+          lines.push('```' + (artifact.content.language || ''));
+          lines.push(code);
+          lines.push('```');
+          lines.push('');
+        }
+      }
     }
 
     return lines.join('\n');

@@ -226,6 +226,7 @@ describe('Entity Types', () => {
           totalSolutions: 3,
           totalDecisions: 2,
           totalPhases: 4,
+          totalArtifacts: 0,
           completionPercentage: 25,
         },
       };

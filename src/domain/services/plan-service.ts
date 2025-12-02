@@ -8,6 +8,7 @@ import type {
   Solution,
   Decision,
   Phase,
+  Artifact,
   Link,
 } from '../entities/types.js';
 
@@ -84,6 +85,7 @@ export interface GetPlanResult {
       solutions: Solution[];
       decisions: Decision[];
       phases: Phase[];
+      artifacts: Artifact[];
     };
     links?: Link[];
   };
@@ -139,6 +141,7 @@ export class PlanService {
         totalSolutions: 0,
         totalDecisions: 0,
         totalPhases: 0,
+        totalArtifacts: 0,
         completionPercentage: 0,
       },
     };
@@ -151,6 +154,7 @@ export class PlanService {
     await this.storage.saveEntities(planId, 'solutions', []);
     await this.storage.saveEntities(planId, 'decisions', []);
     await this.storage.saveEntities(planId, 'phases', []);
+    await this.storage.saveEntities(planId, 'artifacts', []);
     await this.storage.saveLinks(planId, []);
 
     return {
@@ -250,6 +254,7 @@ export class PlanService {
           'decisions'
         ),
         phases: await this.storage.loadEntities<Phase>(input.planId, 'phases'),
+        artifacts: await this.storage.loadEntities<Artifact>(input.planId, 'artifacts'),
       };
       result.plan.links = await this.storage.loadLinks(input.planId);
     }
@@ -386,11 +391,13 @@ export class PlanService {
       'decisions'
     );
     const phases = await this.storage.loadEntities<Phase>(planId, 'phases');
+    const artifacts = await this.storage.loadEntities<Artifact>(planId, 'artifacts');
 
     manifest.statistics.totalRequirements = requirements.length;
     manifest.statistics.totalSolutions = solutions.length;
     manifest.statistics.totalDecisions = decisions.length;
     manifest.statistics.totalPhases = phases.length;
+    manifest.statistics.totalArtifacts = artifacts.length;
 
     // Calculate completion percentage
     if (phases.length > 0) {
