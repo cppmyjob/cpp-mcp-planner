@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
 import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag } from '../entities/types.js';
+import { validateEffortEstimate, validateTags } from './validators.js';
 
 // Input types
 export interface ProposeSolutionInput {
@@ -137,6 +138,10 @@ export class SolutionService {
   async proposeSolution(input: ProposeSolutionInput): Promise<ProposeSolutionResult> {
     // Validate tradeoffs format
     this.validateTradeoffs(input.solution.tradeoffs);
+    // Validate effortEstimate format
+    validateEffortEstimate(input.solution.evaluation?.effortEstimate);
+    // Validate tags format
+    validateTags(input.solution.tags || []);
 
     const solutionId = uuidv4();
     const now = new Date().toISOString();
@@ -305,8 +310,14 @@ export class SolutionService {
       solution.tradeoffs = input.updates.tradeoffs;
     }
     if (input.updates.addressing !== undefined) solution.addressing = input.updates.addressing;
-    if (input.updates.evaluation !== undefined) solution.evaluation = input.updates.evaluation;
-    if (input.updates.tags !== undefined) solution.metadata.tags = input.updates.tags;
+    if (input.updates.evaluation !== undefined) {
+      validateEffortEstimate(input.updates.evaluation.effortEstimate);
+      solution.evaluation = input.updates.evaluation;
+    }
+    if (input.updates.tags !== undefined) {
+      validateTags(input.updates.tags);
+      solution.metadata.tags = input.updates.tags;
+    }
 
     solution.updatedAt = now;
     solution.version += 1;

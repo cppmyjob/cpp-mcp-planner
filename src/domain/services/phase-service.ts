@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone } from '../entities/types.js';
+import { validateEffortEstimate, validateTags } from './validators.js';
 
 // Input types
 export interface AddPhaseInput {
@@ -14,6 +15,7 @@ export interface AddPhaseInput {
     successCriteria: string[];
     parentId?: string | null;
     order?: number;
+    estimatedEffort?: EffortEstimate; // Direct field for API convenience
     schedule?: {
       estimatedEffort: EffortEstimate;
     };
@@ -144,6 +146,12 @@ export class PhaseService {
   ) {}
 
   async addPhase(input: AddPhaseInput): Promise<AddPhaseResult> {
+    // Validate estimatedEffort format (support both direct and schedule.estimatedEffort)
+    const effort = input.phase.estimatedEffort ?? input.phase.schedule?.estimatedEffort;
+    validateEffortEstimate(effort, 'estimatedEffort');
+    // Validate tags format
+    validateTags(input.phase.tags || []);
+
     const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
     const phaseId = uuidv4();
     const now = new Date().toISOString();
@@ -185,8 +193,8 @@ export class PhaseService {
       objectives: input.phase.objectives,
       deliverables: input.phase.deliverables,
       successCriteria: input.phase.successCriteria,
-      schedule: input.phase.schedule || {
-        estimatedEffort: { value: 0, unit: 'hours', confidence: 'low' },
+      schedule: {
+        estimatedEffort: effort || { value: 0, unit: 'hours', confidence: 'low' },
       },
       status: 'planned',
       progress: 0,
@@ -222,7 +230,10 @@ export class PhaseService {
       phase.schedule = { ...phase.schedule, ...input.updates.schedule };
     }
     if (input.updates.milestones !== undefined) phase.milestones = input.updates.milestones;
-    if (input.updates.tags !== undefined) phase.metadata.tags = input.updates.tags;
+    if (input.updates.tags !== undefined) {
+      validateTags(input.updates.tags);
+      phase.metadata.tags = input.updates.tags;
+    }
 
     phase.updatedAt = now;
     phase.version += 1;
