@@ -30,7 +30,7 @@ export interface ListPlansInput {
 export interface GetPlanInput {
   planId: string;
   includeEntities?: boolean;
-  entityTypes?: ('requirement' | 'solution' | 'decision' | 'phase')[];
+  entityTypes?: ('requirement' | 'solution' | 'decision' | 'phase' | 'artifact')[];
 }
 
 export interface UpdatePlanInput {

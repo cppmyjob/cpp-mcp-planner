@@ -260,6 +260,27 @@ describe('ArtifactService', () => {
   });
 
   describe('edge cases', () => {
+    it('should add artifact without content field (documentation with fileTable only)', async () => {
+      const result = await service.addArtifact({
+        planId,
+        artifact: {
+          title: 'Critical Files to Read',
+          description: 'Key files for implementation',
+          artifactType: 'documentation',
+          fileTable: [
+            { path: 'src/services/user.ts', action: 'modify', description: 'User service' },
+            { path: 'src/models/user.ts', action: 'modify', description: 'User model' },
+          ],
+        } as any,
+      });
+
+      expect(result.artifactId).toBeDefined();
+      expect(result.artifact.title).toBe('Critical Files to Read');
+      expect(result.artifact.artifactType).toBe('documentation');
+      expect(result.artifact.fileTable).toHaveLength(2);
+      expect(result.artifact.content).toEqual({});
+    });
+
     it('should throw for non-existent planId on addArtifact', async () => {
       await expect(
         service.addArtifact({

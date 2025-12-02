@@ -17,7 +17,7 @@ export interface AddArtifactInput {
     title: string;
     description: string;
     artifactType: ArtifactType;
-    content: {
+    content?: {
       language?: string;
       sourceCode?: string;
       filename?: string;
@@ -139,11 +139,13 @@ export class ArtifactService {
       description: input.artifact.description,
       artifactType: input.artifact.artifactType,
       status: 'draft',
-      content: {
-        language: input.artifact.content.language,
-        sourceCode: input.artifact.content.sourceCode,
-        filename: input.artifact.content.filename,
-      },
+      content: input.artifact.content
+        ? {
+            language: input.artifact.content.language,
+            sourceCode: input.artifact.content.sourceCode,
+            filename: input.artifact.content.filename,
+          }
+        : {},
       fileTable: input.artifact.fileTable,
       relatedPhaseId: input.artifact.relatedPhaseId,
       relatedSolutionId: input.artifact.relatedSolutionId,
