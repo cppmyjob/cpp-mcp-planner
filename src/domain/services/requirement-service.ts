@@ -9,6 +9,7 @@ import type {
   RequirementStatus,
   Tag,
 } from '../entities/types.js';
+import { validateTags } from './validators.js';
 
 // Input types
 export interface AddRequirementInput {
@@ -124,6 +125,9 @@ export class RequirementService {
       throw new Error('Plan not found');
     }
 
+    // Validate tags format
+    validateTags(input.requirement.tags || []);
+
     const requirementId = uuidv4();
     const now = new Date().toISOString();
 
@@ -235,6 +239,7 @@ export class RequirementService {
       requirement.impact = input.updates.impact;
     }
     if (input.updates.tags !== undefined) {
+      validateTags(input.updates.tags);
       requirement.metadata.tags = input.updates.tags;
     }
 

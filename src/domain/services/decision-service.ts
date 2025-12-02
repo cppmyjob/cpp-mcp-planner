@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
 import type { Decision, DecisionStatus, AlternativeConsidered, Tag } from '../entities/types.js';
+import { validateAlternativesConsidered, validateTags } from './validators.js';
 
 // Input types
 export interface RecordDecisionInput {
@@ -176,6 +177,11 @@ export class DecisionService {
   }
 
   async recordDecision(input: RecordDecisionInput): Promise<RecordDecisionResult> {
+    // Validate alternativesConsidered format
+    validateAlternativesConsidered(input.decision.alternativesConsidered);
+    // Validate tags format
+    validateTags(input.decision.tags || []);
+
     const decisionId = uuidv4();
     const now = new Date().toISOString();
 
@@ -312,12 +318,17 @@ export class DecisionService {
       if (input.updates.question !== undefined) decision.question = input.updates.question;
       if (input.updates.context !== undefined) decision.context = input.updates.context;
       if (input.updates.decision !== undefined) decision.decision = input.updates.decision;
-      if (input.updates.alternativesConsidered !== undefined)
+      if (input.updates.alternativesConsidered !== undefined) {
+        validateAlternativesConsidered(input.updates.alternativesConsidered);
         decision.alternativesConsidered = input.updates.alternativesConsidered;
+      }
       if (input.updates.consequences !== undefined)
         decision.consequences = input.updates.consequences;
       if (input.updates.impactScope !== undefined) decision.impactScope = input.updates.impactScope;
-      if (input.updates.tags !== undefined) decision.metadata.tags = input.updates.tags;
+      if (input.updates.tags !== undefined) {
+        validateTags(input.updates.tags);
+        decision.metadata.tags = input.updates.tags;
+      }
     }
 
     decision.updatedAt = now;

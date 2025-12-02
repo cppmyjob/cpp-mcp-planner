@@ -21,7 +21,17 @@ export const tools = [
             status: { type: 'string', enum: ['active', 'archived', 'completed'] },
           },
         },
-        tags: { type: 'array', items: { type: 'object' } },
+        tags: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              key: { type: 'string' },
+              value: { type: 'string' },
+            },
+            required: ['key', 'value'],
+          },
+        },
         reason: { type: 'string' },
         workspacePath: { type: 'string' },
         includeEntities: { type: 'boolean' },
@@ -62,7 +72,17 @@ export const tools = [
             acceptanceCriteria: { type: 'array', items: { type: 'string' } },
             priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
             category: { type: 'string', enum: ['functional', 'non-functional', 'technical', 'business'] },
-            tags: { type: 'array', items: { type: 'object' } },
+            tags: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  key: { type: 'string' },
+                  value: { type: 'string' },
+                },
+                required: ['key', 'value'],
+              },
+            },
           },
         },
         updates: { type: 'object' },
@@ -117,7 +137,15 @@ export const tools = [
             evaluation: {
               type: 'object',
               properties: {
-                effortEstimate: { type: 'object' },
+                effortEstimate: {
+                  type: 'object',
+                  properties: {
+                    value: { type: 'number' },
+                    unit: { type: 'string', enum: ['hours', 'days', 'weeks', 'story-points'] },
+                    confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+                  },
+                  required: ['value', 'unit', 'confidence'],
+                },
                 technicalFeasibility: { type: 'string', enum: ['high', 'medium', 'low'] },
                 riskAssessment: { type: 'string' },
               },
@@ -152,7 +180,18 @@ export const tools = [
             context: { type: 'string' },
             decision: { type: 'string' },
             consequences: { type: 'string' },
-            alternativesConsidered: { type: 'array', items: { type: 'object' } },
+            alternativesConsidered: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  option: { type: 'string' },
+                  reasoning: { type: 'string' },
+                  whyNotChosen: { type: 'string' },
+                },
+                required: ['option', 'reasoning'],
+              },
+            },
           },
         },
         newDecision: { type: 'object' },
@@ -183,7 +222,15 @@ export const tools = [
             objectives: { type: 'array', items: { type: 'string' } },
             deliverables: { type: 'array', items: { type: 'string' } },
             successCriteria: { type: 'array', items: { type: 'string' } },
-            estimatedEffort: { type: 'object' },
+            estimatedEffort: {
+              type: 'object',
+              properties: {
+                value: { type: 'number' },
+                unit: { type: 'string', enum: ['hours', 'days', 'weeks', 'story-points'] },
+                confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+              },
+              required: ['value', 'unit', 'confidence'],
+            },
           },
         },
         status: { type: 'string', enum: ['planned', 'in_progress', 'completed', 'blocked', 'skipped'] },

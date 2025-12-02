@@ -252,11 +252,11 @@ describe('E2E: Complete Planning Workflow', () => {
           alternativesConsidered: [
             {
               option: 'localStorage',
-              reason: 'Rejected due to XSS vulnerability',
+              reasoning: 'Rejected due to XSS vulnerability',
             },
             {
               option: 'sessionStorage',
-              reason: 'Rejected - tokens lost on tab close',
+              reasoning: 'Rejected - tokens lost on tab close',
             },
           ],
           consequences: 'Requires CSRF protection. More secure against XSS.',
@@ -269,11 +269,11 @@ describe('E2E: Complete Planning Workflow', () => {
           alternativesConsidered: [
             {
               option: 'Argon2',
-              reason: 'Considered but less library support',
+              reasoning: 'Considered but less library support',
             },
             {
               option: 'PBKDF2',
-              reason: 'Rejected - bcrypt more resistant to GPU attacks',
+              reasoning: 'Rejected - bcrypt more resistant to GPU attacks',
             },
           ],
           consequences: 'Proven security. Good library support.',

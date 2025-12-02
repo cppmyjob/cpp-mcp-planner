@@ -182,6 +182,56 @@ describe('Tool Handlers Integration', () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.success).toBe(true);
     });
+
+    it('requirement add should accept valid tags format', async () => {
+      const result = await handleToolCall(
+        'requirement',
+        {
+          action: 'add',
+          planId: ctx.planId,
+          requirement: {
+            title: 'Req with tags',
+            description: 'Testing tags',
+            source: { type: 'user-request' },
+            acceptanceCriteria: ['AC1'],
+            priority: 'high',
+            category: 'functional',
+            tags: [
+              { key: 'priority', value: 'p1' },
+              { key: 'team', value: 'backend' },
+            ],
+          },
+        },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.requirementId).toBeDefined();
+    });
+
+    it('requirement add should reject invalid tags format', async () => {
+      await expect(
+        handleToolCall(
+          'requirement',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            requirement: {
+              title: 'Req with invalid tags',
+              description: 'Should fail',
+              source: { type: 'user-request' },
+              acceptanceCriteria: ['AC1'],
+              priority: 'high',
+              category: 'functional',
+              tags: [
+                { name: 'tag1', label: 'Label' }, // Invalid format!
+              ],
+            },
+          },
+          ctx.services
+        )
+      ).rejects.toThrow(/tag|key|value/i);
+    });
   });
 
   describe('Solution Tools', () => {
@@ -323,6 +373,187 @@ describe('Tool Handlers Integration', () => {
         )
       ).rejects.toThrow(/tradeoff|aspect|pros|cons/i);
     });
+
+    it('solution propose should accept valid effortEstimate format', async () => {
+      const result = await handleToolCall(
+        'solution',
+        {
+          action: 'propose',
+          planId: ctx.planId,
+          solution: {
+            title: 'Solution with valid effortEstimate',
+            description: 'Testing effortEstimate validation',
+            approach: 'Standard approach',
+            addressing: [],
+            tradeoffs: [],
+            evaluation: {
+              effortEstimate: { value: 8, unit: 'hours', confidence: 'high' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.solutionId).toBeDefined();
+      expect(parsed.solution.evaluation.effortEstimate.value).toBe(8);
+      expect(parsed.solution.evaluation.effortEstimate.unit).toBe('hours');
+      expect(parsed.solution.evaluation.effortEstimate.confidence).toBe('high');
+    });
+
+    it('solution propose should reject invalid effortEstimate format', async () => {
+      await expect(
+        handleToolCall(
+          'solution',
+          {
+            action: 'propose',
+            planId: ctx.planId,
+            solution: {
+              title: 'Solution with invalid effortEstimate',
+              description: 'Should fail',
+              approach: 'Approach',
+              addressing: [],
+              tradeoffs: [],
+              evaluation: {
+                effortEstimate: { hours: 8, complexity: 'medium' }, // Invalid format!
+                technicalFeasibility: 'high',
+                riskAssessment: 'Low',
+              },
+            },
+          },
+          ctx.services
+        )
+      ).rejects.toThrow(/effortEstimate|value|unit|confidence/i);
+    });
+
+    it('solution update should reject invalid effortEstimate format', async () => {
+      // First create a valid solution
+      const createResult = await handleToolCall(
+        'solution',
+        {
+          action: 'propose',
+          planId: ctx.planId,
+          solution: {
+            title: 'Solution for update test',
+            description: 'Valid solution',
+            approach: 'Approach',
+            addressing: [],
+            tradeoffs: [],
+            evaluation: {
+              effortEstimate: { value: 8, unit: 'hours', confidence: 'high' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        },
+        ctx.services
+      );
+      const { solutionId } = JSON.parse(createResult.content[0].text);
+
+      // Then try to update with invalid effortEstimate
+      await expect(
+        handleToolCall(
+          'solution',
+          {
+            action: 'update',
+            planId: ctx.planId,
+            solutionId,
+            updates: {
+              evaluation: {
+                effortEstimate: { hours: 16, complexity: 'low' }, // Invalid format!
+                technicalFeasibility: 'medium',
+                riskAssessment: 'Medium',
+              },
+            },
+          },
+          ctx.services
+        )
+      ).rejects.toThrow(/effortEstimate|value|unit|confidence/i);
+    });
+
+    it('solution update should reject invalid tags format', async () => {
+      // First create a valid solution
+      const createResult = await handleToolCall(
+        'solution',
+        {
+          action: 'propose',
+          planId: ctx.planId,
+          solution: {
+            title: 'Solution for tags update test',
+            description: 'Valid solution',
+            approach: 'Approach',
+            addressing: [],
+            tradeoffs: [],
+            evaluation: {
+              effortEstimate: { value: 4, unit: 'hours', confidence: 'medium' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        },
+        ctx.services
+      );
+      const { solutionId } = JSON.parse(createResult.content[0].text);
+
+      // Then try to update with invalid tags
+      await expect(
+        handleToolCall(
+          'solution',
+          {
+            action: 'update',
+            planId: ctx.planId,
+            solutionId,
+            updates: {
+              tags: [{ name: 'tag1', label: 'Label' }], // Invalid format!
+            },
+          },
+          ctx.services
+        )
+      ).rejects.toThrow(/tag|key|value/i);
+    });
+
+    it('solution update should reject invalid tradeoffs format', async () => {
+      // First create a valid solution
+      const createResult = await handleToolCall(
+        'solution',
+        {
+          action: 'propose',
+          planId: ctx.planId,
+          solution: {
+            title: 'Solution for tradeoffs update test',
+            description: 'Valid solution',
+            approach: 'Approach',
+            addressing: [],
+            tradeoffs: [],
+            evaluation: {
+              effortEstimate: { value: 2, unit: 'days', confidence: 'low' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        },
+        ctx.services
+      );
+      const { solutionId } = JSON.parse(createResult.content[0].text);
+
+      // Then try to update with invalid tradeoffs
+      await expect(
+        handleToolCall(
+          'solution',
+          {
+            action: 'update',
+            planId: ctx.planId,
+            solutionId,
+            updates: {
+              tradeoffs: [{ pro: 'Good', con: 'Bad' }], // Invalid format!
+            },
+          },
+          ctx.services
+        )
+      ).rejects.toThrow(/tradeoff|aspect|pros|cons/i);
+    });
   });
 
   describe('Decision Tools', () => {
@@ -345,6 +576,54 @@ describe('Tool Handlers Integration', () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.decisionId).toBeDefined();
+    });
+
+    it('decision record should accept valid alternativesConsidered format', async () => {
+      const result = await handleToolCall(
+        'decision',
+        {
+          action: 'record',
+          planId: ctx.planId,
+          decision: {
+            title: 'Decision with alternatives',
+            question: 'Which approach?',
+            context: 'Context',
+            decision: 'Option A',
+            alternativesConsidered: [
+              { option: 'Option B', reasoning: 'Simpler', whyNotChosen: 'Less flexible' },
+              { option: 'Option C', reasoning: 'Faster' },
+            ],
+          },
+        },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.decisionId).toBeDefined();
+      expect(parsed.decision.alternativesConsidered).toHaveLength(2);
+      expect(parsed.decision.alternativesConsidered[0].option).toBe('Option B');
+    });
+
+    it('decision record should reject invalid alternativesConsidered format', async () => {
+      await expect(
+        handleToolCall(
+          'decision',
+          {
+            action: 'record',
+            planId: ctx.planId,
+            decision: {
+              title: 'Decision with invalid alternatives',
+              question: 'What?',
+              context: 'Context',
+              decision: 'Answer',
+              alternativesConsidered: [
+                { name: 'Option A', desc: 'Description' }, // Invalid format!
+              ],
+            },
+          },
+          ctx.services
+        )
+      ).rejects.toThrow(/alternativesConsidered|option|reasoning/i);
     });
 
     it('decision get should return decision', async () => {
@@ -414,6 +693,51 @@ describe('Tool Handlers Integration', () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.phaseId).toBeDefined();
+    });
+
+    it('phase add should accept valid estimatedEffort format', async () => {
+      const result = await handleToolCall(
+        'phase',
+        {
+          action: 'add',
+          planId: ctx.planId,
+          phase: {
+            title: 'Phase with effort',
+            description: 'Testing estimatedEffort',
+            objectives: ['Obj1'],
+            deliverables: ['Del1'],
+            successCriteria: ['Crit1'],
+            estimatedEffort: { value: 4, unit: 'days', confidence: 'medium' },
+          },
+        },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.phaseId).toBeDefined();
+      expect(parsed.phase.schedule.estimatedEffort.value).toBe(4);
+      expect(parsed.phase.schedule.estimatedEffort.unit).toBe('days');
+    });
+
+    it('phase add should reject invalid estimatedEffort format', async () => {
+      await expect(
+        handleToolCall(
+          'phase',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            phase: {
+              title: 'Phase with invalid effort',
+              description: 'Should fail',
+              objectives: ['Obj1'],
+              deliverables: ['Del1'],
+              successCriteria: ['Crit1'],
+              estimatedEffort: { hours: 8 }, // Invalid format!
+            },
+          },
+          ctx.services
+        )
+      ).rejects.toThrow(/effortEstimate|estimatedEffort|value|unit|confidence/i);
     });
 
     it('phase get_tree should return tree', async () => {
