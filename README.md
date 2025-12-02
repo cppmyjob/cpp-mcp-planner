@@ -25,9 +25,9 @@ Add to your Claude Code MCP settings:
 ```json
 {
   "mcpServers": {
-    "planner": {
+    "planning": {
       "command": "node",
-      "args": ["path/to/cpp-mcp-planner/dist/index.js"],
+      "args": ["path/to/planner/dist/index.js"],
       "env": {
         "MCP_PLANNING_STORAGE_PATH": "./.mcp-plans"
       }
@@ -35,6 +35,27 @@ Add to your Claude Code MCP settings:
   }
 }
 ```
+
+### Disabling Permission Prompts
+
+By default, Claude Code asks for confirmation before each MCP tool use. To allow all planning tools without prompts, add to your settings:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__planning"
+    ]
+  }
+}
+```
+
+Settings locations (in order of priority):
+- **Project-local:** `.claude/settings.local.json` — for this project only, not committed to git
+- **Project-shared:** `.claude/settings.json` — shared with team via git
+- **Global:** `~/.claude/settings.json` — applies to all your projects
+
+**Note:** MCP permissions do NOT support wildcards. Use `mcp__planning` (not `mcp__planning__*`) to allow all tools from this server.
 
 ## Usage
 
