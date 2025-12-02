@@ -7,7 +7,13 @@ export default {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   transform: {
-    '^.+\\.tsx?$': [
+    '^.+\\.(ts|tsx)$': [
+      'ts-jest',
+      {
+        useESM: true,
+      },
+    ],
+    '^.+\\.js$': [
       'ts-jest',
       {
         useESM: true,
@@ -16,8 +22,9 @@ export default {
   },
   testMatch: ['**/tests/**/*.test.ts'],
   transformIgnorePatterns: [
-    'node_modules/(?!(@modelcontextprotocol)/)',
+    'node_modules/(?!(@modelcontextprotocol/sdk)/)',
   ],
+  modulePathIgnorePatterns: [],
   collectCoverageFrom: [
     'src/**/*.ts',
     // Exclude bootstrap/entry point files

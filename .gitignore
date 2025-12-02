@@ -39,3 +39,4 @@ PLAN.md
 
 # Claude Code local settings
 .claude/
+.mcp.json

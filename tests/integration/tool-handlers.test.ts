@@ -10,6 +10,12 @@ import {
   type TestContext,
 } from '../helpers/test-utils.js';
 
+/**
+ * Integration tests for tool handlers.
+ *
+ * NOTE: These tests call handleToolCall() directly, bypassing MCP transport.
+ * For E2E tests through the MCP protocol, see tests/e2e/mcp-all-tools.test.ts
+ */
 describe('Tool Handlers Integration', () => {
   let ctx: TestContext;
 
@@ -22,10 +28,10 @@ describe('Tool Handlers Integration', () => {
   });
 
   describe('Plan Management Tools', () => {
-    it('create_plan should create a new plan', async () => {
+    it('plan create should create a new plan', async () => {
       const result = await handleToolCall(
-        'create_plan',
-        { name: 'New Plan', description: 'Test' },
+        'plan',
+        { action: 'create', name: 'New Plan', description: 'Test' },
         ctx.services
       );
 
@@ -35,17 +41,17 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.manifest.name).toBe('New Plan');
     });
 
-    it('list_plans should return plans', async () => {
-      const result = await handleToolCall('list_plans', {}, ctx.services);
+    it('plan list should return plans', async () => {
+      const result = await handleToolCall('plan', { action: 'list' }, ctx.services);
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.plans.length).toBeGreaterThan(0);
     });
 
-    it('get_plan should return plan details', async () => {
+    it('plan get should return plan details', async () => {
       const result = await handleToolCall(
-        'get_plan',
-        { planId: ctx.planId, includeEntities: true },
+        'plan',
+        { action: 'get', planId: ctx.planId, includeEntities: true },
         ctx.services
       );
 
@@ -54,10 +60,10 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.plan.entities).toBeDefined();
     });
 
-    it('update_plan should update plan', async () => {
+    it('plan update should update plan', async () => {
       const result = await handleToolCall(
-        'update_plan',
-        { planId: ctx.planId, updates: { name: 'Updated Name' } },
+        'plan',
+        { action: 'update', planId: ctx.planId, updates: { name: 'Updated Name' } },
         ctx.services
       );
 
@@ -65,18 +71,18 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.plan.name).toBe('Updated Name');
     });
 
-    it('set_active_plan and get_active_plan should work', async () => {
+    it('plan set_active and get_active should work', async () => {
       const workspacePath = '/test-workspace-' + Date.now();
 
       await handleToolCall(
-        'set_active_plan',
-        { planId: ctx.planId, workspacePath },
+        'plan',
+        { action: 'set_active', planId: ctx.planId, workspacePath },
         ctx.services
       );
 
       const result = await handleToolCall(
-        'get_active_plan',
-        { workspacePath },
+        'plan',
+        { action: 'get_active', workspacePath },
         ctx.services
       );
 
@@ -85,10 +91,10 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.activePlan.planId).toBe(ctx.planId);
     });
 
-    it('archive_plan should archive plan', async () => {
+    it('plan archive should archive plan', async () => {
       const result = await handleToolCall(
-        'archive_plan',
-        { planId: ctx.planId, reason: 'Test' },
+        'plan',
+        { action: 'archive', planId: ctx.planId, reason: 'Test' },
         ctx.services
       );
 
@@ -98,10 +104,11 @@ describe('Tool Handlers Integration', () => {
   });
 
   describe('Requirement Tools', () => {
-    it('add_requirement should add requirement', async () => {
+    it('requirement add should add requirement', async () => {
       const result = await handleToolCall(
-        'add_requirement',
+        'requirement',
         {
+          action: 'add',
           planId: ctx.planId,
           requirement: {
             title: 'Test Req',
@@ -119,12 +126,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.requirementId).toBeDefined();
     });
 
-    it('get_requirement should return requirement', async () => {
+    it('requirement get should return requirement', async () => {
       const req = await createTestRequirement(ctx);
 
       const result = await handleToolCall(
-        'get_requirement',
-        { planId: ctx.planId, requirementId: req.requirementId },
+        'requirement',
+        { action: 'get', planId: ctx.planId, requirementId: req.requirementId },
         ctx.services
       );
 
@@ -132,12 +139,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.requirement.id).toBe(req.requirementId);
     });
 
-    it('list_requirements should return requirements', async () => {
+    it('requirement list should return requirements', async () => {
       await createTestRequirement(ctx);
 
       const result = await handleToolCall(
-        'list_requirements',
-        { planId: ctx.planId },
+        'requirement',
+        { action: 'list', planId: ctx.planId },
         ctx.services
       );
 
@@ -145,12 +152,13 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.requirements.length).toBeGreaterThan(0);
     });
 
-    it('update_requirement should update', async () => {
+    it('requirement update should update', async () => {
       const req = await createTestRequirement(ctx);
 
       const result = await handleToolCall(
-        'update_requirement',
+        'requirement',
         {
+          action: 'update',
           planId: ctx.planId,
           requirementId: req.requirementId,
           updates: { title: 'Updated' },
@@ -162,12 +170,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.requirement.title).toBe('Updated');
     });
 
-    it('delete_requirement should delete', async () => {
+    it('requirement delete should delete', async () => {
       const req = await createTestRequirement(ctx);
 
       const result = await handleToolCall(
-        'delete_requirement',
-        { planId: ctx.planId, requirementId: req.requirementId },
+        'requirement',
+        { action: 'delete', planId: ctx.planId, requirementId: req.requirementId },
         ctx.services
       );
 
@@ -177,10 +185,11 @@ describe('Tool Handlers Integration', () => {
   });
 
   describe('Solution Tools', () => {
-    it('propose_solution should create solution', async () => {
+    it('solution propose should create solution', async () => {
       const result = await handleToolCall(
-        'propose_solution',
+        'solution',
         {
+          action: 'propose',
           planId: ctx.planId,
           solution: {
             title: 'Solution',
@@ -202,12 +211,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.solutionId).toBeDefined();
     });
 
-    it('get_solution should return solution', async () => {
+    it('solution get should return solution', async () => {
       const sol = await createTestSolution(ctx);
 
       const result = await handleToolCall(
-        'get_solution',
-        { planId: ctx.planId, solutionId: sol.solutionId },
+        'solution',
+        { action: 'get', planId: ctx.planId, solutionId: sol.solutionId },
         ctx.services
       );
 
@@ -215,13 +224,13 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.solution.id).toBe(sol.solutionId);
     });
 
-    it('compare_solutions should compare', async () => {
+    it('solution compare should compare', async () => {
       const sol1 = await createTestSolution(ctx, [], { title: 'Solution 1' });
       const sol2 = await createTestSolution(ctx, [], { title: 'Solution 2' });
 
       const result = await handleToolCall(
-        'compare_solutions',
-        { planId: ctx.planId, solutionIds: [sol1.solutionId, sol2.solutionId] },
+        'solution',
+        { action: 'compare', planId: ctx.planId, solutionIds: [sol1.solutionId, sol2.solutionId] },
         ctx.services
       );
 
@@ -229,12 +238,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.comparison.solutions).toHaveLength(2);
     });
 
-    it('select_solution should select', async () => {
+    it('solution select should select', async () => {
       const sol = await createTestSolution(ctx);
 
       const result = await handleToolCall(
-        'select_solution',
-        { planId: ctx.planId, solutionId: sol.solutionId, rationale: 'Best fit' },
+        'solution',
+        { action: 'select', planId: ctx.planId, solutionId: sol.solutionId, reason: 'Best fit' },
         ctx.services
       );
 
@@ -242,12 +251,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.solution.status).toBe('selected');
     });
 
-    it('delete_solution should delete', async () => {
+    it('solution delete should delete', async () => {
       const sol = await createTestSolution(ctx);
 
       const result = await handleToolCall(
-        'delete_solution',
-        { planId: ctx.planId, solutionId: sol.solutionId },
+        'solution',
+        { action: 'delete', planId: ctx.planId, solutionId: sol.solutionId },
         ctx.services
       );
 
@@ -257,10 +266,11 @@ describe('Tool Handlers Integration', () => {
   });
 
   describe('Decision Tools', () => {
-    it('record_decision should create decision', async () => {
+    it('decision record should create decision', async () => {
       const result = await handleToolCall(
-        'record_decision',
+        'decision',
         {
+          action: 'record',
           planId: ctx.planId,
           decision: {
             title: 'Decision',
@@ -277,12 +287,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.decisionId).toBeDefined();
     });
 
-    it('get_decision should return decision', async () => {
+    it('decision get should return decision', async () => {
       const dec = await createTestDecision(ctx);
 
       const result = await handleToolCall(
-        'get_decision',
-        { planId: ctx.planId, decisionId: dec.decisionId },
+        'decision',
+        { action: 'get', planId: ctx.planId, decisionId: dec.decisionId },
         ctx.services
       );
 
@@ -290,12 +300,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.decision.id).toBe(dec.decisionId);
     });
 
-    it('list_decisions should return decisions', async () => {
+    it('decision list should return decisions', async () => {
       await createTestDecision(ctx);
 
       const result = await handleToolCall(
-        'list_decisions',
-        { planId: ctx.planId },
+        'decision',
+        { action: 'list', planId: ctx.planId },
         ctx.services
       );
 
@@ -303,12 +313,13 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.decisions.length).toBeGreaterThan(0);
     });
 
-    it('supersede_decision should create new decision', async () => {
+    it('decision supersede should create new decision', async () => {
       const dec = await createTestDecision(ctx);
 
       const result = await handleToolCall(
-        'supersede_decision',
+        'decision',
         {
+          action: 'supersede',
           planId: ctx.planId,
           decisionId: dec.decisionId,
           newDecision: { decision: 'New answer' },
@@ -324,10 +335,11 @@ describe('Tool Handlers Integration', () => {
   });
 
   describe('Phase Tools', () => {
-    it('add_phase should create phase', async () => {
+    it('phase add should create phase', async () => {
       const result = await handleToolCall(
-        'add_phase',
+        'phase',
         {
+          action: 'add',
           planId: ctx.planId,
           phase: {
             title: 'Phase 1',
@@ -344,12 +356,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.phaseId).toBeDefined();
     });
 
-    it('get_phase_tree should return tree', async () => {
+    it('phase get_tree should return tree', async () => {
       await createTestPhase(ctx);
 
       const result = await handleToolCall(
-        'get_phase_tree',
-        { planId: ctx.planId },
+        'phase',
+        { action: 'get_tree', planId: ctx.planId },
         ctx.services
       );
 
@@ -357,12 +369,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.tree.length).toBeGreaterThan(0);
     });
 
-    it('update_phase_status should update status', async () => {
+    it('phase update_status should update status', async () => {
       const phase = await createTestPhase(ctx);
 
       const result = await handleToolCall(
-        'update_phase_status',
-        { planId: ctx.planId, phaseId: phase.phaseId, status: 'in_progress' },
+        'phase',
+        { action: 'update_status', planId: ctx.planId, phaseId: phase.phaseId, status: 'in_progress' },
         ctx.services
       );
 
@@ -370,13 +382,13 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.phase.status).toBe('in_progress');
     });
 
-    it('move_phase should move phase', async () => {
+    it('phase move should move phase', async () => {
       const parent = await createTestPhase(ctx, { title: 'Parent' });
       const child = await createTestPhase(ctx, { title: 'Child' });
 
       const result = await handleToolCall(
-        'move_phase',
-        { planId: ctx.planId, phaseId: child.phaseId, newParentId: parent.phaseId },
+        'phase',
+        { action: 'move', planId: ctx.planId, phaseId: child.phaseId, newParentId: parent.phaseId },
         ctx.services
       );
 
@@ -384,12 +396,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.phase.parentId).toBe(parent.phaseId);
     });
 
-    it('delete_phase should delete phase', async () => {
+    it('phase delete should delete phase', async () => {
       const phase = await createTestPhase(ctx);
 
       const result = await handleToolCall(
-        'delete_phase',
-        { planId: ctx.planId, phaseId: phase.phaseId },
+        'phase',
+        { action: 'delete', planId: ctx.planId, phaseId: phase.phaseId },
         ctx.services
       );
 
@@ -397,12 +409,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.success).toBe(true);
     });
 
-    it('get_next_actions should return actions', async () => {
+    it('phase get_next_actions should return actions', async () => {
       await createTestPhase(ctx);
 
       const result = await handleToolCall(
-        'get_next_actions',
-        { planId: ctx.planId },
+        'phase',
+        { action: 'get_next_actions', planId: ctx.planId },
         ctx.services
       );
 
@@ -412,10 +424,11 @@ describe('Tool Handlers Integration', () => {
   });
 
   describe('Linking Tools', () => {
-    it('link_entities should create link', async () => {
+    it('link create should create link', async () => {
       const result = await handleToolCall(
-        'link_entities',
+        'link',
         {
+          action: 'create',
           planId: ctx.planId,
           sourceId: 'entity-1',
           targetId: 'entity-2',
@@ -428,10 +441,11 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.linkId).toBeDefined();
     });
 
-    it('get_entity_links should return links', async () => {
+    it('link get should return links', async () => {
       await handleToolCall(
-        'link_entities',
+        'link',
         {
+          action: 'create',
           planId: ctx.planId,
           sourceId: 'entity-1',
           targetId: 'entity-2',
@@ -441,8 +455,8 @@ describe('Tool Handlers Integration', () => {
       );
 
       const result = await handleToolCall(
-        'get_entity_links',
-        { planId: ctx.planId, entityId: 'entity-1' },
+        'link',
+        { action: 'get', planId: ctx.planId, entityId: 'entity-1' },
         ctx.services
       );
 
@@ -450,10 +464,11 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.links.length).toBeGreaterThan(0);
     });
 
-    it('unlink_entities should remove link', async () => {
+    it('link delete should remove link', async () => {
       const link = await handleToolCall(
-        'link_entities',
+        'link',
         {
+          action: 'create',
           planId: ctx.planId,
           sourceId: 'entity-1',
           targetId: 'entity-2',
@@ -465,8 +480,8 @@ describe('Tool Handlers Integration', () => {
       const linkId = JSON.parse(link.content[0].text).linkId;
 
       const result = await handleToolCall(
-        'unlink_entities',
-        { planId: ctx.planId, linkId },
+        'link',
+        { action: 'delete', planId: ctx.planId, linkId },
         ctx.services
       );
 
@@ -476,12 +491,12 @@ describe('Tool Handlers Integration', () => {
   });
 
   describe('Query Tools', () => {
-    it('search_entities should search', async () => {
+    it('query search should search', async () => {
       await createTestRequirement(ctx, { title: 'Authentication' });
 
       const result = await handleToolCall(
-        'search_entities',
-        { planId: ctx.planId, query: 'auth' },
+        'query',
+        { action: 'search', planId: ctx.planId, query: 'auth' },
         ctx.services
       );
 
@@ -489,12 +504,12 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.results.length).toBeGreaterThan(0);
     });
 
-    it('trace_requirement should trace', async () => {
+    it('query trace should trace', async () => {
       const req = await createTestRequirement(ctx);
 
       const result = await handleToolCall(
-        'trace_requirement',
-        { planId: ctx.planId, requirementId: req.requirementId },
+        'query',
+        { action: 'trace', planId: ctx.planId, requirementId: req.requirementId },
         ctx.services
       );
 
@@ -502,10 +517,10 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.requirement.id).toBe(req.requirementId);
     });
 
-    it('validate_plan should validate', async () => {
+    it('query validate should validate', async () => {
       const result = await handleToolCall(
-        'validate_plan',
-        { planId: ctx.planId },
+        'query',
+        { action: 'validate', planId: ctx.planId },
         ctx.services
       );
 
@@ -513,10 +528,10 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.checksPerformed).toBeDefined();
     });
 
-    it('export_plan should export to markdown', async () => {
+    it('query export should export to markdown', async () => {
       const result = await handleToolCall(
-        'export_plan',
-        { planId: ctx.planId, format: 'markdown' },
+        'query',
+        { action: 'export', planId: ctx.planId, format: 'markdown' },
         ctx.services
       );
 
@@ -525,21 +540,19 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.content).toContain('# Test Plan');
     });
 
-    it('export_plan should export to json', async () => {
+    it('query export should export to json', async () => {
       const result = await handleToolCall(
-        'export_plan',
-        { planId: ctx.planId, format: 'json' },
+        'query',
+        { action: 'export', planId: ctx.planId, format: 'json' },
         ctx.services
       );
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.format).toBe('json');
     });
-  });
 
-  describe('System Tools', () => {
-    it('planning_health_check should return status', async () => {
-      const result = await handleToolCall('planning_health_check', {}, ctx.services);
+    it('query health should return status', async () => {
+      const result = await handleToolCall('query', { action: 'health' }, ctx.services);
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.status).toBe('healthy');
@@ -554,11 +567,17 @@ describe('Tool Handlers Integration', () => {
       ).rejects.toThrow('Unknown tool');
     });
 
+    it('should throw McpError for unknown action', async () => {
+      await expect(
+        handleToolCall('plan', { action: 'unknown_action' }, ctx.services)
+      ).rejects.toThrow('Unknown action');
+    });
+
     it('should throw McpError for missing requirement', async () => {
       await expect(
         handleToolCall(
-          'get_requirement',
-          { planId: ctx.planId, requirementId: 'non-existent' },
+          'requirement',
+          { action: 'get', planId: ctx.planId, requirementId: 'non-existent' },
           ctx.services
         )
       ).rejects.toThrow();
