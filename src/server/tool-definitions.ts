@@ -1,7 +1,7 @@
 export const tools = [
   {
     name: 'plan',
-    description: 'Manage plans: create, list, get, update, archive, set_active, get_active',
+    description: 'Manage development plans - the top-level container for all planning entities. Create a plan first before using other tools. Set active plan per workspace to avoid passing planId repeatedly. Actions: create, list, get, update, archive, set_active, get_active.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -44,7 +44,7 @@ export const tools = [
   },
   {
     name: 'requirement',
-    description: 'Manage requirements: add, get, update, list, delete',
+    description: 'Manage project requirements - the foundation of planning workflow. Add requirements first, then propose solutions with `solution` tool to address them. Link requirements to phases for implementation tracking. Use `query` tool to trace requirement coverage. Actions: add, get, update, list, delete.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -102,7 +102,7 @@ export const tools = [
   },
   {
     name: 'solution',
-    description: 'Manage solutions: propose, get, update, compare, select, delete',
+    description: 'Manage solution proposals for requirements. Propose multiple solutions with tradeoff analysis, compare them to evaluate options, then select the best one. Use `decision` tool to record selection rationale. Selected solutions guide phase implementation. Actions: propose, get, update, compare, select, delete.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -162,7 +162,7 @@ export const tools = [
   },
   {
     name: 'decision',
-    description: 'Manage decisions: record, get, list, supersede',
+    description: 'Record architectural decisions (ADR pattern) with context and alternatives considered. Use after solution selection or for any significant technical choice. Decisions can be superseded when context changes, maintaining decision history. Link decisions to requirements/solutions for traceability. Actions: record, get, list, supersede.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -203,7 +203,7 @@ export const tools = [
   },
   {
     name: 'phase',
-    description: 'Manage phases: add, get_tree, update_status, move, delete, get_next_actions',
+    description: 'Manage implementation phases/tasks in hierarchical structure. Break selected solutions into phases with objectives, deliverables, and estimates. Track progress, update status (planned/in_progress/completed/blocked), and get next actionable items. Use after solution selection. Actions: add, get_tree, update_status, move, delete, get_next_actions.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -263,7 +263,7 @@ export const tools = [
   },
   {
     name: 'artifact',
-    description: 'Manage artifacts (generated code, configs, migrations): add, get, update, list, delete',
+    description: 'Store generated artifacts (code, configs, migrations, docs, tests, scripts) related to phases and solutions. Track file changes with fileTable, store source code with syntax highlighting. Link artifacts to phases/solutions/requirements for traceability. Use during phase implementation. Actions: add, get, update, list, delete.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -322,7 +322,7 @@ export const tools = [
   },
   {
     name: 'link',
-    description: 'Manage entity links: create, get, delete',
+    description: 'Create explicit relationships between entities for traceability. Relation types: implements (solution->requirement), addresses (phase->requirement), depends_on (phase->phase with cycle detection), blocks, alternative_to, supersedes (decision->decision), has_artifact. Use `query` trace action for impact analysis. Actions: create, get, delete.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -347,7 +347,7 @@ export const tools = [
   },
   {
     name: 'query',
-    description: 'Query and analyze: search, trace, validate, export, health',
+    description: 'Search, analyze, and validate plans. Search entities by text/tags, trace requirement implementation path (requirements->solutions->phases), validate plan integrity (uncovered requirements, orphan solutions, broken links), export to markdown/json, check plan health. Use for analysis and quality assurance. Actions: search, trace, validate, export, health.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -358,7 +358,7 @@ export const tools = [
         planId: { type: 'string' },
         query: { type: 'string' },
         requirementId: { type: 'string' },
-        entityTypes: { type: 'array', items: { type: 'string' } },
+        entityTypes: { type: 'array', items: { type: 'string', enum: ['requirement', 'solution', 'decision', 'phase', 'artifact'] } },
         filters: { type: 'object' },
         checks: { type: 'array', items: { type: 'string' } },
         format: { type: 'string', enum: ['markdown', 'json'] },
