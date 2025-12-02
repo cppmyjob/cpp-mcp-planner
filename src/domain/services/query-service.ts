@@ -485,9 +485,10 @@ export class QueryService {
         lines.push('');
         lines.push(sol.description);
         lines.push('');
-        if (sol.tradeoffs.length > 0) {
+        const tradeoffs = sol.tradeoffs || [];
+        if (tradeoffs.length > 0) {
           lines.push('**Trade-offs**:');
-          for (const t of sol.tradeoffs) {
+          for (const t of tradeoffs) {
             lines.push(`- **${t.aspect}**: +${t.pros.join(', ')} / -${t.cons.join(', ')}`);
           }
         }
