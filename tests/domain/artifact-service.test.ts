@@ -271,7 +271,7 @@ describe('ArtifactService', () => {
             { path: 'src/services/user.ts', action: 'modify', description: 'User service' },
             { path: 'src/models/user.ts', action: 'modify', description: 'User model' },
           ],
-        } as any,
+        },
       });
 
       expect(result.artifactId).toBeDefined();
