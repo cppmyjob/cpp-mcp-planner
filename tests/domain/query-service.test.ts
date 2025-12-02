@@ -381,5 +381,45 @@ describe('QueryService', () => {
       expect(result.content).toContain('## Phases');
       expect(result.content).toContain('Phase 1');
     });
+
+    it('should handle solutions without tradeoffs field (undefined)', async () => {
+      // Simulate solution created without tradeoffs field (as happens via MCP tool)
+      const solutions = await storage.loadEntities(planId, 'solutions');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      solutions.push({
+        id: 'solution-without-tradeoffs',
+        type: 'solution',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1,
+        metadata: {
+          createdBy: 'test',
+          tags: [],
+          annotations: [],
+        },
+        title: 'Solution Without Tradeoffs',
+        description: 'This solution has no tradeoffs field',
+        approach: 'Some approach',
+        addressing: [],
+        evaluation: {
+          effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
+          technicalFeasibility: 'high',
+          riskAssessment: 'Low',
+        },
+        status: 'proposed',
+        // NOTE: tradeoffs field is intentionally missing (undefined)
+      } as any);
+      await storage.saveEntities(planId, 'solutions', solutions);
+
+      // This should NOT throw "Cannot read properties of undefined (reading 'length')"
+      const result = await queryService.exportPlan({
+        planId,
+        format: 'markdown',
+      });
+
+      expect(result.format).toBe('markdown');
+      expect(result.content).toContain('## Solutions');
+      expect(result.content).toContain('Solution Without Tradeoffs');
+    });
   });
 });
