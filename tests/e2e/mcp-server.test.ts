@@ -47,13 +47,14 @@ describe('E2E: MCP Server Discovery & Errors', () => {
   });
 
   describe('Tool Discovery', () => {
-    it('should list all 7 tools', async () => {
+    it('should list all 8 tools', async () => {
       const result = await client.listTools();
 
-      expect(result.tools).toHaveLength(7);
+      expect(result.tools).toHaveLength(8);
 
       const toolNames = result.tools.map(t => t.name).sort();
       expect(toolNames).toEqual([
+        'artifact',
         'decision',
         'link',
         'phase',
@@ -82,6 +83,7 @@ describe('E2E: MCP Server Discovery & Errors', () => {
         solution: ['propose', 'get', 'update', 'compare', 'select', 'delete'],
         decision: ['record', 'get', 'list', 'supersede'],
         phase: ['add', 'get_tree', 'update_status', 'move', 'delete', 'get_next_actions'],
+        artifact: ['add', 'get', 'update', 'list', 'delete'],
         link: ['create', 'get', 'delete'],
         query: ['search', 'trace', 'validate', 'export', 'health'],
       };

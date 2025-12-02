@@ -43,6 +43,7 @@ describe('FileStorage', () => {
         totalSolutions: 0,
         totalDecisions: 0,
         totalPhases: 0,
+        totalArtifacts: 0,
         completionPercentage: 0,
       },
     };

@@ -7,6 +7,7 @@ import {
   createTestSolution,
   createTestPhase,
   createTestDecision,
+  createTestArtifact,
   type TestContext,
 } from '../helpers/test-utils.js';
 
@@ -981,6 +982,229 @@ describe('Tool Handlers Integration', () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.status).toBe('healthy');
       expect(parsed.version).toBe('1.0.0');
+    });
+  });
+
+  describe('Artifact Tools', () => {
+    it('artifact add should create artifact', async () => {
+      const result = await handleToolCall(
+        'artifact',
+        {
+          action: 'add',
+          planId: ctx.planId,
+          artifact: {
+            title: 'User Service',
+            description: 'Service for user management',
+            artifactType: 'code',
+            content: {
+              language: 'typescript',
+              sourceCode: 'export class UserService { }',
+              filename: 'user-service.ts',
+            },
+          },
+        },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.artifactId).toBeDefined();
+      expect(parsed.artifact.title).toBe('User Service');
+      expect(parsed.artifact.artifactType).toBe('code');
+      expect(parsed.artifact.status).toBe('draft');
+    });
+
+    it('artifact add should accept valid fileTable', async () => {
+      const result = await handleToolCall(
+        'artifact',
+        {
+          action: 'add',
+          planId: ctx.planId,
+          artifact: {
+            title: 'Database Migration',
+            description: 'Add users table',
+            artifactType: 'migration',
+            content: {
+              language: 'sql',
+              sourceCode: 'CREATE TABLE users (id INT PRIMARY KEY);',
+            },
+            fileTable: [
+              { path: 'migrations/001_users.sql', action: 'create', description: 'User table migration' },
+              { path: 'src/models/user.ts', action: 'create' },
+            ],
+          },
+        },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.artifactId).toBeDefined();
+      expect(parsed.artifact.fileTable).toHaveLength(2);
+      expect(parsed.artifact.fileTable[0].action).toBe('create');
+    });
+
+    it('artifact add should reject invalid artifactType', async () => {
+      await expect(
+        handleToolCall(
+          'artifact',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            artifact: {
+              title: 'Invalid Artifact',
+              description: 'Should fail',
+              artifactType: 'invalid-type',
+              content: { language: 'ts', sourceCode: '' },
+            },
+          },
+          ctx.services
+        )
+      ).rejects.toThrow(/artifactType/i);
+    });
+
+    it('artifact add should reject invalid fileTable action', async () => {
+      await expect(
+        handleToolCall(
+          'artifact',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            artifact: {
+              title: 'Test Artifact',
+              description: 'Test',
+              artifactType: 'code',
+              content: { language: 'ts', sourceCode: '' },
+              fileTable: [{ path: 'file.ts', action: 'invalid-action' }],
+            },
+          },
+          ctx.services
+        )
+      ).rejects.toThrow(/action/i);
+    });
+
+    it('artifact get should return artifact', async () => {
+      const artifact = await createTestArtifact(ctx);
+
+      const result = await handleToolCall(
+        'artifact',
+        { action: 'get', planId: ctx.planId, artifactId: artifact.artifactId },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.artifact.id).toBe(artifact.artifactId);
+    });
+
+    it('artifact update should update artifact', async () => {
+      const artifact = await createTestArtifact(ctx);
+
+      const result = await handleToolCall(
+        'artifact',
+        {
+          action: 'update',
+          planId: ctx.planId,
+          artifactId: artifact.artifactId,
+          updates: {
+            title: 'Updated Title',
+            status: 'reviewed',
+          },
+        },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.artifact.title).toBe('Updated Title');
+      expect(parsed.artifact.status).toBe('reviewed');
+      expect(parsed.artifact.version).toBe(2);
+    });
+
+    it('artifact update should reject invalid fileTable', async () => {
+      const artifact = await createTestArtifact(ctx);
+
+      await expect(
+        handleToolCall(
+          'artifact',
+          {
+            action: 'update',
+            planId: ctx.planId,
+            artifactId: artifact.artifactId,
+            updates: {
+              fileTable: [{ path: '', action: 'create' }], // Empty path
+            },
+          },
+          ctx.services
+        )
+      ).rejects.toThrow(/path/i);
+    });
+
+    it('artifact list should return artifacts', async () => {
+      await createTestArtifact(ctx, { title: 'Artifact 1', artifactType: 'code' });
+      await createTestArtifact(ctx, { title: 'Artifact 2', artifactType: 'config' });
+
+      const result = await handleToolCall(
+        'artifact',
+        { action: 'list', planId: ctx.planId },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.artifacts).toHaveLength(2);
+    });
+
+    it('artifact list should filter by artifactType', async () => {
+      await createTestArtifact(ctx, { title: 'Code Artifact', artifactType: 'code' });
+      await createTestArtifact(ctx, { title: 'Config Artifact', artifactType: 'config' });
+
+      const result = await handleToolCall(
+        'artifact',
+        { action: 'list', planId: ctx.planId, filters: { artifactType: 'code' } },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.artifacts).toHaveLength(1);
+      expect(parsed.artifacts[0].title).toBe('Code Artifact');
+    });
+
+    it('artifact delete should delete artifact', async () => {
+      const artifact = await createTestArtifact(ctx);
+
+      const result = await handleToolCall(
+        'artifact',
+        { action: 'delete', planId: ctx.planId, artifactId: artifact.artifactId },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+
+      // Verify deletion
+      const list = await handleToolCall(
+        'artifact',
+        { action: 'list', planId: ctx.planId },
+        ctx.services
+      );
+      const listParsed = JSON.parse(list.content[0].text);
+      expect(listParsed.artifacts).toHaveLength(0);
+    });
+
+    it('artifact get should throw for non-existent plan', async () => {
+      await expect(
+        handleToolCall(
+          'artifact',
+          { action: 'get', planId: 'non-existent-plan', artifactId: 'any' },
+          ctx.services
+        )
+      ).rejects.toThrow(/Plan not found/i);
+    });
+
+    it('artifact get should throw for non-existent artifact', async () => {
+      await expect(
+        handleToolCall(
+          'artifact',
+          { action: 'get', planId: ctx.planId, artifactId: 'non-existent-artifact' },
+          ctx.services
+        )
+      ).rejects.toThrow(/Artifact not found/i);
     });
   });
 

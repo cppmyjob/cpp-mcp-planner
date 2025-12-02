@@ -387,4 +387,140 @@ describe('PhaseService', () => {
       expect(result.phase.path).toBe('1.1');
     });
   });
+
+  describe('phase with implementation details', () => {
+    it('should add phase with implementationNotes', async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Implementation Phase',
+          description: 'Phase with notes',
+          objectives: ['Build feature'],
+          deliverables: ['Code'],
+          successCriteria: ['Tests pass'],
+          implementationNotes: '## TDD Steps\n1. Write failing test\n2. Implement\n3. Refactor',
+        },
+      });
+
+      expect(result.phase.implementationNotes).toBe(
+        '## TDD Steps\n1. Write failing test\n2. Implement\n3. Refactor'
+      );
+    });
+
+    it('should add phase with codeExamples', async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Code Phase',
+          description: 'Phase with code examples',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+          codeExamples: [
+            {
+              language: 'typescript',
+              filename: 'service.ts',
+              code: 'export class MyService {}',
+              description: 'Service skeleton',
+            },
+            {
+              language: 'typescript',
+              code: 'it("should work", () => expect(true).toBe(true));',
+            },
+          ],
+        },
+      });
+
+      expect(result.phase.codeExamples).toHaveLength(2);
+      expect(result.phase.codeExamples![0].language).toBe('typescript');
+      expect(result.phase.codeExamples![0].filename).toBe('service.ts');
+      expect(result.phase.codeExamples![1].code).toContain('expect(true)');
+    });
+
+    it('should validate codeExamples structure', async () => {
+      await expect(
+        service.addPhase({
+          planId,
+          phase: {
+            title: 'Invalid',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            codeExamples: [{ lang: 'ts', src: 'code' } as any],
+          },
+        })
+      ).rejects.toThrow(/language/i);
+    });
+
+    it('should update phase with implementationNotes', async () => {
+      const phase = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test',
+          description: '',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      const result = await service.updatePhase({
+        planId,
+        phaseId: phase.phaseId,
+        updates: {
+          implementationNotes: '## Updated Notes\n- Step 1\n- Step 2',
+        },
+      });
+
+      expect(result.phase.implementationNotes).toBe('## Updated Notes\n- Step 1\n- Step 2');
+    });
+
+    it('should update phase with codeExamples', async () => {
+      const phase = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test',
+          description: '',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      const result = await service.updatePhase({
+        planId,
+        phaseId: phase.phaseId,
+        updates: {
+          codeExamples: [{ language: 'python', code: 'print("hello")' }],
+        },
+      });
+
+      expect(result.phase.codeExamples).toHaveLength(1);
+      expect(result.phase.codeExamples![0].language).toBe('python');
+    });
+
+    it('should validate codeExamples on update', async () => {
+      const phase = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test',
+          description: '',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await expect(
+        service.updatePhase({
+          planId,
+          phaseId: phase.phaseId,
+          updates: {
+            codeExamples: [{ language: '', code: 'x' }],
+          },
+        })
+      ).rejects.toThrow(/language/i);
+    });
+  });
 });

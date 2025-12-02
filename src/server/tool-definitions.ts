@@ -231,6 +231,20 @@ export const tools = [
               },
               required: ['value', 'unit', 'confidence'],
             },
+            implementationNotes: { type: 'string' },
+            codeExamples: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  language: { type: 'string' },
+                  filename: { type: 'string' },
+                  code: { type: 'string' },
+                  description: { type: 'string' },
+                },
+                required: ['language', 'code'],
+              },
+            },
           },
         },
         status: { type: 'string', enum: ['planned', 'in_progress', 'completed', 'blocked', 'skipped'] },
@@ -243,6 +257,65 @@ export const tools = [
         includeCompleted: { type: 'boolean' },
         maxDepth: { type: 'number' },
         limit: { type: 'number' },
+      },
+      required: ['action', 'planId'],
+    },
+  },
+  {
+    name: 'artifact',
+    description: 'Manage artifacts (generated code, configs, migrations): add, get, update, list, delete',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['add', 'get', 'update', 'list', 'delete'],
+        },
+        planId: { type: 'string' },
+        artifactId: { type: 'string' },
+        artifact: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            description: { type: 'string' },
+            artifactType: {
+              type: 'string',
+              enum: ['code', 'config', 'migration', 'documentation', 'test', 'script', 'other'],
+            },
+            content: {
+              type: 'object',
+              properties: {
+                language: { type: 'string' },
+                sourceCode: { type: 'string' },
+                filename: { type: 'string' },
+              },
+            },
+            fileTable: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  path: { type: 'string' },
+                  action: { type: 'string', enum: ['create', 'modify', 'delete'] },
+                  description: { type: 'string' },
+                },
+                required: ['path', 'action'],
+              },
+            },
+            relatedPhaseId: { type: 'string' },
+            relatedSolutionId: { type: 'string' },
+            relatedRequirementIds: { type: 'array', items: { type: 'string' } },
+          },
+        },
+        updates: { type: 'object' },
+        filters: {
+          type: 'object',
+          properties: {
+            artifactType: { type: 'string' },
+            status: { type: 'string' },
+            relatedPhaseId: { type: 'string' },
+          },
+        },
       },
       required: ['action', 'planId'],
     },
@@ -264,7 +337,7 @@ export const tools = [
         linkId: { type: 'string' },
         relationType: {
           type: 'string',
-          enum: ['implements', 'addresses', 'depends_on', 'blocks', 'alternative_to', 'supersedes', 'references', 'derived_from'],
+          enum: ['implements', 'addresses', 'depends_on', 'blocks', 'alternative_to', 'supersedes', 'references', 'derived_from', 'has_artifact'],
         },
         direction: { type: 'string', enum: ['outgoing', 'incoming', 'both'] },
         metadata: { type: 'object' },

@@ -4,6 +4,7 @@ import { RequirementService } from '../domain/services/requirement-service.js';
 import { SolutionService } from '../domain/services/solution-service.js';
 import { DecisionService } from '../domain/services/decision-service.js';
 import { PhaseService } from '../domain/services/phase-service.js';
+import { ArtifactService } from '../domain/services/artifact-service.js';
 import { LinkingService } from '../domain/services/linking-service.js';
 import { QueryService } from '../domain/services/query-service.js';
 
@@ -15,6 +16,7 @@ export interface Services {
   solutionService: SolutionService;
   decisionService: DecisionService;
   phaseService: PhaseService;
+  artifactService: ArtifactService;
   linkingService: LinkingService;
   queryService: QueryService;
 }
@@ -28,6 +30,7 @@ export async function createServices(storagePath: string): Promise<Services> {
   const solutionService = new SolutionService(storage, planService);
   const decisionService = new DecisionService(storage, planService);
   const phaseService = new PhaseService(storage, planService);
+  const artifactService = new ArtifactService(storage, planService);
   const linkingService = new LinkingService(storage);
   const queryService = new QueryService(storage, planService, linkingService);
 
@@ -39,6 +42,7 @@ export async function createServices(storagePath: string): Promise<Services> {
     solutionService,
     decisionService,
     phaseService,
+    artifactService,
     linkingService,
     queryService,
   };

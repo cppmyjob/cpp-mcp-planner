@@ -1,8 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
-import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone } from '../entities/types.js';
-import { validateEffortEstimate, validateTags } from './validators.js';
+import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, CodeExample } from '../entities/types.js';
+import { validateEffortEstimate, validateTags, validateCodeExamples } from './validators.js';
 
 // Input types
 export interface AddPhaseInput {
@@ -20,6 +20,8 @@ export interface AddPhaseInput {
       estimatedEffort: EffortEstimate;
     };
     tags?: Tag[];
+    implementationNotes?: string;
+    codeExamples?: CodeExample[];
   };
 }
 
@@ -42,6 +44,8 @@ export interface UpdatePhaseInput {
     };
     milestones: Milestone[];
     tags: Tag[];
+    implementationNotes: string;
+    codeExamples: CodeExample[];
   }>;
 }
 
@@ -151,6 +155,8 @@ export class PhaseService {
     validateEffortEstimate(effort, 'estimatedEffort');
     // Validate tags format
     validateTags(input.phase.tags || []);
+    // Validate codeExamples format
+    validateCodeExamples(input.phase.codeExamples || []);
 
     const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
     const phaseId = uuidv4();
@@ -198,6 +204,8 @@ export class PhaseService {
       },
       status: 'planned',
       progress: 0,
+      implementationNotes: input.phase.implementationNotes,
+      codeExamples: input.phase.codeExamples,
     };
 
     phases.push(phase);
@@ -233,6 +241,13 @@ export class PhaseService {
     if (input.updates.tags !== undefined) {
       validateTags(input.updates.tags);
       phase.metadata.tags = input.updates.tags;
+    }
+    if (input.updates.implementationNotes !== undefined) {
+      phase.implementationNotes = input.updates.implementationNotes;
+    }
+    if (input.updates.codeExamples !== undefined) {
+      validateCodeExamples(input.updates.codeExamples);
+      phase.codeExamples = input.updates.codeExamples;
     }
 
     phase.updatedAt = now;

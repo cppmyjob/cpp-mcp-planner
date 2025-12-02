@@ -22,6 +22,7 @@ export async function handleToolCall(
     solutionService,
     decisionService,
     phaseService,
+    artifactService,
     linkingService,
     queryService,
   } = services;
@@ -148,6 +149,28 @@ export async function handleToolCall(
             break;
           default:
             throw new ToolError('InvalidAction', `Unknown action for phase: ${action}`);
+        }
+        break;
+
+      case 'artifact':
+        switch (action) {
+          case 'add':
+            result = await artifactService.addArtifact(args as any);
+            break;
+          case 'get':
+            result = await artifactService.getArtifact(args as any);
+            break;
+          case 'update':
+            result = await artifactService.updateArtifact(args as any);
+            break;
+          case 'list':
+            result = await artifactService.listArtifacts(args as any);
+            break;
+          case 'delete':
+            result = await artifactService.deleteArtifact(args as any);
+            break;
+          default:
+            throw new ToolError('InvalidAction', `Unknown action for artifact: ${action}`);
         }
         break;
 
