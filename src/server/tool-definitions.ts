@@ -1,103 +1,49 @@
-// Tool definitions for MCP Planning Server
-
 export const tools = [
-  // Plan Management (7)
   {
-    name: 'create_plan',
-    description: 'Create a new planning document for a task or project',
+    name: 'plan',
+    description: 'Manage plans: create, list, get, update, archive, set_active, get_active',
     inputSchema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Plan name' },
-        description: { type: 'string', description: 'Plan description' },
-        tags: { type: 'array', items: { type: 'object' }, description: 'Optional tags' },
-      },
-      required: ['name', 'description'],
-    },
-  },
-  {
-    name: 'list_plans',
-    description: 'List all planning documents with optional filters',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        status: { type: 'string', enum: ['active', 'archived', 'all'] },
+        action: {
+          type: 'string',
+          enum: ['create', 'list', 'get', 'update', 'archive', 'set_active', 'get_active'],
+        },
+        planId: { type: 'string' },
+        name: { type: 'string' },
+        description: { type: 'string' },
+        status: { type: 'string', enum: ['active', 'archived', 'completed'] },
+        updates: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            description: { type: 'string' },
+            status: { type: 'string', enum: ['active', 'archived', 'completed'] },
+          },
+        },
+        tags: { type: 'array', items: { type: 'object' } },
+        reason: { type: 'string' },
+        workspacePath: { type: 'string' },
+        includeEntities: { type: 'boolean' },
+        includeLinks: { type: 'boolean' },
         limit: { type: 'number' },
         offset: { type: 'number' },
       },
+      required: ['action'],
     },
   },
   {
-    name: 'get_plan',
-    description: 'Get detailed plan information including entities and statistics',
+    name: 'requirement',
+    description: 'Manage requirements: add, get, update, list, delete',
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string', description: 'Plan ID' },
-        includeEntities: { type: 'boolean', description: 'Include all entities' },
-        includeLinks: { type: 'boolean', description: 'Include all links' },
-        includeVersionHistory: { type: 'boolean', description: 'Include version history' },
-      },
-      required: ['planId'],
-    },
-  },
-  {
-    name: 'update_plan',
-    description: 'Update plan metadata (name, description, status)',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string', description: 'Plan ID' },
-        name: { type: 'string' },
-        description: { type: 'string' },
-        status: { type: 'string', enum: ['draft', 'active', 'completed', 'on_hold', 'archived'] },
-      },
-      required: ['planId'],
-    },
-  },
-  {
-    name: 'archive_plan',
-    description: 'Archive a plan (soft delete)',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string', description: 'Plan ID' },
-        reason: { type: 'string', description: 'Archive reason' },
-      },
-      required: ['planId'],
-    },
-  },
-  {
-    name: 'set_active_plan',
-    description: 'Set the active plan for current workspace',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string', description: 'Plan ID' },
-        workspaceId: { type: 'string', description: 'Workspace identifier (defaults to cwd)' },
-      },
-      required: ['planId'],
-    },
-  },
-  {
-    name: 'get_active_plan',
-    description: 'Get the currently active plan for workspace',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        workspaceId: { type: 'string', description: 'Workspace identifier' },
-      },
-    },
-  },
-
-  // Requirements (5)
-  {
-    name: 'add_requirement',
-    description: 'Add a new requirement to the plan',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string', description: 'Plan ID' },
+        action: {
+          type: 'string',
+          enum: ['add', 'get', 'update', 'list', 'delete'],
+        },
+        planId: { type: 'string' },
+        requirementId: { type: 'string' },
         requirement: {
           type: 'object',
           properties: {
@@ -107,7 +53,7 @@ export const tools = [
             source: {
               type: 'object',
               properties: {
-                type: { type: 'string', enum: ['user-request', 'derived', 'constraint', 'assumption'] },
+                type: { type: 'string', enum: ['user-request', 'discovered', 'derived'] },
                 context: { type: 'string' },
                 parentId: { type: 'string' },
               },
@@ -115,48 +61,11 @@ export const tools = [
             },
             acceptanceCriteria: { type: 'array', items: { type: 'string' } },
             priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
-            category: { type: 'string', enum: ['functional', 'non-functional', 'constraint', 'assumption'] },
+            category: { type: 'string', enum: ['functional', 'non-functional', 'technical', 'business'] },
             tags: { type: 'array', items: { type: 'object' } },
           },
-          required: ['title', 'description', 'source', 'acceptanceCriteria', 'priority', 'category'],
         },
-      },
-      required: ['planId', 'requirement'],
-    },
-  },
-  {
-    name: 'get_requirement',
-    description: 'Get requirement details',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        requirementId: { type: 'string' },
-        includeRelated: { type: 'boolean' },
-      },
-      required: ['planId', 'requirementId'],
-    },
-  },
-  {
-    name: 'update_requirement',
-    description: 'Update an existing requirement',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        requirementId: { type: 'string' },
         updates: { type: 'object' },
-      },
-      required: ['planId', 'requirementId', 'updates'],
-    },
-  },
-  {
-    name: 'list_requirements',
-    description: 'List all requirements with filters',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
         filters: {
           type: 'object',
           properties: {
@@ -165,32 +74,25 @@ export const tools = [
             category: { type: 'string' },
           },
         },
+        includeTraceability: { type: 'boolean' },
+        force: { type: 'boolean' },
       },
-      required: ['planId'],
+      required: ['action', 'planId'],
     },
   },
   {
-    name: 'delete_requirement',
-    description: 'Delete a requirement',
+    name: 'solution',
+    description: 'Manage solutions: propose, get, update, compare, select, delete',
     inputSchema: {
       type: 'object',
       properties: {
+        action: {
+          type: 'string',
+          enum: ['propose', 'get', 'update', 'compare', 'select', 'delete'],
+        },
         planId: { type: 'string' },
-        requirementId: { type: 'string' },
-        cascade: { type: 'boolean', description: 'Delete linked solutions/decisions' },
-      },
-      required: ['planId', 'requirementId'],
-    },
-  },
-
-  // Solutions (6)
-  {
-    name: 'propose_solution',
-    description: 'Propose a new solution for requirements',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
+        solutionId: { type: 'string' },
+        solutionIds: { type: 'array', items: { type: 'string' } },
         solution: {
           type: 'object',
           properties: {
@@ -207,88 +109,29 @@ export const tools = [
                 technicalFeasibility: { type: 'string', enum: ['high', 'medium', 'low'] },
                 riskAssessment: { type: 'string' },
               },
-              required: ['effortEstimate', 'technicalFeasibility', 'riskAssessment'],
             },
           },
-          required: ['title', 'description', 'approach', 'addressing', 'tradeoffs', 'evaluation'],
         },
-      },
-      required: ['planId', 'solution'],
-    },
-  },
-  {
-    name: 'get_solution',
-    description: 'Get solution details',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        solutionId: { type: 'string' },
-      },
-      required: ['planId', 'solutionId'],
-    },
-  },
-  {
-    name: 'update_solution',
-    description: 'Update a solution',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        solutionId: { type: 'string' },
         updates: { type: 'object' },
-      },
-      required: ['planId', 'solutionId', 'updates'],
-    },
-  },
-  {
-    name: 'compare_solutions',
-    description: 'Compare multiple solutions side by side',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        solutionIds: { type: 'array', items: { type: 'string' } },
-        criteria: { type: 'array', items: { type: 'string' } },
-      },
-      required: ['planId', 'solutionIds'],
-    },
-  },
-  {
-    name: 'select_solution',
-    description: 'Select a solution as the chosen approach',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        solutionId: { type: 'string' },
-        rationale: { type: 'string' },
+        aspects: { type: 'array', items: { type: 'string' } },
+        reason: { type: 'string' },
         createDecisionRecord: { type: 'boolean' },
       },
-      required: ['planId', 'solutionId', 'rationale'],
+      required: ['action', 'planId'],
     },
   },
   {
-    name: 'delete_solution',
-    description: 'Delete a solution',
+    name: 'decision',
+    description: 'Manage decisions: record, get, list, supersede',
     inputSchema: {
       type: 'object',
       properties: {
+        action: {
+          type: 'string',
+          enum: ['record', 'get', 'list', 'supersede'],
+        },
         planId: { type: 'string' },
-        solutionId: { type: 'string' },
-      },
-      required: ['planId', 'solutionId'],
-    },
-  },
-
-  // Decisions (4)
-  {
-    name: 'record_decision',
-    description: 'Record an architectural or design decision',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
+        decisionId: { type: 'string' },
         decision: {
           type: 'object',
           properties: {
@@ -296,63 +139,29 @@ export const tools = [
             question: { type: 'string' },
             context: { type: 'string' },
             decision: { type: 'string' },
-            consequences: { type: 'array', items: { type: 'string' } },
-            alternatives: { type: 'array', items: { type: 'object' } },
+            consequences: { type: 'string' },
+            alternativesConsidered: { type: 'array', items: { type: 'object' } },
           },
-          required: ['title', 'question', 'context', 'decision'],
         },
-      },
-      required: ['planId', 'decision'],
-    },
-  },
-  {
-    name: 'get_decision',
-    description: 'Get decision details',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        decisionId: { type: 'string' },
-      },
-      required: ['planId', 'decisionId'],
-    },
-  },
-  {
-    name: 'list_decisions',
-    description: 'List all decisions with optional filters',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        status: { type: 'string', enum: ['active', 'superseded', 'deprecated', 'all'] },
-        includeSuperseded: { type: 'boolean' },
-      },
-      required: ['planId'],
-    },
-  },
-  {
-    name: 'supersede_decision',
-    description: 'Replace a decision with a new one',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        decisionId: { type: 'string' },
         newDecision: { type: 'object' },
         reason: { type: 'string' },
+        status: { type: 'string', enum: ['active', 'superseded', 'reversed'] },
       },
-      required: ['planId', 'decisionId', 'newDecision', 'reason'],
+      required: ['action', 'planId'],
     },
   },
-
-  // Phases (6)
   {
-    name: 'add_phase',
-    description: 'Add an implementation phase to the plan',
+    name: 'phase',
+    description: 'Manage phases: add, get_tree, update_status, move, delete, get_next_actions',
     inputSchema: {
       type: 'object',
       properties: {
+        action: {
+          type: 'string',
+          enum: ['add', 'get_tree', 'update_status', 'move', 'delete', 'get_next_actions'],
+        },
         planId: { type: 'string' },
+        phaseId: { type: 'string' },
         phase: {
           type: 'object',
           properties: {
@@ -364,193 +173,69 @@ export const tools = [
             successCriteria: { type: 'array', items: { type: 'string' } },
             estimatedEffort: { type: 'object' },
           },
-          required: ['title', 'description', 'objectives', 'deliverables', 'successCriteria'],
         },
-      },
-      required: ['planId', 'phase'],
-    },
-  },
-  {
-    name: 'get_phase_tree',
-    description: 'Get the hierarchical phase structure',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        includeCompleted: { type: 'boolean' },
-        maxDepth: { type: 'number' },
-      },
-      required: ['planId'],
-    },
-  },
-  {
-    name: 'update_phase_status',
-    description: 'Update phase execution status and progress',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        phaseId: { type: 'string' },
         status: { type: 'string', enum: ['planned', 'in_progress', 'completed', 'blocked', 'skipped'] },
         progress: { type: 'number', minimum: 0, maximum: 100 },
         notes: { type: 'string' },
         actualEffort: { type: 'number' },
-      },
-      required: ['planId', 'phaseId', 'status'],
-    },
-  },
-  {
-    name: 'move_phase',
-    description: 'Reorder or reparent a phase',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        phaseId: { type: 'string' },
         newParentId: { type: 'string' },
         newOrder: { type: 'number' },
-      },
-      required: ['planId', 'phaseId'],
-    },
-  },
-  {
-    name: 'delete_phase',
-    description: 'Delete a phase',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        phaseId: { type: 'string' },
         deleteChildren: { type: 'boolean' },
-      },
-      required: ['planId', 'phaseId'],
-    },
-  },
-  {
-    name: 'get_next_actions',
-    description: 'Get recommended next actions based on current state',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
+        includeCompleted: { type: 'boolean' },
+        maxDepth: { type: 'number' },
         limit: { type: 'number' },
       },
-      required: ['planId'],
+      required: ['action', 'planId'],
     },
   },
-
-  // Linking (3)
   {
-    name: 'link_entities',
-    description: 'Create a relationship between entities',
+    name: 'link',
+    description: 'Manage entity links: create, get, delete',
     inputSchema: {
       type: 'object',
       properties: {
+        action: {
+          type: 'string',
+          enum: ['create', 'get', 'delete'],
+        },
         planId: { type: 'string' },
         sourceId: { type: 'string' },
         targetId: { type: 'string' },
+        entityId: { type: 'string' },
+        linkId: { type: 'string' },
         relationType: {
           type: 'string',
-          enum: ['implements', 'depends_on', 'conflicts_with', 'alternative_to', 'derived_from', 'addresses'],
+          enum: ['implements', 'addresses', 'depends_on', 'blocks', 'alternative_to', 'supersedes', 'references', 'derived_from'],
         },
+        direction: { type: 'string', enum: ['outgoing', 'incoming', 'both'] },
         metadata: { type: 'object' },
       },
-      required: ['planId', 'sourceId', 'targetId', 'relationType'],
+      required: ['action', 'planId'],
     },
   },
   {
-    name: 'get_entity_links',
-    description: 'Get all links for an entity',
+    name: 'query',
+    description: 'Query and analyze: search, trace, validate, export, health',
     inputSchema: {
       type: 'object',
       properties: {
-        planId: { type: 'string' },
-        entityId: { type: 'string' },
-        relationType: { type: 'string' },
-        direction: { type: 'string', enum: ['outgoing', 'incoming', 'both'] },
-      },
-      required: ['planId', 'entityId'],
-    },
-  },
-  {
-    name: 'unlink_entities',
-    description: 'Remove a link between entities',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        linkId: { type: 'string' },
-        sourceId: { type: 'string' },
-        targetId: { type: 'string' },
-        relationType: { type: 'string' },
-      },
-      required: ['planId'],
-    },
-  },
-
-  // Query & Analysis (4)
-  {
-    name: 'search_entities',
-    description: 'Search across all entities in a plan',
-    inputSchema: {
-      type: 'object',
-      properties: {
+        action: {
+          type: 'string',
+          enum: ['search', 'trace', 'validate', 'export', 'health'],
+        },
         planId: { type: 'string' },
         query: { type: 'string' },
+        requirementId: { type: 'string' },
         entityTypes: { type: 'array', items: { type: 'string' } },
         filters: { type: 'object' },
-        limit: { type: 'number' },
-        offset: { type: 'number' },
-      },
-      required: ['planId', 'query'],
-    },
-  },
-  {
-    name: 'trace_requirement',
-    description: 'Trace requirement through solutions, decisions, and phases',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
-        requirementId: { type: 'string' },
-      },
-      required: ['planId', 'requirementId'],
-    },
-  },
-  {
-    name: 'validate_plan',
-    description: 'Check plan for consistency and completeness',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
         checks: { type: 'array', items: { type: 'string' } },
-      },
-      required: ['planId'],
-    },
-  },
-  {
-    name: 'export_plan',
-    description: 'Export plan to markdown or JSON',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        planId: { type: 'string' },
         format: { type: 'string', enum: ['markdown', 'json'] },
         sections: { type: 'array', items: { type: 'string' } },
         includeVersionHistory: { type: 'boolean' },
+        limit: { type: 'number' },
+        offset: { type: 'number' },
       },
-      required: ['planId', 'format'],
-    },
-  },
-
-  // System (1)
-  {
-    name: 'planning_health_check',
-    description: 'Check the health of the planning server',
-    inputSchema: {
-      type: 'object',
-      properties: {},
+      required: ['action'],
     },
   },
 ];

@@ -7,7 +7,12 @@ import {
 } from '../helpers/test-utils.js';
 
 /**
- * End-to-end test that simulates a complete planning workflow:
+ * Integration workflow test that simulates a complete planning scenario.
+ *
+ * NOTE: This test calls handleToolCall() directly, bypassing MCP transport.
+ * For E2E tests through the actual MCP protocol, see tests/e2e/mcp-all-tools.test.ts
+ *
+ * This test demonstrates a realistic workflow:
  * 1. Create a plan
  * 2. Add requirements
  * 3. Propose multiple solutions
@@ -37,8 +42,9 @@ describe('E2E: Complete Planning Workflow', () => {
   describe('Step 1: Plan Creation', () => {
     it('should create a new project plan', async () => {
       const result = await handleToolCall(
-        'create_plan',
+        'plan',
         {
+          action: 'create',
           name: 'User Authentication System',
           description: 'Implement a secure authentication system with OAuth support',
           author: 'e2e-test',
@@ -54,8 +60,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should set the plan as active', async () => {
       const result = await handleToolCall(
-        'set_active_plan',
-        { planId, workspacePath: '/e2e-test-workspace' },
+        'plan',
+        { action: 'set_active', planId, workspacePath: '/e2e-test-workspace' },
         ctx.services
       );
 
@@ -94,21 +100,21 @@ describe('E2E: Complete Planning Workflow', () => {
         {
           title: 'Session Management',
           description: 'Secure session handling with JWT tokens',
-          source: { type: 'technical' },
+          source: { type: 'derived' },
           acceptanceCriteria: [
             'JWT tokens issued on login',
             'Refresh token rotation',
             'Session revocation',
           ],
           priority: 'high',
-          category: 'security',
+          category: 'technical',
         },
       ];
 
       for (const req of requirements) {
         const result = await handleToolCall(
-          'add_requirement',
-          { planId, requirement: req },
+          'requirement',
+          { action: 'add', planId, requirement: req },
           ctx.services
         );
 
@@ -122,8 +128,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should list all requirements', async () => {
       const result = await handleToolCall(
-        'list_requirements',
-        { planId },
+        'requirement',
+        { action: 'list', planId },
         ctx.services
       );
 
@@ -193,8 +199,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
       for (const sol of solutions) {
         const result = await handleToolCall(
-          'propose_solution',
-          { planId, solution: sol },
+          'solution',
+          { action: 'propose', planId, solution: sol },
           ctx.services
         );
 
@@ -208,8 +214,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should compare all solutions', async () => {
       const result = await handleToolCall(
-        'compare_solutions',
-        { planId, solutionIds },
+        'solution',
+        { action: 'compare', planId, solutionIds },
         ctx.services
       );
 
@@ -220,11 +226,12 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should select the best solution', async () => {
       const result = await handleToolCall(
-        'select_solution',
+        'solution',
         {
+          action: 'select',
           planId,
           solutionId: solutionIds[2], // Passport.js solution
-          rationale: 'Best balance of effort, flexibility, and maintainability',
+          reason: 'Best balance of effort, flexibility, and maintainability',
         },
         ctx.services
       );
@@ -252,7 +259,7 @@ describe('E2E: Complete Planning Workflow', () => {
               reason: 'Rejected - tokens lost on tab close',
             },
           ],
-          consequences: ['Requires CSRF protection', 'More secure against XSS'],
+          consequences: 'Requires CSRF protection. More secure against XSS.',
         },
         {
           title: 'Password Hashing Algorithm',
@@ -269,14 +276,14 @@ describe('E2E: Complete Planning Workflow', () => {
               reason: 'Rejected - bcrypt more resistant to GPU attacks',
             },
           ],
-          consequences: ['Proven security', 'Good library support'],
+          consequences: 'Proven security. Good library support.',
         },
       ];
 
       for (const dec of decisions) {
         const result = await handleToolCall(
-          'record_decision',
-          { planId, decision: dec },
+          'decision',
+          { action: 'record', planId, decision: dec },
           ctx.services
         );
 
@@ -293,8 +300,9 @@ describe('E2E: Complete Planning Workflow', () => {
     it('should create implementation phases with hierarchy', async () => {
       // Create parent phase
       const mainPhaseResult = await handleToolCall(
-        'add_phase',
+        'phase',
         {
+          action: 'add',
           planId,
           phase: {
             title: 'Phase 1: Core Authentication',
@@ -340,8 +348,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
       for (const phase of subPhases) {
         const result = await handleToolCall(
-          'add_phase',
-          { planId, phase },
+          'phase',
+          { action: 'add', planId, phase },
           ctx.services
         );
 
@@ -355,8 +363,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should retrieve the phase tree', async () => {
       const result = await handleToolCall(
-        'get_phase_tree',
-        { planId },
+        'phase',
+        { action: 'get_tree', planId },
         ctx.services
       );
 
@@ -367,8 +375,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should update phase status to in_progress', async () => {
       const result = await handleToolCall(
-        'update_phase_status',
-        { planId, phaseId: phaseIds[1], status: 'in_progress' },
+        'phase',
+        { action: 'update_status', planId, phaseId: phaseIds[1], status: 'in_progress' },
         ctx.services
       );
 
@@ -380,12 +388,13 @@ describe('E2E: Complete Planning Workflow', () => {
   describe('Step 6: Entity Linking', () => {
     it('should link requirements to solutions', async () => {
       const result = await handleToolCall(
-        'link_entities',
+        'link',
         {
+          action: 'create',
           planId,
           sourceId: requirementIds[0],
           targetId: solutionIds[2],
-          relationType: 'implemented_by',
+          relationType: 'implements',
           metadata: { coverage: 'full' },
         },
         ctx.services
@@ -397,8 +406,9 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should link phases to requirements', async () => {
       const result = await handleToolCall(
-        'link_entities',
+        'link',
         {
+          action: 'create',
           planId,
           sourceId: phaseIds[1],
           targetId: requirementIds[0],
@@ -413,8 +423,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should get all links for an entity', async () => {
       const result = await handleToolCall(
-        'get_entity_links',
-        { planId, entityId: requirementIds[0] },
+        'link',
+        { action: 'get', planId, entityId: requirementIds[0] },
         ctx.services
       );
 
@@ -426,8 +436,8 @@ describe('E2E: Complete Planning Workflow', () => {
   describe('Step 7: Query and Analysis', () => {
     it('should search for authentication-related entities', async () => {
       const result = await handleToolCall(
-        'search_entities',
-        { planId, query: 'authentication' },
+        'query',
+        { action: 'search', planId, query: 'authentication' },
         ctx.services
       );
 
@@ -437,8 +447,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should trace a requirement through the plan', async () => {
       const result = await handleToolCall(
-        'trace_requirement',
-        { planId, requirementId: requirementIds[0] },
+        'query',
+        { action: 'trace', planId, requirementId: requirementIds[0] },
         ctx.services
       );
 
@@ -449,8 +459,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should validate the plan', async () => {
       const result = await handleToolCall(
-        'validate_plan',
-        { planId },
+        'query',
+        { action: 'validate', planId },
         ctx.services
       );
 
@@ -461,8 +471,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should get next actions', async () => {
       const result = await handleToolCall(
-        'get_next_actions',
-        { planId },
+        'phase',
+        { action: 'get_next_actions', planId },
         ctx.services
       );
 
@@ -474,8 +484,8 @@ describe('E2E: Complete Planning Workflow', () => {
   describe('Step 8: Plan Export', () => {
     it('should export plan as markdown', async () => {
       const result = await handleToolCall(
-        'export_plan',
-        { planId, format: 'markdown' },
+        'query',
+        { action: 'export', planId, format: 'markdown' },
         ctx.services
       );
 
@@ -487,8 +497,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should export plan as JSON', async () => {
       const result = await handleToolCall(
-        'export_plan',
-        { planId, format: 'json' },
+        'query',
+        { action: 'export', planId, format: 'json' },
         ctx.services
       );
 
@@ -501,8 +511,8 @@ describe('E2E: Complete Planning Workflow', () => {
   describe('Step 9: Plan Summary', () => {
     it('should retrieve complete plan with all entities', async () => {
       const result = await handleToolCall(
-        'get_plan',
-        { planId, includeEntities: true },
+        'plan',
+        { action: 'get', planId, includeEntities: true },
         ctx.services
       );
 
@@ -516,8 +526,8 @@ describe('E2E: Complete Planning Workflow', () => {
 
     it('should verify plan statistics', async () => {
       const result = await handleToolCall(
-        'get_plan',
-        { planId },
+        'plan',
+        { action: 'get', planId },
         ctx.services
       );
 
