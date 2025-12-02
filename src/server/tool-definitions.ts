@@ -100,7 +100,19 @@ export const tools = [
             description: { type: 'string' },
             approach: { type: 'string' },
             implementationNotes: { type: 'string' },
-            tradeoffs: { type: 'array', items: { type: 'object' } },
+            tradeoffs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  aspect: { type: 'string' },
+                  pros: { type: 'array', items: { type: 'string' } },
+                  cons: { type: 'array', items: { type: 'string' } },
+                  score: { type: 'number' },
+                },
+                required: ['aspect', 'pros', 'cons'],
+              },
+            },
             addressing: { type: 'array', items: { type: 'string' } },
             evaluation: {
               type: 'object',

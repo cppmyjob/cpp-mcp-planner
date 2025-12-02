@@ -135,6 +135,9 @@ export class SolutionService {
   }
 
   async proposeSolution(input: ProposeSolutionInput): Promise<ProposeSolutionResult> {
+    // Validate tradeoffs format
+    this.validateTradeoffs(input.solution.tradeoffs);
+
     const solutionId = uuidv4();
     const now = new Date().toISOString();
 
@@ -297,7 +300,10 @@ export class SolutionService {
     if (input.updates.approach !== undefined) solution.approach = input.updates.approach;
     if (input.updates.implementationNotes !== undefined)
       solution.implementationNotes = input.updates.implementationNotes;
-    if (input.updates.tradeoffs !== undefined) solution.tradeoffs = input.updates.tradeoffs;
+    if (input.updates.tradeoffs !== undefined) {
+      this.validateTradeoffs(input.updates.tradeoffs);
+      solution.tradeoffs = input.updates.tradeoffs;
+    }
     if (input.updates.addressing !== undefined) solution.addressing = input.updates.addressing;
     if (input.updates.evaluation !== undefined) solution.evaluation = input.updates.evaluation;
     if (input.updates.tags !== undefined) solution.metadata.tags = input.updates.tags;
@@ -350,6 +356,43 @@ export class SolutionService {
     await this.planService.updateStatistics(input.planId);
 
     return { success: true, message: 'Solution deleted' };
+  }
+
+  private validateTradeoffs(tradeoffs: unknown[]): void {
+    if (!Array.isArray(tradeoffs)) {
+      return; // Empty or not array is OK
+    }
+
+    for (let i = 0; i < tradeoffs.length; i++) {
+      const t = tradeoffs[i] as Record<string, unknown>;
+
+      // Check for invalid { pro, con } format
+      if ('pro' in t || 'con' in t) {
+        throw new Error(
+          `Invalid tradeoff format at index ${i}: found { pro, con } format. ` +
+          `Expected { aspect: string, pros: string[], cons: string[] }`
+        );
+      }
+
+      // Validate required fields
+      if (typeof t.aspect !== 'string' || !t.aspect) {
+        throw new Error(
+          `Invalid tradeoff at index ${i}: 'aspect' must be a non-empty string`
+        );
+      }
+
+      if (!Array.isArray(t.pros)) {
+        throw new Error(
+          `Invalid tradeoff at index ${i}: 'pros' must be an array of strings`
+        );
+      }
+
+      if (!Array.isArray(t.cons)) {
+        throw new Error(
+          `Invalid tradeoff at index ${i}: 'cons' must be an array of strings`
+        );
+      }
+    }
   }
 }
 

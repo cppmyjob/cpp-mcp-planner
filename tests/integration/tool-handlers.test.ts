@@ -263,6 +263,66 @@ describe('Tool Handlers Integration', () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.success).toBe(true);
     });
+
+    it('solution propose should accept valid tradeoffs format', async () => {
+      const result = await handleToolCall(
+        'solution',
+        {
+          action: 'propose',
+          planId: ctx.planId,
+          solution: {
+            title: 'Solution with tradeoffs',
+            description: 'Testing tradeoffs validation',
+            approach: 'Standard approach',
+            addressing: [],
+            tradeoffs: [
+              { aspect: 'Performance', pros: ['Fast', 'Efficient'], cons: ['Memory usage'], score: 8 },
+              { aspect: 'Maintainability', pros: ['Clean code'], cons: ['Learning curve'], score: 7 },
+            ],
+            evaluation: {
+              effortEstimate: { value: 1, unit: 'days', confidence: 'medium' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.solutionId).toBeDefined();
+      expect(parsed.solution.tradeoffs).toHaveLength(2);
+      expect(parsed.solution.tradeoffs[0].aspect).toBe('Performance');
+      expect(parsed.solution.tradeoffs[0].pros).toEqual(['Fast', 'Efficient']);
+      expect(parsed.solution.tradeoffs[0].cons).toEqual(['Memory usage']);
+    });
+
+    it('solution propose should reject invalid tradeoffs format { pro, con }', async () => {
+      await expect(
+        handleToolCall(
+          'solution',
+          {
+            action: 'propose',
+            planId: ctx.planId,
+            solution: {
+              title: 'Solution with invalid tradeoffs',
+              description: 'Should fail',
+              approach: 'Approach',
+              addressing: [],
+              tradeoffs: [
+                { pro: 'Some benefit', con: 'Some drawback' }, // Invalid format!
+              ],
+              evaluation: {
+                effortEstimate: { value: 1, unit: 'days', confidence: 'medium' },
+                technicalFeasibility: 'high',
+                riskAssessment: 'Low',
+              },
+            },
+          },
+          ctx.services
+        )
+      ).rejects.toThrow(/tradeoff|aspect|pros|cons/i);
+    });
   });
 
   describe('Decision Tools', () => {
@@ -549,6 +609,46 @@ describe('Tool Handlers Integration', () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.format).toBe('json');
+    });
+
+    it('query export markdown should include tradeoffs correctly', async () => {
+      // Create solution with tradeoffs
+      await handleToolCall(
+        'solution',
+        {
+          action: 'propose',
+          planId: ctx.planId,
+          solution: {
+            title: 'Solution for export test',
+            description: 'Testing markdown export',
+            approach: 'Standard approach',
+            addressing: [],
+            tradeoffs: [
+              { aspect: 'Performance', pros: ['Fast', 'Scalable'], cons: ['Memory heavy'], score: 8 },
+            ],
+            evaluation: {
+              effortEstimate: { value: 1, unit: 'days', confidence: 'medium' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        },
+        ctx.services
+      );
+
+      const result = await handleToolCall(
+        'query',
+        { action: 'export', planId: ctx.planId, format: 'markdown' },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.format).toBe('markdown');
+      expect(parsed.content).toContain('Trade-offs');
+      expect(parsed.content).toContain('Performance');
+      expect(parsed.content).toContain('Fast');
+      expect(parsed.content).toContain('Scalable');
+      expect(parsed.content).toContain('Memory heavy');
     });
 
     it('query health should return status', async () => {
