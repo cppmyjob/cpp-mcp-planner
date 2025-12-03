@@ -1,33 +1,68 @@
 # MCP Planning Server
 
-A Model Context Protocol (MCP) server for Claude Code that provides structured task planning and tracking capabilities.
+MCP server for Claude Code that helps organize and track software development tasks.
 
-## Features
+## What is this?
 
-- **40 planning tools** organized into 8 categories
-- **File-based JSON storage** with atomic writes
-- **Hierarchical phases** with progress tracking
-- **Requirement traceability** from definition to implementation
-- **Decision records** (ADR-style) with supersede support
-- **Solution comparison** with tradeoff analysis
+This is a plugin for Claude Code (Anthropic's AI coding assistant). It adds planning tools that help:
+- Break down complex tasks into steps
+- Track what's done and what's next
+- Record technical decisions
+- Compare different solution approaches
+
+## Prerequisites
+
+Before installing, make sure you have:
+- **Node.js** (version 18 or higher) - download from https://nodejs.org
+- **Claude Code** - the CLI tool from Anthropic
+
+To check if Node.js is installed, run in terminal:
+```bash
+node --version
+```
 
 ## Installation
 
+1. Clone or download this repository
+
+2. Open terminal in the project folder
+
+3. Install dependencies:
 ```bash
 npm install
+```
+
+4. Build the project:
+```bash
 npm run build
 ```
 
+After build, you should see a `dist` folder with compiled files.
+
 ## Configuration
 
-Add to your Claude Code MCP settings:
+To use this server with Claude Code, you need to add it to MCP settings.
+
+### Step 1: Find your settings file
+
+Settings can be placed in one of these locations:
+
+| Location | File path | Use case |
+|----------|-----------|----------|
+| Project (private) | `.claude/settings.local.json` | Only for you, not shared |
+| Project (shared) | `.claude/settings.json` | Shared with team via git |
+| Global | `~/.claude/settings.json` | All your projects |
+
+### Step 2: Add server configuration
+
+Open or create the settings file and add:
 
 ```json
 {
   "mcpServers": {
     "planning": {
       "command": "node",
-      "args": ["path/to/planner/dist/index.js"],
+      "args": ["FULL_PATH_TO/planner/dist/index.js"],
       "env": {
         "MCP_PLANNING_STORAGE_PATH": "./.mcp-plans"
       }
@@ -36,9 +71,15 @@ Add to your Claude Code MCP settings:
 }
 ```
 
-### Disabling Permission Prompts
+**Important:** Replace `FULL_PATH_TO` with the actual path to this folder.
 
-By default, Claude Code asks for confirmation before each MCP tool use. To allow all planning tools without prompts, add to your settings:
+Example paths:
+- Windows: `D:/Projects/planner/dist/index.js`
+- Mac/Linux: `/home/user/projects/planner/dist/index.js`
+
+### Step 3 (Optional): Allow tools without confirmation
+
+By default, Claude Code asks permission for each tool use. To skip confirmation for planning tools, add this section to your settings file:
 
 ```json
 {
@@ -50,84 +91,103 @@ By default, Claude Code asks for confirmation before each MCP tool use. To allow
 }
 ```
 
-Settings locations (in order of priority):
-- **Project-local:** `.claude/settings.local.json` — for this project only, not committed to git
-- **Project-shared:** `.claude/settings.json` — shared with team via git
-- **Global:** `~/.claude/settings.json` — applies to all your projects
+Your complete settings file will look like this:
 
-**Note:** MCP permissions do NOT support wildcards. Use `mcp__planning` (not `mcp__planning__*`) to allow all tools from this server.
+```json
+{
+  "mcpServers": {
+    "planning": {
+      "command": "node",
+      "args": ["FULL_PATH_TO/planner/dist/index.js"],
+      "env": {
+        "MCP_PLANNING_STORAGE_PATH": "./.mcp-plans"
+      }
+    }
+  },
+  "permissions": {
+    "allow": [
+      "mcp__planning"
+    ]
+  }
+}
+```
 
-## Usage
+**Note:** Use exactly `mcp__planning` (not `mcp__planning__*`). Wildcards are not supported.
 
-### Creating a Plan
+## How to use
 
-Simply describe your task to Claude Code. The assistant will automatically create a plan:
+Once configured, just talk to Claude Code naturally.
 
-> "I need to build a user authentication system with OAuth support"
+### Starting a new plan
 
-Claude Code will:
-1. Create a new plan
-2. Add requirements based on your description
-3. Propose solutions with tradeoffs
-4. Break down implementation into phases
+Tell Claude Code what you want to build:
 
-### Tracking Progress
+> "I need to build a user login system"
 
-As you work, Claude Code updates the plan:
+Claude Code will automatically:
+1. Create a plan
+2. Add requirements
+3. Suggest solutions
+4. Break work into phases
 
-> "I've finished implementing the login form"
+### Checking progress
 
-The assistant will mark the corresponding phase as complete and suggest next actions.
-
-### Viewing Plan Status
-
-Ask about your current progress:
+Ask Claude Code about your plan:
 
 > "What's the status of my plan?"
 > "What should I work on next?"
 
-## Tool Categories
+### Updating progress
 
-| Category | Tools | Description |
-|----------|-------|-------------|
-| Plan Management | 7 | Create, list, get, update, archive plans |
-| Requirements | 5 | Manage requirements with priorities and acceptance criteria |
-| Solutions | 6 | Propose, compare, and select solutions |
-| Decisions | 4 | Record architectural decisions (ADR) |
-| Phases | 6 | Hierarchical implementation phases |
-| Linking | 3 | Entity relationships with cycle detection |
-| Query | 4 | Search, trace, validate, export |
-| System | 1 | Health check |
+Tell Claude Code when you finish something:
 
-## Storage
+> "I finished the login form"
 
-Plans are stored as JSON files in the configured storage path:
+Claude Code will update the plan and suggest what to do next.
+
+## Available tools
+
+The server provides tools in 8 categories:
+
+| Category | Description |
+|----------|-------------|
+| Plan | Create and manage plans |
+| Requirement | Define what needs to be built |
+| Solution | Compare different approaches |
+| Decision | Record technical choices |
+| Phase | Break work into steps |
+| Link | Connect related items |
+| Query | Search and analyze plans |
+| Artifact | Store code and configs |
+
+## Where plans are stored
+
+Plans are saved as JSON files:
 
 ```
 .mcp-plans/
-├── plans/
-│   └── {plan-id}/
-│       ├── manifest.json
-│       ├── requirements.json
-│       ├── solutions.json
-│       ├── decisions.json
-│       ├── phases.json
-│       └── links.json
-└── active-plans.json
+  plans/
+    {plan-id}/
+      manifest.json
+      requirements.json
+      solutions.json
+      decisions.json
+      phases.json
+      links.json
+      artifacts.json
+  active-plans.json
 ```
 
-## Development
+## Troubleshooting
 
-```bash
-# Run tests
-npm test
+**Claude Code doesn't see the planning tools**
+- Check that the path in settings is correct
+- Make sure you ran `npm run build`
+- Restart Claude Code after changing settings
 
-# Build
-npm run build
-
-# Type check
-npx tsc --noEmit
-```
+**Permission errors**
+- Check that the storage path is writable
+- On Windows, avoid paths with spaces if possible
 
 ## License
 
