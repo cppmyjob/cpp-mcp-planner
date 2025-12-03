@@ -141,7 +141,7 @@ export const tools = [
                   type: 'object',
                   properties: {
                     value: { type: 'number' },
-                    unit: { type: 'string', enum: ['hours', 'days', 'weeks', 'story-points'] },
+                    unit: { type: 'string', enum: ['minutes', 'hours', 'days', 'weeks', 'story-points'] },
                     confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
                   },
                   required: ['value', 'unit', 'confidence'],
@@ -226,7 +226,7 @@ export const tools = [
               type: 'object',
               properties: {
                 value: { type: 'number' },
-                unit: { type: 'string', enum: ['hours', 'days', 'weeks', 'story-points'] },
+                unit: { type: 'string', enum: ['minutes', 'hours', 'days', 'weeks', 'story-points'] },
                 confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
               },
               required: ['value', 'unit', 'confidence'],
