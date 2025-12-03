@@ -138,6 +138,9 @@ export async function handleToolCall(
           case 'get_tree':
             result = await phaseService.getPhaseTree(args as any);
             break;
+          case 'update':
+            result = await phaseService.updatePhase(args as any);
+            break;
           case 'update_status':
             result = await phaseService.updatePhaseStatus(args as any);
             break;
