@@ -66,7 +66,7 @@ export interface Tradeoff {
 
 export interface EffortEstimate {
   value: number;
-  unit: 'hours' | 'days' | 'weeks' | 'story-points';
+  unit: 'minutes' | 'hours' | 'days' | 'weeks' | 'story-points';
   confidence: 'low' | 'medium' | 'high';
 }
 

@@ -101,6 +101,27 @@ describe('Validators', () => {
       expect(() => validateEffortEstimate(undefined)).not.toThrow();
       expect(() => validateEffortEstimate(null)).not.toThrow();
     });
+
+    it('should accept minutes as valid unit', () => {
+      expect(() =>
+        validateEffortEstimate({ value: 30, unit: 'minutes', confidence: 'high' })
+      ).not.toThrow();
+    });
+
+    it('should accept all valid units', () => {
+      const validUnits = ['minutes', 'hours', 'days', 'weeks', 'story-points'];
+      for (const unit of validUnits) {
+        expect(() =>
+          validateEffortEstimate({ value: 1, unit, confidence: 'medium' })
+        ).not.toThrow();
+      }
+    });
+
+    it('should throw for invalid unit', () => {
+      expect(() =>
+        validateEffortEstimate({ value: 1, unit: 'seconds', confidence: 'high' })
+      ).toThrow(/unit.*must be one of/);
+    });
   });
 
   describe('validateAlternativesConsidered', () => {

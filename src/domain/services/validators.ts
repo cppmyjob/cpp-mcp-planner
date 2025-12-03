@@ -2,7 +2,7 @@
  * Common validation functions for entity fields
  */
 
-const VALID_EFFORT_UNITS = ['hours', 'days', 'weeks', 'story-points'] as const;
+const VALID_EFFORT_UNITS = ['minutes', 'hours', 'days', 'weeks', 'story-points'] as const;
 const VALID_CONFIDENCE_LEVELS = ['low', 'medium', 'high'] as const;
 const VALID_ARTIFACT_TYPES = ['code', 'config', 'migration', 'documentation', 'test', 'script', 'other'] as const;
 const VALID_FILE_ACTIONS = ['create', 'modify', 'delete'] as const;
@@ -18,7 +18,7 @@ export function validateEffortEstimate(effort: unknown, fieldName = 'effortEstim
   if ('hours' in e || 'complexity' in e) {
     throw new Error(
       `Invalid ${fieldName} format: found legacy { hours, complexity } format. ` +
-      `Expected { value: number, unit: 'hours'|'days'|'weeks'|'story-points', confidence: 'low'|'medium'|'high' }`
+      `Expected { value: number, unit: 'minutes'|'hours'|'days'|'weeks'|'story-points', confidence: 'low'|'medium'|'high' }`
     );
   }
 
