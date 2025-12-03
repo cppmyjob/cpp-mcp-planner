@@ -31,6 +31,49 @@ describe('PhaseService', () => {
     await fs.rm(testDir, { recursive: true, force: true });
   });
 
+  describe('get_phase', () => {
+    it('should get phase by id', async () => {
+      const added = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'A test phase',
+          objectives: ['Test objective'],
+          deliverables: ['Test deliverable'],
+          successCriteria: ['Test passes'],
+        },
+      });
+
+      const result = await service.getPhase({
+        planId,
+        phaseId: added.phaseId,
+      });
+
+      expect(result.phase).toBeDefined();
+      expect(result.phase.id).toBe(added.phaseId);
+      expect(result.phase.title).toBe('Test Phase');
+      expect(result.phase.description).toBe('A test phase');
+    });
+
+    it('should throw error for non-existent phase', async () => {
+      await expect(
+        service.getPhase({
+          planId,
+          phaseId: 'non-existent-id',
+        })
+      ).rejects.toThrow('Phase not found');
+    });
+
+    it('should throw error for non-existent plan', async () => {
+      await expect(
+        service.getPhase({
+          planId: 'non-existent-plan',
+          phaseId: 'some-id',
+        })
+      ).rejects.toThrow();
+    });
+  });
+
   describe('add_phase', () => {
     it('should add a root phase', async () => {
       const result = await service.addPhase({

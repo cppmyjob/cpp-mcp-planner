@@ -82,7 +82,7 @@ describe('E2E: MCP Server Discovery & Errors', () => {
         requirement: ['add', 'get', 'update', 'list', 'delete'],
         solution: ['propose', 'get', 'update', 'compare', 'select', 'delete'],
         decision: ['record', 'get', 'list', 'supersede'],
-        phase: ['add', 'get_tree', 'update_status', 'move', 'delete', 'get_next_actions'],
+        phase: ['add', 'get', 'get_tree', 'update_status', 'move', 'delete', 'get_next_actions'],
         artifact: ['add', 'get', 'update', 'list', 'delete'],
         link: ['create', 'get', 'delete'],
         query: ['search', 'trace', 'validate', 'export', 'health'],

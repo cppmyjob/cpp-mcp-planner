@@ -203,13 +203,13 @@ export const tools = [
   },
   {
     name: 'phase',
-    description: 'Manage implementation phases/tasks in hierarchical structure. Break selected solutions into phases with objectives, deliverables, and estimates. Track progress, update status (planned/in_progress/completed/blocked), and get next actionable items. Use after solution selection. Actions: add, get_tree, update_status, move, delete, get_next_actions.',
+    description: 'Manage implementation phases/tasks in hierarchical structure. Break selected solutions into phases with objectives, deliverables, and estimates. Track progress, update status (planned/in_progress/completed/blocked), and get next actionable items. Use after solution selection. Actions: add, get, get_tree, update_status, move, delete, get_next_actions.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['add', 'get_tree', 'update_status', 'move', 'delete', 'get_next_actions'],
+          enum: ['add', 'get', 'get_tree', 'update_status', 'move', 'delete', 'get_next_actions'],
         },
         planId: { type: 'string' },
         phaseId: { type: 'string' },
