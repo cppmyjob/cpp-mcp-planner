@@ -56,6 +56,15 @@ export interface MovePhaseInput {
   newOrder?: number;
 }
 
+export interface GetPhaseInput {
+  planId: string;
+  phaseId: string;
+}
+
+export interface GetPhaseResult {
+  phase: Phase;
+}
+
 export interface GetPhaseTreeInput {
   planId: string;
   rootPhaseId?: string;
@@ -148,6 +157,26 @@ export class PhaseService {
     private storage: FileStorage,
     private planService: PlanService
   ) {}
+
+  private async ensurePlanExists(planId: string): Promise<void> {
+    const exists = await this.storage.planExists(planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+  }
+
+  async getPhase(input: GetPhaseInput): Promise<GetPhaseResult> {
+    await this.ensurePlanExists(input.planId);
+
+    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const phase = phases.find((p) => p.id === input.phaseId);
+
+    if (!phase) {
+      throw new Error('Phase not found');
+    }
+
+    return { phase };
+  }
 
   async addPhase(input: AddPhaseInput): Promise<AddPhaseResult> {
     // Validate estimatedEffort format (support both direct and schedule.estimatedEffort)
