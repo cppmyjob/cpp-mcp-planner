@@ -69,6 +69,8 @@ export interface GetPhaseTreeInput {
   planId: string;
   rootPhaseId?: string;
   includeCompleted?: boolean;
+  fields?: string[];  // Summary by default; ['*'] for all, or specific fields
+  maxDepth?: number;  // Limit tree depth (0 = root only)
 }
 
 export interface DeletePhaseInput {
@@ -109,9 +111,21 @@ export interface GetNextActionsResult {
   };
 }
 
+// Summary phase contains only essential fields for tree navigation
+export interface PhaseSummary {
+  id: string;
+  title: string;
+  status: string;
+  progress: number;
+  path: string;
+  childCount: number;
+  // Additional fields when requested via fields parameter
+  [key: string]: unknown;
+}
+
 // Output types
 export interface PhaseTreeNode {
-  phase: Phase;
+  phase: Phase | PhaseSummary;
   children: PhaseTreeNode[];
   depth: number;
   hasChildren: boolean;
@@ -356,17 +370,62 @@ export class PhaseService {
       phases = phases.filter((p) => p.status !== 'completed');
     }
 
-    const buildTree = (parentId: string | null, depth: number): PhaseTreeNode[] => {
+    const requestedFields = input.fields || [];
+    const isFullMode = requestedFields.includes('*');
+
+    // Pre-calculate child counts for all phases
+    const childCounts = new Map<string | null, number>();
+    for (const p of phases) {
+      const parentKey = p.parentId ?? null;
+      childCounts.set(parentKey, (childCounts.get(parentKey) || 0) + 1);
+    }
+
+    // Build phase data based on fields parameter
+    const buildPhaseData = (phase: Phase): Phase | PhaseSummary => {
+      if (isFullMode) {
+        // Return full phase with childCount added
+        return {
+          ...phase,
+          childCount: childCounts.get(phase.id) || 0,
+        } as Phase & { childCount: number };
+      }
+
+      // Summary mode: only essential fields + requested additional fields
+      const summary: PhaseSummary = {
+        id: phase.id,
+        title: phase.title,
+        status: phase.status,
+        progress: phase.progress,
+        path: phase.path,
+        childCount: childCounts.get(phase.id) || 0,
+      };
+
+      // Add requested additional fields (ignore unknown fields)
+      for (const field of requestedFields) {
+        if (field in phase) {
+          summary[field] = (phase as unknown as Record<string, unknown>)[field];
+        }
+      }
+
+      return summary;
+    };
+
+    const buildTree = (parentId: string | null, currentDepth: number): PhaseTreeNode[] => {
       return phases
         .filter((p) => p.parentId === parentId)
         .sort((a, b) => a.order - b.order)
         .map((phase) => {
-          const children = buildTree(phase.id, depth + 1);
+          const hasChildPhases = (childCounts.get(phase.id) || 0) > 0;
+
+          // Respect maxDepth: truncate children if we've reached the limit
+          const shouldTruncate = input.maxDepth !== undefined && currentDepth >= input.maxDepth;
+          const children = shouldTruncate ? [] : buildTree(phase.id, currentDepth + 1);
+
           return {
-            phase,
+            phase: buildPhaseData(phase),
             children,
-            depth,
-            hasChildren: children.length > 0,
+            depth: currentDepth,
+            hasChildren: hasChildPhases,  // True even if children truncated by maxDepth
           };
         });
     };
