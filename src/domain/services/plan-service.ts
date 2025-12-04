@@ -11,6 +11,8 @@ import type {
   Artifact,
   Link,
 } from '../entities/types.js';
+import type { UsageGuide } from '../entities/usage-guide.js';
+import { DEFAULT_USAGE_GUIDE } from '../constants/default-usage-guide.js';
 
 // Input types
 export interface CreatePlanInput {
@@ -54,6 +56,7 @@ export interface SetActivePlanInput {
 
 export interface GetActivePlanInput {
   workspacePath?: string;
+  includeGuide?: boolean;
 }
 
 // Output types
@@ -113,6 +116,7 @@ export interface GetActivePlanResult {
     planId: string;
     plan: PlanManifest;
     lastUpdated: string;
+    usageGuide?: UsageGuide;
   } | null;
 }
 
@@ -344,6 +348,7 @@ export class PlanService {
 
   async getActivePlan(input: GetActivePlanInput): Promise<GetActivePlanResult> {
     const workspacePath = input.workspacePath || process.cwd();
+    const includeGuide = input.includeGuide !== false; // Default: true
     const activePlans = await this.storage.loadActivePlans();
 
     const mapping = activePlans[workspacePath];
@@ -353,13 +358,22 @@ export class PlanService {
 
     try {
       const manifest = await this.storage.loadManifest(mapping.planId);
-      return {
+
+      // Build response with optional guide
+      const response: GetActivePlanResult = {
         activePlan: {
           planId: mapping.planId,
           plan: manifest,
           lastUpdated: mapping.lastUpdated,
         },
       };
+
+      // Add usage guide if requested
+      if (includeGuide) {
+        response.activePlan!.usageGuide = DEFAULT_USAGE_GUIDE;
+      }
+
+      return response;
     } catch {
       // Plan was deleted, clear mapping
       delete activePlans[workspacePath];
