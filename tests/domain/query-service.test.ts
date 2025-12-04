@@ -288,7 +288,7 @@ describe('QueryService', () => {
         },
       });
 
-      const result = await queryService.validatePlan({ planId });
+      const result = await queryService.validatePlan({ planId, validationLevel: 'strict' });
 
       expect(result.issues.some((i) => i.type === 'orphan_solution')).toBe(true);
     });
@@ -308,6 +308,596 @@ describe('QueryService', () => {
       expect(result.checksPerformed).toContain('orphan_solutions');
       expect(result.checksPerformed).toContain('missing_decisions');
       expect(result.checksPerformed).toContain('broken_links');
+    });
+
+    // RED TEST 1: Phase status logic - child completed but parent planned
+    it('should detect child.status=completed but parent.status=planned', async () => {
+      const { phaseId: parentId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Parent Phase',
+          description: 'Parent',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      const { phaseId: childId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Child Phase',
+          description: 'Child',
+          parentId,
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      // Set child to completed
+      await phaseService.updatePhaseStatus({ planId, phaseId: childId, status: 'completed', progress: 100 });
+
+      const result = await queryService.validatePlan({ planId });
+
+      const issue = result.issues.find(i => i.type === 'invalid_phase_status' && i.entityId === childId);
+      expect(issue).toBeDefined();
+      expect(issue!.severity).toBe('error');
+      expect(issue!.message).toContain('Child Phase');
+      expect(issue!.message).toContain('completed');
+      expect(issue!.message).toContain('Parent Phase');
+      expect(issue!.message).toContain('planned');
+    });
+
+    // RED TEST 2: Phase status logic - child in_progress but parent planned
+    it('should detect child.status=in_progress but parent.status=planned', async () => {
+      const { phaseId: parentId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Parent Phase',
+          description: 'Parent',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      const { phaseId: childId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Child Phase',
+          description: 'Child',
+          parentId,
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      // Set child to in_progress
+      await phaseService.updatePhaseStatus({ planId, phaseId: childId, status: 'in_progress', progress: 50 });
+
+      const result = await queryService.validatePlan({ planId, validationLevel: 'strict' });
+
+      const issue = result.issues.find(i => i.type === 'invalid_phase_status' && i.entityId === childId);
+      expect(issue).toBeDefined();
+      expect(issue!.severity).toBe('warning');
+      expect(issue!.message).toContain('in progress');
+      expect(issue!.message).toContain('planned');
+    });
+
+    // GREEN TEST 3: Phase status logic - child completed and parent completed (valid)
+    it('should pass validation for child.status=completed and parent.status=completed', async () => {
+      const { phaseId: parentId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Parent Phase',
+          description: 'Parent',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      const { phaseId: childId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Child Phase',
+          description: 'Child',
+          parentId,
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      // Set both to completed
+      await phaseService.updatePhaseStatus({ planId, phaseId: childId, status: 'completed', progress: 100 });
+      await phaseService.updatePhaseStatus({ planId, phaseId: parentId, status: 'completed', progress: 100 });
+
+      const result = await queryService.validatePlan({ planId });
+
+      const statusIssues = result.issues.filter(i => i.type === 'invalid_phase_status' && i.entityId === childId);
+      expect(statusIssues.length).toBe(0);
+    });
+
+    // GREEN TEST 4: Phase status logic - child in_progress and parent in_progress (valid)
+    it('should pass validation for child.status=in_progress and parent.status=in_progress', async () => {
+      const { phaseId: parentId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Parent Phase',
+          description: 'Parent',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      const { phaseId: childId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Child Phase',
+          description: 'Child',
+          parentId,
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      // Set both to in_progress
+      await phaseService.updatePhaseStatus({ planId, phaseId: parentId, status: 'in_progress', progress: 50 });
+      await phaseService.updatePhaseStatus({ planId, phaseId: childId, status: 'in_progress', progress: 30 });
+
+      const result = await queryService.validatePlan({ planId });
+
+      const statusIssues = result.issues.filter(i => i.type === 'invalid_phase_status' && i.entityId === childId);
+      expect(statusIssues.length).toBe(0);
+    });
+
+    // RED TEST 5: All children completed but parent not completed
+    it('should detect all children completed but parent.status!=completed', async () => {
+      const { phaseId: parentId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Parent Phase',
+          description: 'Parent',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      // Create 3 child phases
+      const childIds = [];
+      for (let i = 1; i <= 3; i++) {
+        const { phaseId } = await phaseService.addPhase({
+          planId,
+          phase: {
+            title: `Child Phase ${i}`,
+            description: `Child ${i}`,
+            parentId,
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+        childIds.push(phaseId);
+      }
+
+      // Set all children to completed
+      for (const childId of childIds) {
+        await phaseService.updatePhaseStatus({ planId, phaseId: childId, status: 'completed', progress: 100 });
+      }
+
+      // Parent remains in_progress
+      await phaseService.updatePhaseStatus({ planId, phaseId: parentId, status: 'in_progress', progress: 80 });
+
+      const result = await queryService.validatePlan({ planId, validationLevel: 'strict' });
+
+      const issue = result.issues.find(i => i.type === 'parent_should_complete' && i.entityId === parentId);
+      expect(issue).toBeDefined();
+      expect(issue!.severity).toBe('info');
+      expect(issue!.message).toContain('all children completed');
+      expect(issue!.message).toContain('Parent Phase');
+    });
+
+    // RED TEST 6: File existence - detect missing file in artifact.fileTable
+    it('should detect missing file in artifact.fileTable', async () => {
+      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(storage, planService);
+
+      await artifactService.addArtifact({
+        planId,
+        artifact: {
+          title: 'Code Artifact',
+          description: 'Implementation',
+          artifactType: 'code',
+          fileTable: [
+            { path: '/absolute/nonexistent.ts', action: 'modify', description: 'Nonexistent file' },
+          ],
+        },
+      });
+
+      const result = await queryService.validatePlan({ planId, validationLevel: 'strict' });
+
+      const issue = result.issues.find(i => i.type === 'missing_file');
+      expect(issue).toBeDefined();
+      expect(issue!.severity).toBe('warning');
+      expect(issue!.filePath).toBe('/absolute/nonexistent.ts');
+      expect(issue!.message).toContain('/absolute/nonexistent.ts');
+      expect(issue!.message).toContain('modify');
+    });
+
+    // GREEN TEST 7: File existence - skip files with action='create'
+    it('should NOT check files with action=create (will be created)', async () => {
+      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(storage, planService);
+
+      await artifactService.addArtifact({
+        planId,
+        artifact: {
+          title: 'New Code',
+          description: 'New implementation',
+          artifactType: 'code',
+          fileTable: [
+            { path: '/new-file.ts', action: 'create', description: 'Will be created' },
+          ],
+        },
+      });
+
+      const result = await queryService.validatePlan({ planId });
+
+      const missingFileIssues = result.issues.filter(i => i.type === 'missing_file');
+      expect(missingFileIssues.length).toBe(0);
+    });
+
+    // RED TEST 8: File existence - check files with action='modify' exist
+    it('should check that files with action=modify exist', async () => {
+      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(storage, planService);
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const os = await import('os');
+
+      // Create a real temp file
+      const tmpDir = path.join(os.tmpdir(), `mcp-test-${Date.now()}`);
+      await fs.mkdir(tmpDir, { recursive: true });
+      const tmpFile = path.join(tmpDir, 'existing.ts');
+      await fs.writeFile(tmpFile, 'content');
+
+      try {
+        await artifactService.addArtifact({
+          planId,
+          artifact: {
+            title: 'Modify Existing',
+            description: 'Modify existing file',
+            artifactType: 'code',
+            fileTable: [
+              { path: tmpFile, action: 'modify', description: 'Existing file' },
+            ],
+          },
+        });
+
+        const result = await queryService.validatePlan({ planId });
+
+        const missingFileIssue = result.issues.find(i => i.type === 'missing_file' && i.filePath === tmpFile);
+        expect(missingFileIssue).toBeUndefined();
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    // GREEN TEST 9: File existence - skip check if artifact.fileTable is undefined
+    it('should skip file check if artifact.fileTable is undefined', async () => {
+      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(storage, planService);
+
+      await artifactService.addArtifact({
+        planId,
+        artifact: {
+          title: 'No File Table',
+          description: 'Artifact without fileTable',
+          artifactType: 'documentation',
+        },
+      });
+
+      const result = await queryService.validatePlan({ planId });
+
+      const missingFileIssues = result.issues.filter(i => i.type === 'missing_file');
+      expect(missingFileIssues.length).toBe(0);
+    });
+
+    // RED TEST 11: Requirement coverage - solution.status='selected' without implementing phases
+    it('should detect solution.status=selected without implementing phases', async () => {
+      const { requirementId } = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Req',
+          source: { type: 'user-request' },
+          priority: 'high',
+          category: 'functional',
+          acceptanceCriteria: [],
+        },
+      });
+
+      const { solutionId } = await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Selected Solution',
+          description: 'Sol',
+          addressing: [requirementId],
+          approach: 'Approach',
+          tradeoffs: [],
+          evaluation: {
+            effortEstimate: { value: 1, unit: 'hours', confidence: 'medium' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Low risk',
+          },
+        },
+      });
+
+      // Select the solution
+      await solutionService.selectSolution({ planId, solutionId, reason: 'Best approach' });
+
+      // Create link
+      const linkingService = new (await import('../../src/domain/services/linking-service.js')).LinkingService(storage);
+      await linkingService.linkEntities({
+        planId,
+        sourceId: solutionId,
+        targetId: requirementId,
+        relationType: 'implements',
+      });
+
+      // NO phases created -> issue expected
+
+      const result = await queryService.validatePlan({ planId, validationLevel: 'strict' });
+
+      const issue = result.issues.find(i => i.type === 'unimplemented_solution' && i.entityId === solutionId);
+      expect(issue).toBeDefined();
+      expect(issue!.severity).toBe('warning');
+      expect(issue!.message).toContain('Selected Solution');
+      expect(issue!.message).toContain('no implementing phases');
+    });
+
+    // GREEN TEST 12: Requirement coverage - solution with implementing phase passes
+    it('should pass validation for solution with implementing phase', async () => {
+      const { requirementId } = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Req',
+          source: { type: 'user-request' },
+          priority: 'high',
+          category: 'functional',
+          acceptanceCriteria: [],
+        },
+      });
+
+      const { solutionId } = await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Selected Solution',
+          description: 'Sol',
+          addressing: [requirementId],
+          approach: 'Approach',
+          tradeoffs: [],
+          evaluation: {
+            effortEstimate: { value: 1, unit: 'hours', confidence: 'medium' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Low risk',
+          },
+        },
+      });
+
+      await solutionService.selectSolution({ planId, solutionId, reason: 'Best' });
+
+      // Create phase
+      const { phaseId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Implementation Phase',
+          description: 'Implements requirement',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      // Link phase to requirement
+      const linkingService = new (await import('../../src/domain/services/linking-service.js')).LinkingService(storage);
+      await linkingService.linkEntities({
+        planId,
+        sourceId: phaseId,
+        targetId: requirementId,
+        relationType: 'addresses',
+      });
+
+      const result = await queryService.validatePlan({ planId });
+
+      const unimplementedIssues = result.issues.filter(i => i.type === 'unimplemented_solution' && i.entityId === solutionId);
+      expect(unimplementedIssues.length).toBe(0);
+    });
+
+    // GREEN TEST 13: Requirement coverage - ignore solution.status='proposed' (not selected)
+    it('should ignore solution.status=proposed (not selected)', async () => {
+      const { requirementId } = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Req',
+          source: { type: 'user-request' },
+          priority: 'high',
+          category: 'functional',
+          acceptanceCriteria: [],
+        },
+      });
+
+      await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Proposed Solution',
+          description: 'Not selected',
+          addressing: [requirementId],
+          approach: 'Approach',
+          tradeoffs: [],
+          evaluation: {
+            effortEstimate: { value: 1, unit: 'hours', confidence: 'medium' },
+            technicalFeasibility: 'medium',
+            riskAssessment: 'Low risk',
+          },
+        },
+      });
+
+      // Solution remains 'proposed', not selected -> no issue expected
+
+      const result = await queryService.validatePlan({ planId });
+
+      const unimplementedIssues = result.issues.filter(i => i.type === 'unimplemented_solution');
+      expect(unimplementedIssues.length).toBe(0);
+    });
+
+    // RED TEST 14: Validation level - ValidatePlanInput accepts validationLevel
+    it('should accept validationLevel parameter in ValidatePlanInput', async () => {
+      // This test verifies TypeScript compilation
+      const input: import('../../src/domain/services/query-service.js').ValidatePlanInput = {
+        planId,
+        validationLevel: 'strict',
+      };
+
+      expect(input.validationLevel).toBe('strict');
+    });
+
+    // RED TEST 15: Validation level - basic returns only severity='error'
+    it('should return only severity=error when validationLevel=basic', async () => {
+      // Create issues with different severities
+      // Error: uncovered requirement
+      await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Uncovered Req',
+          description: 'No solution',
+          source: { type: 'user-request' },
+          priority: 'high',
+          category: 'functional',
+          acceptanceCriteria: [],
+        },
+      });
+
+      // Warning: child in_progress, parent planned
+      const { phaseId: parentId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Parent',
+          description: 'Parent',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      const { phaseId: childId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Child',
+          description: 'Child',
+          parentId,
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await phaseService.updatePhaseStatus({ planId, phaseId: childId, status: 'in_progress', progress: 50 });
+
+      const result = await queryService.validatePlan({ planId, validationLevel: 'basic' });
+
+      expect(result.issues.every(i => i.severity === 'error')).toBe(true);
+      expect(result.summary.errors).toBeGreaterThan(0);
+      expect(result.summary.warnings).toBe(0);
+      expect(result.summary.infos).toBe(0);
+    });
+
+    // RED TEST 16: Validation level - strict returns ALL issues
+    it('should return ALL issues when validationLevel=strict', async () => {
+      // Create issues with different severities
+      // Error: uncovered requirement
+      await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Uncovered Req',
+          description: 'No solution',
+          source: { type: 'user-request' },
+          priority: 'high',
+          category: 'functional',
+          acceptanceCriteria: [],
+        },
+      });
+
+      // Warning: child in_progress, parent planned
+      const { phaseId: parentId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Parent',
+          description: 'Parent',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      const { phaseId: childId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Child',
+          description: 'Child',
+          parentId,
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await phaseService.updatePhaseStatus({ planId, phaseId: childId, status: 'in_progress', progress: 50 });
+
+      const result = await queryService.validatePlan({ planId, validationLevel: 'strict' });
+
+      expect(result.summary.errors).toBeGreaterThan(0);
+      expect(result.summary.warnings).toBeGreaterThan(0);
+    });
+
+    // GREEN TEST 17: Validation level - default is 'basic'
+    it('should use validationLevel=basic by default', async () => {
+      // Create a warning issue: child in_progress, parent planned
+      const { phaseId: parentId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Parent',
+          description: 'Parent',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      const { phaseId: childId } = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Child',
+          description: 'Child',
+          parentId,
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await phaseService.updatePhaseStatus({ planId, phaseId: childId, status: 'in_progress', progress: 50 });
+
+      // Call without validationLevel parameter
+      const result = await queryService.validatePlan({ planId });
+
+      // Should filter out warnings (basic mode)
+      const warningIssues = result.issues.filter(i => i.severity === 'warning');
+      expect(warningIssues.length).toBe(0);
     });
   });
 
