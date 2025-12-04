@@ -7,6 +7,7 @@ import { PhaseService } from '../../src/domain/services/phase-service.js';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { LinkingService } from '../../src/domain/services/linking-service.js';
 import { FileStorage } from '../../src/infrastructure/file-storage.js';
+import type { Requirement, Solution, Phase, Artifact } from '../../src/domain/entities/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -1074,6 +1075,276 @@ describe('QueryService', () => {
       expect(result.content).toContain('migrations/001_users.sql');
       expect(result.content).toContain('[create]');
       expect(result.content).toContain('[modify]');
+    });
+  });
+
+  describe('getSearchableText - null-safety (RED phase)', () => {
+    beforeEach(async () => {
+      // Create base entities for null-safety testing
+      await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'For null-safety testing',
+          source: { type: 'user-request' },
+          priority: 'high',
+          category: 'functional',
+          acceptanceCriteria: ['AC1', 'AC2'],
+        },
+      });
+
+      await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Test Solution',
+          description: 'For null-safety testing',
+          approach: 'Test approach',
+          addressing: [],
+          tradeoffs: [
+            {
+              aspect: 'Performance',
+              pros: ['Fast'],
+              cons: ['Memory usage'],
+            },
+          ],
+          evaluation: {
+            effortEstimate: { value: 1, unit: 'days', confidence: 'high' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Low',
+          },
+        },
+      });
+
+      await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'For null-safety testing',
+          objectives: ['Obj1', 'Obj2'],
+          deliverables: ['Del1', 'Del2'],
+          successCriteria: ['SC1'],
+        },
+      });
+    });
+
+    // REQUIREMENT ENTITY
+    it('RED: should handle requirement with undefined acceptanceCriteria', async () => {
+      const requirements = await storage.loadEntities<Requirement>(planId, 'requirements');
+      requirements[0].acceptanceCriteria = undefined as any;
+      await storage.saveEntities(planId, 'requirements', requirements);
+
+      const result = await queryService.searchEntities({
+        planId,
+        query: 'requirement',
+      });
+
+      expect(result).toBeDefined(); // Should not crash
+    });
+
+    it('RED: should handle requirement with empty acceptanceCriteria', async () => {
+      await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Empty AC Requirement',
+          description: 'Test empty acceptance criteria',
+          source: { type: 'user-request' },
+          priority: 'high',
+          category: 'functional',
+          acceptanceCriteria: [], // Empty array
+        },
+      });
+
+      const result = await queryService.searchEntities({
+        planId,
+        query: 'Empty',
+      });
+
+      expect(result.results.length).toBeGreaterThan(0);
+    });
+
+    it('RED: should handle requirement with null rationale', async () => {
+      const requirements = await storage.loadEntities<Requirement>(planId, 'requirements');
+      requirements[0].rationale = null as any;
+      await storage.saveEntities(planId, 'requirements', requirements);
+
+      const result = await queryService.searchEntities({ planId, query: 'test' });
+      expect(result).toBeDefined();
+    });
+
+    // SOLUTION ENTITY
+    it('RED: should handle solution with undefined tradeoffs', async () => {
+      const solutions = await storage.loadEntities<Solution>(planId, 'solutions');
+      if (solutions.length > 0) {
+        solutions[0].tradeoffs = undefined as any;
+        await storage.saveEntities(planId, 'solutions', solutions);
+      }
+
+      const result = await queryService.exportPlan({ planId, format: 'markdown' });
+      expect(result.content).toContain('Solution');
+    });
+
+    it('RED: should handle tradeoff with undefined pros', async () => {
+      const solutions = await storage.loadEntities<Solution>(planId, 'solutions');
+      if (solutions.length > 0) {
+        solutions[0].tradeoffs = [
+          {
+            aspect: 'Performance',
+            pros: undefined as any,
+            cons: ['Slower'],
+          },
+        ];
+        await storage.saveEntities(planId, 'solutions', solutions);
+      }
+
+      const result = await queryService.exportPlan({ planId, format: 'markdown' });
+      expect(result.content).toBeDefined(); // Should not crash
+    });
+
+    it('RED: should handle tradeoff with undefined cons', async () => {
+      const solutions = await storage.loadEntities<Solution>(planId, 'solutions');
+      if (solutions.length > 0) {
+        solutions[0].tradeoffs = [
+          {
+            aspect: 'Test',
+            pros: ['Fast'],
+            cons: undefined as any,
+          },
+        ];
+        await storage.saveEntities(planId, 'solutions', solutions);
+      }
+
+      const result = await queryService.exportPlan({ planId, format: 'markdown' });
+      expect(result).toBeDefined();
+    });
+
+    // PHASE ENTITY
+    it('RED: should handle phase with undefined objectives', async () => {
+      const phases = await storage.loadEntities<Phase>(planId, 'phases');
+      if (phases.length > 0) {
+        phases[0].objectives = undefined as any;
+        await storage.saveEntities(planId, 'phases', phases);
+      }
+
+      const result = await queryService.searchEntities({ planId, query: 'phase' });
+      expect(result).toBeDefined();
+    });
+
+    it('RED: should handle phase with undefined deliverables', async () => {
+      const phases = await storage.loadEntities<Phase>(planId, 'phases');
+      if (phases.length > 0) {
+        phases[0].deliverables = undefined as any;
+        await storage.saveEntities(planId, 'phases', phases);
+      }
+
+      const result = await queryService.searchEntities({ planId, query: 'phase' });
+      expect(result).toBeDefined();
+    });
+
+    it('RED: should handle phase with empty arrays', async () => {
+      await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Empty Phase',
+          description: 'Test empty arrays',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      const result = await queryService.searchEntities({ planId, query: 'Empty' });
+      expect(result.results.length).toBeGreaterThan(0);
+    });
+
+    // ARTIFACT ENTITY
+    it('RED: should handle artifact with undefined sourceCode', async () => {
+      await artifactService.addArtifact({
+        planId,
+        artifact: {
+          title: 'Test Artifact No Code',
+          description: 'Test undefined sourceCode',
+          artifactType: 'code',
+          content: {
+            sourceCode: undefined as any,
+          },
+        },
+      });
+
+      const result = await queryService.searchEntities({ planId, query: 'Artifact' });
+      expect(result).toBeDefined();
+    });
+
+    it('RED: should handle artifact with undefined filename', async () => {
+      await artifactService.addArtifact({
+        planId,
+        artifact: {
+          title: 'No Filename',
+          description: 'Test undefined filename',
+          artifactType: 'code',
+          content: {
+            sourceCode: 'code',
+            filename: undefined,
+          },
+        },
+      });
+
+      const result = await queryService.searchEntities({ planId, query: 'Filename' });
+      expect(result).toBeDefined();
+    });
+
+    // INTEGRATION TESTS
+    it('RED: should search phase without objectives/deliverables', async () => {
+      const phases = await storage.loadEntities<Phase>(planId, 'phases');
+      if (phases.length > 0) {
+        const phaseTitle = phases[0].title;
+        phases[0].objectives = undefined as any;
+        phases[0].deliverables = undefined as any;
+        await storage.saveEntities(planId, 'phases', phases);
+
+        const result = await queryService.searchEntities({
+          planId,
+          query: phaseTitle,
+        });
+
+        expect(result.results.length).toBeGreaterThan(0);
+        expect(result.results[0].entityType).toBe('phase');
+      } else {
+        expect(true).toBe(true); // Skip if no phases
+      }
+    });
+
+    it('RED: should export plan with mixed null fields', async () => {
+      // Create entities with various undefined fields
+      const phases = await storage.loadEntities<Phase>(planId, 'phases');
+      if (phases.length > 0) {
+        phases[0].objectives = undefined as any;
+        await storage.saveEntities(planId, 'phases', phases);
+      }
+
+      const requirements = await storage.loadEntities<Requirement>(planId, 'requirements');
+      if (requirements.length > 0) {
+        requirements[0].acceptanceCriteria = undefined as any;
+        await storage.saveEntities(planId, 'requirements', requirements);
+      }
+
+      const result = await queryService.exportPlan({ planId, format: 'markdown' });
+
+      expect(result.format).toBe('markdown');
+      expect(result.content).toBeDefined();
+      expect(result.content.length).toBeGreaterThan(0);
+    });
+
+    it('RED: should export markdown with undefined acceptanceCriteria', async () => {
+      const requirements = await storage.loadEntities<Requirement>(planId, 'requirements');
+      if (requirements.length > 0) {
+        requirements[0].acceptanceCriteria = undefined as any;
+        await storage.saveEntities(planId, 'requirements', requirements);
+      }
+
+      const result = await queryService.exportPlan({ planId, format: 'markdown' });
+
+      expect(result.content).toContain('## Requirements');
+      // Should not crash on acceptanceCriteria.length check
     });
   });
 
