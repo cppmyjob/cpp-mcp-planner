@@ -74,7 +74,6 @@ export interface DeleteArtifactInput {
 // Output types
 export interface AddArtifactResult {
   artifactId: string;
-  artifact: Artifact;
 }
 
 export interface GetArtifactResult {
@@ -83,7 +82,7 @@ export interface GetArtifactResult {
 
 export interface UpdateArtifactResult {
   success: boolean;
-  artifact: Artifact;
+  artifactId: string;
 }
 
 export interface ListArtifactsResult {
@@ -156,7 +155,7 @@ export class ArtifactService {
     await this.storage.saveEntities(input.planId, 'artifacts', artifacts);
     await this.planService.updateStatistics(input.planId);
 
-    return { artifactId, artifact };
+    return { artifactId };
   }
 
   async getArtifact(input: GetArtifactInput): Promise<GetArtifactResult> {
@@ -211,7 +210,7 @@ export class ArtifactService {
 
     await this.storage.saveEntities(input.planId, 'artifacts', artifacts);
 
-    return { success: true, artifact };
+    return { success: true, artifactId: input.artifactId };
   }
 
   async listArtifacts(input: ListArtifactsInput): Promise<ListArtifactsResult> {

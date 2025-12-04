@@ -88,9 +88,12 @@ describe('PhaseService', () => {
       });
 
       expect(result.phaseId).toBeDefined();
-      expect(result.phase.depth).toBe(0);
-      expect(result.phase.path).toBe('1');
-      expect(result.phase.status).toBe('planned');
+
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      expect(phase.depth).toBe(0);
+      expect(phase.path).toBe('1');
+      expect(phase.status).toBe('planned');
     });
 
     it('should add a nested phase', async () => {
@@ -117,9 +120,11 @@ describe('PhaseService', () => {
         },
       });
 
-      expect(child.phase.depth).toBe(1);
-      expect(child.phase.path).toBe('1.1');
-      expect(child.phase.parentId).toBe(parent.phaseId);
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: child.phaseId });
+      expect(phase.depth).toBe(1);
+      expect(phase.path).toBe('1.1');
+      expect(phase.parentId).toBe(parent.phaseId);
     });
 
     it('should auto-increment order', async () => {
@@ -145,8 +150,10 @@ describe('PhaseService', () => {
         },
       });
 
-      expect(p2.phase.order).toBe(2);
-      expect(p2.phase.path).toBe('2');
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: p2.phaseId });
+      expect(phase.order).toBe(2);
+      expect(phase.path).toBe('2');
     });
   });
 
@@ -225,7 +232,7 @@ describe('PhaseService', () => {
 
   describe('update_phase_status', () => {
     it('should auto-set startedAt on in_progress', async () => {
-      const phase = await service.addPhase({
+      const added = await service.addPhase({
         planId,
         phase: {
           title: 'Test',
@@ -236,18 +243,19 @@ describe('PhaseService', () => {
         },
       });
 
-      const result = await service.updatePhaseStatus({
+      await service.updatePhaseStatus({
         planId,
-        phaseId: phase.phaseId,
+        phaseId: added.phaseId,
         status: 'in_progress',
       });
 
-      expect(result.phase.startedAt).toBeDefined();
-      expect(result.autoUpdatedTimestamps.startedAt).toBeDefined();
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      expect(phase.startedAt).toBeDefined();
     });
 
     it('should auto-set completedAt and progress on completed', async () => {
-      const phase = await service.addPhase({
+      const added = await service.addPhase({
         planId,
         phase: {
           title: 'Test',
@@ -258,14 +266,16 @@ describe('PhaseService', () => {
         },
       });
 
-      const result = await service.updatePhaseStatus({
+      await service.updatePhaseStatus({
         planId,
-        phaseId: phase.phaseId,
+        phaseId: added.phaseId,
         status: 'completed',
       });
 
-      expect(result.phase.completedAt).toBeDefined();
-      expect(result.phase.progress).toBe(100);
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      expect(phase.completedAt).toBeDefined();
+      expect(phase.progress).toBe(100);
     });
 
     it('should require notes for blocked status', async () => {
@@ -290,7 +300,7 @@ describe('PhaseService', () => {
     });
 
     it('should accept notes for blocked status', async () => {
-      const phase = await service.addPhase({
+      const added = await service.addPhase({
         planId,
         phase: {
           title: 'Test',
@@ -301,18 +311,20 @@ describe('PhaseService', () => {
         },
       });
 
-      const result = await service.updatePhaseStatus({
+      await service.updatePhaseStatus({
         planId,
-        phaseId: phase.phaseId,
+        phaseId: added.phaseId,
         status: 'blocked',
         notes: 'Waiting for API access',
       });
 
-      expect(result.phase.status).toBe('blocked');
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      expect(phase.status).toBe('blocked');
     });
 
     it('should track actual effort', async () => {
-      const phase = await service.addPhase({
+      const added = await service.addPhase({
         planId,
         phase: {
           title: 'Test',
@@ -323,14 +335,16 @@ describe('PhaseService', () => {
         },
       });
 
-      const result = await service.updatePhaseStatus({
+      await service.updatePhaseStatus({
         planId,
-        phaseId: phase.phaseId,
+        phaseId: added.phaseId,
         status: 'completed',
         actualEffort: 4.5,
       });
 
-      expect(result.phase.schedule.actualEffort).toBe(4.5);
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      expect(phase.schedule.actualEffort).toBe(4.5);
     });
   });
 
@@ -418,16 +432,18 @@ describe('PhaseService', () => {
       });
 
       // Move Phase 2 under Phase 1
-      const result = await service.movePhase({
+      await service.movePhase({
         planId,
         phaseId: p2.phaseId,
         newParentId: p1.phaseId,
         newOrder: 1,
       });
 
-      expect(result.phase.parentId).toBe(p1.phaseId);
-      expect(result.phase.depth).toBe(1);
-      expect(result.phase.path).toBe('1.1');
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: p2.phaseId });
+      expect(phase.parentId).toBe(p1.phaseId);
+      expect(phase.depth).toBe(1);
+      expect(phase.path).toBe('1.1');
     });
   });
 
@@ -445,7 +461,9 @@ describe('PhaseService', () => {
         },
       });
 
-      expect(result.phase.implementationNotes).toBe(
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      expect(phase.implementationNotes).toBe(
         '## TDD Steps\n1. Write failing test\n2. Implement\n3. Refactor'
       );
     });
@@ -474,10 +492,12 @@ describe('PhaseService', () => {
         },
       });
 
-      expect(result.phase.codeExamples).toHaveLength(2);
-      expect(result.phase.codeExamples![0].language).toBe('typescript');
-      expect(result.phase.codeExamples![0].filename).toBe('service.ts');
-      expect(result.phase.codeExamples![1].code).toContain('expect(true)');
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      expect(phase.codeExamples).toHaveLength(2);
+      expect(phase.codeExamples![0].language).toBe('typescript');
+      expect(phase.codeExamples![0].filename).toBe('service.ts');
+      expect(phase.codeExamples![1].code).toContain('expect(true)');
     });
 
     it('should validate codeExamples structure', async () => {
@@ -497,7 +517,7 @@ describe('PhaseService', () => {
     });
 
     it('should update phase with implementationNotes', async () => {
-      const phase = await service.addPhase({
+      const added = await service.addPhase({
         planId,
         phase: {
           title: 'Test',
@@ -508,19 +528,21 @@ describe('PhaseService', () => {
         },
       });
 
-      const result = await service.updatePhase({
+      await service.updatePhase({
         planId,
-        phaseId: phase.phaseId,
+        phaseId: added.phaseId,
         updates: {
           implementationNotes: '## Updated Notes\n- Step 1\n- Step 2',
         },
       });
 
-      expect(result.phase.implementationNotes).toBe('## Updated Notes\n- Step 1\n- Step 2');
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      expect(phase.implementationNotes).toBe('## Updated Notes\n- Step 1\n- Step 2');
     });
 
     it('should update phase with codeExamples', async () => {
-      const phase = await service.addPhase({
+      const added = await service.addPhase({
         planId,
         phase: {
           title: 'Test',
@@ -531,16 +553,18 @@ describe('PhaseService', () => {
         },
       });
 
-      const result = await service.updatePhase({
+      await service.updatePhase({
         planId,
-        phaseId: phase.phaseId,
+        phaseId: added.phaseId,
         updates: {
           codeExamples: [{ language: 'python', code: 'print("hello")' }],
         },
       });
 
-      expect(result.phase.codeExamples).toHaveLength(1);
-      expect(result.phase.codeExamples![0].language).toBe('python');
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      expect(phase.codeExamples).toHaveLength(1);
+      expect(phase.codeExamples![0].language).toBe('python');
     });
 
     it('should validate codeExamples on update', async () => {
@@ -1001,8 +1025,9 @@ describe('PhaseService', () => {
             successCriteria: [],
           },
         });
-        expect(result.phase.order).toBe(1);
-        expect(result.phase.path).toBe('1');
+        const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+        expect(phase.order).toBe(1);
+        expect(phase.path).toBe('1');
       });
 
       it('should set order=2 for second root phase', async () => {
@@ -1026,8 +1051,9 @@ describe('PhaseService', () => {
             successCriteria: [],
           },
         });
-        expect(result.phase.order).toBe(2);
-        expect(result.phase.path).toBe('2');
+        const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+        expect(phase.order).toBe(2);
+        expect(phase.path).toBe('2');
       });
 
       it('should calculate order based on max sibling order, not count', async () => {
@@ -1052,8 +1078,9 @@ describe('PhaseService', () => {
         });
 
         // Should be 5, not 4 (siblings.length + 1)
-        expect(result.phase.order).toBe(5);
-        expect(result.phase.path).toBe('5');
+        const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+        expect(phase.order).toBe(5);
+        expect(phase.path).toBe('5');
       });
 
       it('should handle gaps in order sequence', async () => {
@@ -1078,8 +1105,9 @@ describe('PhaseService', () => {
         });
 
         // Should be 11, not 4
-        expect(result.phase.order).toBe(11);
-        expect(result.phase.path).toBe('11');
+        const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+        expect(phase.order).toBe(11);
+        expect(phase.path).toBe('11');
       });
 
       it('should set order=1 for first child phase', async () => {
@@ -1099,8 +1127,9 @@ describe('PhaseService', () => {
           },
         });
 
-        expect(child.phase.order).toBe(1);
-        expect(child.phase.path).toBe('1.1');
+        const { phase } = await service.getPhase({ planId, phaseId: child.phaseId });
+        expect(phase.order).toBe(1);
+        expect(phase.path).toBe('1.1');
       });
 
       it('should calculate child order based on max sibling order', async () => {
@@ -1161,8 +1190,9 @@ describe('PhaseService', () => {
         });
 
         // Should be 9, not 4
-        expect(result.phase.order).toBe(9);
-        expect(result.phase.path).toBe('1.9');
+        const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+        expect(phase.order).toBe(9);
+        expect(phase.path).toBe('1.9');
       });
     });
 
@@ -1177,8 +1207,9 @@ describe('PhaseService', () => {
           phase: { title: 'Explicit', description: '', objectives: [], deliverables: [], successCriteria: [], order: 99 },
         });
 
-        expect(result.phase.order).toBe(99);
-        expect(result.phase.path).toBe('99');
+        const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+        expect(phase.order).toBe(99);
+        expect(phase.path).toBe('99');
       });
 
       it('should throw error when explicit order conflicts with existing', async () => {
@@ -1230,32 +1261,38 @@ describe('PhaseService', () => {
           },
         });
 
-        expect(child1.phase.order).toBe(1);
-        expect(child2.phase.order).toBe(1);
-        expect(child1.phase.path).toBe('1.1');
-        expect(child2.phase.path).toBe('2.1');
+        const { phase: c1Phase } = await service.getPhase({ planId, phaseId: child1.phaseId });
+        const { phase: c2Phase } = await service.getPhase({ planId, phaseId: child2.phaseId });
+        expect(c1Phase.order).toBe(1);
+        expect(c2Phase.order).toBe(1);
+        expect(c1Phase.path).toBe('1.1');
+        expect(c2Phase.path).toBe('2.1');
       });
     });
 
     describe('path uniqueness', () => {
       it('should generate unique paths for all siblings', async () => {
-        const phases = [];
+        const phaseIds = [];
         for (let i = 0; i < 15; i++) {
           const result = await service.addPhase({
             planId,
             phase: { title: `Phase ${i}`, description: '', objectives: [], deliverables: [], successCriteria: [] },
           });
-          phases.push(result.phase);
+          phaseIds.push(result.phaseId);
         }
 
-        const paths = phases.map((p) => p.path);
+        const paths = [];
+        for (const phaseId of phaseIds) {
+          const { phase } = await service.getPhase({ planId, phaseId });
+          paths.push(phase.path);
+        }
         const uniquePaths = new Set(paths);
 
         expect(uniquePaths.size).toBe(15);
       });
 
       it('should maintain path consistency after delete and add', async () => {
-        const p1 = await service.addPhase({
+        await service.addPhase({
           planId,
           phase: { title: 'P1', description: '', objectives: [], deliverables: [], successCriteria: [] },
         });
@@ -1278,8 +1315,113 @@ describe('PhaseService', () => {
         });
 
         // Should get order 4, not 3 (even though only 2 siblings now)
-        expect(p4.phase.order).toBe(4);
-        expect(p4.phase.path).toBe('4');
+        const { phase } = await service.getPhase({ planId, phaseId: p4.phaseId });
+        expect(phase.order).toBe(4);
+        expect(phase.path).toBe('4');
+      });
+    });
+  });
+
+  describe('minimal return values (Sprint 6)', () => {
+    describe('addPhase should return only phaseId', () => {
+      it('should not include full phase object in result', async () => {
+        const result = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Test Phase',
+            description: 'Test',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+
+        expect(result.phaseId).toBeDefined();
+        expect(result).not.toHaveProperty('phase');
+      });
+    });
+
+    describe('updatePhase should return only success and phaseId', () => {
+      it('should not include full phase object in result', async () => {
+        const added = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Test',
+            description: 'Test',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+
+        const result = await service.updatePhase({
+          planId,
+          phaseId: added.phaseId,
+          updates: { title: 'Updated' },
+        });
+
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty('phase');
+      });
+    });
+
+    describe('updatePhaseStatus should return only success and phaseId', () => {
+      it('should not include full phase object in result', async () => {
+        const added = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Test',
+            description: 'Test',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+
+        const result = await service.updatePhaseStatus({
+          planId,
+          phaseId: added.phaseId,
+          status: 'in_progress',
+        });
+
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty('phase');
+      });
+    });
+
+    describe('movePhase should return only success and IDs', () => {
+      it('should not include full phase objects in result', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Phase 1',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+
+        await service.addPhase({
+          planId,
+          phase: {
+            title: 'Phase 2',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+
+        const result = await service.movePhase({
+          planId,
+          phaseId: p1.phaseId,
+          newOrder: 2,
+        });
+
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty('phase');
+        expect(result).not.toHaveProperty('affectedPhases');
       });
     });
   });

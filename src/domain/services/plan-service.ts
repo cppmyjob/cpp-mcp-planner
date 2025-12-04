@@ -59,8 +59,6 @@ export interface GetActivePlanInput {
 // Output types
 export interface CreatePlanResult {
   planId: string;
-  manifest: PlanManifest;
-  createdAt: string;
 }
 
 export interface ListPlansResult {
@@ -93,8 +91,7 @@ export interface GetPlanResult {
 
 export interface UpdatePlanResult {
   success: boolean;
-  plan: PlanManifest;
-  updatedAt: string;
+  planId: string;
 }
 
 export interface ArchivePlanResult {
@@ -159,8 +156,6 @@ export class PlanService {
 
     return {
       planId,
-      manifest,
-      createdAt: now,
     };
   }
 
@@ -289,8 +284,7 @@ export class PlanService {
 
     return {
       success: true,
-      plan: manifest,
-      updatedAt: now,
+      planId: input.planId,
     };
   }
 

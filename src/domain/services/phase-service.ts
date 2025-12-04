@@ -162,18 +162,17 @@ export interface PhaseTreeNode {
 
 export interface AddPhaseResult {
   phaseId: string;
-  phase: Phase;
 }
 
 export interface UpdatePhaseResult {
   success: boolean;
-  phase: Phase;
+  phaseId: string;
 }
 
 export interface MovePhaseResult {
   success: boolean;
-  phase: Phase;
-  affectedPhases: Phase[];
+  phaseId: string;
+  affectedPhaseIds?: string[];
 }
 
 export interface GetPhaseTreeResult {
@@ -188,11 +187,7 @@ export interface DeletePhaseResult {
 
 export interface UpdatePhaseStatusResult {
   success: boolean;
-  phase: Phase;
-  autoUpdatedTimestamps: {
-    startedAt?: string;
-    completedAt?: string;
-  };
+  phaseId: string;
 }
 
 export class PhaseService {
@@ -284,7 +279,7 @@ export class PhaseService {
     await this.storage.saveEntities(input.planId, 'phases', phases);
     await this.planService.updateStatistics(input.planId);
 
-    return { phaseId, phase };
+    return { phaseId };
   }
 
   async updatePhase(input: UpdatePhaseInput): Promise<UpdatePhaseResult> {
@@ -328,7 +323,7 @@ export class PhaseService {
 
     await this.storage.saveEntities(input.planId, 'phases', phases);
 
-    return { success: true, phase };
+    return { success: true, phaseId: input.phaseId };
   }
 
   async movePhase(input: MovePhaseInput): Promise<MovePhaseResult> {
@@ -389,7 +384,11 @@ export class PhaseService {
 
     await this.storage.saveEntities(input.planId, 'phases', phases);
 
-    return { success: true, phase, affectedPhases };
+    return {
+      success: true,
+      phaseId: input.phaseId,
+      affectedPhaseIds: affectedPhases.length > 0 ? affectedPhases.map((p) => p.id) : undefined,
+    };
   }
 
   async getPhaseTree(input: GetPhaseTreeInput): Promise<GetPhaseTreeResult> {
@@ -555,8 +554,7 @@ export class PhaseService {
 
     return {
       success: true,
-      phase,
-      autoUpdatedTimestamps: autoUpdated,
+      phaseId: input.phaseId,
     };
   }
 

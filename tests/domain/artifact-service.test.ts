@@ -48,10 +48,13 @@ describe('ArtifactService', () => {
       });
 
       expect(result.artifactId).toBeDefined();
-      expect(result.artifact.title).toBe('User Service');
-      expect(result.artifact.artifactType).toBe('code');
-      expect(result.artifact.content.language).toBe('typescript');
-      expect(result.artifact.status).toBe('draft');
+
+      // Verify via getArtifact
+      const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
+      expect(artifact.title).toBe('User Service');
+      expect(artifact.artifactType).toBe('code');
+      expect(artifact.content.language).toBe('typescript');
+      expect(artifact.status).toBe('draft');
     });
 
     it('should add artifact with fileTable', async () => {
@@ -72,8 +75,10 @@ describe('ArtifactService', () => {
         },
       });
 
-      expect(result.artifact.fileTable).toHaveLength(2);
-      expect(result.artifact.fileTable![0].action).toBe('create');
+      // Verify via getArtifact
+      const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
+      expect(artifact.fileTable).toHaveLength(2);
+      expect(artifact.fileTable![0].action).toBe('create');
     });
 
     it('should add artifact with related entities', async () => {
@@ -93,8 +98,10 @@ describe('ArtifactService', () => {
         },
       });
 
-      expect(result.artifact.relatedPhaseId).toBe('phase-123');
-      expect(result.artifact.relatedRequirementIds).toEqual(['req-1', 'req-2']);
+      // Verify via getArtifact
+      const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
+      expect(artifact.relatedPhaseId).toBe('phase-123');
+      expect(artifact.relatedRequirementIds).toEqual(['req-1', 'req-2']);
     });
   });
 
@@ -150,9 +157,11 @@ describe('ArtifactService', () => {
         },
       });
 
-      expect(result.artifact.title).toBe('Updated');
-      expect(result.artifact.content.sourceCode).toBe('const y = 2;');
-      expect(result.artifact.version).toBe(2);
+      // Verify via getArtifact
+      const { artifact } = await service.getArtifact({ planId, artifactId: added.artifactId });
+      expect(artifact.title).toBe('Updated');
+      expect(artifact.content.sourceCode).toBe('const y = 2;');
+      expect(artifact.version).toBe(2);
     });
 
     it('should update artifact status', async () => {
@@ -166,13 +175,15 @@ describe('ArtifactService', () => {
         },
       });
 
-      const result = await service.updateArtifact({
+      await service.updateArtifact({
         planId,
         artifactId: added.artifactId,
         updates: { status: 'reviewed' },
       });
 
-      expect(result.artifact.status).toBe('reviewed');
+      // Verify via getArtifact
+      const { artifact } = await service.getArtifact({ planId, artifactId: added.artifactId });
+      expect(artifact.status).toBe('reviewed');
     });
   });
 
@@ -275,10 +286,13 @@ describe('ArtifactService', () => {
       });
 
       expect(result.artifactId).toBeDefined();
-      expect(result.artifact.title).toBe('Critical Files to Read');
-      expect(result.artifact.artifactType).toBe('documentation');
-      expect(result.artifact.fileTable).toHaveLength(2);
-      expect(result.artifact.content).toEqual({});
+
+      // Verify via getArtifact
+      const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
+      expect(artifact.title).toBe('Critical Files to Read');
+      expect(artifact.artifactType).toBe('documentation');
+      expect(artifact.fileTable).toHaveLength(2);
+      expect(artifact.content).toEqual({});
     });
 
     it('should throw for non-existent planId on addArtifact', async () => {
@@ -358,6 +372,48 @@ describe('ArtifactService', () => {
           },
         })
       ).rejects.toThrow(/action/i);
+    });
+  });
+
+  describe('minimal return values (Sprint 6)', () => {
+    describe('addArtifact should return only artifactId', () => {
+      it('should not include full artifact object in result', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test Artifact',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: 'console.log("test")' },
+          },
+        });
+
+        expect(result.artifactId).toBeDefined();
+        expect(result).not.toHaveProperty('artifact');
+      });
+    });
+
+    describe('updateArtifact should return only success and artifactId', () => {
+      it('should not include full artifact object in result', async () => {
+        const added = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+          },
+        });
+
+        const result = await service.updateArtifact({
+          planId,
+          artifactId: added.artifactId,
+          updates: { title: 'Updated' },
+        });
+
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty('artifact');
+      });
     });
   });
 });

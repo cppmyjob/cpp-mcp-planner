@@ -47,8 +47,11 @@ describe('RequirementService', () => {
       });
 
       expect(result.requirementId).toBeDefined();
-      expect(result.requirement.title).toBe('User Login');
-      expect(result.requirement.status).toBe('draft');
+
+      // Verify via getRequirement
+      const { requirement } = await service.getRequirement({ planId, requirementId: result.requirementId });
+      expect(requirement.title).toBe('User Login');
+      expect(requirement.status).toBe('draft');
     });
 
     it('should generate UUID for requirement', async () => {
@@ -106,8 +109,10 @@ describe('RequirementService', () => {
         },
       });
 
-      expect(result.requirement.rationale).toBe('User experience');
-      expect(result.requirement.impact?.riskLevel).toBe('low');
+      // Verify via getRequirement
+      const { requirement } = await service.getRequirement({ planId, requirementId: result.requirementId });
+      expect(requirement.rationale).toBe('User experience');
+      expect(requirement.impact?.riskLevel).toBe('low');
     });
   });
 
@@ -165,9 +170,11 @@ describe('RequirementService', () => {
         },
       });
 
-      expect(result.requirement.title).toBe('Updated');
-      expect(result.requirement.priority).toBe('high');
-      expect(result.requirement.status).toBe('approved');
+      // Verify via getRequirement
+      const { requirement } = await service.getRequirement({ planId, requirementId: added.requirementId });
+      expect(requirement.title).toBe('Updated');
+      expect(requirement.priority).toBe('high');
+      expect(requirement.status).toBe('approved');
     });
 
     it('should increment version on update', async () => {
@@ -320,6 +327,52 @@ describe('RequirementService', () => {
       await expect(
         service.deleteRequirement({ planId, requirementId: 'non-existent' })
       ).rejects.toThrow('Requirement not found');
+    });
+  });
+
+  describe('minimal return values (Sprint 6)', () => {
+    describe('addRequirement should return only requirementId', () => {
+      it('should not include full requirement object in result', async () => {
+        const result = await service.addRequirement({
+          planId,
+          requirement: {
+            title: 'Test Req',
+            description: 'Test',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'medium',
+            category: 'functional',
+          },
+        });
+
+        expect(result.requirementId).toBeDefined();
+        expect(result).not.toHaveProperty('requirement');
+      });
+    });
+
+    describe('updateRequirement should return only success and requirementId', () => {
+      it('should not include full requirement object in result', async () => {
+        const added = await service.addRequirement({
+          planId,
+          requirement: {
+            title: 'Test Req',
+            description: 'Test',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'medium',
+            category: 'functional',
+          },
+        });
+
+        const result = await service.updateRequirement({
+          planId,
+          requirementId: added.requirementId,
+          updates: { title: 'Updated' },
+        });
+
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty('requirement');
+      });
     });
   });
 });
