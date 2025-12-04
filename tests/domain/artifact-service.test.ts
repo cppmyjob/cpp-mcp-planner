@@ -681,6 +681,201 @@ describe('ArtifactService', () => {
     });
   });
 
+  describe('ArtifactTarget support (Phase 2.3)', () => {
+    describe('RED: addArtifact with targets field', () => {
+      it('RED: should accept targets with basic path and action', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test Artifact',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+            targets: [{ path: 'src/file.ts', action: 'create' }],
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.targets).toBeDefined();
+        expect(retrieved.artifact.targets).toHaveLength(1);
+        expect(retrieved.artifact.targets![0].path).toBe('src/file.ts');
+        expect(retrieved.artifact.targets![0].action).toBe('create');
+      });
+
+      it('RED: should accept targets with lineNumber', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test Artifact',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+            targets: [{ path: 'src/file.ts', action: 'modify', lineNumber: 42 }],
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.targets![0].lineNumber).toBe(42);
+      });
+
+      it('RED: should accept targets with lineNumber and lineEnd', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test Artifact',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+            targets: [{ path: 'src/file.ts', action: 'modify', lineNumber: 10, lineEnd: 20 }],
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.targets![0].lineNumber).toBe(10);
+        expect(retrieved.artifact.targets![0].lineEnd).toBe(20);
+      });
+
+      it('RED: should accept targets with searchPattern', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test Artifact',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+            targets: [{ path: 'src/file.ts', action: 'modify', searchPattern: 'function.*test' }],
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.targets![0].searchPattern).toBe('function.*test');
+      });
+
+      it('RED: should accept targets with description', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test Artifact',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+            targets: [{ path: 'src/file.ts', action: 'create', description: 'Main source file' }],
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.targets![0].description).toBe('Main source file');
+      });
+    });
+
+    describe('RED: updateArtifact to modify targets', () => {
+      it('RED: should update targets field', async () => {
+        const added = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+            targets: [{ path: 'old.ts', action: 'create' }],
+          },
+        });
+
+        await service.updateArtifact({
+          planId,
+          artifactId: added.artifactId,
+          updates: { targets: [{ path: 'new.ts', action: 'modify', lineNumber: 10 }] },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: added.artifactId });
+        expect(retrieved.artifact.targets).toHaveLength(1);
+        expect(retrieved.artifact.targets![0].path).toBe('new.ts');
+        expect(retrieved.artifact.targets![0].lineNumber).toBe(10);
+      });
+    });
+
+    describe('RED: fileTable to targets migration', () => {
+      it('RED: should auto-migrate fileTable to targets on read', async () => {
+        // Create artifact with old fileTable field by directly manipulating storage
+        const artifactId = 'test-migration-' + Date.now();
+        const artifacts = await storage.loadEntities(planId, 'artifacts');
+
+        artifacts.push({
+          id: artifactId,
+          type: 'artifact',
+          title: 'Legacy Artifact',
+          description: 'Test',
+          artifactType: 'code',
+          status: 'draft',
+          content: {},
+          fileTable: [
+            { path: 'src/old.ts', action: 'create', description: 'Old format' },
+          ],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: 1,
+          metadata: { createdBy: 'test', tags: [], annotations: [] },
+        } as any);
+
+        await storage.saveEntities(planId, 'artifacts', artifacts);
+
+        // Read via service - should auto-migrate
+        const retrieved = await service.getArtifact({ planId, artifactId });
+        expect(retrieved.artifact.targets).toBeDefined();
+        expect(retrieved.artifact.targets).toHaveLength(1);
+        expect(retrieved.artifact.targets![0].path).toBe('src/old.ts');
+        expect(retrieved.artifact.targets![0].action).toBe('create');
+        expect(retrieved.artifact.targets![0].description).toBe('Old format');
+      });
+
+      it('RED: should preserve targets if both fileTable and targets exist', async () => {
+        // Edge case: if both exist, targets takes precedence
+        const artifactId = 'test-both-' + Date.now();
+        const artifacts = await storage.loadEntities(planId, 'artifacts');
+
+        artifacts.push({
+          id: artifactId,
+          type: 'artifact',
+          title: 'Both Fields',
+          description: 'Test',
+          artifactType: 'code',
+          status: 'draft',
+          content: {},
+          fileTable: [{ path: 'src/old.ts', action: 'create' }],
+          targets: [{ path: 'src/new.ts', action: 'modify', lineNumber: 5 }],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: 1,
+          metadata: { createdBy: 'test', tags: [], annotations: [] },
+        } as any);
+
+        await storage.saveEntities(planId, 'artifacts', artifacts);
+
+        const retrieved = await service.getArtifact({ planId, artifactId });
+        expect(retrieved.artifact.targets).toHaveLength(1);
+        expect(retrieved.artifact.targets![0].path).toBe('src/new.ts');
+        expect(retrieved.artifact.targets![0].lineNumber).toBe(5);
+      });
+    });
+
+    describe('RED: targets validation', () => {
+      it('RED: should validate targets using validateTargets', async () => {
+        await expect(
+          service.addArtifact({
+            planId,
+            artifact: {
+              title: 'Invalid',
+              description: 'Test',
+              artifactType: 'code',
+              content: {},
+              targets: [{ path: '', action: 'create' }], // Invalid: empty path
+            },
+          })
+        ).rejects.toThrow(/path must be a non-empty string/);
+      });
+    });
+  });
+
   describe('minimal return values (Sprint 6)', () => {
     describe('addArtifact should return only artifactId', () => {
       it('should not include full artifact object in result', async () => {

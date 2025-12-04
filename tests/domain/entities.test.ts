@@ -5,6 +5,8 @@ import type {
   Solution,
   Decision,
   Phase,
+  Artifact,
+  ArtifactTarget,
   Link,
   PlanManifest,
   Tag,
@@ -269,6 +271,69 @@ describe('Entity Types', () => {
 
       expect(manifest.statistics.totalRequirements).toBe(5);
       expect(manifest.lockVersion).toBe(1);
+    });
+  });
+
+  describe('ArtifactTarget interface', () => {
+    it('RED: should have required path field', () => {
+      const target: ArtifactTarget = { path: 'src/file.ts', action: 'create' };
+      expect(target.path).toBe('src/file.ts');
+    });
+
+    it('RED: should have required action field', () => {
+      const target: ArtifactTarget = { path: 'src/file.ts', action: 'modify' };
+      expect(target.action).toBe('modify');
+    });
+
+    it('RED: should accept all valid actions', () => {
+      const create: ArtifactTarget = { path: 'f.ts', action: 'create' };
+      const modify: ArtifactTarget = { path: 'f.ts', action: 'modify' };
+      const del: ArtifactTarget = { path: 'f.ts', action: 'delete' };
+      expect([create.action, modify.action, del.action]).toEqual(['create', 'modify', 'delete']);
+    });
+
+    it('RED: should allow optional lineNumber', () => {
+      const target: ArtifactTarget = { path: 'src/file.ts', action: 'modify', lineNumber: 10 };
+      expect(target.lineNumber).toBe(10);
+    });
+
+    it('RED: should allow optional lineEnd', () => {
+      const target: ArtifactTarget = { path: 'src/file.ts', action: 'modify', lineNumber: 10, lineEnd: 20 };
+      expect(target.lineEnd).toBe(20);
+    });
+
+    it('RED: should allow optional searchPattern', () => {
+      const target: ArtifactTarget = { path: 'src/file.ts', action: 'modify', searchPattern: 'function.*test' };
+      expect(target.searchPattern).toBe('function.*test');
+    });
+
+    it('RED: should allow optional description', () => {
+      const target: ArtifactTarget = { path: 'src/file.ts', action: 'create', description: 'New file' };
+      expect(target.description).toBe('New file');
+    });
+  });
+
+  describe('Artifact interface with targets', () => {
+    it('RED: should have targets field instead of fileTable', () => {
+      const artifact: Artifact = {
+        id: '1', type: 'artifact', title: 'Test', description: 'Test',
+        artifactType: 'code', status: 'draft', content: {},
+        targets: [{ path: 'file.ts', action: 'create' }],
+        createdAt: '', updatedAt: '', version: 1,
+        metadata: { createdBy: '', tags: [], annotations: [] }
+      };
+      expect(artifact.targets).toBeDefined();
+      expect(artifact.targets).toHaveLength(1);
+    });
+
+    it('RED: should allow undefined targets (optional field)', () => {
+      const artifact: Artifact = {
+        id: '1', type: 'artifact', title: 'Test', description: 'Test',
+        artifactType: 'code', status: 'draft', content: {},
+        createdAt: '', updatedAt: '', version: 1,
+        metadata: { createdBy: '', tags: [], annotations: [] }
+      };
+      expect(artifact.targets).toBeUndefined();
     });
   });
 });

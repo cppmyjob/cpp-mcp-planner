@@ -1,344 +1,187 @@
 import { describe, it, expect } from '@jest/globals';
-import {
-  validateEffortEstimate,
-  validateAlternativesConsidered,
-  validateTags,
-  validateCodeExamples,
-  validateArtifactType,
-  validateFileTable,
-  validatePriority,
-  validateCodeRefs,
-} from '../../src/domain/services/validators.js';
+import { validateTargets } from '../../src/domain/services/validators.js';
 
-describe('Validators', () => {
-  describe('validateCodeExamples', () => {
-    it('should accept valid code examples', () => {
-      expect(() =>
-        validateCodeExamples([
-          { language: 'typescript', code: 'const x = 1;' },
-          { language: 'javascript', code: 'let y = 2;', filename: 'test.js' },
-          { language: 'python', code: 'x = 1', description: 'Simple assignment' },
-        ])
-      ).not.toThrow();
+describe('validateTargets', () => {
+  describe('basic validation', () => {
+    it('RED: should accept empty array', () => {
+      expect(() => validateTargets([])).not.toThrow();
     });
 
-    it('should accept empty array', () => {
-      expect(() => validateCodeExamples([])).not.toThrow();
+    it('RED: should accept undefined', () => {
+      expect(() => validateTargets(undefined as any)).not.toThrow();
     });
 
-    it('should skip validation if not an array', () => {
-      expect(() => validateCodeExamples(null as any)).not.toThrow();
-      expect(() => validateCodeExamples(undefined as any)).not.toThrow();
+    it('RED: should accept valid target with path and action', () => {
+      expect(() => validateTargets([{ path: 'src/file.ts', action: 'create' }])).not.toThrow();
     });
 
-    it('should throw if language is missing', () => {
-      expect(() =>
-        validateCodeExamples([{ code: 'const x = 1;' } as any])
-      ).toThrow(/language/i);
+    it('RED: should accept all valid actions', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'create' }])).not.toThrow();
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify' }])).not.toThrow();
+      expect(() => validateTargets([{ path: 'file.ts', action: 'delete' }])).not.toThrow();
     });
 
-    it('should throw if language is empty string', () => {
-      expect(() =>
-        validateCodeExamples([{ language: '', code: 'const x = 1;' }])
-      ).toThrow(/language/i);
+    it('RED: should reject invalid action', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'invalid' }]))
+        .toThrow(/action must be one of/);
     });
 
-    it('should throw if language is not a string', () => {
-      expect(() =>
-        validateCodeExamples([{ language: 123, code: 'const x = 1;' } as any])
-      ).toThrow(/language/i);
+    it('RED: should reject missing path', () => {
+      expect(() => validateTargets([{ action: 'create' }]))
+        .toThrow(/path must be a non-empty string/);
     });
 
-    it('should throw if code is missing', () => {
-      expect(() =>
-        validateCodeExamples([{ language: 'typescript' } as any])
-      ).toThrow(/code/i);
+    it('RED: should reject empty path', () => {
+      expect(() => validateTargets([{ path: '', action: 'create' }]))
+        .toThrow(/path must be a non-empty string/);
     });
 
-    it('should throw if code is not a string', () => {
-      expect(() =>
-        validateCodeExamples([{ language: 'typescript', code: 123 } as any])
-      ).toThrow(/code/i);
-    });
-
-    it('should accept code as empty string', () => {
-      expect(() =>
-        validateCodeExamples([{ language: 'typescript', code: '' }])
-      ).not.toThrow();
-    });
-
-    it('should report correct index in error message', () => {
-      expect(() =>
-        validateCodeExamples([
-          { language: 'typescript', code: 'ok' },
-          { language: 'python', code: 'ok' },
-          { language: '', code: 'bad' },
-        ])
-      ).toThrow(/index 2/i);
-    });
-
-    it('should accept optional filename and description', () => {
-      expect(() =>
-        validateCodeExamples([
-          {
-            language: 'typescript',
-            code: 'export class MyService {}',
-            filename: 'my-service.ts',
-            description: 'Service implementation',
-          },
-        ])
-      ).not.toThrow();
+    it('RED: should reject path with only whitespace', () => {
+      expect(() => validateTargets([{ path: '   ', action: 'create' }]))
+        .toThrow(/path must be a non-empty string/);
     });
   });
 
-  // Existing validators - basic sanity tests
-  describe('validateEffortEstimate', () => {
-    it('should accept valid effort estimate', () => {
-      expect(() =>
-        validateEffortEstimate({ value: 5, unit: 'days', confidence: 'medium' })
-      ).not.toThrow();
+  describe('line number validation', () => {
+    it('RED: should accept lineNumber alone', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', lineNumber: 10 }])).not.toThrow();
     });
 
-    it('should skip undefined/null', () => {
-      expect(() => validateEffortEstimate(undefined)).not.toThrow();
-      expect(() => validateEffortEstimate(null)).not.toThrow();
+    it('RED: should accept lineNumber with lineEnd', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', lineNumber: 10, lineEnd: 20 }])).not.toThrow();
     });
 
-    it('should accept minutes as valid unit', () => {
-      expect(() =>
-        validateEffortEstimate({ value: 30, unit: 'minutes', confidence: 'high' })
-      ).not.toThrow();
+    it('RED: should accept lineEnd equal to lineNumber (single line range)', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', lineNumber: 10, lineEnd: 10 }])).not.toThrow();
     });
 
-    it('should accept all valid units', () => {
-      const validUnits = ['minutes', 'hours', 'days', 'weeks', 'story-points'];
-      for (const unit of validUnits) {
-        expect(() =>
-          validateEffortEstimate({ value: 1, unit, confidence: 'medium' })
-        ).not.toThrow();
-      }
+    it('RED: should reject lineEnd without lineNumber', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', lineEnd: 20 }]))
+        .toThrow(/lineEnd requires lineNumber/);
     });
 
-    it('should throw for invalid unit', () => {
-      expect(() =>
-        validateEffortEstimate({ value: 1, unit: 'seconds', confidence: 'high' })
-      ).toThrow(/unit.*must be one of/);
+    it('RED: should reject lineEnd < lineNumber', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', lineNumber: 20, lineEnd: 10 }]))
+        .toThrow(/lineEnd must be >= lineNumber/);
     });
-  });
 
-  describe('validateAlternativesConsidered', () => {
-    it('should accept valid alternatives', () => {
-      expect(() =>
-        validateAlternativesConsidered([
-          { option: 'Option A', reasoning: 'Because...' },
-        ])
-      ).not.toThrow();
+    it('RED: should reject lineNumber = 0', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', lineNumber: 0 }]))
+        .toThrow(/lineNumber must be a positive integer/);
     });
-  });
 
-  describe('validateTags', () => {
-    it('should accept valid tags', () => {
-      expect(() =>
-        validateTags([{ key: 'priority', value: 'high' }])
-      ).not.toThrow();
+    it('RED: should reject negative lineNumber', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', lineNumber: -5 }]))
+        .toThrow(/lineNumber must be a positive integer/);
+    });
+
+    it('RED: should reject fractional lineNumber', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', lineNumber: 10.5 }]))
+        .toThrow(/lineNumber must be an integer/);
+    });
+
+    it('RED: should reject non-number lineNumber', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', lineNumber: '10' as any }]))
+        .toThrow(/lineNumber must be a number/);
     });
   });
 
-  describe('validateArtifactType', () => {
-    it('should accept valid artifact types', () => {
-      const validTypes = ['code', 'config', 'migration', 'documentation', 'test', 'script', 'other'];
-      for (const type of validTypes) {
-        expect(() => validateArtifactType(type)).not.toThrow();
-      }
+  describe('search pattern validation', () => {
+    it('RED: should accept valid regex pattern', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', searchPattern: 'function.*test' }])).not.toThrow();
     });
 
-    it('should throw for invalid artifact type', () => {
-      expect(() => validateArtifactType('invalid')).toThrow(/artifactType/i);
-      expect(() => validateArtifactType('')).toThrow(/artifactType/i);
-      expect(() => validateArtifactType(123)).toThrow(/artifactType/i);
-    });
-  });
-
-  describe('validateFileTable', () => {
-    it('should accept valid file table entries', () => {
-      expect(() =>
-        validateFileTable([
-          { path: 'src/file.ts', action: 'create' },
-          { path: 'src/other.ts', action: 'modify', description: 'Update imports' },
-          { path: 'old/file.ts', action: 'delete' },
-        ])
-      ).not.toThrow();
+    it('RED: should accept simple string pattern', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', searchPattern: 'TODO' }])).not.toThrow();
     });
 
-    it('should accept empty array', () => {
-      expect(() => validateFileTable([])).not.toThrow();
+    it('RED: should reject empty searchPattern', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', searchPattern: '' }]))
+        .toThrow(/searchPattern must be a non-empty string/);
     });
 
-    it('should skip validation if not an array', () => {
-      expect(() => validateFileTable(null as any)).not.toThrow();
-      expect(() => validateFileTable(undefined as any)).not.toThrow();
+    it('RED: should reject invalid regex (unclosed group)', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', searchPattern: 'function(' }]))
+        .toThrow(/invalid regex in searchPattern/);
     });
 
-    it('should throw if path is missing', () => {
-      expect(() =>
-        validateFileTable([{ action: 'create' } as any])
-      ).toThrow(/path/i);
+    it('RED: should reject invalid regex (unclosed bracket)', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', searchPattern: '[abc' }]))
+        .toThrow(/invalid regex in searchPattern/);
     });
 
-    it('should throw if path is empty', () => {
-      expect(() =>
-        validateFileTable([{ path: '', action: 'create' }])
-      ).toThrow(/path/i);
+    it('RED: should reject invalid regex (quantifier at start)', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', searchPattern: '*test' }]))
+        .toThrow(/invalid regex in searchPattern/);
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', searchPattern: '+test' }]))
+        .toThrow(/invalid regex in searchPattern/);
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', searchPattern: '?test' }]))
+        .toThrow(/invalid regex in searchPattern/);
     });
 
-    it('should throw if action is invalid', () => {
-      expect(() =>
-        validateFileTable([{ path: 'src/file.ts', action: 'invalid' }])
-      ).toThrow(/action/i);
-    });
-
-    it('should report correct index in error message', () => {
-      expect(() =>
-        validateFileTable([
-          { path: 'ok.ts', action: 'create' },
-          { path: '', action: 'modify' },
-        ])
-      ).toThrow(/index 1/i);
+    it('RED: should reject lineNumber + searchPattern conflict', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'modify', lineNumber: 10, searchPattern: 'test' }]))
+        .toThrow(/cannot use both lineNumber and searchPattern/);
     });
   });
 
-  describe('validatePriority', () => {
-    it('should accept undefined (optional field)', () => {
-      expect(() => validatePriority(undefined)).not.toThrow();
+  describe('path validation', () => {
+    it('RED: should accept Unix paths', () => {
+      expect(() => validateTargets([{ path: 'src/services/user.ts', action: 'create' }])).not.toThrow();
     });
 
-    it('should accept null (optional field)', () => {
-      expect(() => validatePriority(null)).not.toThrow();
+    it('RED: should accept Windows paths', () => {
+      expect(() => validateTargets([{ path: 'src\\services\\user.ts', action: 'create' }])).not.toThrow();
     });
 
-    it('should accept all valid priority values', () => {
-      const validPriorities = ['critical', 'high', 'medium', 'low'];
-      for (const priority of validPriorities) {
-        expect(() => validatePriority(priority)).not.toThrow();
-      }
+    it('RED: should accept absolute Unix paths', () => {
+      expect(() => validateTargets([{ path: '/home/user/project/file.ts', action: 'create' }])).not.toThrow();
     });
 
-    it('should reject empty string', () => {
-      expect(() => validatePriority('')).toThrow(/Invalid priority/);
+    it('RED: should accept absolute Windows paths', () => {
+      expect(() => validateTargets([{ path: 'C:\\Projects\\file.ts', action: 'create' }])).not.toThrow();
     });
 
-    it('should reject invalid priority value', () => {
-      expect(() => validatePriority('urgent')).toThrow(/Invalid priority/);
-      expect(() => validatePriority('urgent')).toThrow(/critical, high, medium, low/);
+    it('RED: should accept paths with spaces', () => {
+      expect(() => validateTargets([{ path: 'My Documents/file.ts', action: 'create' }])).not.toThrow();
     });
 
-    it('should reject wrong case (case-sensitive)', () => {
-      expect(() => validatePriority('CRITICAL')).toThrow(/Invalid priority/);
-      expect(() => validatePriority('High')).toThrow(/Invalid priority/);
+    it('RED: should accept paths with unicode', () => {
+      expect(() => validateTargets([{ path: 'src/файл.ts', action: 'create' }])).not.toThrow();
     });
 
-    it('should reject non-string types', () => {
-      expect(() => validatePriority(1)).toThrow(/must be a string/);
-      expect(() => validatePriority({ value: 'high' })).toThrow(/must be a string/);
+    it('RED: should accept paths with parent directory references', () => {
+      expect(() => validateTargets([{ path: '../file.ts', action: 'create' }])).not.toThrow();
+      expect(() => validateTargets([{ path: '../../parent/file.ts', action: 'create' }])).not.toThrow();
     });
   });
 
-  describe('validateCodeRefs', () => {
-    it('should accept valid code references', () => {
-      expect(() =>
-        validateCodeRefs([
-          'src/file.ts:42',
-          'src/services/phase-service.ts:100',
-          'tests/unit/test.ts:1',
-        ])
-      ).not.toThrow();
+  describe('multiple targets validation', () => {
+    it('RED: should accept multiple targets', () => {
+      expect(() => validateTargets([
+        { path: 'file1.ts', action: 'create' },
+        { path: 'file2.ts', action: 'modify' },
+        { path: 'file3.ts', action: 'delete' },
+      ])).not.toThrow();
     });
 
-    it('should accept empty array', () => {
-      expect(() => validateCodeRefs([])).not.toThrow();
+    it('RED: should allow duplicate paths (same file, different operations)', () => {
+      // This is valid: create then modify in same artifact
+      expect(() => validateTargets([
+        { path: 'file.ts', action: 'create' },
+        { path: 'file.ts', action: 'modify', lineNumber: 10 },
+      ])).not.toThrow();
+    });
+  });
+
+  describe('description validation', () => {
+    it('RED: should accept description', () => {
+      expect(() => validateTargets([{ path: 'file.ts', action: 'create', description: 'Create user service' }])).not.toThrow();
     });
 
-    it('should skip validation if not an array', () => {
-      expect(() => validateCodeRefs(null as any)).not.toThrow();
-      expect(() => validateCodeRefs(undefined as any)).not.toThrow();
-    });
-
-    it('should throw if entry is not a string', () => {
-      expect(() =>
-        validateCodeRefs([123 as any])
-      ).toThrow(/must be a string/);
-    });
-
-    it('should throw if entry is empty string', () => {
-      expect(() =>
-        validateCodeRefs([''])
-      ).toThrow(/cannot be empty/);
-    });
-
-    it('should throw if entry does not contain colon with line number', () => {
-      expect(() =>
-        validateCodeRefs(['src/file.ts'])
-      ).toThrow(/must be in format/);
-    });
-
-    it('should throw if line number is not a positive integer', () => {
-      expect(() =>
-        validateCodeRefs(['src/file.ts:0'])
-      ).toThrow(/line number must be a positive integer/);
-
-      expect(() =>
-        validateCodeRefs(['src/file.ts:-1'])
-      ).toThrow(/line number must be a positive integer/);
-
-      expect(() =>
-        validateCodeRefs(['src/file.ts:abc'])
-      ).toThrow(/line number must be a positive integer/);
-
-      expect(() =>
-        validateCodeRefs(['src/file.ts:1.5'])
-      ).toThrow(/line number must be a positive integer/);
-    });
-
-    it('should report correct index in error message', () => {
-      expect(() =>
-        validateCodeRefs([
-          'src/valid.ts:10',
-          'src/another.ts:20',
-          'invalid-no-line',
-        ])
-      ).toThrow(/index 2/i);
-    });
-
-    it('should accept Windows-style paths', () => {
-      expect(() =>
-        validateCodeRefs([
-          'D:\\Projects\\file.ts:42',
-          'C:\\Users\\name\\code.ts:100',
-        ])
-      ).not.toThrow();
-    });
-
-    it('should accept paths with spaces', () => {
-      expect(() =>
-        validateCodeRefs([
-          'src/my file.ts:42',
-          'path with spaces/code.ts:10',
-        ])
-      ).not.toThrow();
-    });
-
-    it('should accept colons in Windows drive letters', () => {
-      // Windows paths like D:\path\file.ts:42 have two colons
-      expect(() =>
-        validateCodeRefs(['D:\\path\\file.ts:42'])
-      ).not.toThrow();
-    });
-
-    it('should handle multiple colons - take last as line number', () => {
-      // Edge case: file path might have colon in URL-like paths
-      expect(() =>
-        validateCodeRefs(['http://example.com/path:42'])
-      ).not.toThrow();
+    it('RED: should accept empty description string', () => {
+      // Empty string is different from undefined - both are valid
+      expect(() => validateTargets([{ path: 'file.ts', action: 'create', description: '' }])).not.toThrow();
     });
   });
 });

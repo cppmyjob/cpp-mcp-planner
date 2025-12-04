@@ -191,6 +191,21 @@ export type ArtifactType =
 
 export type ArtifactStatus = 'draft' | 'reviewed' | 'approved' | 'implemented' | 'outdated';
 
+/**
+ * Target file for artifact - replaces FileEntry with additional precision fields
+ */
+export interface ArtifactTarget {
+  path: string;                    // File path (relative or absolute)
+  action: 'create' | 'modify' | 'delete';  // What to do with the file
+  lineNumber?: number;             // Specific line to target (1-indexed)
+  lineEnd?: number;                // End line for range (inclusive, requires lineNumber)
+  searchPattern?: string;          // Regex to find location (conflicts with lineNumber)
+  description?: string;            // Human-readable description
+}
+
+/**
+ * @deprecated Use ArtifactTarget instead. This type is kept for backward compatibility.
+ */
 export interface FileEntry {
   path: string;
   action: 'create' | 'modify' | 'delete';
@@ -212,8 +227,13 @@ export interface Artifact extends Entity {
     filename?: string;         // Suggested filename
   };
 
-  // File table - list of files to be created/modified
-  fileTable?: FileEntry[];
+  // File targets - list of files to be created/modified with precision
+  targets?: ArtifactTarget[];      // NEW: replaces fileTable
+
+  /**
+   * @deprecated Use targets instead. This field is kept for reading legacy data only.
+   */
+  fileTable?: FileEntry[];         // DEPRECATED: auto-migrated to targets on read
 
   // Context - what this artifact relates to
   relatedPhaseId?: string;     // The phase this artifact belongs to

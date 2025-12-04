@@ -330,7 +330,7 @@ export const tools = [
   },
   {
     name: 'artifact',
-    description: 'Store generated artifacts (code, configs, migrations, docs, tests, scripts) related to phases and solutions. Track file changes with fileTable, store source code with syntax highlighting. Link artifacts to phases/solutions/requirements for traceability. Use during phase implementation. Actions: add, get, update, list, delete.',
+    description: 'Store generated artifacts (code, configs, migrations, docs, tests, scripts) related to phases and solutions. Track file targets with precision (lineNumber, lineEnd, searchPattern), store source code with syntax highlighting. Link artifacts to phases/solutions/requirements for traceability. Use during phase implementation. Actions: add, get, update, list, delete.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -373,6 +373,21 @@ export const tools = [
                 required: ['path', 'action'],
               },
             },
+            targets: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  path: { type: 'string' },
+                  action: { type: 'string', enum: ['create', 'modify', 'delete'] },
+                  lineNumber: { type: 'number', description: 'Specific line to target (1-indexed)' },
+                  lineEnd: { type: 'number', description: 'End line for range (inclusive, requires lineNumber)' },
+                  searchPattern: { type: 'string', description: 'Regex to find location (conflicts with lineNumber)' },
+                  description: { type: 'string' },
+                },
+                required: ['path', 'action'],
+              },
+            },
             relatedPhaseId: { type: 'string' },
             relatedSolutionId: { type: 'string' },
             relatedRequirementIds: { type: 'array', items: { type: 'string' } },
@@ -392,6 +407,7 @@ export const tools = [
             status: { type: 'string' },
             content: { type: 'object' },
             fileTable: { type: 'array' },
+            targets: { type: 'array' },
             relatedPhaseId: { type: 'string' },
             relatedSolutionId: { type: 'string' },
             relatedRequirementIds: { type: 'array' },
