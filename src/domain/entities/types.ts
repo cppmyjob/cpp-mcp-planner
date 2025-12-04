@@ -114,6 +114,7 @@ export interface Decision extends Entity {
 
 // Phase types
 export type PhaseStatus = 'planned' | 'in_progress' | 'completed' | 'blocked' | 'skipped';
+export type PhasePriority = 'critical' | 'high' | 'medium' | 'low';
 
 // Code example for phases
 export interface CodeExample {
@@ -174,6 +175,8 @@ export interface Phase extends Entity {
   // Implementation details
   implementationNotes?: string;
   codeExamples?: CodeExample[];
+  codeRefs?: string[];  // Code references in format "file_path:line_number"
+  priority?: PhasePriority;
 }
 
 // Artifact types - for storing generated content (code, configs, docs)
@@ -198,6 +201,7 @@ export interface Artifact extends Entity {
   type: 'artifact';
   title: string;
   description: string;
+  slug?: string;                 // URL-friendly identifier (auto-generated from title if not provided)
   artifactType: ArtifactType;
   status: ArtifactStatus;
 
@@ -215,6 +219,9 @@ export interface Artifact extends Entity {
   relatedPhaseId?: string;     // The phase this artifact belongs to
   relatedSolutionId?: string;  // The solution this artifact implements
   relatedRequirementIds?: string[]; // Requirements this artifact addresses
+
+  // Code references in format "file_path:line_number"
+  codeRefs?: string[];
 }
 
 // Link types

@@ -185,6 +185,54 @@ describe('ArtifactService', () => {
       const { artifact } = await service.getArtifact({ planId, artifactId: added.artifactId });
       expect(artifact.status).toBe('reviewed');
     });
+
+    it('should update artifact with codeRefs', async () => {
+      const added = await service.addArtifact({
+        planId,
+        artifact: {
+          title: 'Test',
+          description: 'Test',
+          artifactType: 'code',
+          content: { language: 'ts', sourceCode: '' },
+        },
+      });
+
+      await service.updateArtifact({
+        planId,
+        artifactId: added.artifactId,
+        updates: {
+          codeRefs: ['src/updated-file.ts:50', 'tests/updated.test.ts:75'],
+        },
+      });
+
+      // Verify via getArtifact
+      const { artifact } = await service.getArtifact({ planId, artifactId: added.artifactId });
+      expect(artifact.codeRefs).toHaveLength(2);
+      expect(artifact.codeRefs![0]).toBe('src/updated-file.ts:50');
+      expect(artifact.codeRefs![1]).toBe('tests/updated.test.ts:75');
+    });
+
+    it('should validate codeRefs on update', async () => {
+      const added = await service.addArtifact({
+        planId,
+        artifact: {
+          title: 'Test',
+          description: 'Test',
+          artifactType: 'code',
+          content: { language: 'ts', sourceCode: '' },
+        },
+      });
+
+      await expect(
+        service.updateArtifact({
+          planId,
+          artifactId: added.artifactId,
+          updates: {
+            codeRefs: ['no-line-number'],
+          },
+        })
+      ).rejects.toThrow(/must be in format/i);
+    });
   });
 
   describe('listArtifacts', () => {
@@ -372,6 +420,264 @@ describe('ArtifactService', () => {
           },
         })
       ).rejects.toThrow(/action/i);
+    });
+
+    it('should add artifact with codeRefs', async () => {
+      const result = await service.addArtifact({
+        planId,
+        artifact: {
+          title: 'Implementation artifact',
+          description: 'Artifact with code references',
+          artifactType: 'code',
+          content: { language: 'typescript', sourceCode: 'export class MyClass {}' },
+          codeRefs: [
+            'src/services/my-service.ts:42',
+            'tests/my-service.test.ts:100',
+          ],
+        },
+      });
+
+      // Verify via getArtifact
+      const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
+      expect(artifact.codeRefs).toHaveLength(2);
+      expect(artifact.codeRefs![0]).toBe('src/services/my-service.ts:42');
+      expect(artifact.codeRefs![1]).toBe('tests/my-service.test.ts:100');
+    });
+
+    it('should validate codeRefs format in addArtifact', async () => {
+      await expect(
+        service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+            codeRefs: ['invalid-no-line-number'],
+          },
+        })
+      ).rejects.toThrow(/must be in format/i);
+    });
+
+    it('should validate codeRefs line number in addArtifact', async () => {
+      await expect(
+        service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+            codeRefs: ['src/file.ts:0'],
+          },
+        })
+      ).rejects.toThrow(/line number must be a positive integer/i);
+    });
+  });
+
+  describe('slug functionality', () => {
+    describe('CYCLE 1: Basic slug storage and retrieval', () => {
+      it('should save and retrieve artifact with explicit slug', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'User Service',
+            description: 'Service implementation',
+            artifactType: 'code',
+            content: { language: 'typescript', sourceCode: 'export class UserService {}' },
+            slug: 'my-artifact',
+          },
+        });
+
+        const retrieved = await service.getArtifact({
+          planId,
+          artifactId: result.artifactId,
+        });
+
+        expect(retrieved.artifact.slug).toBe('my-artifact');
+      });
+    });
+
+    describe('CYCLE 2: Auto-generate slug from title', () => {
+      it('should auto-generate slug when not provided', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'User Service Implementation',
+            description: 'Service for user management',
+            artifactType: 'code',
+            content: { language: 'typescript', sourceCode: 'export class UserService {}' },
+          },
+        });
+
+        const retrieved = await service.getArtifact({
+          planId,
+          artifactId: result.artifactId,
+        });
+
+        expect(retrieved.artifact.slug).toBe('user-service-implementation');
+      });
+    });
+
+    describe('CYCLE 3: Slug normalization edge cases', () => {
+      it('should remove special characters', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: "User's Service!!!",
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.slug).toBe('users-service');
+      });
+
+      it('should collapse multiple spaces', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Multiple   Spaces',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.slug).toBe('multiple-spaces');
+      });
+
+      it('should collapse multiple dashes', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test--Double--Dashes',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.slug).toBe('test-double-dashes');
+      });
+
+      it('should handle numbers correctly', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: '123 Numbers 456',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.slug).toBe('123-numbers-456');
+      });
+
+      it('should handle Unicode by removing non-ASCII', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Unicode Привет',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.slug).toBe('unicode');
+      });
+
+      it('should use fallback for empty results (only special chars)', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: '!!!',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.slug).toBe(`artifact-${result.artifactId}`);
+      });
+
+      it('should enforce max length of 100 characters', async () => {
+        const longTitle = 'A'.repeat(150);
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: longTitle,
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+          },
+        });
+
+        const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(retrieved.artifact.slug).toHaveLength(100);
+        expect(retrieved.artifact.slug).toBe('a'.repeat(100));
+      });
+    });
+
+    describe('CYCLE 4: Slug uniqueness validation', () => {
+      it('should throw error for duplicate explicit slug', async () => {
+        await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'First Artifact',
+            description: 'Test',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+            slug: 'duplicate-slug',
+          },
+        });
+
+        await expect(
+          service.addArtifact({
+            planId,
+            artifact: {
+              title: 'Second Artifact',
+              description: 'Test',
+              artifactType: 'code',
+              content: { language: 'ts', sourceCode: '' },
+              slug: 'duplicate-slug',
+            },
+          })
+        ).rejects.toThrow(/slug.*duplicate-slug.*already exists/i);
+      });
+
+      it('should throw error for duplicate auto-generated slug', async () => {
+        await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Same Title',
+            description: 'First',
+            artifactType: 'code',
+            content: { language: 'ts', sourceCode: '' },
+          },
+        });
+
+        await expect(
+          service.addArtifact({
+            planId,
+            artifact: {
+              title: 'Same Title',
+              description: 'Second',
+              artifactType: 'code',
+              content: { language: 'ts', sourceCode: '' },
+            },
+          })
+        ).rejects.toThrow(/slug.*same-title.*already exists/i);
+      });
     });
   });
 

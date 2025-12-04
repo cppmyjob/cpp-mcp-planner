@@ -1,13 +1,13 @@
 export const tools = [
   {
     name: 'plan',
-    description: 'Manage development plans - the top-level container for all planning entities. Create a plan first before using other tools. Set active plan per workspace to avoid passing planId repeatedly. Actions: create, list, get, update, archive, set_active, get_active.',
+    description: 'Manage development plans - the top-level container for all planning entities. Create a plan first before using other tools. Set active plan per workspace to avoid passing planId repeatedly. Use get_summary for plan overview (returns plan info, phase tree summary, statistics). Use includeEntities only for full export/backup - it returns large data. Actions: create, list, get, update, archive, set_active, get_active, get_summary.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['create', 'list', 'get', 'update', 'archive', 'set_active', 'get_active'],
+          enum: ['create', 'list', 'get', 'update', 'archive', 'set_active', 'get_active', 'get_summary'],
         },
         planId: { type: 'string' },
         name: { type: 'string' },
@@ -106,13 +106,13 @@ export const tools = [
   },
   {
     name: 'solution',
-    description: 'Manage solution proposals for requirements. Propose multiple solutions with tradeoff analysis, compare them to evaluate options, then select the best one. Use `decision` tool to record selection rationale. Selected solutions guide phase implementation. Actions: propose, get, update, compare, select, delete.',
+    description: 'Manage solution proposals for requirements. Propose multiple solutions with tradeoff analysis, compare them to evaluate options, then select the best one. Use `decision` tool to record selection rationale. Selected solutions guide phase implementation. Actions: propose, get, update, list, compare, select, delete.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['propose', 'get', 'update', 'compare', 'select', 'delete'],
+          enum: ['propose', 'get', 'update', 'list', 'compare', 'select', 'delete'],
         },
         planId: { type: 'string' },
         solutionId: { type: 'string' },
@@ -166,13 +166,13 @@ export const tools = [
   },
   {
     name: 'decision',
-    description: 'Record architectural decisions (ADR pattern) with context and alternatives considered. Use after solution selection or for any significant technical choice. Decisions can be superseded when context changes, maintaining decision history. Link decisions to requirements/solutions for traceability. Actions: record, get, list, supersede.',
+    description: 'Record architectural decisions (ADR pattern) with context and alternatives considered. Use after solution selection or for any significant technical choice. Decisions can be superseded when context changes, maintaining decision history. Link decisions to requirements/solutions for traceability. Actions: record, get, update, list, supersede.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['record', 'get', 'list', 'supersede'],
+          enum: ['record', 'get', 'update', 'list', 'supersede'],
         },
         planId: { type: 'string' },
         decisionId: { type: 'string' },
@@ -198,6 +198,16 @@ export const tools = [
             },
           },
         },
+        updates: {
+          type: 'object',
+          description: 'Partial update of decision fields for action=update',
+          properties: {
+            title: { type: 'string' },
+            context: { type: 'string' },
+            decision: { type: 'string' },
+            consequences: { type: 'string' },
+          },
+        },
         newDecision: { type: 'object' },
         reason: { type: 'string' },
         status: { type: 'string', enum: ['active', 'superseded', 'reversed'] },
@@ -207,13 +217,13 @@ export const tools = [
   },
   {
     name: 'phase',
-    description: 'Manage implementation phases/tasks in hierarchical structure. Break selected solutions into phases with objectives, deliverables, and estimates. Track progress, update status (planned/in_progress/completed/blocked), and get next actionable items. Use after solution selection. Actions: add, get, get_tree, update, update_status, move, delete, get_next_actions.',
+    description: 'Manage implementation phases/tasks in hierarchical structure. Break selected solutions into phases with objectives, deliverables, and estimates. Track progress, update status (planned/in_progress/completed/blocked), and get next actionable items. For plan overview/summary, use get_tree with fields parameter to get compact tree. Use link tool with depends_on relation to create phase dependencies with cycle detection. Use after solution selection. Actions: add, get, get_tree, update, update_status, move, delete, get_next_actions, complete_and_advance.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['add', 'get', 'get_tree', 'update', 'update_status', 'move', 'delete', 'get_next_actions'],
+          enum: ['add', 'get', 'get_tree', 'update', 'update_status', 'move', 'delete', 'get_next_actions', 'complete_and_advance'],
         },
         planId: { type: 'string' },
         phaseId: { type: 'string' },
@@ -249,6 +259,16 @@ export const tools = [
                 required: ['language', 'code'],
               },
             },
+            codeRefs: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Code references in format "file_path:line_number" (e.g., "src/services/phase-service.ts:42")',
+            },
+            priority: {
+              type: 'string',
+              enum: ['critical', 'high', 'medium', 'low'],
+              description: 'Phase priority for sorting in get_next_actions. Defaults to medium.',
+            },
           },
         },
         updates: {
@@ -277,6 +297,16 @@ export const tools = [
                 required: ['language', 'code'],
               },
             },
+            codeRefs: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Code references in format "file_path:line_number" (e.g., "src/services/phase-service.ts:42")',
+            },
+            priority: {
+              type: 'string',
+              enum: ['critical', 'high', 'medium', 'low'],
+              description: 'Phase priority. Defaults to medium.',
+            },
           },
         },
         status: { type: 'string', enum: ['planned', 'in_progress', 'completed', 'blocked', 'skipped'] },
@@ -291,7 +321,7 @@ export const tools = [
         fields: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Fields to include. Default returns summary (id, title, status, progress, path, childCount). Available fields: "description", "parentId", "order", "depth", "objectives", "deliverables", "successCriteria", "schedule", "startedAt", "completedAt", "milestones", "blockers", "implementationNotes", "codeExamples", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
+          description: 'Fields to include. Default returns summary (id, title, status, progress, path, childCount). Available fields: "description", "parentId", "order", "depth", "objectives", "deliverables", "successCriteria", "schedule", "startedAt", "completedAt", "milestones", "blockers", "implementationNotes", "codeExamples", "codeRefs", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
         },
         limit: { type: 'number' },
       },
@@ -315,6 +345,10 @@ export const tools = [
           properties: {
             title: { type: 'string' },
             description: { type: 'string' },
+            slug: {
+              type: 'string',
+              description: 'URL-friendly identifier (auto-generated from title if not provided). Must be lowercase alphanumeric with dashes, max 100 chars.',
+            },
             artifactType: {
               type: 'string',
               enum: ['code', 'config', 'migration', 'documentation', 'test', 'script', 'other'],
@@ -342,9 +376,32 @@ export const tools = [
             relatedPhaseId: { type: 'string' },
             relatedSolutionId: { type: 'string' },
             relatedRequirementIds: { type: 'array', items: { type: 'string' } },
+            codeRefs: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Code references in format "file_path:line_number" (e.g., "src/services/artifact-service.ts:100")',
+            },
           },
         },
-        updates: { type: 'object' },
+        updates: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            description: { type: 'string' },
+            slug: { type: 'string', description: 'Update slug (must be unique within plan)' },
+            status: { type: 'string' },
+            content: { type: 'object' },
+            fileTable: { type: 'array' },
+            relatedPhaseId: { type: 'string' },
+            relatedSolutionId: { type: 'string' },
+            relatedRequirementIds: { type: 'array' },
+            codeRefs: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Code references in format "file_path:line_number"',
+            },
+          },
+        },
         filters: {
           type: 'object',
           properties: {

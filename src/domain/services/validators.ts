@@ -135,3 +135,67 @@ export function validateFileTable(fileTable: unknown[]): void {
     }
   }
 }
+
+const VALID_PRIORITIES = ['critical', 'high', 'medium', 'low'] as const;
+
+/**
+ * Validates code references array.
+ * Format: "file_path:line_number" (e.g., "src/file.ts:42")
+ * Supports Windows paths with drive letters (e.g., "D:\\path\\file.ts:42")
+ */
+export function validateCodeRefs(codeRefs: unknown[]): void {
+  if (!Array.isArray(codeRefs)) {
+    return;
+  }
+
+  for (let i = 0; i < codeRefs.length; i++) {
+    const ref = codeRefs[i];
+
+    if (typeof ref !== 'string') {
+      throw new Error(
+        `Invalid codeRef at index ${i}: must be a string`
+      );
+    }
+
+    if (!ref) {
+      throw new Error(
+        `Invalid codeRef at index ${i}: cannot be empty`
+      );
+    }
+
+    // Find the last colon - line number comes after it
+    const lastColonIndex = ref.lastIndexOf(':');
+
+    if (lastColonIndex === -1) {
+      throw new Error(
+        `Invalid codeRef at index ${i}: must be in format 'file_path:line_number' (e.g., 'src/file.ts:42')`
+      );
+    }
+
+    const lineNumberStr = ref.slice(lastColonIndex + 1);
+    const lineNumber = parseInt(lineNumberStr, 10);
+
+    // Check if it's a positive integer
+    if (!Number.isInteger(lineNumber) || lineNumber < 1 || lineNumberStr !== String(lineNumber)) {
+      throw new Error(
+        `Invalid codeRef at index ${i}: line number must be a positive integer (got '${lineNumberStr}')`
+      );
+    }
+  }
+}
+
+export function validatePriority(priority: unknown): void {
+  if (priority === undefined || priority === null) {
+    return; // Optional field
+  }
+
+  if (typeof priority !== 'string') {
+    throw new Error('Invalid priority: must be a string');
+  }
+
+  if (!VALID_PRIORITIES.includes(priority as typeof VALID_PRIORITIES[number])) {
+    throw new Error(
+      `Invalid priority '${priority}': must be one of: ${VALID_PRIORITIES.join(', ')}`
+    );
+  }
+}

@@ -178,6 +178,42 @@ describe('Entity Types', () => {
       expect(phase.progress).toBe(100);
       expect(phase.schedule.actualEffort).toBe(3.5);
     });
+
+    it('should have optional priority field', () => {
+      const phase: Phase = {
+        id: 'phase-003',
+        type: 'phase',
+        createdAt: '2024-12-01T10:00:00Z',
+        updatedAt: '2024-12-01T10:00:00Z',
+        version: 1,
+        metadata: { createdBy: 'claude-code', tags: [], annotations: [] },
+        title: 'High Priority Phase',
+        description: 'Critical work',
+        parentId: null,
+        order: 1,
+        depth: 0,
+        path: '1',
+        objectives: ['Build auth'],
+        deliverables: ['Login API'],
+        successCriteria: ['Tests pass'],
+        schedule: {
+          estimatedEffort: { value: 2, unit: 'days', confidence: 'medium' },
+        },
+        status: 'planned',
+        progress: 0,
+        priority: 'critical',
+      };
+
+      expect(phase.priority).toBe('critical');
+    });
+
+    it('should allow phase without priority field', () => {
+      const phase: Partial<Phase> = {
+        title: 'No Priority',
+        priority: undefined,
+      };
+      expect(phase.priority).toBeUndefined();
+    });
   });
 
   describe('Link', () => {

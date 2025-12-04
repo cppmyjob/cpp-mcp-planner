@@ -1,8 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
-import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, CodeExample } from '../entities/types.js';
-import { validateEffortEstimate, validateTags, validateCodeExamples } from './validators.js';
+import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, CodeExample, PhasePriority } from '../entities/types.js';
+import { validateEffortEstimate, validateTags, validateCodeExamples, validatePriority, validateCodeRefs } from './validators.js';
 
 /**
  * Calculate the next valid order for a phase.
@@ -51,6 +51,8 @@ export interface AddPhaseInput {
     tags?: Tag[];
     implementationNotes?: string;
     codeExamples?: CodeExample[];
+    codeRefs?: string[];
+    priority?: PhasePriority;
   };
 }
 
@@ -75,6 +77,8 @@ export interface UpdatePhaseInput {
     tags: Tag[];
     implementationNotes: string;
     codeExamples: CodeExample[];
+    codeRefs: string[];
+    priority: PhasePriority;
   }>;
 }
 
@@ -138,6 +142,19 @@ export interface GetNextActionsResult {
     totalInProgress: number;
     totalBlocked: number;
   };
+}
+
+export interface CompleteAndAdvanceInput {
+  planId: string;
+  phaseId: string;
+  actualEffort?: number;
+  notes?: string;
+}
+
+export interface CompleteAndAdvanceResult {
+  completedPhaseId: string;
+  nextPhaseId: string | null;
+  success: true;
 }
 
 // Summary phase contains only essential fields for tree navigation
@@ -224,6 +241,12 @@ export class PhaseService {
     validateTags(input.phase.tags || []);
     // Validate codeExamples format
     validateCodeExamples(input.phase.codeExamples || []);
+    // Validate priority if provided
+    if (input.phase.priority !== undefined) {
+      validatePriority(input.phase.priority);
+    }
+    // Validate codeRefs format
+    validateCodeRefs(input.phase.codeRefs || []);
 
     const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
     const phaseId = uuidv4();
@@ -273,6 +296,8 @@ export class PhaseService {
       progress: 0,
       implementationNotes: input.phase.implementationNotes,
       codeExamples: input.phase.codeExamples,
+      codeRefs: input.phase.codeRefs,
+      priority: input.phase.priority ?? 'medium',
     };
 
     phases.push(phase);
@@ -315,6 +340,14 @@ export class PhaseService {
     if (input.updates.codeExamples !== undefined) {
       validateCodeExamples(input.updates.codeExamples);
       phase.codeExamples = input.updates.codeExamples;
+    }
+    if (input.updates.codeRefs !== undefined) {
+      validateCodeRefs(input.updates.codeRefs);
+      phase.codeRefs = input.updates.codeRefs;
+    }
+    if (input.updates.priority !== undefined) {
+      validatePriority(input.updates.priority);
+      phase.priority = input.updates.priority;
     }
 
     phase.updatedAt = now;
@@ -558,6 +591,18 @@ export class PhaseService {
     };
   }
 
+  private comparePriority(a: Phase, b: Phase): number {
+    const priorityOrder: Record<PhasePriority, number> = {
+      critical: 0,
+      high: 1,
+      medium: 2,
+      low: 3,
+    };
+    const aPrio = a.priority ?? 'medium';
+    const bPrio = b.priority ?? 'medium';
+    return priorityOrder[aPrio] - priorityOrder[bPrio];
+  }
+
   async getNextActions(input: GetNextActionsInput): Promise<GetNextActionsResult> {
     const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
     const limit = input.limit || 5;
@@ -569,7 +614,7 @@ export class PhaseService {
     const blocked = phases.filter((p) => p.status === 'blocked');
 
     // Priority 1: Blocked phases need attention
-    for (const phase of blocked) {
+    for (const phase of blocked.sort((a, b) => this.comparePriority(a, b))) {
       if (actions.length >= limit) break;
       actions.push({
         phaseId: phase.id,
@@ -582,7 +627,11 @@ export class PhaseService {
     }
 
     // Priority 2: In-progress phases near completion
-    for (const phase of inProgress.sort((a, b) => b.progress - a.progress)) {
+    for (const phase of inProgress.sort((a, b) => {
+      const progressDiff = b.progress - a.progress;
+      if (progressDiff !== 0) return progressDiff;
+      return this.comparePriority(a, b);
+    })) {
       if (actions.length >= limit) break;
       if (phase.progress >= 80) {
         actions.push({
@@ -613,7 +662,11 @@ export class PhaseService {
         const parent = phases.find((x) => x.id === p.parentId);
         return !parent || parent.status === 'completed' || parent.status === 'in_progress';
       })
-      .sort((a, b) => a.path.localeCompare(b.path));
+      .sort((a, b) => {
+        const prioDiff = this.comparePriority(a, b);
+        if (prioDiff !== 0) return prioDiff;
+        return a.path.localeCompare(b.path);
+      });
 
     for (const phase of readyToStart) {
       if (actions.length >= limit) break;
@@ -635,6 +688,117 @@ export class PhaseService {
         totalBlocked: blocked.length,
       },
     };
+  }
+
+  async completeAndAdvance(input: CompleteAndAdvanceInput): Promise<CompleteAndAdvanceResult> {
+    await this.ensurePlanExists(input.planId);
+
+    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const currentIndex = phases.findIndex((p) => p.id === input.phaseId);
+
+    if (currentIndex === -1) {
+      throw new Error('Phase not found');
+    }
+
+    const currentPhase = phases[currentIndex];
+    const now = new Date().toISOString();
+
+    // Validate current phase status
+    if (currentPhase.status === 'completed') {
+      throw new Error('Phase is already completed');
+    }
+
+    if (currentPhase.status === 'skipped') {
+      throw new Error('Cannot complete skipped phase');
+    }
+
+    if (currentPhase.status === 'blocked') {
+      throw new Error('Cannot complete blocked phase. Unblock it first.');
+    }
+
+    // Complete current phase
+    currentPhase.status = 'completed';
+    currentPhase.progress = 100;
+    currentPhase.completedAt = now;
+    currentPhase.updatedAt = now;
+    currentPhase.version += 1;
+
+    if (input.actualEffort !== undefined) {
+      currentPhase.schedule.actualEffort = input.actualEffort;
+    }
+
+    if (input.notes) {
+      currentPhase.metadata.annotations.push({
+        id: uuidv4(),
+        text: input.notes,
+        author: 'claude-code',
+        createdAt: now,
+      });
+    }
+
+    phases[currentIndex] = currentPhase;
+
+    // Find and start next planned phase
+    const nextPhase = this.findNextPlannedPhase(currentPhase, phases);
+
+    if (nextPhase) {
+      nextPhase.status = 'in_progress';
+      nextPhase.startedAt = now;
+      nextPhase.updatedAt = now;
+      nextPhase.version += 1;
+
+      const nextIndex = phases.findIndex((p) => p.id === nextPhase.id);
+      phases[nextIndex] = nextPhase;
+    }
+
+    await this.storage.saveEntities(input.planId, 'phases', phases);
+    await this.planService.updateStatistics(input.planId);
+
+    return {
+      completedPhaseId: currentPhase.id,
+      nextPhaseId: nextPhase?.id || null,
+      success: true as const,
+    };
+  }
+
+  /**
+   * Finds the next planned phase following hierarchical traversal:
+   * 1. Check for planned children (depth-first)
+   * 2. Check for next planned sibling
+   * 3. Recursively check parent's next sibling (move up)
+   */
+  private findNextPlannedPhase(currentPhase: Phase, allPhases: Phase[]): Phase | null {
+    // 1. Check for planned children (depth-first)
+    const children = allPhases
+      .filter((p) => p.parentId === currentPhase.id && p.status === 'planned')
+      .sort((a, b) => a.order - b.order);
+
+    if (children.length > 0) {
+      return children[0];
+    }
+
+    // 2. Check for next planned sibling
+    const siblings = allPhases
+      .filter(
+        (p) =>
+          p.parentId === currentPhase.parentId && p.order > currentPhase.order && p.status === 'planned'
+      )
+      .sort((a, b) => a.order - b.order);
+
+    if (siblings.length > 0) {
+      return siblings[0];
+    }
+
+    // 3. Move up to parent and recursively find its next sibling
+    if (currentPhase.parentId) {
+      const parent = allPhases.find((p) => p.id === currentPhase.parentId);
+      if (parent) {
+        return this.findNextPlannedPhase(parent, allPhases);
+      }
+    }
+
+    // 4. No next phase found
+    return null;
   }
 }
 

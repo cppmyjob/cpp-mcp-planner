@@ -59,6 +59,10 @@ export interface GetActivePlanInput {
   includeGuide?: boolean;
 }
 
+export interface GetSummaryInput {
+  planId: string;
+}
+
 // Output types
 export interface CreatePlanResult {
   planId: string;
@@ -118,6 +122,28 @@ export interface GetActivePlanResult {
     lastUpdated: string;
     usageGuide?: UsageGuide;
   } | null;
+}
+
+export interface PhaseSummaryItem {
+  id: string;
+  title: string;
+  status: string;
+  progress: number;
+  path: string;
+  childCount: number;
+}
+
+export interface GetSummaryResult {
+  plan: {
+    id: string;
+    name: string;
+    description: string;
+    status: PlanStatus;
+    createdAt: string;
+    updatedAt: string;
+  };
+  phases: PhaseSummaryItem[];
+  statistics: PlanManifest['statistics'];
 }
 
 export class PlanService {
@@ -380,6 +406,47 @@ export class PlanService {
       await this.storage.saveActivePlans(activePlans);
       return { activePlan: null };
     }
+  }
+
+  async getSummary(input: GetSummaryInput): Promise<GetSummaryResult> {
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    const manifest = await this.storage.loadManifest(input.planId);
+    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+
+    // Calculate child counts for each phase
+    const childCounts = new Map<string, number>();
+    for (const phase of phases) {
+      if (phase.parentId) {
+        childCounts.set(phase.parentId, (childCounts.get(phase.parentId) || 0) + 1);
+      }
+    }
+
+    // Convert phases to summary format
+    const phaseSummaries: PhaseSummaryItem[] = phases.map((phase) => ({
+      id: phase.id,
+      title: phase.title,
+      status: phase.status,
+      progress: phase.progress,
+      path: phase.path,
+      childCount: childCounts.get(phase.id) || 0,
+    }));
+
+    return {
+      plan: {
+        id: manifest.id,
+        name: manifest.name,
+        description: manifest.description,
+        status: manifest.status,
+        createdAt: manifest.createdAt,
+        updatedAt: manifest.updatedAt,
+      },
+      phases: phaseSummaries,
+      statistics: manifest.statistics,
+    };
   }
 
   // Helper to update statistics
