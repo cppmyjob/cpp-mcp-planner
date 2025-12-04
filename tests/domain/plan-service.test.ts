@@ -228,6 +228,62 @@ describe('PlanService', () => {
     });
   });
 
+  describe('getActivePlan with usageGuide (Sprint 9)', () => {
+    it('should return usageGuide by default', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace',
+      });
+
+      const result = await service.getActivePlan({ workspacePath: '/test/workspace' });
+
+      expect(result.activePlan).toBeDefined();
+      expect(result.activePlan!.usageGuide).toBeDefined();
+      expect(result.activePlan!.usageGuide!.quickStart).toContain('phase get_tree');
+      expect(result.activePlan!.usageGuide!.commands.overview).toHaveLength(4);
+      expect(result.activePlan!.usageGuide!.warnings[0]).toContain("NEVER use fields: ['*']");
+    });
+
+    it('should exclude usageGuide when includeGuide=false', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace',
+      });
+
+      const result = await service.getActivePlan({
+        workspacePath: '/test/workspace',
+        includeGuide: false,
+      });
+
+      expect(result.activePlan).toBeDefined();
+      expect(result.activePlan!.usageGuide).toBeUndefined();
+    });
+
+    it('should have valid usageGuide structure', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace',
+      });
+
+      const result = await service.getActivePlan({ workspacePath: '/test/workspace' });
+      const guide = result.activePlan!.usageGuide!;
+
+      expect(guide.quickStart).toBeTruthy();
+      expect(guide.commands.overview).toBeInstanceOf(Array);
+      expect(guide.commands.detailed).toBeInstanceOf(Array);
+      expect(guide.formattingGuide).toContain('Tree View');
+      expect(guide.warnings).toBeInstanceOf(Array);
+
+      // Check command structure
+      const cmd = guide.commands.overview[0];
+      expect(cmd.cmd).toBeTruthy();
+      expect(cmd.desc).toBeTruthy();
+    });
+  });
+
   describe('minimal return values (Sprint 6)', () => {
     describe('createPlan should return only planId', () => {
       it('should not include manifest in result', async () => {
