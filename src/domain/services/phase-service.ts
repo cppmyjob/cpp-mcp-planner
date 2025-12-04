@@ -4,6 +4,35 @@ import type { PlanService } from './plan-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, CodeExample } from '../entities/types.js';
 import { validateEffortEstimate, validateTags, validateCodeExamples } from './validators.js';
 
+/**
+ * Calculate the next valid order for a phase.
+ *
+ * - If explicitOrder is provided, validates it doesn't conflict with existing siblings
+ * - Otherwise, calculates next order based on max existing sibling order (not count!)
+ *   This prevents duplicate paths when phases are deleted creating gaps in the sequence.
+ *
+ * @param siblings - Array of existing sibling phases (same parentId)
+ * @param explicitOrder - Optional explicit order value provided by user
+ * @returns The validated order value to use
+ * @throws Error if explicit order conflicts with existing sibling
+ */
+function calculateNextOrder(siblings: Phase[], explicitOrder?: number): number {
+  const maxSiblingOrder = siblings.length > 0 ? Math.max(...siblings.map((s) => s.order)) : 0;
+
+  if (explicitOrder !== undefined) {
+    const conflicting = siblings.find((s) => s.order === explicitOrder);
+    if (conflicting) {
+      throw new Error(
+        `Order ${explicitOrder} already exists for sibling phase "${conflicting.title}". ` +
+          `Use a different order value or omit to auto-generate.`
+      );
+    }
+    return explicitOrder;
+  }
+
+  return maxSiblingOrder + 1;
+}
+
 // Input types
 export interface AddPhaseInput {
   planId: string;
@@ -208,7 +237,7 @@ export class PhaseService {
     // Calculate hierarchy
     const parentId = input.phase.parentId === undefined ? null : input.phase.parentId;
     const siblings = phases.filter((p) => p.parentId === parentId);
-    const order = input.phase.order ?? siblings.length + 1;
+    const order = calculateNextOrder(siblings, input.phase.order);
 
     let depth = 0;
     let path = String(order);

@@ -1034,6 +1034,238 @@ describe('E2E: All MCP Tools Validation', () => {
       const parsed = parseResult<{ success: boolean }>(result);
       expect(parsed.success).toBe(true);
     });
+
+    // Sprint 5 - Order/Path Bug Fix E2E Tests
+    describe('order/path calculation (Sprint 5 - Bug Fix)', () => {
+      let e2ePlanId: string;
+
+      beforeAll(async () => {
+        // Create a fresh plan for order/path testing
+        const result = await client.callTool({
+          name: 'plan',
+          arguments: {
+            action: 'create',
+            name: 'Order Path E2E Test Plan',
+            description: 'Testing order/path calculation',
+          },
+        });
+        e2ePlanId = parseResult<{ planId: string }>(result).planId;
+      });
+
+      it('should calculate order based on max sibling order after delete', async () => {
+        // Create 3 phases
+        const phase1Result = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'add',
+            planId: e2ePlanId,
+            phase: { title: 'E2E Phase 1', description: 'First', objectives: ['O1'] },
+          },
+        });
+        const phase2Result = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'add',
+            planId: e2ePlanId,
+            phase: { title: 'E2E Phase 2', description: 'Second', objectives: ['O2'] },
+          },
+        });
+        const phase3Result = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'add',
+            planId: e2ePlanId,
+            phase: { title: 'E2E Phase 3', description: 'Third', objectives: ['O3'] },
+          },
+        });
+
+        const p1 = parseResult<{ phaseId: string; phase: { order: number } }>(phase1Result);
+        const p2 = parseResult<{ phaseId: string; phase: { order: number } }>(phase2Result);
+        const p3 = parseResult<{ phaseId: string; phase: { order: number } }>(phase3Result);
+
+        expect(p1.phase.order).toBe(1);
+        expect(p2.phase.order).toBe(2);
+        expect(p3.phase.order).toBe(3);
+
+        // Delete phase 2
+        await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'delete',
+            planId: e2ePlanId,
+            phaseId: p2.phaseId,
+          },
+        });
+
+        // Add new phase - should get order 4 (max=3 + 1), not 3 (count=2 + 1)
+        const phase4Result = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'add',
+            planId: e2ePlanId,
+            phase: { title: 'E2E Phase 4', description: 'Fourth', objectives: ['O4'] },
+          },
+        });
+
+        const p4 = parseResult<{ phase: { order: number; path: string } }>(phase4Result);
+        expect(p4.phase.order).toBe(4);
+        expect(p4.phase.path).toBe('4');
+      });
+
+      it('should generate unique paths for nested phases through full MCP flow', async () => {
+        // Create parent phase
+        const parentResult = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'add',
+            planId: e2ePlanId,
+            phase: { title: 'E2E Parent', description: 'Parent phase', objectives: ['P'] },
+          },
+        });
+        const parent = parseResult<{ phaseId: string; phase: { path: string } }>(parentResult);
+
+        // Create 3 children
+        const child1Result = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'add',
+            planId: e2ePlanId,
+            phase: {
+              title: 'E2E Child 1',
+              description: 'C1',
+              objectives: ['C'],
+              parentId: parent.phaseId,
+            },
+          },
+        });
+        const child2Result = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'add',
+            planId: e2ePlanId,
+            phase: {
+              title: 'E2E Child 2',
+              description: 'C2',
+              objectives: ['C'],
+              parentId: parent.phaseId,
+            },
+          },
+        });
+        const child3Result = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'add',
+            planId: e2ePlanId,
+            phase: {
+              title: 'E2E Child 3',
+              description: 'C3',
+              objectives: ['C'],
+              parentId: parent.phaseId,
+            },
+          },
+        });
+
+        const c1 = parseResult<{ phaseId: string; phase: { path: string } }>(child1Result);
+        const c2 = parseResult<{ phaseId: string; phase: { path: string } }>(child2Result);
+        const c3 = parseResult<{ phaseId: string; phase: { path: string } }>(child3Result);
+
+        // Delete child 2
+        await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'delete',
+            planId: e2ePlanId,
+            phaseId: c2.phaseId,
+          },
+        });
+
+        // Add new child - should get order 4 and path X.4
+        const child4Result = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'add',
+            planId: e2ePlanId,
+            phase: {
+              title: 'E2E Child 4',
+              description: 'C4',
+              objectives: ['C'],
+              parentId: parent.phaseId,
+            },
+          },
+        });
+
+        const c4 = parseResult<{ phase: { order: number; path: string } }>(child4Result);
+        expect(c4.phase.order).toBe(4);
+        expect(c4.phase.path).toBe(`${parent.phase.path}.4`);
+
+        // Verify tree has no duplicate paths
+        const treeResult = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'get_tree',
+            planId: e2ePlanId,
+            fields: ['path'],
+          },
+        });
+
+        const tree = parseResult<{
+          tree: Array<{ phase: { path: string }; children: Array<{ phase: { path: string } }> }>;
+        }>(treeResult);
+
+        // Collect all paths and verify uniqueness
+        const allPaths = new Set<string>();
+        const collectPaths = (
+          nodes: Array<{ phase: { path: string }; children?: Array<{ phase: { path: string } }> }>
+        ) => {
+          for (const node of nodes) {
+            expect(allPaths.has(node.phase.path)).toBe(false);
+            allPaths.add(node.phase.path);
+            if (node.children && node.children.length > 0) {
+              collectPaths(node.children);
+            }
+          }
+        };
+        collectPaths(tree.tree);
+
+        // Should have no duplicates
+        expect(allPaths.size).toBeGreaterThan(0);
+      });
+
+      it('should handle explicit order correctly after gaps', async () => {
+        // Create phase with explicit order=100
+        const phase100Result = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'add',
+            planId: e2ePlanId,
+            phase: {
+              title: 'E2E Phase 100',
+              description: 'Explicit order',
+              objectives: ['O'],
+              order: 100,
+            },
+          },
+        });
+
+        const p100 = parseResult<{ phase: { order: number; path: string } }>(phase100Result);
+        expect(p100.phase.order).toBe(100);
+        expect(p100.phase.path).toBe('100');
+
+        // Add auto-ordered phase - should get order 101
+        const autoResult = await client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'add',
+            planId: e2ePlanId,
+            phase: { title: 'E2E Auto Phase', description: 'Auto order', objectives: ['O'] },
+          },
+        });
+
+        const pAuto = parseResult<{ phase: { order: number; path: string } }>(autoResult);
+        expect(pAuto.phase.order).toBe(101);
+        expect(pAuto.phase.path).toBe('101');
+      });
+    });
   });
 
   // ============================================================

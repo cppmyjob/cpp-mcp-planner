@@ -806,6 +806,247 @@ describe('Tool Handlers Integration', () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.actions).toBeDefined();
     });
+
+    // Sprint 5 - Order/Path Bug Fix Integration Tests
+    describe('order/path persistence (Sprint 5 - Bug Fix)', () => {
+      it('should generate correct order after adding multiple phases', async () => {
+        // Add 3 phases sequentially
+        const phase1 = await handleToolCall(
+          'phase',
+          { action: 'add', planId: ctx.planId, phase: { title: 'Phase 1', description: 'First' } },
+          ctx.services
+        );
+        const phase2 = await handleToolCall(
+          'phase',
+          { action: 'add', planId: ctx.planId, phase: { title: 'Phase 2', description: 'Second' } },
+          ctx.services
+        );
+        const phase3 = await handleToolCall(
+          'phase',
+          { action: 'add', planId: ctx.planId, phase: { title: 'Phase 3', description: 'Third' } },
+          ctx.services
+        );
+
+        const p1 = JSON.parse(phase1.content[0].text);
+        const p2 = JSON.parse(phase2.content[0].text);
+        const p3 = JSON.parse(phase3.content[0].text);
+
+        expect(p1.phase.order).toBe(1);
+        expect(p2.phase.order).toBe(2);
+        expect(p3.phase.order).toBe(3);
+        expect(p1.phase.path).toBe('1');
+        expect(p2.phase.path).toBe('2');
+        expect(p3.phase.path).toBe('3');
+      });
+
+      it('should calculate order based on max existing order after delete', async () => {
+        // Add 3 phases
+        const phase1 = await handleToolCall(
+          'phase',
+          { action: 'add', planId: ctx.planId, phase: { title: 'Phase 1', description: 'First' } },
+          ctx.services
+        );
+        const phase2 = await handleToolCall(
+          'phase',
+          { action: 'add', planId: ctx.planId, phase: { title: 'Phase 2', description: 'Second' } },
+          ctx.services
+        );
+        const phase3 = await handleToolCall(
+          'phase',
+          { action: 'add', planId: ctx.planId, phase: { title: 'Phase 3', description: 'Third' } },
+          ctx.services
+        );
+
+        const p2 = JSON.parse(phase2.content[0].text);
+        const p3 = JSON.parse(phase3.content[0].text);
+
+        // Delete phase 2
+        await handleToolCall(
+          'phase',
+          { action: 'delete', planId: ctx.planId, phaseId: p2.phaseId },
+          ctx.services
+        );
+
+        // Add new phase - should get order 4 (max=3, +1), not 3 (count=2, +1)
+        const phase4 = await handleToolCall(
+          'phase',
+          { action: 'add', planId: ctx.planId, phase: { title: 'Phase 4', description: 'Fourth' } },
+          ctx.services
+        );
+
+        const p4 = JSON.parse(phase4.content[0].text);
+        expect(p4.phase.order).toBe(4);
+        expect(p4.phase.path).toBe('4');
+      });
+
+      it('should maintain unique paths for all phases in tree', async () => {
+        // Add parent phases
+        const parent1 = await handleToolCall(
+          'phase',
+          { action: 'add', planId: ctx.planId, phase: { title: 'Parent 1', description: 'P1' } },
+          ctx.services
+        );
+        const parent2 = await handleToolCall(
+          'phase',
+          { action: 'add', planId: ctx.planId, phase: { title: 'Parent 2', description: 'P2' } },
+          ctx.services
+        );
+
+        const p1 = JSON.parse(parent1.content[0].text);
+        const p2 = JSON.parse(parent2.content[0].text);
+
+        // Add children to parent1
+        const child1 = await handleToolCall(
+          'phase',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            phase: { title: 'Child 1.1', description: 'C1', parentId: p1.phaseId },
+          },
+          ctx.services
+        );
+        const child2 = await handleToolCall(
+          'phase',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            phase: { title: 'Child 1.2', description: 'C2', parentId: p1.phaseId },
+          },
+          ctx.services
+        );
+
+        const c1 = JSON.parse(child1.content[0].text);
+        const c2 = JSON.parse(child2.content[0].text);
+
+        // Verify paths are unique
+        expect(p1.phase.path).toBe('1');
+        expect(p2.phase.path).toBe('2');
+        expect(c1.phase.path).toBe('1.1');
+        expect(c2.phase.path).toBe('1.2');
+
+        // Get tree and verify all paths
+        const tree = await handleToolCall(
+          'phase',
+          { action: 'get_tree', planId: ctx.planId },
+          ctx.services
+        );
+        const treeData = JSON.parse(tree.content[0].text);
+
+        const allPaths = new Set<string>();
+        const collectPaths = (
+          nodes: Array<{ phase: { path: string }; children?: Array<{ phase: { path: string } }> }>
+        ) => {
+          for (const node of nodes) {
+            expect(allPaths.has(node.phase.path)).toBe(false); // Should not have duplicates
+            allPaths.add(node.phase.path);
+            if (node.children && node.children.length > 0) {
+              collectPaths(
+                node.children as Array<{
+                  phase: { path: string };
+                  children?: Array<{ phase: { path: string } }>;
+                }>
+              );
+            }
+          }
+        };
+        collectPaths(treeData.tree);
+
+        expect(allPaths.size).toBe(4); // 2 parents + 2 children
+      });
+
+      it('should handle order gaps when adding child phases after delete', async () => {
+        // Add parent
+        const parent = await handleToolCall(
+          'phase',
+          { action: 'add', planId: ctx.planId, phase: { title: 'Parent', description: 'P' } },
+          ctx.services
+        );
+        const p = JSON.parse(parent.content[0].text);
+
+        // Add 3 children
+        const child1 = await handleToolCall(
+          'phase',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            phase: { title: 'Child 1', description: 'C1', parentId: p.phaseId },
+          },
+          ctx.services
+        );
+        const child2 = await handleToolCall(
+          'phase',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            phase: { title: 'Child 2', description: 'C2', parentId: p.phaseId },
+          },
+          ctx.services
+        );
+        const child3 = await handleToolCall(
+          'phase',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            phase: { title: 'Child 3', description: 'C3', parentId: p.phaseId },
+          },
+          ctx.services
+        );
+
+        const c1 = JSON.parse(child1.content[0].text);
+        const c2 = JSON.parse(child2.content[0].text);
+        const c3 = JSON.parse(child3.content[0].text);
+
+        // Delete child 2 (creates gap: 1, _, 3)
+        await handleToolCall(
+          'phase',
+          { action: 'delete', planId: ctx.planId, phaseId: c2.phaseId },
+          ctx.services
+        );
+
+        // Add new child - should get order 4 (max=3, +1), not 3 (count=2, +1)
+        const child4 = await handleToolCall(
+          'phase',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            phase: { title: 'Child 4', description: 'C4', parentId: p.phaseId },
+          },
+          ctx.services
+        );
+
+        const c4 = JSON.parse(child4.content[0].text);
+        expect(c4.phase.order).toBe(4);
+        expect(c4.phase.path).toBe('1.4');
+      });
+
+      it('should persist order correctly when using explicit order', async () => {
+        // Add phase with explicit order=10
+        const phase1 = await handleToolCall(
+          'phase',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            phase: { title: 'Phase 10', description: 'Explicit order', order: 10 },
+          },
+          ctx.services
+        );
+
+        const p1 = JSON.parse(phase1.content[0].text);
+        expect(p1.phase.order).toBe(10);
+        expect(p1.phase.path).toBe('10');
+
+        // Add auto-ordered phase - should get order 11 (max=10, +1)
+        const phase2 = await handleToolCall(
+          'phase',
+          { action: 'add', planId: ctx.planId, phase: { title: 'Phase Auto', description: 'Auto order' } },
+          ctx.services
+        );
+
+        const p2 = JSON.parse(phase2.content[0].text);
+        expect(p2.phase.order).toBe(11);
+        expect(p2.phase.path).toBe('11');
+      });
+    });
   });
 
   describe('Linking Tools', () => {
