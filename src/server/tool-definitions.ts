@@ -464,4 +464,32 @@ export const tools = [
       required: ['action'],
     },
   },
+  {
+    name: 'batch',
+    description: 'Execute multiple planning operations atomically in a single transaction. All operations succeed together or all fail (rollback). Supports temp IDs ($0, $1, $2, ...) for referencing entities created within the same batch. Temp IDs are resolved to real UUIDs after entity creation. Use batch for: creating complex dependency trees, bulk imports, setting up initial project structure. Actions: execute.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        planId: { type: 'string' },
+        operations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              entity_type: {
+                type: 'string',
+                enum: ['requirement', 'solution', 'phase', 'link', 'decision', 'artifact'],
+              },
+              payload: {
+                type: 'object',
+                description: 'Entity-specific payload. For temp ID support, use tempId field. For referencing other entities in the batch, use $0, $1, $2, etc. in ID fields (parentId, addressing, sourceId, targetId, relatedPhaseId, relatedSolutionId, relatedRequirementIds, source.parentId).',
+              },
+            },
+            required: ['entity_type', 'payload'],
+          },
+        },
+      },
+      required: ['planId', 'operations'],
+    },
+  },
 ];

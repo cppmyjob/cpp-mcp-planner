@@ -16,8 +16,8 @@ describe('Tool Definitions', () => {
 
     it('should have get_summary in enum', () => {
       const planTool = tools.find(t => t.name === 'plan');
-      const actionEnum = planTool!.inputSchema.properties.action.enum;
-      expect(actionEnum).toContain('get_summary');
+      const actionProp = planTool!.inputSchema.properties?.action as { enum?: string[] };
+      expect(actionProp?.enum).toContain('get_summary');
     });
   });
 

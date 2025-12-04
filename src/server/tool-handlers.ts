@@ -25,6 +25,7 @@ export async function handleToolCall(
     artifactService,
     linkingService,
     queryService,
+    batchService,
   } = services;
 
   const action = args.action as string;
@@ -233,6 +234,10 @@ export async function handleToolCall(
           default:
             throw new ToolError('InvalidAction', `Unknown action for query: ${action}`);
         }
+        break;
+
+      case 'batch':
+        result = await batchService.executeBatch(args as any);
         break;
 
       default:

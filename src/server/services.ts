@@ -7,6 +7,7 @@ import { PhaseService } from '../domain/services/phase-service.js';
 import { ArtifactService } from '../domain/services/artifact-service.js';
 import { LinkingService } from '../domain/services/linking-service.js';
 import { QueryService } from '../domain/services/query-service.js';
+import { BatchService } from '../domain/services/batch-service.js';
 
 export interface Services {
   storage: FileStorage;
@@ -19,6 +20,7 @@ export interface Services {
   artifactService: ArtifactService;
   linkingService: LinkingService;
   queryService: QueryService;
+  batchService: BatchService;
 }
 
 export async function createServices(storagePath: string): Promise<Services> {
@@ -33,6 +35,16 @@ export async function createServices(storagePath: string): Promise<Services> {
   const artifactService = new ArtifactService(storage, planService);
   const linkingService = new LinkingService(storage);
   const queryService = new QueryService(storage, planService, linkingService);
+  const batchService = new BatchService(
+    storage,
+    planService,
+    requirementService,
+    solutionService,
+    phaseService,
+    linkingService,
+    decisionService,
+    artifactService
+  );
 
   return {
     storage,
@@ -45,5 +57,6 @@ export async function createServices(storagePath: string): Promise<Services> {
     artifactService,
     linkingService,
     queryService,
+    batchService,
   };
 }

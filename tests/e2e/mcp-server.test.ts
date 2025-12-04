@@ -47,14 +47,15 @@ describe('E2E: MCP Server Discovery & Errors', () => {
   });
 
   describe('Tool Discovery', () => {
-    it('should list all 8 tools', async () => {
+    it('should list all 9 tools', async () => {
       const result = await client.listTools();
 
-      expect(result.tools).toHaveLength(8);
+      expect(result.tools).toHaveLength(9);
 
       const toolNames = result.tools.map(t => t.name).sort();
       expect(toolNames).toEqual([
         'artifact',
+        'batch',
         'decision',
         'link',
         'phase',
@@ -89,6 +90,9 @@ describe('E2E: MCP Server Discovery & Errors', () => {
       };
 
       for (const tool of result.tools) {
+        // Skip tools without actions (like batch)
+        if (!expectedActions[tool.name]) continue;
+
         const actionProp = tool.inputSchema.properties?.action as { enum?: string[] };
         expect(actionProp?.enum?.sort()).toEqual(expectedActions[tool.name].sort());
       }

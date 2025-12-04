@@ -1,0 +1,509 @@
+/**
+ * Edge Case Tests: BatchService
+ *
+ * Tests 40-52 cover edge cases and boundary conditions:
+ * - Invalid temp IDs
+ * - Circular references
+ * - Large payloads
+ * - Complex dependency chains
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { BatchService } from '../../src/domain/services/batch-service.js';
+import { PlanService } from '../../src/domain/services/plan-service.js';
+import { RequirementService } from '../../src/domain/services/requirement-service.js';
+import { SolutionService } from '../../src/domain/services/solution-service.js';
+import { PhaseService } from '../../src/domain/services/phase-service.js';
+import { LinkingService } from '../../src/domain/services/linking-service.js';
+import { DecisionService } from '../../src/domain/services/decision-service.js';
+import { ArtifactService } from '../../src/domain/services/artifact-service.js';
+import { FileStorage } from '../../src/infrastructure/file-storage.js';
+import type { Requirement, Solution, Phase, Artifact } from '../../src/domain/entities/types.js';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
+
+describe('BatchService - Edge Cases', () => {
+  let batchService: BatchService;
+  let storage: FileStorage;
+  let testDir: string;
+  let testPlanId: string;
+
+  beforeEach(async () => {
+    testDir = path.join(os.tmpdir(), `mcp-batch-edge-${Date.now()}`);
+    storage = new FileStorage(testDir);
+    await storage.initialize();
+
+    const planService = new PlanService(storage);
+    const requirementService = new RequirementService(storage, planService);
+    const solutionService = new SolutionService(storage, planService);
+    const phaseService = new PhaseService(storage, planService);
+    const linkingService = new LinkingService(storage);
+    const decisionService = new DecisionService(storage, planService);
+    const artifactService = new ArtifactService(storage, planService);
+
+    batchService = new BatchService(
+      storage,
+      planService,
+      requirementService,
+      solutionService,
+      phaseService,
+      linkingService,
+      decisionService,
+      artifactService
+    );
+
+    const { planId } = await planService.createPlan({
+      name: 'Edge Case Test Plan',
+      description: 'Testing edge cases',
+    });
+    testPlanId = planId;
+  });
+
+  afterEach(async () => {
+    await fs.rm(testDir, { recursive: true, force: true });
+  });
+
+  it('Test 40: Empty operations array returns empty result', async () => {
+    const result = await batchService.executeBatch({
+      planId: testPlanId,
+      operations: [],
+    });
+
+    expect(result.results).toHaveLength(0);
+    expect(result.tempIdMapping).toEqual({});
+  });
+
+  it('Test 41: Single operation batch succeeds', async () => {
+    const result = await batchService.executeBatch({
+      planId: testPlanId,
+      operations: [
+        {
+          entity_type: 'requirement',
+          payload: {
+            title: 'Single Req',
+            description: 'Only one',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+      ],
+    });
+
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].success).toBe(true);
+  });
+
+  it('Test 42: Invalid entity_type throws error', async () => {
+    await expect(
+      batchService.executeBatch({
+        planId: testPlanId,
+        operations: [
+          {
+            entity_type: 'invalid' as any,
+            payload: {},
+          },
+        ],
+      })
+    ).rejects.toThrow();
+  });
+
+  it('Test 43: Temp ID in text content is NOT resolved', async () => {
+    const result = await batchService.executeBatch({
+      planId: testPlanId,
+      operations: [
+        {
+          entity_type: 'requirement',
+          payload: {
+            tempId: '$0',
+            title: 'Task with $0 reference in title',
+            description: 'This description mentions $1 and $2',
+            source: { type: 'user-request' },
+            acceptanceCriteria: ['Verify $0 works'],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+      ],
+    });
+
+    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
+    expect(requirements[0].title).toBe('Task with $0 reference in title');
+    expect(requirements[0].description).toBe('This description mentions $1 and $2');
+    expect(requirements[0].acceptanceCriteria[0]).toBe('Verify $0 works');
+  });
+
+  it('Test 44: Unresolved temp ID in ID field throws error from service', async () => {
+    // PhaseService validates parentId existence
+    await expect(
+      batchService.executeBatch({
+        planId: testPlanId,
+        operations: [
+          {
+            entity_type: 'phase',
+            payload: {
+              title: 'Phase with unresolved parent',
+              description: 'References non-existent parent',
+              parentId: '$999', // Not created in this batch
+              objectives: [],
+              deliverables: [],
+            },
+          },
+        ],
+      })
+    ).rejects.toThrow('Parent phase not found');
+  });
+
+  it('Test 45: Mixed real UUIDs and temp IDs in arrays resolve correctly', async () => {
+    const result = await batchService.executeBatch({
+      planId: testPlanId,
+      operations: [
+        {
+          entity_type: 'requirement',
+          payload: {
+            tempId: '$0',
+            title: 'Req 1',
+            description: 'First',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+        {
+          entity_type: 'solution',
+          payload: {
+            title: 'Solution',
+            description: 'Implementation',
+            addressing: ['$0', '550e8400-e29b-41d4-a716-446655440000'], // Mix of temp ID and real UUID
+            approach: 'Approach',
+          },
+        },
+      ],
+    });
+
+    const solutions = await storage.loadEntities<Solution>(testPlanId, 'solutions');
+    expect(solutions[0].addressing[0]).toBe(result.results[0].id); // $0 resolved
+    expect(solutions[0].addressing[1]).toBe('550e8400-e29b-41d4-a716-446655440000'); // Real UUID unchanged
+  });
+
+  it('Test 46: Large batch (100 operations) succeeds', async () => {
+    const operations = [];
+    for (let i = 0; i < 100; i++) {
+      operations.push({
+        entity_type: 'requirement' as const,
+        payload: {
+          title: `Requirement ${i}`,
+          description: `Description for requirement ${i}`,
+          source: { type: 'user-request' as const },
+          acceptanceCriteria: [],
+          priority: 'medium' as const,
+          category: 'functional' as const,
+        },
+      });
+    }
+
+    const result = await batchService.executeBatch({
+      planId: testPlanId,
+      operations,
+    });
+
+    expect(result.results).toHaveLength(100);
+    expect(result.results.every((r) => r.success)).toBe(true);
+  });
+
+  it('Test 47: Deep dependency chain (10 levels) resolves correctly', async () => {
+    const operations = [];
+
+    // Create 10 phases with parent-child relationships
+    for (let i = 0; i < 10; i++) {
+      operations.push({
+        entity_type: 'phase' as const,
+        payload: {
+          tempId: `$${i}`,
+          title: `Phase Level ${i}`,
+          description: `Phase at depth ${i}`,
+          parentId: i > 0 ? `$${i - 1}` : undefined,
+          objectives: [],
+          deliverables: [],
+        },
+      });
+    }
+
+    const result = await batchService.executeBatch({
+      planId: testPlanId,
+      operations,
+    });
+
+    expect(result.results).toHaveLength(10);
+    expect(result.results.every((r) => r.success)).toBe(true);
+
+    // Verify chain
+    const phases = await storage.loadEntities<Phase>(testPlanId, 'phases');
+    for (let i = 1; i < 10; i++) {
+      const phase = phases.find((p) => p.title === `Phase Level ${i}`);
+      const parent = phases.find((p) => p.title === `Phase Level ${i - 1}`);
+      expect(phase).toBeDefined();
+      expect(parent).toBeDefined();
+      expect(phase!.parentId).toBe(parent!.id);
+    }
+  });
+
+  it('Test 48: Batch with only links (no entities) succeeds', async () => {
+    // Create requirement first
+    await batchService.executeBatch({
+      planId: testPlanId,
+      operations: [
+        {
+          entity_type: 'requirement',
+          payload: {
+            tempId: '$0',
+            title: 'Req',
+            description: 'Desc',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+        {
+          entity_type: 'solution',
+          payload: {
+            tempId: '$1',
+            title: 'Sol',
+            description: 'Desc',
+            addressing: ['$0'],
+            approach: 'A',
+          },
+        },
+      ],
+    });
+
+    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
+    const solutions = await storage.loadEntities<Solution>(testPlanId, 'solutions');
+
+    // Now batch with only links
+    const result = await batchService.executeBatch({
+      planId: testPlanId,
+      operations: [
+        {
+          entity_type: 'link',
+          payload: {
+            sourceId: solutions[0].id,
+            targetId: requirements[0].id,
+            relationType: 'implements',
+          },
+        },
+      ],
+    });
+
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].success).toBe(true);
+  });
+
+  it('Test 49: Complex nested source.parentId resolves correctly', async () => {
+    const result = await batchService.executeBatch({
+      planId: testPlanId,
+      operations: [
+        {
+          entity_type: 'requirement',
+          payload: {
+            tempId: '$0',
+            title: 'Parent Req',
+            description: 'Parent',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+        {
+          entity_type: 'requirement',
+          payload: {
+            title: 'Child Req',
+            description: 'Child',
+            source: {
+              type: 'derived',
+              parentId: '$0', // Nested temp ID
+            },
+            acceptanceCriteria: [],
+            priority: 'medium',
+            category: 'functional',
+          },
+        },
+      ],
+    });
+
+    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
+    const childReq = requirements.find((r) => r.title === 'Child Req');
+    expect(childReq).toBeDefined();
+    expect(childReq!.source.parentId).toBe(result.results[0].id);
+  });
+
+  it('Test 50: Multiple temp IDs in single payload resolve correctly', async () => {
+    const result = await batchService.executeBatch({
+      planId: testPlanId,
+      operations: [
+        {
+          entity_type: 'requirement',
+          payload: {
+            tempId: '$0',
+            title: 'Req 1',
+            description: 'First',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+        {
+          entity_type: 'requirement',
+          payload: {
+            tempId: '$1',
+            title: 'Req 2',
+            description: 'Second',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+        {
+          entity_type: 'requirement',
+          payload: {
+            tempId: '$2',
+            title: 'Req 3',
+            description: 'Third',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+        {
+          entity_type: 'solution',
+          payload: {
+            title: 'Multi-solution',
+            description: 'Addresses multiple requirements',
+            addressing: ['$0', '$1', '$2'], // Multiple temp IDs
+            approach: 'Comprehensive approach',
+          },
+        },
+      ],
+    });
+
+    const solutions = await storage.loadEntities<Solution>(testPlanId, 'solutions');
+    expect(solutions[0].addressing).toHaveLength(3);
+    expect(solutions[0].addressing[0]).toBe(result.results[0].id);
+    expect(solutions[0].addressing[1]).toBe(result.results[1].id);
+    expect(solutions[0].addressing[2]).toBe(result.results[2].id);
+  });
+
+  it('Test 51: Operation execution order is preserved', async () => {
+    const result = await batchService.executeBatch({
+      planId: testPlanId,
+      operations: [
+        {
+          entity_type: 'requirement',
+          payload: {
+            tempId: '$0',
+            title: 'First',
+            description: 'Created first',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+        {
+          entity_type: 'requirement',
+          payload: {
+            tempId: '$1',
+            title: 'Second',
+            description: 'Created second',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+        {
+          entity_type: 'requirement',
+          payload: {
+            tempId: '$2',
+            title: 'Third',
+            description: 'Created third',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+      ],
+    });
+
+    // Verify temp IDs mapped in order
+    expect(result.tempIdMapping['$0']).toBe(result.results[0].id);
+    expect(result.tempIdMapping['$1']).toBe(result.results[1].id);
+    expect(result.tempIdMapping['$2']).toBe(result.results[2].id);
+  });
+
+  it('Test 52: Artifact with multiple related entities resolves correctly', async () => {
+    const result = await batchService.executeBatch({
+      planId: testPlanId,
+      operations: [
+        {
+          entity_type: 'requirement',
+          payload: {
+            tempId: '$0',
+            title: 'Req',
+            description: 'Req',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        },
+        {
+          entity_type: 'solution',
+          payload: {
+            tempId: '$1',
+            title: 'Sol',
+            description: 'Sol',
+            addressing: ['$0'],
+            approach: 'A',
+          },
+        },
+        {
+          entity_type: 'phase',
+          payload: {
+            tempId: '$2',
+            title: 'Phase',
+            description: 'Phase',
+            objectives: [],
+            deliverables: [],
+          },
+        },
+        {
+          entity_type: 'artifact',
+          payload: {
+            title: 'Code Artifact',
+            description: 'Implementation code',
+            artifactType: 'code',
+            relatedPhaseId: '$2',
+            relatedSolutionId: '$1',
+            relatedRequirementIds: ['$0'],
+          },
+        },
+      ],
+    });
+
+    const artifacts = await storage.loadEntities<Artifact>(testPlanId, 'artifacts');
+    expect(artifacts[0].relatedPhaseId).toBe(result.results[2].id);
+    expect(artifacts[0].relatedSolutionId).toBe(result.results[1].id);
+    expect(artifacts[0].relatedRequirementIds).toBeDefined();
+    expect(artifacts[0].relatedRequirementIds![0]).toBe(result.results[0].id);
+  });
+});
