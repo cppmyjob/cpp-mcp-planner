@@ -175,6 +175,11 @@ export class SolutionService {
   }
 
   async compareSolutions(input: CompareSolutionsInput): Promise<CompareSolutionsResult> {
+    // Validate solutionIds parameter
+    if (!input.solutionIds || !Array.isArray(input.solutionIds) || input.solutionIds.length === 0) {
+      throw new Error('solutionIds must be a non-empty array');
+    }
+
     const allSolutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
     const solutions = allSolutions.filter((s) => input.solutionIds.includes(s.id));
 
