@@ -747,6 +747,106 @@ describe('E2E: All MCP Tools Validation', () => {
       expect(parsed.tree.length).toBeGreaterThan(0);
     });
 
+    it('action: get_tree returns summary mode by default', async () => {
+      const result = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'get_tree',
+          planId,
+        },
+      });
+
+      const parsed = parseResult<{ tree: Array<{ phase: Record<string, unknown> }> }>(result);
+      expect(parsed.tree.length).toBeGreaterThan(0);
+
+      const phase = parsed.tree[0].phase;
+      // Summary fields should be present
+      expect(phase.id).toBeDefined();
+      expect(phase.title).toBeDefined();
+      expect(phase.status).toBeDefined();
+      expect(phase.progress).toBeDefined();
+      expect(phase.path).toBeDefined();
+      expect(phase.childCount).toBeDefined();
+
+      // Full fields should NOT be present in summary mode
+      expect(phase.description).toBeUndefined();
+      expect(phase.schedule).toBeUndefined();
+      expect(phase.metadata).toBeUndefined();
+    });
+
+    it('action: get_tree with fields parameter adds requested fields', async () => {
+      const result = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'get_tree',
+          planId,
+          fields: ['objectives', 'deliverables'],
+        },
+      });
+
+      const parsed = parseResult<{ tree: Array<{ phase: Record<string, unknown> }> }>(result);
+      const phase = parsed.tree[0].phase;
+
+      // Summary fields
+      expect(phase.id).toBeDefined();
+      expect(phase.title).toBeDefined();
+      expect(phase.childCount).toBeDefined();
+
+      // Requested fields should be present
+      expect(phase.objectives).toBeDefined();
+      expect(phase.deliverables).toBeDefined();
+
+      // Non-requested fields should NOT be present
+      expect(phase.description).toBeUndefined();
+      expect(phase.schedule).toBeUndefined();
+    });
+
+    it('action: get_tree with fields=["*"] returns full phase', async () => {
+      const result = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'get_tree',
+          planId,
+          fields: ['*'],
+        },
+      });
+
+      const parsed = parseResult<{ tree: Array<{ phase: Record<string, unknown> }> }>(result);
+      const phase = parsed.tree[0].phase;
+
+      // All fields should be present
+      expect(phase.id).toBeDefined();
+      expect(phase.title).toBeDefined();
+      expect(phase.description).toBeDefined();
+      expect(phase.objectives).toBeDefined();
+      expect(phase.schedule).toBeDefined();
+      expect(phase.metadata).toBeDefined();
+      expect(phase.childCount).toBeDefined();
+    });
+
+    it('action: get_tree with maxDepth=0 returns only root phases', async () => {
+      const result = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'get_tree',
+          planId,
+          maxDepth: 0,
+        },
+      });
+
+      const parsed = parseResult<{
+        tree: Array<{ phase: Record<string, unknown>; children: unknown[]; hasChildren: boolean }>;
+      }>(result);
+
+      expect(parsed.tree.length).toBeGreaterThan(0);
+
+      // Root phase should have children truncated but hasChildren=true
+      const rootNode = parsed.tree[0];
+      expect(rootNode.children).toEqual([]);
+      expect(rootNode.hasChildren).toBe(true);
+      expect(rootNode.phase.childCount).toBe(1); // We added one child phase earlier
+    });
+
     it('action: update_status', async () => {
       const result = await client.callTool({
         name: 'phase',

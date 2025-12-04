@@ -284,6 +284,11 @@ export const tools = [
         deleteChildren: { type: 'boolean' },
         includeCompleted: { type: 'boolean' },
         maxDepth: { type: 'number' },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Fields to include. Default returns summary (id, title, status, progress, path, childCount). Use ["*"] for all fields.',
+        },
         limit: { type: 'number' },
       },
       required: ['action', 'planId'],
