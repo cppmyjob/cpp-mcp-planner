@@ -455,6 +455,7 @@ export const tools = [
         entityTypes: { type: 'array', items: { type: 'string', enum: ['requirement', 'solution', 'decision', 'phase', 'artifact'] } },
         filters: { type: 'object' },
         checks: { type: 'array', items: { type: 'string' } },
+        validationLevel: { type: 'string', enum: ['basic', 'strict'], description: 'Validation level: "basic" (default, errors only) or "strict" (all issues including warnings and infos)' },
         format: { type: 'string', enum: ['markdown', 'json'] },
         sections: { type: 'array', items: { type: 'string' } },
         includeVersionHistory: { type: 'boolean' },

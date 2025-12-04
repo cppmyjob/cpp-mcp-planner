@@ -1,6 +1,7 @@
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
 import type { LinkingService } from './linking-service.js';
+import * as fs from 'fs/promises';
 import type {
   Entity,
   EntityType,
@@ -34,6 +35,7 @@ export interface TraceRequirementInput {
 export interface ValidatePlanInput {
   planId: string;
   checks?: string[];
+  validationLevel?: 'basic' | 'strict';
 }
 
 export interface ExportPlanInput {
@@ -81,6 +83,7 @@ export interface ValidationIssue {
   entityType?: EntityType;
   message: string;
   suggestion?: string;
+  filePath?: string;
 }
 
 export interface ValidatePlanResult {
@@ -343,15 +346,122 @@ export class QueryService {
       }
     }
 
-    const errors = issues.filter((i) => i.severity === 'error').length;
-    const warnings = issues.filter((i) => i.severity === 'warning').length;
-    const infos = issues.filter((i) => i.severity === 'info').length;
+    // Check: Phase status logic
+    checksPerformed.push('phase_status_logic');
+    const phaseMap = new Map(entities.phases.map((p) => [p.id, p]));
+    for (const phase of entities.phases) {
+      // Check child-parent status consistency
+      if (phase.parentId) {
+        const parent = phaseMap.get(phase.parentId);
+        if (parent && parent.status === 'planned') {
+          if (phase.status === 'completed') {
+            issues.push({
+              severity: 'error',
+              type: 'invalid_phase_status',
+              entityId: phase.id,
+              entityType: 'phase',
+              message: `Phase '${phase.title}' has status 'completed' but parent '${parent.title}' is still 'planned'`,
+              suggestion: 'Update parent phase status before completing children',
+            });
+          } else if (phase.status === 'in_progress') {
+            issues.push({
+              severity: 'warning',
+              type: 'invalid_phase_status',
+              entityId: phase.id,
+              entityType: 'phase',
+              message: `Phase '${phase.title}' is in progress but parent '${parent.title}' is still planned`,
+              suggestion: 'Consider updating parent phase status',
+            });
+          }
+        }
+      }
+
+      // Check if all children are completed but parent is not
+      if (phase.status !== 'completed') {
+        const children = entities.phases.filter((p) => p.parentId === phase.id);
+        if (children.length > 0 && children.every((c) => c.status === 'completed')) {
+          issues.push({
+            severity: 'info',
+            type: 'parent_should_complete',
+            entityId: phase.id,
+            entityType: 'phase',
+            message: `Phase '${phase.title}' has all children completed but is not marked as completed`,
+            suggestion: 'Consider completing this phase',
+          });
+        }
+      }
+    }
+
+    // Check: File existence
+    checksPerformed.push('file_existence');
+    for (const artifact of entities.artifacts) {
+      if (artifact.fileTable && artifact.fileTable.length > 0) {
+        for (const file of artifact.fileTable) {
+          // Skip files that are being created
+          if (file.action === 'create') {
+            continue;
+          }
+
+          // Check if file exists
+          try {
+            await fs.access(file.path);
+          } catch {
+            issues.push({
+              severity: 'warning',
+              type: 'missing_file',
+              entityId: artifact.id,
+              entityType: 'artifact',
+              filePath: file.path,
+              message: `File '${file.path}' referenced in artifact '${artifact.title}' (action: ${file.action}) does not exist`,
+              suggestion: 'Verify file path or update artifact',
+            });
+          }
+        }
+      }
+    }
+
+    // Check: Solution implementation
+    checksPerformed.push('solution_implementation');
+    const selectedSolutions = entities.solutions.filter((s) => s.status === 'selected');
+    for (const solution of selectedSolutions) {
+      // Find requirements implemented by this solution
+      const implementedReqIds = solution.addressing;
+
+      // Find phases that address these requirements
+      const addressesLinks = links.filter(
+        (l) =>
+          l.relationType === 'addresses' &&
+          implementedReqIds.includes(l.targetId) &&
+          entities.phases.some((p) => p.id === l.sourceId)
+      );
+
+      if (addressesLinks.length === 0) {
+        issues.push({
+          severity: 'warning',
+          type: 'unimplemented_solution',
+          entityId: solution.id,
+          entityType: 'solution',
+          message: `Selected solution '${solution.title}' has no implementing phases`,
+          suggestion: 'Create phases that address the requirements or link existing phases',
+        });
+      }
+    }
+
+    // Apply validation level filtering (default: basic)
+    let filteredIssues = issues;
+    if (input.validationLevel !== 'strict') {
+      filteredIssues = issues.filter((i) => i.severity === 'error');
+    }
+
+    const errors = filteredIssues.filter((i) => i.severity === 'error').length;
+    const warnings = filteredIssues.filter((i) => i.severity === 'warning').length;
+    const infos = filteredIssues.filter((i) => i.severity === 'info').length;
 
     return {
       isValid: errors === 0,
-      issues,
+      issues: filteredIssues,
       summary: {
-        totalIssues: issues.length,
+        totalIssues: filteredIssues.length,
         errors,
         warnings,
         infos,
