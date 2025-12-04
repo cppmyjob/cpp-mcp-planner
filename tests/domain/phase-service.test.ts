@@ -987,4 +987,300 @@ describe('PhaseService', () => {
       console.log(`Compression ratio: ${(fullSize / summarySize).toFixed(1)}x`);
     });
   });
+
+  describe('order/path calculation (Sprint 5 - Bug Fix)', () => {
+    describe('auto-generated order', () => {
+      it('should set order=1 for first root phase', async () => {
+        const result = await service.addPhase({
+          planId,
+          phase: {
+            title: 'First',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+        expect(result.phase.order).toBe(1);
+        expect(result.phase.path).toBe('1');
+      });
+
+      it('should set order=2 for second root phase', async () => {
+        await service.addPhase({
+          planId,
+          phase: {
+            title: 'First',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+        const result = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Second',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+        expect(result.phase.order).toBe(2);
+        expect(result.phase.path).toBe('2');
+      });
+
+      it('should calculate order based on max sibling order, not count', async () => {
+        // Create phases with orders 2, 3, 4 (skipping 1)
+        await service.addPhase({
+          planId,
+          phase: { title: 'P2', description: '', objectives: [], deliverables: [], successCriteria: [], order: 2 },
+        });
+        await service.addPhase({
+          planId,
+          phase: { title: 'P3', description: '', objectives: [], deliverables: [], successCriteria: [], order: 3 },
+        });
+        await service.addPhase({
+          planId,
+          phase: { title: 'P4', description: '', objectives: [], deliverables: [], successCriteria: [], order: 4 },
+        });
+
+        // Add new phase without explicit order
+        const result = await service.addPhase({
+          planId,
+          phase: { title: 'New', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+
+        // Should be 5, not 4 (siblings.length + 1)
+        expect(result.phase.order).toBe(5);
+        expect(result.phase.path).toBe('5');
+      });
+
+      it('should handle gaps in order sequence', async () => {
+        // Create phases with orders 1, 5, 10
+        await service.addPhase({
+          planId,
+          phase: { title: 'P1', description: '', objectives: [], deliverables: [], successCriteria: [], order: 1 },
+        });
+        await service.addPhase({
+          planId,
+          phase: { title: 'P5', description: '', objectives: [], deliverables: [], successCriteria: [], order: 5 },
+        });
+        await service.addPhase({
+          planId,
+          phase: { title: 'P10', description: '', objectives: [], deliverables: [], successCriteria: [], order: 10 },
+        });
+
+        // Add new phase
+        const result = await service.addPhase({
+          planId,
+          phase: { title: 'New', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+
+        // Should be 11, not 4
+        expect(result.phase.order).toBe(11);
+        expect(result.phase.path).toBe('11');
+      });
+
+      it('should set order=1 for first child phase', async () => {
+        const parent = await service.addPhase({
+          planId,
+          phase: { title: 'Parent', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        const child = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+          },
+        });
+
+        expect(child.phase.order).toBe(1);
+        expect(child.phase.path).toBe('1.1');
+      });
+
+      it('should calculate child order based on max sibling order', async () => {
+        const parent = await service.addPhase({
+          planId,
+          phase: { title: 'Parent', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+
+        // Create children with orders 2, 5, 8
+        await service.addPhase({
+          planId,
+          phase: {
+            title: 'C2',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+            order: 2,
+          },
+        });
+        await service.addPhase({
+          planId,
+          phase: {
+            title: 'C5',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+            order: 5,
+          },
+        });
+        await service.addPhase({
+          planId,
+          phase: {
+            title: 'C8',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+            order: 8,
+          },
+        });
+
+        // Add new child without order
+        const result = await service.addPhase({
+          planId,
+          phase: {
+            title: 'New Child',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+          },
+        });
+
+        // Should be 9, not 4
+        expect(result.phase.order).toBe(9);
+        expect(result.phase.path).toBe('1.9');
+      });
+    });
+
+    describe('explicit order', () => {
+      it('should use explicit order when provided', async () => {
+        await service.addPhase({
+          planId,
+          phase: { title: 'First', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        const result = await service.addPhase({
+          planId,
+          phase: { title: 'Explicit', description: '', objectives: [], deliverables: [], successCriteria: [], order: 99 },
+        });
+
+        expect(result.phase.order).toBe(99);
+        expect(result.phase.path).toBe('99');
+      });
+
+      it('should throw error when explicit order conflicts with existing', async () => {
+        await service.addPhase({
+          planId,
+          phase: { title: 'First', description: '', objectives: [], deliverables: [], successCriteria: [], order: 5 },
+        });
+
+        await expect(
+          service.addPhase({
+            planId,
+            phase: { title: 'Conflict', description: '', objectives: [], deliverables: [], successCriteria: [], order: 5 },
+          })
+        ).rejects.toThrow(/order.*already exists|duplicate.*order/i);
+      });
+
+      it('should allow same order for different parents', async () => {
+        const parent1 = await service.addPhase({
+          planId,
+          phase: { title: 'P1', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        const parent2 = await service.addPhase({
+          planId,
+          phase: { title: 'P2', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+
+        const child1 = await service.addPhase({
+          planId,
+          phase: {
+            title: 'C1',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent1.phaseId,
+            order: 1,
+          },
+        });
+        const child2 = await service.addPhase({
+          planId,
+          phase: {
+            title: 'C2',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent2.phaseId,
+            order: 1,
+          },
+        });
+
+        expect(child1.phase.order).toBe(1);
+        expect(child2.phase.order).toBe(1);
+        expect(child1.phase.path).toBe('1.1');
+        expect(child2.phase.path).toBe('2.1');
+      });
+    });
+
+    describe('path uniqueness', () => {
+      it('should generate unique paths for all siblings', async () => {
+        const phases = [];
+        for (let i = 0; i < 15; i++) {
+          const result = await service.addPhase({
+            planId,
+            phase: { title: `Phase ${i}`, description: '', objectives: [], deliverables: [], successCriteria: [] },
+          });
+          phases.push(result.phase);
+        }
+
+        const paths = phases.map((p) => p.path);
+        const uniquePaths = new Set(paths);
+
+        expect(uniquePaths.size).toBe(15);
+      });
+
+      it('should maintain path consistency after delete and add', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'P1', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        const p2 = await service.addPhase({
+          planId,
+          phase: { title: 'P2', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        await service.addPhase({
+          planId,
+          phase: { title: 'P3', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+
+        // Delete middle phase
+        await service.deletePhase({ planId, phaseId: p2.phaseId });
+
+        // Add new phase
+        const p4 = await service.addPhase({
+          planId,
+          phase: { title: 'P4', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+
+        // Should get order 4, not 3 (even though only 2 siblings now)
+        expect(p4.phase.order).toBe(4);
+        expect(p4.phase.path).toBe('4');
+      });
+    });
+  });
 });
