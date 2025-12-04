@@ -136,6 +136,125 @@ export function validateFileTable(fileTable: unknown[]): void {
   }
 }
 
+/**
+ * Validates ArtifactTarget array.
+ * Replaces validateFileTable with additional precision fields (lineNumber, lineEnd, searchPattern).
+ */
+export function validateTargets(targets: unknown[]): void {
+  if (targets === undefined || targets === null) {
+    return; // Optional field
+  }
+
+  if (!Array.isArray(targets)) {
+    return;
+  }
+
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i] as Record<string, unknown>;
+
+    // Validate path - must be non-empty string (after trimming)
+    if (typeof target.path !== 'string') {
+      throw new Error(
+        `Invalid target at index ${i}: path must be a non-empty string`
+      );
+    }
+
+    const trimmedPath = target.path.trim();
+    if (!trimmedPath) {
+      throw new Error(
+        `Invalid target at index ${i}: path must be a non-empty string`
+      );
+    }
+
+    // Validate action
+    if (!VALID_FILE_ACTIONS.includes(target.action as typeof VALID_FILE_ACTIONS[number])) {
+      throw new Error(
+        `Invalid target at index ${i}: action must be one of: ${VALID_FILE_ACTIONS.join(', ')}`
+      );
+    }
+
+    // Validate lineNumber (optional)
+    if (target.lineNumber !== undefined) {
+      if (typeof target.lineNumber !== 'number') {
+        throw new Error(
+          `Invalid target at index ${i}: lineNumber must be a number`
+        );
+      }
+
+      if (!Number.isInteger(target.lineNumber)) {
+        throw new Error(
+          `Invalid target at index ${i}: lineNumber must be an integer`
+        );
+      }
+
+      if (target.lineNumber < 1) {
+        throw new Error(
+          `Invalid target at index ${i}: lineNumber must be a positive integer`
+        );
+      }
+    }
+
+    // Validate lineEnd (optional, requires lineNumber)
+    if (target.lineEnd !== undefined) {
+      if (target.lineNumber === undefined) {
+        throw new Error(
+          `Invalid target at index ${i}: lineEnd requires lineNumber`
+        );
+      }
+
+      if (typeof target.lineEnd !== 'number') {
+        throw new Error(
+          `Invalid target at index ${i}: lineEnd must be a number`
+        );
+      }
+
+      if (!Number.isInteger(target.lineEnd)) {
+        throw new Error(
+          `Invalid target at index ${i}: lineEnd must be an integer`
+        );
+      }
+
+      if (target.lineEnd < (target.lineNumber as number)) {
+        throw new Error(
+          `Invalid target at index ${i}: lineEnd must be >= lineNumber`
+        );
+      }
+    }
+
+    // Validate searchPattern (optional, conflicts with lineNumber)
+    if (target.searchPattern !== undefined) {
+      if (target.lineNumber !== undefined) {
+        throw new Error(
+          `Invalid target at index ${i}: cannot use both lineNumber and searchPattern`
+        );
+      }
+
+      if (typeof target.searchPattern !== 'string') {
+        throw new Error(
+          `Invalid target at index ${i}: searchPattern must be a non-empty string`
+        );
+      }
+
+      if (!target.searchPattern) {
+        throw new Error(
+          `Invalid target at index ${i}: searchPattern must be a non-empty string`
+        );
+      }
+
+      // Validate regex syntax
+      try {
+        new RegExp(target.searchPattern);
+      } catch (e) {
+        throw new Error(
+          `Invalid target at index ${i}: invalid regex in searchPattern`
+        );
+      }
+    }
+
+    // description is optional and can be any string (including empty)
+  }
+}
+
 const VALID_PRIORITIES = ['critical', 'high', 'medium', 'low'] as const;
 
 /**

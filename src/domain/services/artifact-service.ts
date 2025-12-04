@@ -6,9 +6,10 @@ import type {
   ArtifactType,
   ArtifactStatus,
   FileEntry,
+  ArtifactTarget,
   Tag,
 } from '../entities/types.js';
-import { validateTags, validateArtifactType, validateFileTable, validateCodeRefs } from './validators.js';
+import { validateTags, validateArtifactType, validateFileTable, validateTargets, validateCodeRefs } from './validators.js';
 
 /**
  * Converts a title string into a URL-friendly slug
@@ -50,6 +51,7 @@ export interface AddArtifactInput {
       filename?: string;
     };
     fileTable?: FileEntry[];
+    targets?: ArtifactTarget[];
     relatedPhaseId?: string;
     relatedSolutionId?: string;
     relatedRequirementIds?: string[];
@@ -77,6 +79,7 @@ export interface UpdateArtifactInput {
       filename?: string;
     };
     fileTable: FileEntry[];
+    targets: ArtifactTarget[];
     relatedPhaseId: string;
     relatedSolutionId: string;
     relatedRequirementIds: string[];
@@ -169,6 +172,9 @@ export class ArtifactService {
     if (input.artifact.fileTable) {
       validateFileTable(input.artifact.fileTable);
     }
+    if (input.artifact.targets) {
+      validateTargets(input.artifact.targets);
+    }
     // Validate codeRefs format
     validateCodeRefs(input.artifact.codeRefs || []);
 
@@ -205,6 +211,7 @@ export class ArtifactService {
           }
         : {},
       fileTable: input.artifact.fileTable,
+      targets: input.artifact.targets,
       relatedPhaseId: input.artifact.relatedPhaseId,
       relatedSolutionId: input.artifact.relatedSolutionId,
       relatedRequirementIds: input.artifact.relatedRequirementIds,
@@ -228,6 +235,16 @@ export class ArtifactService {
       throw new Error('Artifact not found');
     }
 
+    // Auto-migrate fileTable to targets if needed
+    // If artifact has fileTable but no targets, convert fileTable to targets
+    if (artifact.fileTable && !artifact.targets) {
+      artifact.targets = artifact.fileTable.map((entry) => ({
+        path: entry.path,
+        action: entry.action,
+        description: entry.description,
+      }));
+    }
+
     return { artifact };
   }
 
@@ -240,6 +257,9 @@ export class ArtifactService {
     }
     if (input.updates.fileTable !== undefined) {
       validateFileTable(input.updates.fileTable);
+    }
+    if (input.updates.targets !== undefined) {
+      validateTargets(input.updates.targets);
     }
     if (input.updates.codeRefs !== undefined) {
       validateCodeRefs(input.updates.codeRefs);
@@ -267,6 +287,7 @@ export class ArtifactService {
       artifact.content = { ...artifact.content, ...input.updates.content };
     }
     if (input.updates.fileTable !== undefined) artifact.fileTable = input.updates.fileTable;
+    if (input.updates.targets !== undefined) artifact.targets = input.updates.targets;
     if (input.updates.relatedPhaseId !== undefined) artifact.relatedPhaseId = input.updates.relatedPhaseId;
     if (input.updates.relatedSolutionId !== undefined) artifact.relatedSolutionId = input.updates.relatedSolutionId;
     if (input.updates.relatedRequirementIds !== undefined) artifact.relatedRequirementIds = input.updates.relatedRequirementIds;
