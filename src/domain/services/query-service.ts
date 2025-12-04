@@ -513,7 +513,7 @@ export class QueryService {
           title: req.title,
           description: req.description,
           rationale: req.rationale || '',
-          acceptanceCriteria: req.acceptanceCriteria.join(' '),
+          acceptanceCriteria: (req.acceptanceCriteria ?? []).join(' '),
         };
       }
       case 'solution': {
@@ -541,8 +541,8 @@ export class QueryService {
           ...base,
           title: phase.title,
           description: phase.description,
-          objectives: phase.objectives.join(' '),
-          deliverables: phase.deliverables.join(' '),
+          objectives: (phase.objectives ?? []).join(' '),
+          deliverables: (phase.deliverables ?? []).join(' '),
         };
       }
       case 'artifact': {
@@ -590,10 +590,11 @@ export class QueryService {
         lines.push(req.description);
         lines.push('');
         lines.push(`**Priority**: ${req.priority} | **Category**: ${req.category}`);
-        if (req.acceptanceCriteria.length > 0) {
+        const acceptanceCriteria = req.acceptanceCriteria ?? [];
+        if (acceptanceCriteria.length > 0) {
           lines.push('');
           lines.push('**Acceptance Criteria**:');
-          for (const ac of req.acceptanceCriteria) {
+          for (const ac of acceptanceCriteria) {
             lines.push(`- ${ac}`);
           }
         }
@@ -615,7 +616,9 @@ export class QueryService {
         if (tradeoffs.length > 0) {
           lines.push('**Trade-offs**:');
           for (const t of tradeoffs) {
-            lines.push(`- **${t.aspect}**: +${t.pros.join(', ')} / -${t.cons.join(', ')}`);
+            const pros = (t.pros ?? []).join(', ');
+            const cons = (t.cons ?? []).join(', ');
+            lines.push(`- **${t.aspect}**: +${pros} / -${cons}`);
           }
         }
         lines.push('');
