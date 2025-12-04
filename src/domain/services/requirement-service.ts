@@ -124,6 +124,14 @@ export class RequirementService {
       throw new Error('Plan not found');
     }
 
+    // Validate required fields
+    if (!input.requirement.title || input.requirement.title.trim() === '') {
+      throw new Error('Title is required');
+    }
+    if (!input.requirement.description || input.requirement.description.trim() === '') {
+      throw new Error('Description is required');
+    }
+
     // Validate tags format
     validateTags(input.requirement.tags || []);
 
