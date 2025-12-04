@@ -182,6 +182,33 @@ describe('SolutionService', () => {
       expect(result.comparison.matrix).toHaveLength(1);
       expect(result.comparison.matrix[0].aspect).toBe('Security');
     });
+
+    it('should throw error when solutionIds is undefined', async () => {
+      await expect(
+        service.compareSolutions({
+          planId,
+          solutionIds: undefined as any,
+        })
+      ).rejects.toThrow('solutionIds must be a non-empty array');
+    });
+
+    it('should throw error when solutionIds is empty array', async () => {
+      await expect(
+        service.compareSolutions({
+          planId,
+          solutionIds: [],
+        })
+      ).rejects.toThrow('solutionIds must be a non-empty array');
+    });
+
+    it('should throw error when solutionIds is not an array', async () => {
+      await expect(
+        service.compareSolutions({
+          planId,
+          solutionIds: 'not-an-array' as any,
+        })
+      ).rejects.toThrow('solutionIds must be a non-empty array');
+    });
   });
 
   describe('select_solution', () => {
