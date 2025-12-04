@@ -287,7 +287,7 @@ export const tools = [
         fields: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Fields to include. Default returns summary (id, title, status, progress, path, childCount). Use ["*"] for all fields.',
+          description: 'Fields to include. Default returns summary (id, title, status, progress, path, childCount). Available fields: "description", "parentId", "order", "depth", "objectives", "deliverables", "successCriteria", "schedule", "startedAt", "completedAt", "milestones", "blockers", "implementationNotes", "codeExamples", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
         },
         limit: { type: 'number' },
       },
