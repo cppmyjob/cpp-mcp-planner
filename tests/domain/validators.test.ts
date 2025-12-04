@@ -6,6 +6,8 @@ import {
   validateCodeExamples,
   validateArtifactType,
   validateFileTable,
+  validatePriority,
+  validateCodeRefs,
 } from '../../src/domain/services/validators.js';
 
 describe('Validators', () => {
@@ -202,6 +204,141 @@ describe('Validators', () => {
           { path: '', action: 'modify' },
         ])
       ).toThrow(/index 1/i);
+    });
+  });
+
+  describe('validatePriority', () => {
+    it('should accept undefined (optional field)', () => {
+      expect(() => validatePriority(undefined)).not.toThrow();
+    });
+
+    it('should accept null (optional field)', () => {
+      expect(() => validatePriority(null)).not.toThrow();
+    });
+
+    it('should accept all valid priority values', () => {
+      const validPriorities = ['critical', 'high', 'medium', 'low'];
+      for (const priority of validPriorities) {
+        expect(() => validatePriority(priority)).not.toThrow();
+      }
+    });
+
+    it('should reject empty string', () => {
+      expect(() => validatePriority('')).toThrow(/Invalid priority/);
+    });
+
+    it('should reject invalid priority value', () => {
+      expect(() => validatePriority('urgent')).toThrow(/Invalid priority/);
+      expect(() => validatePriority('urgent')).toThrow(/critical, high, medium, low/);
+    });
+
+    it('should reject wrong case (case-sensitive)', () => {
+      expect(() => validatePriority('CRITICAL')).toThrow(/Invalid priority/);
+      expect(() => validatePriority('High')).toThrow(/Invalid priority/);
+    });
+
+    it('should reject non-string types', () => {
+      expect(() => validatePriority(1)).toThrow(/must be a string/);
+      expect(() => validatePriority({ value: 'high' })).toThrow(/must be a string/);
+    });
+  });
+
+  describe('validateCodeRefs', () => {
+    it('should accept valid code references', () => {
+      expect(() =>
+        validateCodeRefs([
+          'src/file.ts:42',
+          'src/services/phase-service.ts:100',
+          'tests/unit/test.ts:1',
+        ])
+      ).not.toThrow();
+    });
+
+    it('should accept empty array', () => {
+      expect(() => validateCodeRefs([])).not.toThrow();
+    });
+
+    it('should skip validation if not an array', () => {
+      expect(() => validateCodeRefs(null as any)).not.toThrow();
+      expect(() => validateCodeRefs(undefined as any)).not.toThrow();
+    });
+
+    it('should throw if entry is not a string', () => {
+      expect(() =>
+        validateCodeRefs([123 as any])
+      ).toThrow(/must be a string/);
+    });
+
+    it('should throw if entry is empty string', () => {
+      expect(() =>
+        validateCodeRefs([''])
+      ).toThrow(/cannot be empty/);
+    });
+
+    it('should throw if entry does not contain colon with line number', () => {
+      expect(() =>
+        validateCodeRefs(['src/file.ts'])
+      ).toThrow(/must be in format/);
+    });
+
+    it('should throw if line number is not a positive integer', () => {
+      expect(() =>
+        validateCodeRefs(['src/file.ts:0'])
+      ).toThrow(/line number must be a positive integer/);
+
+      expect(() =>
+        validateCodeRefs(['src/file.ts:-1'])
+      ).toThrow(/line number must be a positive integer/);
+
+      expect(() =>
+        validateCodeRefs(['src/file.ts:abc'])
+      ).toThrow(/line number must be a positive integer/);
+
+      expect(() =>
+        validateCodeRefs(['src/file.ts:1.5'])
+      ).toThrow(/line number must be a positive integer/);
+    });
+
+    it('should report correct index in error message', () => {
+      expect(() =>
+        validateCodeRefs([
+          'src/valid.ts:10',
+          'src/another.ts:20',
+          'invalid-no-line',
+        ])
+      ).toThrow(/index 2/i);
+    });
+
+    it('should accept Windows-style paths', () => {
+      expect(() =>
+        validateCodeRefs([
+          'D:\\Projects\\file.ts:42',
+          'C:\\Users\\name\\code.ts:100',
+        ])
+      ).not.toThrow();
+    });
+
+    it('should accept paths with spaces', () => {
+      expect(() =>
+        validateCodeRefs([
+          'src/my file.ts:42',
+          'path with spaces/code.ts:10',
+        ])
+      ).not.toThrow();
+    });
+
+    it('should accept colons in Windows drive letters', () => {
+      // Windows paths like D:\path\file.ts:42 have two colons
+      expect(() =>
+        validateCodeRefs(['D:\\path\\file.ts:42'])
+      ).not.toThrow();
+    });
+
+    it('should handle multiple colons - take last as line number', () => {
+      // Edge case: file path might have colon in URL-like paths
+      expect(() =>
+        validateCodeRefs(['http://example.com/path:42'])
+      ).not.toThrow();
     });
   });
 });

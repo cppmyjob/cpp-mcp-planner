@@ -56,6 +56,9 @@ export async function handleToolCall(
           case 'get_active':
             result = await planService.getActivePlan(args as any);
             break;
+          case 'get_summary':
+            result = await planService.getSummary(args as any);
+            break;
           default:
             throw new ToolError('InvalidAction', `Unknown action for plan: ${action}`);
         }
@@ -94,6 +97,9 @@ export async function handleToolCall(
           case 'update':
             result = await solutionService.updateSolution(args as any);
             break;
+          case 'list':
+            result = await solutionService.listSolutions(args as any);
+            break;
           case 'compare':
             result = await solutionService.compareSolutions(args as any);
             break;
@@ -115,6 +121,9 @@ export async function handleToolCall(
             break;
           case 'get':
             result = await decisionService.getDecision(args as any);
+            break;
+          case 'update':
+            result = await decisionService.updateDecision(args as any);
             break;
           case 'list':
             result = await decisionService.listDecisions(args as any);
@@ -152,6 +161,9 @@ export async function handleToolCall(
             break;
           case 'get_next_actions':
             result = await phaseService.getNextActions(args as any);
+            break;
+          case 'complete_and_advance':
+            result = await phaseService.completeAndAdvance(args as any);
             break;
           default:
             throw new ToolError('InvalidAction', `Unknown action for phase: ${action}`);

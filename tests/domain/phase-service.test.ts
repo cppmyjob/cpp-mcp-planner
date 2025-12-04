@@ -230,6 +230,123 @@ describe('PhaseService', () => {
     });
   });
 
+  describe('priority field', () => {
+    it('should save priority=critical when provided', async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Critical Phase',
+          description: 'High priority work',
+          objectives: ['Critical objective'],
+          deliverables: ['Critical deliverable'],
+          successCriteria: ['Tests pass'],
+          priority: 'critical',
+        },
+      });
+
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      expect(phase.priority).toBe('critical');
+    });
+
+    it('should save each priority value correctly', async () => {
+      const priorities: Array<'critical' | 'high' | 'medium' | 'low'> =
+        ['critical', 'high', 'medium', 'low'];
+
+      for (const prio of priorities) {
+        const result = await service.addPhase({
+          planId,
+          phase: {
+            title: `${prio} Priority`,
+            description: 'Test',
+            objectives: ['T'],
+            deliverables: ['T'],
+            successCriteria: ['T'],
+            priority: prio,
+          },
+        });
+        const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+        expect(phase.priority).toBe(prio);
+      }
+    });
+
+    it('should default to medium when priority not provided', async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'No Priority',
+          description: 'Test',
+          objectives: ['T'],
+          deliverables: ['T'],
+          successCriteria: ['T'],
+        },
+      });
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      expect(phase.priority).toBe('medium');
+    });
+
+    it('should reject invalid priority value', async () => {
+      await expect(
+        service.addPhase({
+          planId,
+          phase: {
+            title: 'Invalid',
+            description: 'Test',
+            objectives: ['T'],
+            deliverables: ['T'],
+            successCriteria: ['T'],
+            priority: 'urgent' as any,
+          },
+        })
+      ).rejects.toThrow(/Invalid priority/);
+    });
+
+    it('should update priority from low to critical', async () => {
+      const added = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: ['T'],
+          deliverables: ['T'],
+          successCriteria: ['T'],
+          priority: 'low',
+        },
+      });
+
+      const updated = await service.updatePhase({
+        planId,
+        phaseId: added.phaseId,
+        updates: { priority: 'critical' },
+      });
+
+      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      expect(phase.priority).toBe('critical');
+    });
+
+    it('should preserve priority when updating status', async () => {
+      const added = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test',
+          description: 'Test',
+          objectives: ['T'],
+          deliverables: ['T'],
+          successCriteria: ['T'],
+          priority: 'high',
+        },
+      });
+
+      await service.updatePhaseStatus({
+        planId,
+        phaseId: added.phaseId,
+        status: 'in_progress',
+      });
+
+      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      expect(phase.priority).toBe('high');
+    });
+  });
+
   describe('update_phase_status', () => {
     it('should auto-set startedAt on in_progress', async () => {
       const added = await service.addPhase({
@@ -345,6 +462,153 @@ describe('PhaseService', () => {
       // Verify via getPhase
       const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
       expect(phase.schedule.actualEffort).toBe(4.5);
+    });
+  });
+
+  describe('get_next_actions with priority', () => {
+    it('should sort planned phases by priority: critical > high > medium > low', async () => {
+      const low = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Low',
+          description: 'Test',
+          objectives: ['T'],
+          deliverables: ['T'],
+          successCriteria: ['T'],
+          priority: 'low',
+        },
+      });
+
+      const critical = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Critical',
+          description: 'Test',
+          objectives: ['T'],
+          deliverables: ['T'],
+          successCriteria: ['T'],
+          priority: 'critical',
+        },
+      });
+
+      const medium = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Medium',
+          description: 'Test',
+          objectives: ['T'],
+          deliverables: ['T'],
+          successCriteria: ['T'],
+          priority: 'medium',
+        },
+      });
+
+      const high = await service.addPhase({
+        planId,
+        phase: {
+          title: 'High',
+          description: 'Test',
+          objectives: ['T'],
+          deliverables: ['T'],
+          successCriteria: ['T'],
+          priority: 'high',
+        },
+      });
+
+      const result = await service.getNextActions({ planId, limit: 10 });
+
+      const plannedActions = result.actions.filter(a => a.action === 'start');
+      expect(plannedActions[0].phaseId).toBe(critical.phaseId);
+      expect(plannedActions[1].phaseId).toBe(high.phaseId);
+      expect(plannedActions[2].phaseId).toBe(medium.phaseId);
+      expect(plannedActions[3].phaseId).toBe(low.phaseId);
+    });
+
+    it('should prioritize status over priority (blocked-low before in_progress-critical)', async () => {
+      const blocked = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Blocked Low',
+          description: 'Test',
+          objectives: ['T'],
+          deliverables: ['T'],
+          successCriteria: ['T'],
+          priority: 'low',
+        },
+      });
+      await service.updatePhaseStatus({
+        planId,
+        phaseId: blocked.phaseId,
+        status: 'blocked',
+        notes: 'Waiting',
+      });
+
+      const inProgress = await service.addPhase({
+        planId,
+        phase: {
+          title: 'InProgress Critical',
+          description: 'Test',
+          objectives: ['T'],
+          deliverables: ['T'],
+          successCriteria: ['T'],
+          priority: 'critical',
+        },
+      });
+      await service.updatePhaseStatus({
+        planId,
+        phaseId: inProgress.phaseId,
+        status: 'in_progress',
+      });
+
+      const result = await service.getNextActions({ planId, limit: 10 });
+
+      // Status priority: blocked > in_progress
+      expect(result.actions[0].phaseId).toBe(blocked.phaseId);
+      expect(result.actions[1].phaseId).toBe(inProgress.phaseId);
+    });
+
+    it('should sort blocked phases by priority', async () => {
+      const blockedLow = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Blocked Low',
+          description: 'Test',
+          objectives: ['T'],
+          deliverables: ['T'],
+          successCriteria: ['T'],
+          priority: 'low',
+        },
+      });
+      await service.updatePhaseStatus({
+        planId,
+        phaseId: blockedLow.phaseId,
+        status: 'blocked',
+        notes: 'Waiting',
+      });
+
+      const blockedCritical = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Blocked Critical',
+          description: 'Test',
+          objectives: ['T'],
+          deliverables: ['T'],
+          successCriteria: ['T'],
+          priority: 'critical',
+        },
+      });
+      await service.updatePhaseStatus({
+        planId,
+        phaseId: blockedCritical.phaseId,
+        status: 'blocked',
+        notes: 'Waiting',
+      });
+
+      const result = await service.getNextActions({ planId, limit: 10 });
+
+      const blockedActions = result.actions.filter(a => a.action === 'unblock');
+      expect(blockedActions[0].phaseId).toBe(blockedCritical.phaseId);
+      expect(blockedActions[1].phaseId).toBe(blockedLow.phaseId);
     });
   });
 
@@ -516,6 +780,61 @@ describe('PhaseService', () => {
       ).rejects.toThrow(/language/i);
     });
 
+    it('should add phase with codeRefs', async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase with refs',
+          description: '',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+          codeRefs: [
+            'src/services/phase-service.ts:42',
+            'tests/domain/phase-service.test.ts:100',
+          ],
+        },
+      });
+
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      expect(phase.codeRefs).toHaveLength(2);
+      expect(phase.codeRefs![0]).toBe('src/services/phase-service.ts:42');
+      expect(phase.codeRefs![1]).toBe('tests/domain/phase-service.test.ts:100');
+    });
+
+    it('should validate codeRefs structure', async () => {
+      await expect(
+        service.addPhase({
+          planId,
+          phase: {
+            title: 'Invalid refs',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            codeRefs: ['invalid-no-line-number'],
+          },
+        })
+      ).rejects.toThrow(/must be in format/i);
+    });
+
+    it('should validate codeRefs line number', async () => {
+      await expect(
+        service.addPhase({
+          planId,
+          phase: {
+            title: 'Invalid line',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            codeRefs: ['src/file.ts:0'],
+          },
+        })
+      ).rejects.toThrow(/line number must be a positive integer/i);
+    });
+
     it('should update phase with implementationNotes', async () => {
       const added = await service.addPhase({
         planId,
@@ -588,6 +907,56 @@ describe('PhaseService', () => {
           },
         })
       ).rejects.toThrow(/language/i);
+    });
+
+    it('should update phase with codeRefs', async () => {
+      const added = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test',
+          description: '',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await service.updatePhase({
+        planId,
+        phaseId: added.phaseId,
+        updates: {
+          codeRefs: ['src/new-file.ts:10', 'tests/new-test.ts:20'],
+        },
+      });
+
+      // Verify via getPhase
+      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      expect(phase.codeRefs).toHaveLength(2);
+      expect(phase.codeRefs![0]).toBe('src/new-file.ts:10');
+      expect(phase.codeRefs![1]).toBe('tests/new-test.ts:20');
+    });
+
+    it('should validate codeRefs on update', async () => {
+      const phase = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test',
+          description: '',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await expect(
+        service.updatePhase({
+          planId,
+          phaseId: phase.phaseId,
+          updates: {
+            codeRefs: ['no-line-number'],
+          },
+        })
+      ).rejects.toThrow(/must be in format/i);
     });
   });
 
@@ -1422,6 +1791,277 @@ describe('PhaseService', () => {
         expect(result.success).toBe(true);
         expect(result).not.toHaveProperty('phase');
         expect(result).not.toHaveProperty('affectedPhases');
+      });
+    });
+  });
+
+  // ============================================================
+  // CYCLE 1-9: complete_and_advance (Task 1.6)
+  // ============================================================
+  describe('completeAndAdvance', () => {
+    // CYCLE 2: Basic Complete Functionality
+    describe('Basic Completion', () => {
+      it('should mark current phase as completed with progress 100', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Task 1',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
+
+        const result = await service.completeAndAdvance({ planId, phaseId: p1.phaseId });
+
+        // Minimal return: only IDs
+        expect(result.success).toBe(true);
+        expect(result.completedPhaseId).toBe(p1.phaseId);
+        expect(result.nextPhaseId).toBeNull(); // no siblings
+
+        // Verify via get
+        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        expect(completed.phase.status).toBe('completed');
+        expect(completed.phase.progress).toBe(100);
+        expect(completed.phase.completedAt).toBeDefined();
+      });
+
+      it('should set completedAt timestamp on completed phase', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'Task', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
+
+        const before = new Date();
+        await service.completeAndAdvance({ planId, phaseId: p1.phaseId });
+        const after = new Date();
+
+        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        const timestamp = new Date(completed.phase.completedAt!);
+        expect(timestamp.getTime()).toBeGreaterThanOrEqual(before.getTime());
+        expect(timestamp.getTime()).toBeLessThanOrEqual(after.getTime());
+      });
+
+      it('should save actualEffort in completed phase schedule', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'Task', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
+
+        await service.completeAndAdvance({
+          planId,
+          phaseId: p1.phaseId,
+          actualEffort: 3.5,
+        });
+
+        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        expect(completed.phase.schedule.actualEffort).toBe(3.5);
+      });
+
+      it('should add annotation with notes to completed phase', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'Task', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
+
+        await service.completeAndAdvance({
+          planId,
+          phaseId: p1.phaseId,
+          notes: 'All tests passed',
+        });
+
+        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        expect(completed.phase.metadata.annotations).toContainEqual(
+          expect.objectContaining({
+            text: 'All tests passed',
+            author: 'claude-code',
+          })
+        );
+      });
+
+      it('should increment version of completed phase', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'Task', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
+
+        const beforeVersion = (await service.getPhase({ planId, phaseId: p1.phaseId })).phase.version;
+        await service.completeAndAdvance({ planId, phaseId: p1.phaseId });
+
+        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        expect(completed.phase.version).toBe(beforeVersion + 1);
+      });
+    });
+
+    // CYCLE 3: Status Validation
+    describe('Status Validation', () => {
+      it('should throw error when phase already completed', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'Done', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'completed' });
+
+        await expect(service.completeAndAdvance({ planId, phaseId: p1.phaseId })).rejects.toThrow(
+          /already completed/i
+        );
+      });
+
+      it('should throw error when trying to complete skipped phase', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'Skipped', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'skipped', notes: 'Not needed' });
+
+        await expect(service.completeAndAdvance({ planId, phaseId: p1.phaseId })).rejects.toThrow(
+          /cannot complete skipped/i
+        );
+      });
+
+      it('should allow completing phase that is in_progress', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'Active', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
+
+        const result = await service.completeAndAdvance({ planId, phaseId: p1.phaseId });
+
+        expect(result.success).toBe(true);
+        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        expect(completed.phase.status).toBe('completed');
+      });
+
+      it('should allow completing phase that is still planned', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'Planned', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        // status is 'planned' by default
+
+        const result = await service.completeAndAdvance({ planId, phaseId: p1.phaseId });
+
+        expect(result.success).toBe(true);
+        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        expect(completed.phase.status).toBe('completed');
+      });
+
+      it('should throw error when trying to complete blocked phase', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'Blocked', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'blocked', notes: 'Dependency issue' });
+
+        await expect(service.completeAndAdvance({ planId, phaseId: p1.phaseId })).rejects.toThrow(
+          /cannot complete blocked/i
+        );
+      });
+    });
+
+    // CYCLE 4-6: Find Next Phase Logic
+    describe('Find Next Phase', () => {
+      it('should find and start next planned sibling phase', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'Phase 1', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        const p2 = await service.addPhase({
+          planId,
+          phase: { title: 'Phase 2', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
+
+        const result = await service.completeAndAdvance({ planId, phaseId: p1.phaseId });
+
+        expect(result.nextPhaseId).toBe(p2.phaseId);
+
+        // Verify next phase was started
+        const nextPhase = await service.getPhase({ planId, phaseId: p2.phaseId });
+        expect(nextPhase.phase.status).toBe('in_progress');
+        expect(nextPhase.phase.startedAt).toBeDefined();
+      });
+
+      it('should advance to first planned child when current phase has children', async () => {
+        const parent = await service.addPhase({
+          planId,
+          phase: { title: 'Parent', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        const child1 = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child 1',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+          },
+        });
+        await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child 2',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+          },
+        });
+
+        await service.updatePhaseStatus({ planId, phaseId: parent.phaseId, status: 'in_progress' });
+
+        const result = await service.completeAndAdvance({ planId, phaseId: parent.phaseId });
+
+        expect(result.nextPhaseId).toBe(child1.phaseId);
+
+        const nextPhase = await service.getPhase({ planId, phaseId: child1.phaseId });
+        expect(nextPhase.phase.status).toBe('in_progress');
+      });
+
+      it('should skip blocked phases and find next planned', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'P1', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        const p2 = await service.addPhase({
+          planId,
+          phase: { title: 'P2', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+        const p3 = await service.addPhase({
+          planId,
+          phase: { title: 'P3', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+
+        await service.updatePhaseStatus({ planId, phaseId: p2.phaseId, status: 'blocked', notes: 'Issue' });
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
+
+        const result = await service.completeAndAdvance({ planId, phaseId: p1.phaseId });
+
+        expect(result.nextPhaseId).toBe(p3.phaseId);
+      });
+
+      it('should return null when no more planned phases', async () => {
+        const p1 = await service.addPhase({
+          planId,
+          phase: { title: 'Only Phase', description: '', objectives: [], deliverables: [], successCriteria: [] },
+        });
+
+        await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
+
+        const result = await service.completeAndAdvance({ planId, phaseId: p1.phaseId });
+
+        expect(result.nextPhaseId).toBeNull();
       });
     });
   });

@@ -339,4 +339,105 @@ describe('PlanService', () => {
       });
     });
   });
+
+  describe('getSummary', () => {
+    it('should return plan manifest info', async () => {
+      const created = await service.createPlan({
+        name: 'Test Plan',
+        description: 'Test Description',
+      });
+
+      const result = await service.getSummary({ planId: created.planId });
+
+      expect(result.plan.id).toBe(created.planId);
+      expect(result.plan.name).toBe('Test Plan');
+      expect(result.plan.description).toBe('Test Description');
+      expect(result.plan.status).toBe('active');
+    });
+
+    it('should return statistics from manifest', async () => {
+      const created = await service.createPlan({
+        name: 'Test Plan',
+        description: 'Test',
+      });
+
+      const result = await service.getSummary({ planId: created.planId });
+
+      expect(result.statistics).toBeDefined();
+      expect(result.statistics.totalPhases).toBe(0);
+      expect(result.statistics.totalRequirements).toBe(0);
+      expect(result.statistics.totalSolutions).toBe(0);
+      expect(result.statistics.totalDecisions).toBe(0);
+      expect(result.statistics.totalArtifacts).toBe(0);
+      expect(result.statistics.completionPercentage).toBe(0);
+    });
+
+    it('should return phase summaries array', async () => {
+      const created = await service.createPlan({
+        name: 'Test Plan',
+        description: 'Test',
+      });
+
+      // Add phases directly via storage for testing
+      const phases = [
+        {
+          id: 'phase-1',
+          type: 'phase' as const,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: 1,
+          metadata: { createdBy: 'test', tags: [], annotations: [] },
+          title: 'Phase 1',
+          description: 'First phase',
+          status: 'in_progress' as const,
+          progress: 50,
+          order: 1,
+          path: '1',
+          depth: 0,
+        },
+        {
+          id: 'phase-2',
+          type: 'phase' as const,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: 1,
+          metadata: { createdBy: 'test', tags: [], annotations: [] },
+          title: 'Phase 2',
+          description: 'Second phase',
+          status: 'planned' as const,
+          progress: 0,
+          order: 2,
+          path: '2',
+          depth: 0,
+          parentId: 'phase-1',
+        },
+      ];
+      await storage.saveEntities(created.planId, 'phases', phases);
+
+      const result = await service.getSummary({ planId: created.planId });
+
+      expect(result.phases).toHaveLength(2);
+      expect(result.phases[0]).toEqual({
+        id: 'phase-1',
+        title: 'Phase 1',
+        status: 'in_progress',
+        progress: 50,
+        path: '1',
+        childCount: 1,
+      });
+      expect(result.phases[1]).toEqual({
+        id: 'phase-2',
+        title: 'Phase 2',
+        status: 'planned',
+        progress: 0,
+        path: '2',
+        childCount: 0,
+      });
+    });
+
+    it('should throw error for non-existent plan', async () => {
+      await expect(service.getSummary({ planId: 'non-existent' }))
+        .rejects.toThrow('Plan not found');
+    });
+  });
 });

@@ -59,7 +59,7 @@ describe('E2E: All MCP Tools Validation', () => {
   });
 
   // ============================================================
-  // TOOL: plan (7 actions)
+  // TOOL: plan (8 actions)
   // ============================================================
   describe('Tool: plan', () => {
     it('action: create', async () => {
@@ -184,6 +184,30 @@ describe('E2E: All MCP Tools Validation', () => {
 
       const parsed = parseResult<{ activePlan: { planId: string } }>(result);
       expect(parsed.activePlan.planId).toBe(planId);
+    });
+
+    it('action: get_summary', async () => {
+      const result = await client.callTool({
+        name: 'plan',
+        arguments: {
+          action: 'get_summary',
+          planId,
+        },
+      });
+
+      const parsed = parseResult<{
+        plan: { id: string; name: string; status: string };
+        phases: Array<{ id: string; title: string; status: string }>;
+        statistics: { totalPhases: number };
+      }>(result);
+
+      expect(parsed.plan.id).toBe(planId);
+      // Note: name was updated in 'action: update' test
+      expect(parsed.plan.name).toBe('Updated Plan Name');
+      expect(parsed.plan.status).toBe('active');
+      expect(parsed.phases).toBeInstanceOf(Array);
+      expect(parsed.statistics).toBeDefined();
+      expect(parsed.statistics.totalPhases).toBeGreaterThanOrEqual(0);
     });
 
     it('action: archive (at end)', async () => {
@@ -409,7 +433,7 @@ describe('E2E: All MCP Tools Validation', () => {
   });
 
   // ============================================================
-  // TOOL: solution (6 actions)
+  // TOOL: solution (7 actions)
   // ============================================================
   describe('Tool: solution', () => {
     it('action: propose', async () => {
@@ -545,6 +569,21 @@ describe('E2E: All MCP Tools Validation', () => {
       expect(getParsed.solution.title).toBe('Updated Solution');
     });
 
+    it('action: list', async () => {
+      const result = await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'list',
+          planId,
+        },
+      });
+
+      const parsed = parseResult<{ solutions: Array<{ id: string }>; total: number }>(result);
+      expect(parsed.solutions.length).toBeGreaterThan(0);
+      expect(parsed.total).toBeGreaterThan(0);
+      expect(parsed.solutions.some((s) => s.id === solutionId)).toBe(true);
+    });
+
     it('action: compare', async () => {
       const result = await client.callTool({
         name: 'solution',
@@ -600,7 +639,7 @@ describe('E2E: All MCP Tools Validation', () => {
   });
 
   // ============================================================
-  // TOOL: decision (4 actions)
+  // TOOL: decision (5 actions)
   // ============================================================
   describe('Tool: decision', () => {
     it('action: record', async () => {
@@ -656,6 +695,32 @@ describe('E2E: All MCP Tools Validation', () => {
 
       const parsed = parseResult<{ decisions: unknown[] }>(result);
       expect(parsed.decisions.length).toBeGreaterThan(0);
+    });
+
+    it('action: update', async () => {
+      const result = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'update',
+          planId,
+          decisionId,
+          updates: {
+            consequences: 'Updated consequences for testing',
+          },
+        },
+      });
+
+      const parsed = parseResult<{ success: boolean; decisionId: string }>(result);
+      expect(parsed.success).toBe(true);
+      expect(parsed.decisionId).toBe(decisionId);
+
+      // Verify update was applied
+      const getResult = await client.callTool({
+        name: 'decision',
+        arguments: { action: 'get', planId, decisionId },
+      });
+      const getParsed = parseResult<{ decision: { consequences: string } }>(getResult);
+      expect(getParsed.decision.consequences).toBe('Updated consequences for testing');
     });
 
     it('action: list with all status values', async () => {
@@ -1092,6 +1157,79 @@ describe('E2E: All MCP Tools Validation', () => {
 
       const parsed = parseResult<{ actions: unknown[] }>(result);
       expect(parsed.actions).toBeDefined();
+    });
+
+    it('action: complete_and_advance', async () => {
+      // Create two phases to test completing current and starting next
+      const phase1Result = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'add',
+          planId,
+          phase: {
+            title: 'Phase 1 for Complete',
+            description: 'First phase',
+            objectives: ['Complete me'],
+            deliverables: ['Done'],
+            successCriteria: ['Success'],
+          },
+        },
+      });
+      const phase1Id = parseResult<{ phaseId: string }>(phase1Result).phaseId;
+
+      const phase2Result = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'add',
+          planId,
+          phase: {
+            title: 'Phase 2 for Complete',
+            description: 'Second phase',
+            objectives: ['Next task'],
+            deliverables: ['Done'],
+            successCriteria: ['Success'],
+          },
+        },
+      });
+      const phase2Id = parseResult<{ phaseId: string }>(phase2Result).phaseId;
+
+      // Complete first phase and advance to second
+      const result = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'complete_and_advance',
+          planId,
+          phaseId: phase1Id,
+          actualEffort: 2.5,
+          notes: 'Completed successfully',
+        },
+      });
+
+      const parsed = parseResult<{
+        completedPhaseId: string;
+        nextPhaseId: string | null;
+        success: true;
+      }>(result);
+
+      expect(parsed.success).toBe(true);
+      expect(parsed.completedPhaseId).toBe(phase1Id);
+      expect(parsed.nextPhaseId).toBe(phase2Id);
+
+      // Verify phases via get
+      const completed = await client.callTool({
+        name: 'phase',
+        arguments: { action: 'get', planId, phaseId: phase1Id },
+      });
+      const completedPhase = parseResult<{ phase: { status: string; progress: number } }>(completed);
+      expect(completedPhase.phase.status).toBe('completed');
+      expect(completedPhase.phase.progress).toBe(100);
+
+      const next = await client.callTool({
+        name: 'phase',
+        arguments: { action: 'get', planId, phaseId: phase2Id },
+      });
+      const nextPhase = parseResult<{ phase: { status: string } }>(next);
+      expect(nextPhase.phase.status).toBe('in_progress');
     });
 
     it('action: delete', async () => {

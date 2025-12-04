@@ -8,7 +8,33 @@ import type {
   FileEntry,
   Tag,
 } from '../entities/types.js';
-import { validateTags, validateArtifactType, validateFileTable } from './validators.js';
+import { validateTags, validateArtifactType, validateFileTable, validateCodeRefs } from './validators.js';
+
+/**
+ * Converts a title string into a URL-friendly slug
+ * @param title - The artifact title to slugify
+ * @param artifactId - Fallback ID if slug generation produces empty string
+ * @returns A URL-friendly slug (lowercase, alphanumeric + dashes, max 100 chars)
+ */
+function slugify(title: string, artifactId: string): string {
+  let slug = title
+    .toLowerCase()
+    .normalize('NFD')                    // Decompose Unicode characters
+    .replace(/[\u0300-\u036f]/g, '')    // Remove diacritics (accents)
+    .replace(/[^a-z0-9\s-]/g, '')       // Keep only alphanumeric, spaces, dashes
+    .trim()                              // Remove leading/trailing whitespace
+    .replace(/\s+/g, '-')               // Replace spaces with dashes
+    .replace(/-+/g, '-')                // Collapse multiple dashes into one
+    .replace(/^-|-$/g, '');             // Trim leading/trailing dashes
+
+  // Fallback for empty slugs: use artifact ID for guaranteed uniqueness
+  if (!slug) {
+    slug = `artifact-${artifactId}`;
+  }
+
+  // Enforce max length
+  return slug.substring(0, 100);
+}
 
 // Input types
 export interface AddArtifactInput {
@@ -16,6 +42,7 @@ export interface AddArtifactInput {
   artifact: {
     title: string;
     description: string;
+    slug?: string;
     artifactType: ArtifactType;
     content?: {
       language?: string;
@@ -26,6 +53,7 @@ export interface AddArtifactInput {
     relatedPhaseId?: string;
     relatedSolutionId?: string;
     relatedRequirementIds?: string[];
+    codeRefs?: string[];
     tags?: Tag[];
   };
 }
@@ -41,6 +69,7 @@ export interface UpdateArtifactInput {
   updates: Partial<{
     title: string;
     description: string;
+    slug: string;
     status: ArtifactStatus;
     content: {
       language?: string;
@@ -51,6 +80,7 @@ export interface UpdateArtifactInput {
     relatedPhaseId: string;
     relatedSolutionId: string;
     relatedRequirementIds: string[];
+    codeRefs: string[];
     tags: Tag[];
   }>;
 }
@@ -109,6 +139,27 @@ export class ArtifactService {
     }
   }
 
+  /**
+   * Validates that a slug is unique within the plan
+   * @param artifacts - Existing artifacts in the plan
+   * @param slug - The slug to validate
+   * @param excludeId - Optional artifact ID to exclude from uniqueness check (for updates)
+   * @throws Error if slug already exists
+   */
+  private validateSlugUniqueness(
+    artifacts: Artifact[],
+    slug: string,
+    excludeId?: string
+  ): void {
+    const existing = artifacts.find((a) => a.slug === slug && a.id !== excludeId);
+
+    if (existing) {
+      throw new Error(
+        `Artifact with slug "${slug}" already exists in this plan (ID: ${existing.id})`
+      );
+    }
+  }
+
   async addArtifact(input: AddArtifactInput): Promise<AddArtifactResult> {
     await this.ensurePlanExists(input.planId);
 
@@ -118,9 +169,16 @@ export class ArtifactService {
     if (input.artifact.fileTable) {
       validateFileTable(input.artifact.fileTable);
     }
+    // Validate codeRefs format
+    validateCodeRefs(input.artifact.codeRefs || []);
 
     const artifacts = await this.storage.loadEntities<Artifact>(input.planId, 'artifacts');
     const artifactId = uuidv4();
+    const slug = input.artifact.slug || slugify(input.artifact.title, artifactId);
+
+    // Validate slug uniqueness
+    this.validateSlugUniqueness(artifacts, slug);
+
     const now = new Date().toISOString();
 
     const artifact: Artifact = {
@@ -136,6 +194,7 @@ export class ArtifactService {
       },
       title: input.artifact.title,
       description: input.artifact.description,
+      slug,
       artifactType: input.artifact.artifactType,
       status: 'draft',
       content: input.artifact.content
@@ -149,6 +208,7 @@ export class ArtifactService {
       relatedPhaseId: input.artifact.relatedPhaseId,
       relatedSolutionId: input.artifact.relatedSolutionId,
       relatedRequirementIds: input.artifact.relatedRequirementIds,
+      codeRefs: input.artifact.codeRefs,
     };
 
     artifacts.push(artifact);
@@ -181,6 +241,9 @@ export class ArtifactService {
     if (input.updates.fileTable !== undefined) {
       validateFileTable(input.updates.fileTable);
     }
+    if (input.updates.codeRefs !== undefined) {
+      validateCodeRefs(input.updates.codeRefs);
+    }
 
     const artifacts = await this.storage.loadEntities<Artifact>(input.planId, 'artifacts');
     const index = artifacts.findIndex((a) => a.id === input.artifactId);
@@ -194,6 +257,11 @@ export class ArtifactService {
 
     if (input.updates.title !== undefined) artifact.title = input.updates.title;
     if (input.updates.description !== undefined) artifact.description = input.updates.description;
+    if (input.updates.slug !== undefined) {
+      // Validate slug uniqueness (exclude current artifact)
+      this.validateSlugUniqueness(artifacts, input.updates.slug, input.artifactId);
+      artifact.slug = input.updates.slug;
+    }
     if (input.updates.status !== undefined) artifact.status = input.updates.status;
     if (input.updates.content !== undefined) {
       artifact.content = { ...artifact.content, ...input.updates.content };
@@ -202,6 +270,7 @@ export class ArtifactService {
     if (input.updates.relatedPhaseId !== undefined) artifact.relatedPhaseId = input.updates.relatedPhaseId;
     if (input.updates.relatedSolutionId !== undefined) artifact.relatedSolutionId = input.updates.relatedSolutionId;
     if (input.updates.relatedRequirementIds !== undefined) artifact.relatedRequirementIds = input.updates.relatedRequirementIds;
+    if (input.updates.codeRefs !== undefined) artifact.codeRefs = input.updates.codeRefs;
     if (input.updates.tags !== undefined) artifact.metadata.tags = input.updates.tags;
 
     artifact.updatedAt = now;
