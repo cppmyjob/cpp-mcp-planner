@@ -39,7 +39,15 @@ describe('Tool Handlers Integration', () => {
       expect(result.content[0].type).toBe('text');
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.planId).toBeDefined();
-      expect(parsed.manifest.name).toBe('New Plan');
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'plan',
+        { action: 'get', planId: parsed.planId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.plan.manifest.name).toBe('New Plan');
     });
 
     it('plan list should return plans', async () => {
@@ -69,7 +77,16 @@ describe('Tool Handlers Integration', () => {
       );
 
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.plan.name).toBe('Updated Name');
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'plan',
+        { action: 'get', planId: ctx.planId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.plan.manifest.name).toBe('Updated Name');
     });
 
     it('plan set_active and get_active should work', async () => {
@@ -168,7 +185,16 @@ describe('Tool Handlers Integration', () => {
       );
 
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.requirement.title).toBe('Updated');
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'requirement',
+        { action: 'get', planId: ctx.planId, requirementId: req.requirementId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.requirement.title).toBe('Updated');
     });
 
     it('requirement delete should delete', async () => {
@@ -299,7 +325,16 @@ describe('Tool Handlers Integration', () => {
       );
 
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.solution.status).toBe('selected');
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'solution',
+        { action: 'get', planId: ctx.planId, solutionId: sol.solutionId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.solution.status).toBe('selected');
     });
 
     it('solution delete should delete', async () => {
@@ -342,10 +377,18 @@ describe('Tool Handlers Integration', () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.solutionId).toBeDefined();
-      expect(parsed.solution.tradeoffs).toHaveLength(2);
-      expect(parsed.solution.tradeoffs[0].aspect).toBe('Performance');
-      expect(parsed.solution.tradeoffs[0].pros).toEqual(['Fast', 'Efficient']);
-      expect(parsed.solution.tradeoffs[0].cons).toEqual(['Memory usage']);
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'solution',
+        { action: 'get', planId: ctx.planId, solutionId: parsed.solutionId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.solution.tradeoffs).toHaveLength(2);
+      expect(getParsed.solution.tradeoffs[0].aspect).toBe('Performance');
+      expect(getParsed.solution.tradeoffs[0].pros).toEqual(['Fast', 'Efficient']);
+      expect(getParsed.solution.tradeoffs[0].cons).toEqual(['Memory usage']);
     });
 
     it('solution propose should reject invalid tradeoffs format { pro, con }', async () => {
@@ -399,9 +442,17 @@ describe('Tool Handlers Integration', () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.solutionId).toBeDefined();
-      expect(parsed.solution.evaluation.effortEstimate.value).toBe(8);
-      expect(parsed.solution.evaluation.effortEstimate.unit).toBe('hours');
-      expect(parsed.solution.evaluation.effortEstimate.confidence).toBe('high');
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'solution',
+        { action: 'get', planId: ctx.planId, solutionId: parsed.solutionId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.solution.evaluation.effortEstimate.value).toBe(8);
+      expect(getParsed.solution.evaluation.effortEstimate.unit).toBe('hours');
+      expect(getParsed.solution.evaluation.effortEstimate.confidence).toBe('high');
     });
 
     it('solution propose should reject invalid effortEstimate format', async () => {
@@ -601,8 +652,16 @@ describe('Tool Handlers Integration', () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.decisionId).toBeDefined();
-      expect(parsed.decision.alternativesConsidered).toHaveLength(2);
-      expect(parsed.decision.alternativesConsidered[0].option).toBe('Option B');
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'decision',
+        { action: 'get', planId: ctx.planId, decisionId: parsed.decisionId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.decision.alternativesConsidered).toHaveLength(2);
+      expect(getParsed.decision.alternativesConsidered[0].option).toBe('Option B');
     });
 
     it('decision record should reject invalid alternativesConsidered format', async () => {
@@ -669,8 +728,27 @@ describe('Tool Handlers Integration', () => {
       );
 
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.newDecision).toBeDefined();
-      expect(parsed.supersededDecision.status).toBe('superseded');
+      expect(parsed.success).toBe(true);
+      expect(parsed.newDecisionId).toBeDefined();
+      expect(parsed.supersededDecisionId).toBe(dec.decisionId);
+
+      // Verify old decision is superseded
+      const getOld = await handleToolCall(
+        'decision',
+        { action: 'get', planId: ctx.planId, decisionId: dec.decisionId },
+        ctx.services
+      );
+      const oldParsed = JSON.parse(getOld.content[0].text);
+      expect(oldParsed.decision.status).toBe('superseded');
+
+      // Verify new decision exists
+      const getNew = await handleToolCall(
+        'decision',
+        { action: 'get', planId: ctx.planId, decisionId: parsed.newDecisionId },
+        ctx.services
+      );
+      const newParsed = JSON.parse(getNew.content[0].text);
+      expect(newParsed.decision.decision).toBe('New answer');
     });
   });
 
@@ -716,8 +794,16 @@ describe('Tool Handlers Integration', () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.phaseId).toBeDefined();
-      expect(parsed.phase.schedule.estimatedEffort.value).toBe(4);
-      expect(parsed.phase.schedule.estimatedEffort.unit).toBe('days');
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'phase',
+        { action: 'get', planId: ctx.planId, phaseId: parsed.phaseId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.phase.schedule.estimatedEffort.value).toBe(4);
+      expect(getParsed.phase.schedule.estimatedEffort.unit).toBe('days');
     });
 
     it('phase add should reject invalid estimatedEffort format', async () => {
@@ -764,7 +850,16 @@ describe('Tool Handlers Integration', () => {
       );
 
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.phase.status).toBe('in_progress');
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'phase',
+        { action: 'get', planId: ctx.planId, phaseId: phase.phaseId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.phase.status).toBe('in_progress');
     });
 
     it('phase move should move phase', async () => {
@@ -778,7 +873,16 @@ describe('Tool Handlers Integration', () => {
       );
 
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.phase.parentId).toBe(parent.phaseId);
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'phase',
+        { action: 'get', planId: ctx.planId, phaseId: child.phaseId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.phase.parentId).toBe(parent.phaseId);
     });
 
     it('phase delete should delete phase', async () => {
@@ -831,12 +935,21 @@ describe('Tool Handlers Integration', () => {
         const p2 = JSON.parse(phase2.content[0].text);
         const p3 = JSON.parse(phase3.content[0].text);
 
-        expect(p1.phase.order).toBe(1);
-        expect(p2.phase.order).toBe(2);
-        expect(p3.phase.order).toBe(3);
-        expect(p1.phase.path).toBe('1');
-        expect(p2.phase.path).toBe('2');
-        expect(p3.phase.path).toBe('3');
+        // Verify via get
+        const get1 = await handleToolCall('phase', { action: 'get', planId: ctx.planId, phaseId: p1.phaseId }, ctx.services);
+        const get2 = await handleToolCall('phase', { action: 'get', planId: ctx.planId, phaseId: p2.phaseId }, ctx.services);
+        const get3 = await handleToolCall('phase', { action: 'get', planId: ctx.planId, phaseId: p3.phaseId }, ctx.services);
+
+        const getParsed1 = JSON.parse(get1.content[0].text);
+        const getParsed2 = JSON.parse(get2.content[0].text);
+        const getParsed3 = JSON.parse(get3.content[0].text);
+
+        expect(getParsed1.phase.order).toBe(1);
+        expect(getParsed2.phase.order).toBe(2);
+        expect(getParsed3.phase.order).toBe(3);
+        expect(getParsed1.phase.path).toBe('1');
+        expect(getParsed2.phase.path).toBe('2');
+        expect(getParsed3.phase.path).toBe('3');
       });
 
       it('should calculate order based on max existing order after delete', async () => {
@@ -875,8 +988,13 @@ describe('Tool Handlers Integration', () => {
         );
 
         const p4 = JSON.parse(phase4.content[0].text);
-        expect(p4.phase.order).toBe(4);
-        expect(p4.phase.path).toBe('4');
+
+        // Verify via get
+        const get4 = await handleToolCall('phase', { action: 'get', planId: ctx.planId, phaseId: p4.phaseId }, ctx.services);
+        const getParsed4 = JSON.parse(get4.content[0].text);
+
+        expect(getParsed4.phase.order).toBe(4);
+        expect(getParsed4.phase.path).toBe('4');
       });
 
       it('should maintain unique paths for all phases in tree', async () => {
@@ -918,11 +1036,21 @@ describe('Tool Handlers Integration', () => {
         const c1 = JSON.parse(child1.content[0].text);
         const c2 = JSON.parse(child2.content[0].text);
 
-        // Verify paths are unique
-        expect(p1.phase.path).toBe('1');
-        expect(p2.phase.path).toBe('2');
-        expect(c1.phase.path).toBe('1.1');
-        expect(c2.phase.path).toBe('1.2');
+        // Verify paths via get
+        const get1 = await handleToolCall('phase', { action: 'get', planId: ctx.planId, phaseId: p1.phaseId }, ctx.services);
+        const get2 = await handleToolCall('phase', { action: 'get', planId: ctx.planId, phaseId: p2.phaseId }, ctx.services);
+        const getC1 = await handleToolCall('phase', { action: 'get', planId: ctx.planId, phaseId: c1.phaseId }, ctx.services);
+        const getC2 = await handleToolCall('phase', { action: 'get', planId: ctx.planId, phaseId: c2.phaseId }, ctx.services);
+
+        const getParsed1 = JSON.parse(get1.content[0].text);
+        const getParsed2 = JSON.parse(get2.content[0].text);
+        const getParsedC1 = JSON.parse(getC1.content[0].text);
+        const getParsedC2 = JSON.parse(getC2.content[0].text);
+
+        expect(getParsed1.phase.path).toBe('1');
+        expect(getParsed2.phase.path).toBe('2');
+        expect(getParsedC1.phase.path).toBe('1.1');
+        expect(getParsedC2.phase.path).toBe('1.2');
 
         // Get tree and verify all paths
         const tree = await handleToolCall(
@@ -1015,8 +1143,13 @@ describe('Tool Handlers Integration', () => {
         );
 
         const c4 = JSON.parse(child4.content[0].text);
-        expect(c4.phase.order).toBe(4);
-        expect(c4.phase.path).toBe('1.4');
+
+        // Verify via get
+        const get4 = await handleToolCall('phase', { action: 'get', planId: ctx.planId, phaseId: c4.phaseId }, ctx.services);
+        const getParsed4 = JSON.parse(get4.content[0].text);
+
+        expect(getParsed4.phase.order).toBe(4);
+        expect(getParsed4.phase.path).toBe('1.4');
       });
 
       it('should persist order correctly when using explicit order', async () => {
@@ -1032,8 +1165,13 @@ describe('Tool Handlers Integration', () => {
         );
 
         const p1 = JSON.parse(phase1.content[0].text);
-        expect(p1.phase.order).toBe(10);
-        expect(p1.phase.path).toBe('10');
+
+        // Verify via get
+        const get1 = await handleToolCall('phase', { action: 'get', planId: ctx.planId, phaseId: p1.phaseId }, ctx.services);
+        const getParsed1 = JSON.parse(get1.content[0].text);
+
+        expect(getParsed1.phase.order).toBe(10);
+        expect(getParsed1.phase.path).toBe('10');
 
         // Add auto-ordered phase - should get order 11 (max=10, +1)
         const phase2 = await handleToolCall(
@@ -1043,8 +1181,13 @@ describe('Tool Handlers Integration', () => {
         );
 
         const p2 = JSON.parse(phase2.content[0].text);
-        expect(p2.phase.order).toBe(11);
-        expect(p2.phase.path).toBe('11');
+
+        // Verify via get
+        const get2 = await handleToolCall('phase', { action: 'get', planId: ctx.planId, phaseId: p2.phaseId }, ctx.services);
+        const getParsed2 = JSON.parse(get2.content[0].text);
+
+        expect(getParsed2.phase.order).toBe(11);
+        expect(getParsed2.phase.path).toBe('11');
       });
     });
   });
@@ -1249,9 +1392,17 @@ describe('Tool Handlers Integration', () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.artifactId).toBeDefined();
-      expect(parsed.artifact.title).toBe('User Service');
-      expect(parsed.artifact.artifactType).toBe('code');
-      expect(parsed.artifact.status).toBe('draft');
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'artifact',
+        { action: 'get', planId: ctx.planId, artifactId: parsed.artifactId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.artifact.title).toBe('User Service');
+      expect(getParsed.artifact.artifactType).toBe('code');
+      expect(getParsed.artifact.status).toBe('draft');
     });
 
     it('artifact add should accept valid fileTable', async () => {
@@ -1279,8 +1430,16 @@ describe('Tool Handlers Integration', () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.artifactId).toBeDefined();
-      expect(parsed.artifact.fileTable).toHaveLength(2);
-      expect(parsed.artifact.fileTable[0].action).toBe('create');
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'artifact',
+        { action: 'get', planId: ctx.planId, artifactId: parsed.artifactId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.artifact.fileTable).toHaveLength(2);
+      expect(getParsed.artifact.fileTable[0].action).toBe('create');
     });
 
     it('artifact add should reject invalid artifactType', async () => {
@@ -1353,9 +1512,18 @@ describe('Tool Handlers Integration', () => {
       );
 
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.artifact.title).toBe('Updated Title');
-      expect(parsed.artifact.status).toBe('reviewed');
-      expect(parsed.artifact.version).toBe(2);
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'artifact',
+        { action: 'get', planId: ctx.planId, artifactId: artifact.artifactId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.artifact.title).toBe('Updated Title');
+      expect(getParsed.artifact.status).toBe('reviewed');
+      expect(getParsed.artifact.version).toBe(2);
     });
 
     it('artifact update should reject invalid fileTable', async () => {
@@ -1470,6 +1638,326 @@ describe('Tool Handlers Integration', () => {
           ctx.services
         )
       ).rejects.toThrow();
+    });
+  });
+
+  /**
+   * Sprint 6 - Minimal Return Values Integration Tests
+   *
+   * These tests verify that CREATE/UPDATE operations return only
+   * minimal data (IDs and success flags) instead of full objects
+   * to reduce context pollution.
+   */
+  describe('Minimal Return Values (Sprint 6)', () => {
+    describe('CREATE operations should return only ID', () => {
+      it('plan create should not return manifest or full plan object', async () => {
+        const result = await handleToolCall(
+          'plan',
+          { action: 'create', name: 'Minimal Test', description: 'Test' },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.planId).toBeDefined();
+        expect(parsed).not.toHaveProperty('manifest');
+        expect(parsed).not.toHaveProperty('plan');
+        expect(parsed).not.toHaveProperty('createdAt');
+      });
+
+      it('requirement add should not return full requirement object', async () => {
+        const result = await handleToolCall(
+          'requirement',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            requirement: {
+              title: 'Minimal Req',
+              description: 'Test',
+              source: { type: 'user-request' },
+              acceptanceCriteria: ['AC1'],
+              priority: 'high',
+              category: 'functional',
+            },
+          },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.requirementId).toBeDefined();
+        expect(parsed).not.toHaveProperty('requirement');
+      });
+
+      it('solution propose should not return full solution object', async () => {
+        const result = await handleToolCall(
+          'solution',
+          {
+            action: 'propose',
+            planId: ctx.planId,
+            solution: {
+              title: 'Minimal Solution',
+              description: 'Test',
+              approach: 'Approach',
+              addressing: [],
+              tradeoffs: [],
+              evaluation: {
+                effortEstimate: { value: 1, unit: 'days', confidence: 'medium' },
+                technicalFeasibility: 'high',
+                riskAssessment: 'Low',
+              },
+            },
+          },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.solutionId).toBeDefined();
+        expect(parsed).not.toHaveProperty('solution');
+      });
+
+      it('decision record should not return full decision object', async () => {
+        const result = await handleToolCall(
+          'decision',
+          {
+            action: 'record',
+            planId: ctx.planId,
+            decision: {
+              title: 'Minimal Decision',
+              question: 'What?',
+              context: 'Context',
+              decision: 'Answer',
+              alternativesConsidered: [],
+            },
+          },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.decisionId).toBeDefined();
+        expect(parsed).not.toHaveProperty('decision');
+      });
+
+      it('phase add should not return full phase object', async () => {
+        const result = await handleToolCall(
+          'phase',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            phase: {
+              title: 'Minimal Phase',
+              description: 'Test',
+              objectives: ['Obj1'],
+              deliverables: ['Del1'],
+              successCriteria: ['Crit1'],
+            },
+          },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.phaseId).toBeDefined();
+        expect(parsed).not.toHaveProperty('phase');
+      });
+
+      it('artifact add should not return full artifact object', async () => {
+        const result = await handleToolCall(
+          'artifact',
+          {
+            action: 'add',
+            planId: ctx.planId,
+            artifact: {
+              title: 'Minimal Artifact',
+              description: 'Test',
+              artifactType: 'code',
+              content: {
+                language: 'typescript',
+                sourceCode: 'const x = 1;',
+              },
+            },
+          },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.artifactId).toBeDefined();
+        expect(parsed).not.toHaveProperty('artifact');
+      });
+
+      it('link create should not return full link object', async () => {
+        const result = await handleToolCall(
+          'link',
+          {
+            action: 'create',
+            planId: ctx.planId,
+            sourceId: 'entity-1',
+            targetId: 'entity-2',
+            relationType: 'implements',
+          },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.linkId).toBeDefined();
+        expect(parsed).not.toHaveProperty('link');
+      });
+    });
+
+    describe('UPDATE operations should return only success and ID', () => {
+      it('plan update should not return full plan object', async () => {
+        const result = await handleToolCall(
+          'plan',
+          { action: 'update', planId: ctx.planId, updates: { name: 'Updated' } },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.success).toBe(true);
+        expect(parsed).not.toHaveProperty('plan');
+        expect(parsed).not.toHaveProperty('updatedAt');
+      });
+
+      it('requirement update should not return full requirement object', async () => {
+        const req = await createTestRequirement(ctx);
+
+        const result = await handleToolCall(
+          'requirement',
+          {
+            action: 'update',
+            planId: ctx.planId,
+            requirementId: req.requirementId,
+            updates: { title: 'Updated' },
+          },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.success).toBe(true);
+        expect(parsed).not.toHaveProperty('requirement');
+      });
+
+      it('solution update should not return full solution object', async () => {
+        const sol = await createTestSolution(ctx);
+
+        const result = await handleToolCall(
+          'solution',
+          {
+            action: 'update',
+            planId: ctx.planId,
+            solutionId: sol.solutionId,
+            updates: { title: 'Updated' },
+          },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.success).toBe(true);
+        expect(parsed).not.toHaveProperty('solution');
+      });
+
+      it('solution select should not return full solution objects', async () => {
+        const sol = await createTestSolution(ctx);
+
+        const result = await handleToolCall(
+          'solution',
+          { action: 'select', planId: ctx.planId, solutionId: sol.solutionId, reason: 'Best' },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.success).toBe(true);
+        expect(parsed).not.toHaveProperty('solution');
+        expect(parsed).not.toHaveProperty('deselected');
+      });
+
+      it('phase update should not return full phase object', async () => {
+        const phase = await createTestPhase(ctx);
+
+        const result = await handleToolCall(
+          'phase',
+          {
+            action: 'update',
+            planId: ctx.planId,
+            phaseId: phase.phaseId,
+            updates: { title: 'Updated' },
+          },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.success).toBe(true);
+        expect(parsed).not.toHaveProperty('phase');
+      });
+
+      it('phase update_status should not return full phase object', async () => {
+        const phase = await createTestPhase(ctx);
+
+        const result = await handleToolCall(
+          'phase',
+          { action: 'update_status', planId: ctx.planId, phaseId: phase.phaseId, status: 'in_progress' },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.success).toBe(true);
+        expect(parsed).not.toHaveProperty('phase');
+      });
+
+      it('artifact update should not return full artifact object', async () => {
+        const artifact = await createTestArtifact(ctx);
+
+        const result = await handleToolCall(
+          'artifact',
+          {
+            action: 'update',
+            planId: ctx.planId,
+            artifactId: artifact.artifactId,
+            updates: { title: 'Updated' },
+          },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.success).toBe(true);
+        expect(parsed).not.toHaveProperty('artifact');
+      });
+    });
+
+    describe('SPECIAL operations should return only success and IDs', () => {
+      it('decision supersede should not return full decision objects', async () => {
+        const dec = await createTestDecision(ctx);
+
+        const result = await handleToolCall(
+          'decision',
+          {
+            action: 'supersede',
+            planId: ctx.planId,
+            decisionId: dec.decisionId,
+            newDecision: { decision: 'New answer' },
+            reason: 'Changed requirements',
+          },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.success).toBe(true);
+        expect(parsed).not.toHaveProperty('newDecision');
+        expect(parsed).not.toHaveProperty('supersededDecision');
+      });
+
+      it('phase move should not return full phase object', async () => {
+        const parent = await createTestPhase(ctx, { title: 'Parent' });
+        const child = await createTestPhase(ctx, { title: 'Child' });
+
+        const result = await handleToolCall(
+          'phase',
+          { action: 'move', planId: ctx.planId, phaseId: child.phaseId, newParentId: parent.phaseId },
+          ctx.services
+        );
+
+        const parsed = JSON.parse(result.content[0].text);
+        expect(parsed.success).toBe(true);
+        expect(parsed).not.toHaveProperty('phase');
+      });
+
     });
   });
 });

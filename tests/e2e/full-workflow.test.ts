@@ -54,8 +54,16 @@ describe('E2E: Complete Planning Workflow', () => {
 
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.planId).toBeDefined();
-      expect(parsed.manifest.name).toBe('User Authentication System');
       planId = parsed.planId;
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'plan',
+        { action: 'get', planId },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.plan.manifest.name).toBe('User Authentication System');
     });
 
     it('should set the plan as active', async () => {
@@ -237,7 +245,16 @@ describe('E2E: Complete Planning Workflow', () => {
       );
 
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.solution.status).toBe('selected');
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'solution',
+        { action: 'get', planId, solutionId: solutionIds[2] },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.solution.status).toBe('selected');
     });
   });
 
@@ -381,7 +398,16 @@ describe('E2E: Complete Planning Workflow', () => {
       );
 
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.phase.status).toBe('in_progress');
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await handleToolCall(
+        'phase',
+        { action: 'get', planId, phaseId: phaseIds[1] },
+        ctx.services
+      );
+      const getParsed = JSON.parse(getResult.content[0].text);
+      expect(getParsed.phase.status).toBe('in_progress');
     });
   });
 

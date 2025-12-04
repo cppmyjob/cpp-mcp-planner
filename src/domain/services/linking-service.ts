@@ -29,7 +29,6 @@ export interface UnlinkEntitiesInput {
 // Output types
 export interface LinkEntitiesResult {
   linkId: string;
-  link: Link;
 }
 
 export interface GetEntityLinksResult {
@@ -86,7 +85,7 @@ export class LinkingService {
     links.push(link);
     await this.storage.saveLinks(input.planId, links);
 
-    return { linkId, link };
+    return { linkId };
   }
 
   async getEntityLinks(input: GetEntityLinksInput): Promise<GetEntityLinksResult> {

@@ -82,7 +82,6 @@ export interface DeleteRequirementInput {
 // Output types
 export interface AddRequirementResult {
   requirementId: string;
-  requirement: Requirement;
 }
 
 export interface GetRequirementResult {
@@ -98,7 +97,7 @@ export interface GetRequirementResult {
 
 export interface UpdateRequirementResult {
   success: boolean;
-  requirement: Requirement;
+  requirementId: string;
 }
 
 export interface ListRequirementsResult {
@@ -166,7 +165,6 @@ export class RequirementService {
 
     return {
       requirementId,
-      requirement,
     };
   }
 
@@ -251,7 +249,7 @@ export class RequirementService {
 
     return {
       success: true,
-      requirement,
+      requirementId: input.requirementId,
     };
   }
 

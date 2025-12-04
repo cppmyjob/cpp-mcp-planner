@@ -41,7 +41,11 @@ describe('LinkingService', () => {
       });
 
       expect(result.linkId).toBeDefined();
-      expect(result.link.relationType).toBe('implements');
+
+      // Verify via getEntityLinks
+      const links = await service.getEntityLinks({ planId, entityId: 'sol-001', direction: 'outgoing' });
+      expect(links.outgoing).toHaveLength(1);
+      expect(links.outgoing[0].relationType).toBe('implements');
     });
 
     it('should prevent duplicate links', async () => {
@@ -71,7 +75,11 @@ describe('LinkingService', () => {
         metadata: { comparison: 'Both solve auth' },
       });
 
-      expect(result.link.metadata?.comparison).toBe('Both solve auth');
+      expect(result.linkId).toBeDefined();
+
+      // Verify via getEntityLinks
+      const links = await service.getEntityLinks({ planId, entityId: 'sol-001', direction: 'outgoing' });
+      expect(links.outgoing[0].metadata?.comparison).toBe('Both solve auth');
     });
 
     it('should detect circular dependencies', async () => {
@@ -250,6 +258,22 @@ describe('LinkingService', () => {
 
       const remaining = await service.getLinksForEntity(planId, 'sol-001');
       expect(remaining).toHaveLength(0);
+    });
+  });
+
+  describe('minimal return values (Sprint 6)', () => {
+    describe('linkEntities should return only linkId', () => {
+      it('should not include full link object in result', async () => {
+        const result = await service.linkEntities({
+          planId,
+          sourceId: 'sol-001',
+          targetId: 'req-001',
+          relationType: 'implements',
+        });
+
+        expect(result.linkId).toBeDefined();
+        expect(result).not.toHaveProperty('link');
+      });
     });
   });
 });

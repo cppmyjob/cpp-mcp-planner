@@ -72,7 +72,6 @@ export interface GetSolutionResult {
 // Output types
 export interface ProposeSolutionResult {
   solutionId: string;
-  solution: Solution;
 }
 
 export interface CompareSolutionsResult {
@@ -98,13 +97,13 @@ export interface CompareSolutionsResult {
 
 export interface SelectSolutionResult {
   success: boolean;
-  solution: Solution;
-  deselected?: Solution[];
+  solutionId: string;
+  deselectedIds?: string[];
 }
 
 export interface UpdateSolutionResult {
   success: boolean;
-  solution: Solution;
+  solutionId: string;
 }
 
 export interface ListSolutionsResult {
@@ -172,7 +171,7 @@ export class SolutionService {
     await this.storage.saveEntities(input.planId, 'solutions', solutions);
     await this.planService.updateStatistics(input.planId);
 
-    return { solutionId, solution };
+    return { solutionId };
   }
 
   async compareSolutions(input: CompareSolutionsInput): Promise<CompareSolutionsResult> {
@@ -283,8 +282,8 @@ export class SolutionService {
 
     return {
       success: true,
-      solution,
-      deselected: deselected.length > 0 ? deselected : undefined,
+      solutionId: input.solutionId,
+      deselectedIds: deselected.length > 0 ? deselected.map((s) => s.id) : undefined,
     };
   }
 
@@ -325,7 +324,7 @@ export class SolutionService {
     solutions[index] = solution;
     await this.storage.saveEntities(input.planId, 'solutions', solutions);
 
-    return { success: true, solution };
+    return { success: true, solutionId: input.solutionId };
   }
 
   async listSolutions(input: ListSolutionsInput): Promise<ListSolutionsResult> {

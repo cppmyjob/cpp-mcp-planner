@@ -72,10 +72,17 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ planId: string; manifest: { name: string } }>(result);
+      const parsed = parseResult<{ planId: string }>(result);
       expect(parsed.planId).toBeDefined();
-      expect(parsed.manifest.name).toBe('All Tools Test Plan');
       planId = parsed.planId;
+
+      // Verify via get
+      const getResult = await client.callTool({
+        name: 'plan',
+        arguments: { action: 'get', planId },
+      });
+      const getParsed = parseResult<{ plan: { manifest: { name: string } } }>(getResult);
+      expect(getParsed.plan.manifest.name).toBe('All Tools Test Plan');
     });
 
     it('action: list', async () => {
@@ -140,8 +147,16 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ plan: { name: string } }>(result);
-      expect(parsed.plan.name).toBe('Updated Plan Name');
+      const parsed = parseResult<{ success: boolean }>(result);
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await client.callTool({
+        name: 'plan',
+        arguments: { action: 'get', planId },
+      });
+      const getParsed = parseResult<{ plan: { manifest: { name: string } } }>(getResult);
+      expect(getParsed.plan.manifest.name).toBe('Updated Plan Name');
     });
 
     it('action: set_active', async () => {
@@ -346,9 +361,17 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ requirement: { title: string; priority: string } }>(result);
-      expect(parsed.requirement.title).toBe('Updated Requirement');
-      expect(parsed.requirement.priority).toBe('critical');
+      const parsed = parseResult<{ success: boolean }>(result);
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await client.callTool({
+        name: 'requirement',
+        arguments: { action: 'get', planId, requirementId },
+      });
+      const getParsed = parseResult<{ requirement: { title: string; priority: string } }>(getResult);
+      expect(getParsed.requirement.title).toBe('Updated Requirement');
+      expect(getParsed.requirement.priority).toBe('critical');
     });
 
     it('action: delete', async () => {
@@ -510,8 +533,16 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ solution: { title: string } }>(result);
-      expect(parsed.solution.title).toBe('Updated Solution');
+      const parsed = parseResult<{ success: boolean }>(result);
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await client.callTool({
+        name: 'solution',
+        arguments: { action: 'get', planId, solutionId },
+      });
+      const getParsed = parseResult<{ solution: { title: string } }>(getResult);
+      expect(getParsed.solution.title).toBe('Updated Solution');
     });
 
     it('action: compare', async () => {
@@ -541,8 +572,16 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ solution: { status: string } }>(result);
-      expect(parsed.solution.status).toBe('selected');
+      const parsed = parseResult<{ success: boolean }>(result);
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await client.callTool({
+        name: 'solution',
+        arguments: { action: 'get', planId, solutionId },
+      });
+      const getParsed = parseResult<{ solution: { status: string } }>(getResult);
+      expect(getParsed.solution.status).toBe('selected');
     });
 
     it('action: delete', async () => {
@@ -672,12 +711,24 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{
-        newDecision: { id: string };
-        supersededDecision: { status: string };
-      }>(result);
-      expect(parsed.newDecision.id).toBeDefined();
-      expect(parsed.supersededDecision.status).toBe('superseded');
+      const parsed = parseResult<{ newDecisionId: string }>(result);
+      expect(parsed.newDecisionId).toBeDefined();
+
+      // Verify old decision was superseded
+      const oldDecisionResult = await client.callTool({
+        name: 'decision',
+        arguments: { action: 'get', planId, decisionId },
+      });
+      const oldDecision = parseResult<{ decision: { status: string } }>(oldDecisionResult);
+      expect(oldDecision.decision.status).toBe('superseded');
+
+      // Verify new decision exists
+      const newDecisionResult = await client.callTool({
+        name: 'decision',
+        arguments: { action: 'get', planId, decisionId: parsed.newDecisionId },
+      });
+      const newDecision = parseResult<{ decision: { id: string } }>(newDecisionResult);
+      expect(newDecision.decision.id).toBe(parsed.newDecisionId);
     });
   });
 
@@ -861,9 +912,17 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ phase: { status: string; progress: number } }>(result);
-      expect(parsed.phase.status).toBe('in_progress');
-      expect(parsed.phase.progress).toBe(50);
+      const parsed = parseResult<{ success: boolean }>(result);
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await client.callTool({
+        name: 'phase',
+        arguments: { action: 'get', planId, phaseId: childPhaseId },
+      });
+      const getParsed = parseResult<{ phase: { status: string; progress: number } }>(getResult);
+      expect(getParsed.phase.status).toBe('in_progress');
+      expect(getParsed.phase.progress).toBe(50);
     });
 
     it('action: update_status with all status values', async () => {
@@ -904,8 +963,16 @@ describe('E2E: All MCP Tools Validation', () => {
             ...(notes && { notes }),
           },
         });
-        const parsed = parseResult<{ phase: { status: string } }>(result);
-        expect(parsed.phase.status).toBe(status);
+        const parsed = parseResult<{ success: boolean }>(result);
+        expect(parsed.success).toBe(true);
+
+        // Verify via get
+        const getResult = await client.callTool({
+          name: 'phase',
+          arguments: { action: 'get', planId, phaseId: testPhaseId },
+        });
+        const getParsed = parseResult<{ phase: { status: string } }>(getResult);
+        expect(getParsed.phase.status).toBe(status);
       }
     });
 
@@ -938,8 +1005,16 @@ describe('E2E: All MCP Tools Validation', () => {
           progress: 0,
         },
       });
-      const parsed0 = parseResult<{ phase: { progress: number } }>(result0);
-      expect(parsed0.phase.progress).toBe(0);
+      const parsed0 = parseResult<{ success: boolean }>(result0);
+      expect(parsed0.success).toBe(true);
+
+      // Verify progress 0
+      const getResult0 = await client.callTool({
+        name: 'phase',
+        arguments: { action: 'get', planId, phaseId: progressPhaseId },
+      });
+      const getParsed0 = parseResult<{ phase: { progress: number } }>(getResult0);
+      expect(getParsed0.phase.progress).toBe(0);
 
       // Test progress: 100% (complete)
       const result100 = await client.callTool({
@@ -952,8 +1027,16 @@ describe('E2E: All MCP Tools Validation', () => {
           progress: 100,
         },
       });
-      const parsed100 = parseResult<{ phase: { progress: number } }>(result100);
-      expect(parsed100.phase.progress).toBe(100);
+      const parsed100 = parseResult<{ success: boolean }>(result100);
+      expect(parsed100.success).toBe(true);
+
+      // Verify progress 100
+      const getResult100 = await client.callTool({
+        name: 'phase',
+        arguments: { action: 'get', planId, phaseId: progressPhaseId },
+      });
+      const getParsed100 = parseResult<{ phase: { progress: number } }>(getResult100);
+      expect(getParsed100.phase.progress).toBe(100);
     });
 
     it('action: move', async () => {
@@ -985,8 +1068,16 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ phase: { parentId: string } }>(result);
-      expect(parsed.phase.parentId).toBe(newParent.phaseId);
+      const parsed = parseResult<{ success: boolean }>(result);
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await client.callTool({
+        name: 'phase',
+        arguments: { action: 'get', planId, phaseId: childPhaseId },
+      });
+      const getParsed = parseResult<{ phase: { parentId: string } }>(getResult);
+      expect(getParsed.phase.parentId).toBe(newParent.phaseId);
     });
 
     it('action: get_next_actions', async () => {
@@ -1079,13 +1170,27 @@ describe('E2E: All MCP Tools Validation', () => {
           },
         });
 
-        const p1 = parseResult<{ phaseId: string; phase: { order: number } }>(phase1Result);
-        const p2 = parseResult<{ phaseId: string; phase: { order: number } }>(phase2Result);
-        const p3 = parseResult<{ phaseId: string; phase: { order: number } }>(phase3Result);
+        const p1 = parseResult<{ phaseId: string }>(phase1Result);
+        const p2 = parseResult<{ phaseId: string }>(phase2Result);
+        const p3 = parseResult<{ phaseId: string }>(phase3Result);
 
-        expect(p1.phase.order).toBe(1);
-        expect(p2.phase.order).toBe(2);
-        expect(p3.phase.order).toBe(3);
+        // Verify orders via get
+        const get1 = await client.callTool({
+          name: 'phase',
+          arguments: { action: 'get', planId: e2ePlanId, phaseId: p1.phaseId },
+        });
+        const get2 = await client.callTool({
+          name: 'phase',
+          arguments: { action: 'get', planId: e2ePlanId, phaseId: p2.phaseId },
+        });
+        const get3 = await client.callTool({
+          name: 'phase',
+          arguments: { action: 'get', planId: e2ePlanId, phaseId: p3.phaseId },
+        });
+
+        expect(parseResult<{ phase: { order: number } }>(get1).phase.order).toBe(1);
+        expect(parseResult<{ phase: { order: number } }>(get2).phase.order).toBe(2);
+        expect(parseResult<{ phase: { order: number } }>(get3).phase.order).toBe(3);
 
         // Delete phase 2
         await client.callTool({
@@ -1107,9 +1212,16 @@ describe('E2E: All MCP Tools Validation', () => {
           },
         });
 
-        const p4 = parseResult<{ phase: { order: number; path: string } }>(phase4Result);
-        expect(p4.phase.order).toBe(4);
-        expect(p4.phase.path).toBe('4');
+        const p4 = parseResult<{ phaseId: string }>(phase4Result);
+
+        // Verify via get
+        const get4 = await client.callTool({
+          name: 'phase',
+          arguments: { action: 'get', planId: e2ePlanId, phaseId: p4.phaseId },
+        });
+        const getParsed4 = parseResult<{ phase: { order: number; path: string } }>(get4);
+        expect(getParsed4.phase.order).toBe(4);
+        expect(getParsed4.phase.path).toBe('4');
       });
 
       it('should generate unique paths for nested phases through full MCP flow', async () => {
@@ -1122,7 +1234,14 @@ describe('E2E: All MCP Tools Validation', () => {
             phase: { title: 'E2E Parent', description: 'Parent phase', objectives: ['P'] },
           },
         });
-        const parent = parseResult<{ phaseId: string; phase: { path: string } }>(parentResult);
+        const parent = parseResult<{ phaseId: string }>(parentResult);
+
+        // Get parent path
+        const getParent = await client.callTool({
+          name: 'phase',
+          arguments: { action: 'get', planId: e2ePlanId, phaseId: parent.phaseId },
+        });
+        const parentPath = parseResult<{ phase: { path: string } }>(getParent).phase.path;
 
         // Create 3 children
         const child1Result = await client.callTool({
@@ -1165,9 +1284,9 @@ describe('E2E: All MCP Tools Validation', () => {
           },
         });
 
-        const c1 = parseResult<{ phaseId: string; phase: { path: string } }>(child1Result);
-        const c2 = parseResult<{ phaseId: string; phase: { path: string } }>(child2Result);
-        const c3 = parseResult<{ phaseId: string; phase: { path: string } }>(child3Result);
+        const c1 = parseResult<{ phaseId: string }>(child1Result);
+        const c2 = parseResult<{ phaseId: string }>(child2Result);
+        const c3 = parseResult<{ phaseId: string }>(child3Result);
 
         // Delete child 2
         await client.callTool({
@@ -1194,9 +1313,16 @@ describe('E2E: All MCP Tools Validation', () => {
           },
         });
 
-        const c4 = parseResult<{ phase: { order: number; path: string } }>(child4Result);
-        expect(c4.phase.order).toBe(4);
-        expect(c4.phase.path).toBe(`${parent.phase.path}.4`);
+        const c4 = parseResult<{ phaseId: string }>(child4Result);
+
+        // Verify via get
+        const getC4 = await client.callTool({
+          name: 'phase',
+          arguments: { action: 'get', planId: e2ePlanId, phaseId: c4.phaseId },
+        });
+        const c4Data = parseResult<{ phase: { order: number; path: string } }>(getC4);
+        expect(c4Data.phase.order).toBe(4);
+        expect(c4Data.phase.path).toBe(`${parentPath}.4`);
 
         // Verify tree has no duplicate paths
         const treeResult = await client.callTool({
@@ -1247,9 +1373,16 @@ describe('E2E: All MCP Tools Validation', () => {
           },
         });
 
-        const p100 = parseResult<{ phase: { order: number; path: string } }>(phase100Result);
-        expect(p100.phase.order).toBe(100);
-        expect(p100.phase.path).toBe('100');
+        const p100 = parseResult<{ phaseId: string }>(phase100Result);
+
+        // Verify via get
+        const get100 = await client.callTool({
+          name: 'phase',
+          arguments: { action: 'get', planId: e2ePlanId, phaseId: p100.phaseId },
+        });
+        const p100Data = parseResult<{ phase: { order: number; path: string } }>(get100);
+        expect(p100Data.phase.order).toBe(100);
+        expect(p100Data.phase.path).toBe('100');
 
         // Add auto-ordered phase - should get order 101
         const autoResult = await client.callTool({
@@ -1261,9 +1394,16 @@ describe('E2E: All MCP Tools Validation', () => {
           },
         });
 
-        const pAuto = parseResult<{ phase: { order: number; path: string } }>(autoResult);
-        expect(pAuto.phase.order).toBe(101);
-        expect(pAuto.phase.path).toBe('101');
+        const pAuto = parseResult<{ phaseId: string }>(autoResult);
+
+        // Verify via get
+        const getAuto = await client.callTool({
+          name: 'phase',
+          arguments: { action: 'get', planId: e2ePlanId, phaseId: pAuto.phaseId },
+        });
+        const pAutoData = parseResult<{ phase: { order: number; path: string } }>(getAuto);
+        expect(pAutoData.phase.order).toBe(101);
+        expect(pAutoData.phase.path).toBe('101');
       });
     });
   });

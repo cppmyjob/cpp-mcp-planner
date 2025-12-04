@@ -71,14 +71,13 @@ export interface SupersedeDecisionInput {
 
 export interface SupersedeDecisionResult {
   success: boolean;
-  newDecision: Decision;
-  supersededDecision: Decision;
+  newDecisionId: string;
+  supersededDecisionId: string;
 }
 
 // Output types
 export interface RecordDecisionResult {
   decisionId: string;
-  decision: Decision;
 }
 
 export interface GetDecisionHistoryResult {
@@ -89,8 +88,7 @@ export interface GetDecisionHistoryResult {
 
 export interface UpdateDecisionResult {
   success: boolean;
-  decision: Decision;
-  superseded?: Decision;
+  decisionId: string;
 }
 
 export interface ListDecisionsResult {
@@ -171,8 +169,8 @@ export class DecisionService {
 
     return {
       success: true,
-      newDecision,
-      supersededDecision: oldDecision,
+      newDecisionId: newDecisionId,
+      supersededDecisionId: oldDecision.id,
     };
   }
 
@@ -211,7 +209,7 @@ export class DecisionService {
     await this.storage.saveEntities(input.planId, 'decisions', decisions);
     await this.planService.updateStatistics(input.planId);
 
-    return { decisionId, decision };
+    return { decisionId };
   }
 
   async getDecisionHistory(input: GetDecisionHistoryInput): Promise<GetDecisionHistoryResult> {
@@ -307,8 +305,7 @@ export class DecisionService {
 
       return {
         success: true,
-        decision: newDecision,
-        superseded: decision,
+        decisionId: newDecisionId,
       };
     }
 
@@ -336,7 +333,7 @@ export class DecisionService {
     decisions[index] = decision;
     await this.storage.saveEntities(input.planId, 'decisions', decisions);
 
-    return { success: true, decision };
+    return { success: true, decisionId: input.decisionId };
   }
 
   async listDecisions(input: ListDecisionsInput): Promise<ListDecisionsResult> {

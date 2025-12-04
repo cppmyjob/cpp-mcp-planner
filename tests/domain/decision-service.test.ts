@@ -47,8 +47,11 @@ describe('DecisionService', () => {
       });
 
       expect(result.decisionId).toBeDefined();
-      expect(result.decision.title).toBe('JWT Library Selection');
-      expect(result.decision.status).toBe('active');
+
+      // Verify via getDecision
+      const { decision } = await service.getDecision({ planId, decisionId: result.decisionId });
+      expect(decision.title).toBe('JWT Library Selection');
+      expect(decision.status).toBe('active');
     });
 
     it('should store alternatives considered', async () => {
@@ -66,7 +69,9 @@ describe('DecisionService', () => {
         },
       });
 
-      expect(result.decision.alternativesConsidered).toHaveLength(2);
+      // Verify via getDecision
+      const { decision } = await service.getDecision({ planId, decisionId: result.decisionId });
+      expect(decision.alternativesConsidered).toHaveLength(2);
     });
   });
 
@@ -131,10 +136,14 @@ describe('DecisionService', () => {
         },
       });
 
-      expect(result.decision.decision).toBe('jose');
-      expect(result.decision.status).toBe('active');
-      expect(result.superseded?.status).toBe('superseded');
-      expect(result.decision.supersedes).toBe(original.decisionId);
+      // Verify via getDecision
+      const { decision: newDecision } = await service.getDecision({ planId, decisionId: result.decisionId });
+      const { decision: oldDecision } = await service.getDecision({ planId, decisionId: original.decisionId });
+
+      expect(newDecision.decision).toBe('jose');
+      expect(newDecision.status).toBe('active');
+      expect(oldDecision.status).toBe('superseded');
+      expect(newDecision.supersedes).toBe(original.decisionId);
     });
 
     it('should add old decision to alternatives', async () => {
@@ -158,7 +167,10 @@ describe('DecisionService', () => {
         },
       });
 
-      const oldInAlternatives = result.decision.alternativesConsidered.find(
+      // Verify via getDecision
+      const { decision: newDecision } = await service.getDecision({ planId, decisionId: result.decisionId });
+
+      const oldInAlternatives = newDecision.alternativesConsidered.find(
         (a) => a.option === 'Option A'
       );
       expect(oldInAlternatives).toBeDefined();
@@ -192,6 +204,79 @@ describe('DecisionService', () => {
 
       expect(activeOnly.decisions).toHaveLength(1);
       expect(activeOnly.decisions[0].decision).toBe('B');
+    });
+  });
+
+  describe('minimal return values (Sprint 6)', () => {
+    describe('recordDecision should return only decisionId', () => {
+      it('should not include full decision object in result', async () => {
+        const result = await service.recordDecision({
+          planId,
+          decision: {
+            title: 'Test Decision',
+            question: 'What to do?',
+            context: 'Context',
+            decision: 'Do X',
+            alternativesConsidered: [],
+          },
+        });
+
+        expect(result.decisionId).toBeDefined();
+        expect(result).not.toHaveProperty('decision');
+      });
+    });
+
+    describe('updateDecision should return only success and decisionId', () => {
+      it('should not include full decision object in result', async () => {
+        const added = await service.recordDecision({
+          planId,
+          decision: {
+            title: 'Test',
+            question: 'Q',
+            context: 'C',
+            decision: 'D',
+            alternativesConsidered: [],
+          },
+        });
+
+        const result = await service.updateDecision({
+          planId,
+          decisionId: added.decisionId,
+          updates: { consequences: 'Updated consequences' },
+        });
+
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty('decision');
+      });
+    });
+
+    describe('supersedeDecision should return only success and IDs', () => {
+      it('should not include full decision objects in result', async () => {
+        const original = await service.recordDecision({
+          planId,
+          decision: {
+            title: 'Original',
+            question: 'Q',
+            context: 'C',
+            decision: 'A',
+            alternativesConsidered: [],
+          },
+        });
+
+        const result = await service.supersedeDecision({
+          planId,
+          decisionId: original.decisionId,
+          newDecision: {
+            decision: 'B',
+            context: 'Updated context',
+          },
+          reason: 'Better option',
+        });
+
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty('newDecision');
+        expect(result).not.toHaveProperty('supersededDecision');
+      });
     });
   });
 });

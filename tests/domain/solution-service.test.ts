@@ -52,8 +52,11 @@ describe('SolutionService', () => {
       });
 
       expect(result.solutionId).toBeDefined();
-      expect(result.solution.title).toBe('Use jsonwebtoken');
-      expect(result.solution.status).toBe('proposed');
+
+      // Verify via getSolution
+      const { solution } = await service.getSolution({ planId, solutionId: result.solutionId });
+      expect(solution.title).toBe('Use jsonwebtoken');
+      expect(solution.status).toBe('proposed');
     });
 
     it('should store tradeoffs', async () => {
@@ -76,8 +79,10 @@ describe('SolutionService', () => {
         },
       });
 
-      expect(result.solution.tradeoffs).toHaveLength(2);
-      expect(result.solution.tradeoffs[0].score).toBe(7);
+      // Verify via getSolution
+      const { solution } = await service.getSolution({ planId, solutionId: result.solutionId });
+      expect(solution.tradeoffs).toHaveLength(2);
+      expect(solution.tradeoffs[0].score).toBe(7);
     });
   });
 
@@ -203,8 +208,10 @@ describe('SolutionService', () => {
         reason: 'Best fit',
       });
 
-      expect(result.solution.status).toBe('selected');
-      expect(result.solution.selectionReason).toBe('Best fit');
+      // Verify via getSolution
+      const { solution } = await service.getSolution({ planId, solutionId: proposed.solutionId });
+      expect(solution.status).toBe('selected');
+      expect(solution.selectionReason).toBe('Best fit');
     });
 
     it('should deselect other solutions for same requirement', async () => {
@@ -246,9 +253,11 @@ describe('SolutionService', () => {
       // Select second
       const result = await service.selectSolution({ planId, solutionId: s2.solutionId });
 
-      expect(result.solution.status).toBe('selected');
-      expect(result.deselected).toHaveLength(1);
-      expect(result.deselected![0].id).toBe(s1.solutionId);
+      // Verify via getSolution
+      const { solution } = await service.getSolution({ planId, solutionId: s2.solutionId });
+      expect(solution.status).toBe('selected');
+      expect(result.deselectedIds).toHaveLength(1);
+      expect(result.deselectedIds![0]).toBe(s1.solutionId);
     });
   });
 
@@ -344,6 +353,89 @@ describe('SolutionService', () => {
 
       const list = await service.listSolutions({ planId });
       expect(list.solutions).toHaveLength(0);
+    });
+  });
+
+  describe('minimal return values (Sprint 6)', () => {
+    describe('proposeSolution should return only solutionId', () => {
+      it('should not include full solution object in result', async () => {
+        const result = await service.proposeSolution({
+          planId,
+          solution: {
+            title: 'Test Solution',
+            description: 'Test',
+            approach: 'Approach',
+            tradeoffs: [],
+            addressing: [],
+            evaluation: {
+              effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        });
+
+        expect(result.solutionId).toBeDefined();
+        expect(result).not.toHaveProperty('solution');
+      });
+    });
+
+    describe('updateSolution should return only success and solutionId', () => {
+      it('should not include full solution object in result', async () => {
+        const added = await service.proposeSolution({
+          planId,
+          solution: {
+            title: 'Test',
+            description: 'D',
+            approach: 'A',
+            tradeoffs: [],
+            addressing: [],
+            evaluation: {
+              effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        });
+
+        const result = await service.updateSolution({
+          planId,
+          solutionId: added.solutionId,
+          updates: { title: 'Updated' },
+        });
+
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty('solution');
+      });
+    });
+
+    describe('selectSolution should return only success and IDs', () => {
+      it('should not include full solution objects in result', async () => {
+        const sol = await service.proposeSolution({
+          planId,
+          solution: {
+            title: 'Test',
+            description: 'D',
+            approach: 'A',
+            tradeoffs: [],
+            addressing: [],
+            evaluation: {
+              effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        });
+
+        const result = await service.selectSolution({
+          planId,
+          solutionId: sol.solutionId,
+        });
+
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty('solution');
+        expect(result).not.toHaveProperty('deselected');
+      });
     });
   });
 });

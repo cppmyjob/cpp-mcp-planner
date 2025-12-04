@@ -29,8 +29,11 @@ describe('PlanService', () => {
       });
 
       expect(result.planId).toBeDefined();
-      expect(result.manifest.name).toBe('Test Plan');
-      expect(result.manifest.status).toBe('active');
+
+      // Verify via getPlan
+      const { plan } = await service.getPlan({ planId: result.planId });
+      expect(plan.manifest.name).toBe('Test Plan');
+      expect(plan.manifest.status).toBe('active');
     });
 
     it('should set author', async () => {
@@ -40,7 +43,9 @@ describe('PlanService', () => {
         author: 'test-user',
       });
 
-      expect(result.manifest.author).toBe('test-user');
+      // Verify via getPlan
+      const { plan } = await service.getPlan({ planId: result.planId });
+      expect(plan.manifest.author).toBe('test-user');
     });
 
     it('should initialize statistics to zero', async () => {
@@ -49,9 +54,11 @@ describe('PlanService', () => {
         description: 'A test plan',
       });
 
-      expect(result.manifest.statistics.totalRequirements).toBe(0);
-      expect(result.manifest.statistics.totalSolutions).toBe(0);
-      expect(result.manifest.statistics.completionPercentage).toBe(0);
+      // Verify via getPlan
+      const { plan } = await service.getPlan({ planId: result.planId });
+      expect(plan.manifest.statistics.totalRequirements).toBe(0);
+      expect(plan.manifest.statistics.totalSolutions).toBe(0);
+      expect(plan.manifest.statistics.completionPercentage).toBe(0);
     });
   });
 
@@ -128,7 +135,9 @@ describe('PlanService', () => {
         updates: { name: 'New Name' },
       });
 
-      expect(result.plan.name).toBe('New Name');
+      // Verify via getPlan
+      const { plan } = await service.getPlan({ planId: created.planId });
+      expect(plan.manifest.name).toBe('New Name');
     });
 
     it('should update plan status', async () => {
@@ -139,7 +148,9 @@ describe('PlanService', () => {
         updates: { status: 'completed' },
       });
 
-      expect(result.plan.status).toBe('completed');
+      // Verify via getPlan
+      const { plan } = await service.getPlan({ planId: created.planId });
+      expect(plan.manifest.status).toBe('completed');
     });
 
     it('should increment version on update', async () => {
@@ -214,6 +225,62 @@ describe('PlanService', () => {
 
       const result = await service.getActivePlan({ workspacePath: '/test' });
       expect(result.activePlan?.planId).toBe(plan2.planId);
+    });
+  });
+
+  describe('minimal return values (Sprint 6)', () => {
+    describe('createPlan should return only planId', () => {
+      it('should not include manifest in result', async () => {
+        const result = await service.createPlan({
+          name: 'Test Plan',
+          description: 'Test',
+        });
+
+        expect(result.planId).toBeDefined();
+        expect(result).not.toHaveProperty('manifest');
+      });
+
+      it('should not include createdAt in result', async () => {
+        const result = await service.createPlan({
+          name: 'Test Plan',
+          description: 'Test',
+        });
+
+        expect(result.planId).toBeDefined();
+        expect(result).not.toHaveProperty('createdAt');
+      });
+    });
+
+    describe('updatePlan should return only success and planId', () => {
+      it('should not include full plan object in result', async () => {
+        const created = await service.createPlan({
+          name: 'Test Plan',
+          description: 'Test',
+        });
+
+        const result = await service.updatePlan({
+          planId: created.planId,
+          updates: { name: 'Updated Plan' },
+        });
+
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty('plan');
+      });
+
+      it('should not include updatedAt in result', async () => {
+        const created = await service.createPlan({
+          name: 'Test Plan',
+          description: 'Test',
+        });
+
+        const result = await service.updatePlan({
+          planId: created.planId,
+          updates: { name: 'Updated Plan' },
+        });
+
+        expect(result.success).toBe(true);
+        expect(result).not.toHaveProperty('updatedAt');
+      });
     });
   });
 });
