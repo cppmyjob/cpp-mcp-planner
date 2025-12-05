@@ -48,13 +48,13 @@ export const tools = [
   },
   {
     name: 'requirement',
-    description: 'Manage project requirements - the foundation of planning workflow. Add requirements first, then propose solutions with `solution` tool to address them. Link requirements to phases for implementation tracking. Use `query` tool to trace requirement coverage. Actions: add, get, update, list, delete.',
+    description: 'Manage project requirements - the foundation of planning workflow. Add requirements first, then propose solutions with `solution` tool to address them. Link requirements to phases for implementation tracking. Use `query` tool to trace requirement coverage. Use vote/unvote to prioritize requirements based on user feedback - each requirement has a votes field (default: 0) that can be incremented/decremented. Actions: add, get, update, list, delete, vote, unvote.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['add', 'get', 'update', 'list', 'delete'],
+          enum: ['add', 'get', 'update', 'list', 'delete', 'vote', 'unvote'],
         },
         planId: { type: 'string' },
         requirementId: { type: 'string' },

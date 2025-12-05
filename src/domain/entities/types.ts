@@ -47,6 +47,7 @@ export interface Requirement extends Entity {
   priority: RequirementPriority;
   category: RequirementCategory;
   status: RequirementStatus;
+  votes: number; // Vote count for prioritization (default: 0)
   impact?: {
     scope: string[];
     complexityEstimate: number; // 1-10

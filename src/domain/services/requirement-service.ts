@@ -79,6 +79,16 @@ export interface DeleteRequirementInput {
   force?: boolean;
 }
 
+export interface VoteForRequirementInput {
+  planId: string;
+  requirementId: string;
+}
+
+export interface UnvoteRequirementInput {
+  planId: string;
+  requirementId: string;
+}
+
 // Output types
 export interface AddRequirementResult {
   requirementId: string;
@@ -110,6 +120,16 @@ export interface DeleteRequirementResult {
   success: boolean;
   message: string;
   warnings?: string[];
+}
+
+export interface VoteForRequirementResult {
+  success: boolean;
+  votes: number;
+}
+
+export interface UnvoteRequirementResult {
+  success: boolean;
+  votes: number;
 }
 
 export class RequirementService {
@@ -157,6 +177,7 @@ export class RequirementService {
       priority: input.requirement.priority,
       category: input.requirement.category,
       status: 'draft',
+      votes: 0, // Initialize vote count
       impact: input.requirement.impact,
     };
 
@@ -335,6 +356,72 @@ export class RequirementService {
     return {
       success: true,
       message: 'Requirement deleted',
+    };
+  }
+
+  async voteForRequirement(
+    input: VoteForRequirementInput
+  ): Promise<VoteForRequirementResult> {
+    const requirements = await this.storage.loadEntities<Requirement>(
+      input.planId,
+      'requirements'
+    );
+
+    const index = requirements.findIndex((r) => r.id === input.requirementId);
+    if (index === -1) {
+      throw new Error('Requirement not found');
+    }
+
+    const requirement = requirements[index];
+    const now = new Date().toISOString();
+
+    // Increment votes
+    requirement.votes += 1;
+    requirement.updatedAt = now;
+    requirement.version += 1;
+
+    requirements[index] = requirement;
+    await this.storage.saveEntities(input.planId, 'requirements', requirements);
+
+    return {
+      success: true,
+      votes: requirement.votes,
+    };
+  }
+
+  async unvoteRequirement(
+    input: UnvoteRequirementInput
+  ): Promise<UnvoteRequirementResult> {
+    const requirements = await this.storage.loadEntities<Requirement>(
+      input.planId,
+      'requirements'
+    );
+
+    const index = requirements.findIndex((r) => r.id === input.requirementId);
+    if (index === -1) {
+      throw new Error('Requirement not found');
+    }
+
+    const requirement = requirements[index];
+
+    // Validate: cannot go below 0
+    if (requirement.votes <= 0) {
+      throw new Error('Cannot unvote: votes cannot be negative');
+    }
+
+    const now = new Date().toISOString();
+
+    // Decrement votes
+    requirement.votes -= 1;
+    requirement.updatedAt = now;
+    requirement.version += 1;
+
+    requirements[index] = requirement;
+    await this.storage.saveEntities(input.planId, 'requirements', requirements);
+
+    return {
+      success: true,
+      votes: requirement.votes,
     };
   }
 }

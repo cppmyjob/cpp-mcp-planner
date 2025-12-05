@@ -375,4 +375,143 @@ describe('RequirementService', () => {
       });
     });
   });
+
+  // TDD RED Phase: Voting System Tests (будут failing до реализации)
+  describe('vote_for_requirement', () => {
+    it('should initialize votes to 0 by default', async () => {
+      const added = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'New Requirement',
+          description: 'Test votes initialization',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'medium',
+          category: 'functional',
+        },
+      });
+
+      const { requirement } = await service.getRequirement({
+        planId,
+        requirementId: added.requirementId,
+      });
+
+      expect(requirement.votes).toBe(0);
+    });
+
+    it('should increase votes by 1', async () => {
+      const added = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Votable Req',
+          description: 'Can be voted',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'high',
+          category: 'functional',
+        },
+      });
+
+      const result = await service.voteForRequirement({
+        planId,
+        requirementId: added.requirementId,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.votes).toBe(1);
+
+      // Verify via getRequirement
+      const { requirement } = await service.getRequirement({
+        planId,
+        requirementId: added.requirementId,
+      });
+      expect(requirement.votes).toBe(1);
+    });
+
+    it('should support multiple votes', async () => {
+      const added = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Popular Req',
+          description: 'Many votes',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'critical',
+          category: 'functional',
+        },
+      });
+
+      await service.voteForRequirement({ planId, requirementId: added.requirementId });
+      await service.voteForRequirement({ planId, requirementId: added.requirementId });
+      const result = await service.voteForRequirement({ planId, requirementId: added.requirementId });
+
+      expect(result.votes).toBe(3);
+    });
+
+    it('should throw if requirement not found', async () => {
+      await expect(
+        service.voteForRequirement({ planId, requirementId: 'non-existent' })
+      ).rejects.toThrow('Requirement not found');
+    });
+  });
+
+  describe('unvote_requirement', () => {
+    it('should decrease votes by 1', async () => {
+      const added = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Voted Req',
+          description: 'Has votes',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'medium',
+          category: 'functional',
+        },
+      });
+
+      // Vote first
+      await service.voteForRequirement({ planId, requirementId: added.requirementId });
+      await service.voteForRequirement({ planId, requirementId: added.requirementId });
+
+      // Then unvote
+      const result = await service.unvoteRequirement({
+        planId,
+        requirementId: added.requirementId,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.votes).toBe(1);
+
+      // Verify via getRequirement
+      const { requirement } = await service.getRequirement({
+        planId,
+        requirementId: added.requirementId,
+      });
+      expect(requirement.votes).toBe(1);
+    });
+
+    it('should not allow negative votes', async () => {
+      const added = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Zero Votes',
+          description: 'Has no votes',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'low',
+          category: 'functional',
+        },
+      });
+
+      await expect(
+        service.unvoteRequirement({ planId, requirementId: added.requirementId })
+      ).rejects.toThrow('Cannot unvote: votes cannot be negative');
+    });
+
+    it('should throw if requirement not found', async () => {
+      await expect(
+        service.unvoteRequirement({ planId, requirementId: 'non-existent' })
+      ).rejects.toThrow('Requirement not found');
+    });
+  });
 });
