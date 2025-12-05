@@ -453,6 +453,42 @@ describe('RequirementService', () => {
         service.voteForRequirement({ planId, requirementId: 'non-existent' })
       ).rejects.toThrow('Requirement not found');
     });
+
+    it('should handle undefined votes (backward compatibility)', async () => {
+      const added = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Legacy Req',
+          description: 'Created before votes feature',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'medium',
+          category: 'functional',
+        },
+      });
+
+      // Simulate legacy requirement by setting votes to undefined
+      const requirements = await storage.loadEntities<any>(planId, 'requirements');
+      const reqIndex = requirements.findIndex((r: any) => r.id === added.requirementId);
+      delete requirements[reqIndex].votes; // Remove votes field
+      await storage.saveEntities(planId, 'requirements', requirements);
+
+      // Now vote should initialize to 0 and increment to 1
+      const result = await service.voteForRequirement({
+        planId,
+        requirementId: added.requirementId,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.votes).toBe(1); // Should be 1, not NaN or null
+
+      // Verify persistence
+      const { requirement } = await service.getRequirement({
+        planId,
+        requirementId: added.requirementId,
+      });
+      expect(requirement.votes).toBe(1);
+    });
   });
 
   describe('unvote_requirement', () => {
@@ -512,6 +548,31 @@ describe('RequirementService', () => {
       await expect(
         service.unvoteRequirement({ planId, requirementId: 'non-existent' })
       ).rejects.toThrow('Requirement not found');
+    });
+
+    it('should handle undefined votes (backward compatibility)', async () => {
+      const added = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Legacy Req Unvote',
+          description: 'Created before votes feature',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'medium',
+          category: 'functional',
+        },
+      });
+
+      // Simulate legacy requirement by setting votes to undefined
+      const requirements = await storage.loadEntities<any>(planId, 'requirements');
+      const reqIndex = requirements.findIndex((r: any) => r.id === added.requirementId);
+      delete requirements[reqIndex].votes; // Remove votes field
+      await storage.saveEntities(planId, 'requirements', requirements);
+
+      // Should initialize to 0 and throw error (cannot go below 0)
+      await expect(
+        service.unvoteRequirement({ planId, requirementId: added.requirementId })
+      ).rejects.toThrow('Cannot unvote: votes cannot be negative');
     });
   });
 });

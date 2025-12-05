@@ -375,6 +375,11 @@ export class RequirementService {
     const requirement = requirements[index];
     const now = new Date().toISOString();
 
+    // Initialize votes if undefined (backward compatibility)
+    if (requirement.votes === undefined || requirement.votes === null) {
+      requirement.votes = 0;
+    }
+
     // Increment votes
     requirement.votes += 1;
     requirement.updatedAt = now;
@@ -403,6 +408,11 @@ export class RequirementService {
     }
 
     const requirement = requirements[index];
+
+    // Initialize votes if undefined (backward compatibility)
+    if (requirement.votes === undefined || requirement.votes === null) {
+      requirement.votes = 0;
+    }
 
     // Validate: cannot go below 0
     if (requirement.votes <= 0) {
