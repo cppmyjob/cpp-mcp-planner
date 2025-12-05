@@ -89,6 +89,10 @@ export interface UnvoteRequirementInput {
   requirementId: string;
 }
 
+export interface ResetAllVotesInput {
+  planId: string;
+}
+
 // Output types
 export interface AddRequirementResult {
   requirementId: string;
@@ -130,6 +134,11 @@ export interface VoteForRequirementResult {
 export interface UnvoteRequirementResult {
   success: boolean;
   votes: number;
+}
+
+export interface ResetAllVotesResult {
+  success: boolean;
+  updated: number;
 }
 
 export class RequirementService {
@@ -432,6 +441,46 @@ export class RequirementService {
     return {
       success: true,
       votes: requirement.votes,
+    };
+  }
+
+  async resetAllVotes(
+    input: ResetAllVotesInput
+  ): Promise<ResetAllVotesResult> {
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    const requirements = await this.storage.loadEntities<Requirement>(
+      input.planId,
+      'requirements'
+    );
+
+    const now = new Date().toISOString();
+    let updated = 0;
+
+    // Reset votes for all requirements
+    for (const requirement of requirements) {
+      // Check if votes need to be updated (undefined, null, or non-zero)
+      const needsUpdate =
+        requirement.votes === undefined ||
+        requirement.votes === null ||
+        requirement.votes !== 0;
+
+      if (needsUpdate) {
+        requirement.votes = 0;
+        requirement.updatedAt = now;
+        requirement.version += 1;
+        updated++;
+      }
+    }
+
+    await this.storage.saveEntities(input.planId, 'requirements', requirements);
+
+    return {
+      success: true,
+      updated,
     };
   }
 }

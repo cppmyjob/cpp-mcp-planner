@@ -575,4 +575,183 @@ describe('RequirementService', () => {
       ).rejects.toThrow('Cannot unvote: votes cannot be negative');
     });
   });
+
+  describe('reset_all_votes', () => {
+    it('should reset all votes to 0', async () => {
+      // Create requirements with votes
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 1',
+          description: 'First requirement',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'high',
+          category: 'functional',
+        },
+      });
+
+      const req2 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 2',
+          description: 'Second requirement',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'medium',
+          category: 'functional',
+        },
+      });
+
+      // Add votes
+      await service.voteForRequirement({ planId, requirementId: req1.requirementId });
+      await service.voteForRequirement({ planId, requirementId: req1.requirementId });
+      await service.voteForRequirement({ planId, requirementId: req2.requirementId });
+
+      // Verify votes were added
+      const before1 = await service.getRequirement({ planId, requirementId: req1.requirementId });
+      const before2 = await service.getRequirement({ planId, requirementId: req2.requirementId });
+      expect(before1.requirement.votes).toBe(2);
+      expect(before2.requirement.votes).toBe(1);
+
+      // Reset all votes
+      const result = await service.resetAllVotes({ planId });
+
+      expect(result.success).toBe(true);
+      expect(result.updated).toBe(2);
+
+      // Verify all votes are 0
+      const after1 = await service.getRequirement({ planId, requirementId: req1.requirementId });
+      const after2 = await service.getRequirement({ planId, requirementId: req2.requirementId });
+      expect(after1.requirement.votes).toBe(0);
+      expect(after2.requirement.votes).toBe(0);
+    });
+
+    it('should handle empty requirements list', async () => {
+      const result = await service.resetAllVotes({ planId });
+
+      expect(result.success).toBe(true);
+      expect(result.updated).toBe(0);
+    });
+
+    it('should increment version for each requirement', async () => {
+      const req = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Req',
+          description: 'Test',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'low',
+          category: 'functional',
+        },
+      });
+
+      await service.voteForRequirement({ planId, requirementId: req.requirementId });
+
+      const before = await service.getRequirement({ planId, requirementId: req.requirementId });
+      const versionBefore = before.requirement.version;
+
+      await service.resetAllVotes({ planId });
+
+      const after = await service.getRequirement({ planId, requirementId: req.requirementId });
+      expect(after.requirement.version).toBe(versionBefore + 1);
+    });
+
+    it('should handle requirements with undefined votes (backward compatibility)', async () => {
+      const req = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Legacy Req',
+          description: 'Has undefined votes',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'medium',
+          category: 'functional',
+        },
+      });
+
+      // Simulate legacy requirement by deleting votes field
+      const requirements = await storage.loadEntities<any>(planId, 'requirements');
+      const reqIndex = requirements.findIndex((r: any) => r.id === req.requirementId);
+      delete requirements[reqIndex].votes;
+      await storage.saveEntities(planId, 'requirements', requirements);
+
+      // Reset should initialize to 0 and count as updated
+      const result = await service.resetAllVotes({ planId });
+
+      expect(result.success).toBe(true);
+      expect(result.updated).toBe(1);
+
+      const after = await service.getRequirement({ planId, requirementId: req.requirementId });
+      expect(after.requirement.votes).toBe(0);
+    });
+
+    it('should only count actually modified requirements', async () => {
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Already Zero',
+          description: 'No votes',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'low',
+          category: 'functional',
+        },
+      });
+
+      const req2 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Has Votes',
+          description: 'Has votes',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'high',
+          category: 'functional',
+        },
+      });
+
+      await service.voteForRequirement({ planId, requirementId: req2.requirementId });
+
+      const result = await service.resetAllVotes({ planId });
+
+      // Only req2 should be counted as updated (req1 already had 0 votes)
+      expect(result.success).toBe(true);
+      expect(result.updated).toBe(1);
+    });
+
+    it('should throw if plan not found', async () => {
+      await expect(
+        service.resetAllVotes({ planId: 'non-existent' })
+      ).rejects.toThrow('Plan not found');
+    });
+
+    it('should update updatedAt timestamp', async () => {
+      const req = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Req',
+          description: 'Test',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'medium',
+          category: 'functional',
+        },
+      });
+
+      await service.voteForRequirement({ planId, requirementId: req.requirementId });
+
+      const before = await service.getRequirement({ planId, requirementId: req.requirementId });
+      const updatedAtBefore = before.requirement.updatedAt;
+
+      // Wait a bit to ensure timestamp difference
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      await service.resetAllVotes({ planId });
+
+      const after = await service.getRequirement({ planId, requirementId: req.requirementId });
+      expect(after.requirement.updatedAt).not.toBe(updatedAtBefore);
+    });
+  });
 });

@@ -702,4 +702,422 @@ describe('BatchService - Unit Tests', () => {
     const phases = await storage.loadEntities<any>(planId, 'phases');
     expect(phases).toHaveLength(0);
   });
+
+  /**
+   * TDD RED Phase: Batch Update Operations Tests (будут failing до реализации)
+   */
+  describe('executeBatch - UPDATE operations', () => {
+    it('Test 18: executeBatch should update single requirement', async () => {
+      // Create a requirement first
+      const req = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Original Title',
+          description: 'Original description',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'low',
+          category: 'functional',
+        },
+      });
+
+      // Update it via batch
+      const result = await batchService.executeBatch({
+        planId,
+        operations: [
+          {
+            entity_type: 'requirement',
+            payload: {
+              action: 'update',
+              id: req.requirementId,
+              updates: {
+                title: 'Updated Title',
+                priority: 'critical',
+              },
+            },
+          },
+        ],
+      });
+
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0].success).toBe(true);
+
+      // Verify update
+      const { requirement } = await requirementService.getRequirement({
+        planId,
+        requirementId: req.requirementId,
+      });
+      expect(requirement.title).toBe('Updated Title');
+      expect(requirement.priority).toBe('critical');
+      expect(requirement.description).toBe('Original description'); // Unchanged
+    });
+
+    it('Test 19: executeBatch should update multiple requirements', async () => {
+      // Create requirements
+      const req1 = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 1',
+          description: 'First',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'low',
+          category: 'functional',
+        },
+      });
+
+      const req2 = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 2',
+          description: 'Second',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'low',
+          category: 'functional',
+        },
+      });
+
+      // Batch update
+      const result = await batchService.executeBatch({
+        planId,
+        operations: [
+          {
+            entity_type: 'requirement',
+            payload: {
+              action: 'update',
+              id: req1.requirementId,
+              updates: { priority: 'critical' },
+            },
+          },
+          {
+            entity_type: 'requirement',
+            payload: {
+              action: 'update',
+              id: req2.requirementId,
+              updates: { priority: 'high' },
+            },
+          },
+        ],
+      });
+
+      expect(result.results).toHaveLength(2);
+
+      const { requirement: r1 } = await requirementService.getRequirement({
+        planId,
+        requirementId: req1.requirementId,
+      });
+      const { requirement: r2 } = await requirementService.getRequirement({
+        planId,
+        requirementId: req2.requirementId,
+      });
+
+      expect(r1.priority).toBe('critical');
+      expect(r2.priority).toBe('high');
+    });
+
+    it('Test 20: executeBatch should update phase status', async () => {
+      const phase = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: ['Complete testing'],
+          deliverables: ['Test results'],
+          successCriteria: ['All tests pass'],
+        },
+      });
+
+      const result = await batchService.executeBatch({
+        planId,
+        operations: [
+          {
+            entity_type: 'phase',
+            payload: {
+              action: 'update',
+              id: phase.phaseId,
+              updates: {
+                status: 'in_progress',
+                progress: 50,
+              },
+            },
+          },
+        ],
+      });
+
+      expect(result.results[0].success).toBe(true);
+
+      const { phase: updated } = await phaseService.getPhase({
+        planId,
+        phaseId: phase.phaseId,
+      });
+      expect(updated.status).toBe('in_progress');
+      expect(updated.progress).toBe(50);
+    });
+
+    it('Test 21: executeBatch should rollback all updates on error', async () => {
+      const req1 = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 1',
+          description: 'First',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'low',
+          category: 'functional',
+        },
+      });
+
+      const req2 = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 2',
+          description: 'Second',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'medium',
+          category: 'functional',
+        },
+      });
+
+      // Batch with error in the middle
+      await expect(
+        batchService.executeBatch({
+          planId,
+          operations: [
+            {
+              entity_type: 'requirement',
+              payload: {
+                action: 'update',
+                id: req1.requirementId,
+                updates: { priority: 'critical' },
+              },
+            },
+            {
+              entity_type: 'requirement',
+              payload: {
+                action: 'update',
+                id: 'non-existent-id',
+                updates: { priority: 'high' },
+              },
+            },
+            {
+              entity_type: 'requirement',
+              payload: {
+                action: 'update',
+                id: req2.requirementId,
+                updates: { priority: 'high' },
+              },
+            },
+          ],
+        })
+      ).rejects.toThrow('Requirement not found');
+
+      // Verify rollback - all requirements should remain unchanged
+      const { requirement: r1 } = await requirementService.getRequirement({
+        planId,
+        requirementId: req1.requirementId,
+      });
+      const { requirement: r2 } = await requirementService.getRequirement({
+        planId,
+        requirementId: req2.requirementId,
+      });
+
+      expect(r1.priority).toBe('low'); // Not updated
+      expect(r2.priority).toBe('medium'); // Not updated
+    });
+
+    it('Test 22: executeBatch should support mixed create and update operations', async () => {
+      const existingReq = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Existing Req',
+          description: 'Already exists',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'low',
+          category: 'functional',
+        },
+      });
+
+      const result = await batchService.executeBatch({
+        planId,
+        operations: [
+          {
+            entity_type: 'requirement',
+            payload: {
+              action: 'update',
+              id: existingReq.requirementId,
+              updates: { priority: 'critical' },
+            },
+          },
+          {
+            entity_type: 'requirement',
+            payload: {
+              title: 'New Req',
+              description: 'Newly created',
+              source: { type: 'user-request' },
+              acceptanceCriteria: [],
+              priority: 'high',
+              category: 'functional',
+            },
+          },
+        ],
+      });
+
+      expect(result.results).toHaveLength(2);
+
+      // Verify update
+      const { requirement: updated } = await requirementService.getRequirement({
+        planId,
+        requirementId: existingReq.requirementId,
+      });
+      expect(updated.priority).toBe('critical');
+
+      // Verify create
+      const requirements = await storage.loadEntities<any>(planId, 'requirements');
+      expect(requirements).toHaveLength(2);
+      const newReq = requirements.find((r: any) => r.title === 'New Req');
+      expect(newReq).toBeDefined();
+    });
+
+    it('Test 23: executeBatch should update entity created in same batch (tempId)', async () => {
+      const result = await batchService.executeBatch({
+        planId,
+        operations: [
+          {
+            entity_type: 'requirement',
+            payload: {
+              tempId: '$0',
+              title: 'New Req',
+              description: 'Created in batch',
+              source: { type: 'user-request' },
+              acceptanceCriteria: [],
+              priority: 'low',
+              category: 'functional',
+            },
+          },
+          {
+            entity_type: 'requirement',
+            payload: {
+              action: 'update',
+              id: '$0',
+              updates: {
+                priority: 'critical',
+                status: 'approved',
+              },
+            },
+          },
+        ],
+      });
+
+      expect(result.results).toHaveLength(2);
+      expect(result.results[0].success).toBe(true);
+      expect(result.results[1].success).toBe(true);
+
+      const createdId = result.tempIdMapping['$0'];
+      const { requirement } = await requirementService.getRequirement({
+        planId,
+        requirementId: createdId,
+      });
+
+      expect(requirement.priority).toBe('critical');
+      expect(requirement.status).toBe('approved');
+    });
+
+    it('Test 24: executeBatch should increment version on update', async () => {
+      const req = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test',
+          description: 'Test',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'medium',
+          category: 'functional',
+        },
+      });
+
+      const before = await requirementService.getRequirement({
+        planId,
+        requirementId: req.requirementId,
+      });
+
+      await batchService.executeBatch({
+        planId,
+        operations: [
+          {
+            entity_type: 'requirement',
+            payload: {
+              action: 'update',
+              id: req.requirementId,
+              updates: { title: 'Updated' },
+            },
+          },
+        ],
+      });
+
+      const after = await requirementService.getRequirement({
+        planId,
+        requirementId: req.requirementId,
+      });
+
+      expect(after.requirement.version).toBe(before.requirement.version + 1);
+    });
+
+    it('Test 25: executeBatch should handle solution updates', async () => {
+      const reqResult = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req',
+          description: 'Test',
+          source: { type: 'user-request' },
+          acceptanceCriteria: [],
+          priority: 'high',
+          category: 'functional',
+        },
+      });
+
+      const sol = await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Original Solution',
+          description: 'Original',
+          approach: 'Approach 1',
+          addressing: [reqResult.requirementId],
+          tradeoffs: [],
+          evaluation: {
+            effortEstimate: { value: 5, unit: 'days', confidence: 'medium' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Low risk',
+          },
+        },
+      });
+
+      await batchService.executeBatch({
+        planId,
+        operations: [
+          {
+            entity_type: 'solution',
+            payload: {
+              action: 'update',
+              id: sol.solutionId,
+              updates: {
+                title: 'Updated Solution',
+                approach: 'Approach 2',
+              },
+            },
+          },
+        ],
+      });
+
+      const { solution } = await solutionService.getSolution({
+        planId,
+        solutionId: sol.solutionId,
+      });
+
+      expect(solution.title).toBe('Updated Solution');
+      expect(solution.approach).toBe('Approach 2');
+    });
+  });
 });

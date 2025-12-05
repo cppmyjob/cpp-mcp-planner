@@ -240,41 +240,75 @@ export class BatchService {
         // Resolve temp IDs in payload
         const resolvedPayload = this.resolveTempIds(op.payload, tempIdMapping, op.entity_type);
 
+        // Check if this is an update operation
+        const isUpdate = resolvedPayload.action === 'update';
+
         switch (op.entity_type) {
           case 'requirement':
-            result = await memReqService.addRequirement({
-              planId: input.planId,
-              requirement: resolvedPayload
-            });
-            results.push({ success: true, id: result.requirementId });
+            if (isUpdate) {
+              // Resolve temp ID in id field if needed
+              const requirementId = tempIdMapping[resolvedPayload.id] || resolvedPayload.id;
+              result = await memReqService.updateRequirement({
+                planId: input.planId,
+                requirementId,
+                updates: resolvedPayload.updates
+              });
+              results.push({ success: true, id: requirementId });
+            } else {
+              result = await memReqService.addRequirement({
+                planId: input.planId,
+                requirement: resolvedPayload
+              });
+              results.push({ success: true, id: result.requirementId });
 
-            // Track temp ID mapping
-            if (resolvedPayload.tempId) {
-              tempIdMapping[resolvedPayload.tempId] = result.requirementId;
+              // Track temp ID mapping
+              if (resolvedPayload.tempId) {
+                tempIdMapping[resolvedPayload.tempId] = result.requirementId;
+              }
             }
             break;
 
           case 'solution':
-            result = await memSolService.proposeSolution({
-              planId: input.planId,
-              solution: resolvedPayload
-            });
-            results.push({ success: true, id: result.solutionId });
+            if (isUpdate) {
+              const solutionId = tempIdMapping[resolvedPayload.id] || resolvedPayload.id;
+              result = await memSolService.updateSolution({
+                planId: input.planId,
+                solutionId,
+                updates: resolvedPayload.updates
+              });
+              results.push({ success: true, id: solutionId });
+            } else {
+              result = await memSolService.proposeSolution({
+                planId: input.planId,
+                solution: resolvedPayload
+              });
+              results.push({ success: true, id: result.solutionId });
 
-            if (resolvedPayload.tempId) {
-              tempIdMapping[resolvedPayload.tempId] = result.solutionId;
+              if (resolvedPayload.tempId) {
+                tempIdMapping[resolvedPayload.tempId] = result.solutionId;
+              }
             }
             break;
 
           case 'phase':
-            result = await memPhaseService.addPhase({
-              planId: input.planId,
-              phase: resolvedPayload
-            });
-            results.push({ success: true, id: result.phaseId });
+            if (isUpdate) {
+              const phaseId = tempIdMapping[resolvedPayload.id] || resolvedPayload.id;
+              result = await memPhaseService.updatePhase({
+                planId: input.planId,
+                phaseId,
+                updates: resolvedPayload.updates
+              });
+              results.push({ success: true, id: phaseId });
+            } else {
+              result = await memPhaseService.addPhase({
+                planId: input.planId,
+                phase: resolvedPayload
+              });
+              results.push({ success: true, id: result.phaseId });
 
-            if (resolvedPayload.tempId) {
-              tempIdMapping[resolvedPayload.tempId] = result.phaseId;
+              if (resolvedPayload.tempId) {
+                tempIdMapping[resolvedPayload.tempId] = result.phaseId;
+              }
             }
             break;
 
@@ -287,26 +321,46 @@ export class BatchService {
             break;
 
           case 'decision':
-            result = await memDecService.recordDecision({
-              planId: input.planId,
-              decision: resolvedPayload
-            });
-            results.push({ success: true, id: result.decisionId });
+            if (isUpdate) {
+              const decisionId = tempIdMapping[resolvedPayload.id] || resolvedPayload.id;
+              result = await memDecService.updateDecision({
+                planId: input.planId,
+                decisionId,
+                updates: resolvedPayload.updates
+              });
+              results.push({ success: true, id: decisionId });
+            } else {
+              result = await memDecService.recordDecision({
+                planId: input.planId,
+                decision: resolvedPayload
+              });
+              results.push({ success: true, id: result.decisionId });
 
-            if (resolvedPayload.tempId) {
-              tempIdMapping[resolvedPayload.tempId] = result.decisionId;
+              if (resolvedPayload.tempId) {
+                tempIdMapping[resolvedPayload.tempId] = result.decisionId;
+              }
             }
             break;
 
           case 'artifact':
-            result = await memArtService.addArtifact({
-              planId: input.planId,
-              artifact: resolvedPayload
-            });
-            results.push({ success: true, id: result.artifactId });
+            if (isUpdate) {
+              const artifactId = tempIdMapping[resolvedPayload.id] || resolvedPayload.id;
+              result = await memArtService.updateArtifact({
+                planId: input.planId,
+                artifactId,
+                updates: resolvedPayload.updates
+              });
+              results.push({ success: true, id: artifactId });
+            } else {
+              result = await memArtService.addArtifact({
+                planId: input.planId,
+                artifact: resolvedPayload
+              });
+              results.push({ success: true, id: result.artifactId });
 
-            if (resolvedPayload.tempId) {
-              tempIdMapping[resolvedPayload.tempId] = result.artifactId;
+              if (resolvedPayload.tempId) {
+                tempIdMapping[resolvedPayload.tempId] = result.artifactId;
+              }
             }
             break;
 

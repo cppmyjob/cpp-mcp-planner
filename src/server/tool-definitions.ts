@@ -48,13 +48,13 @@ export const tools = [
   },
   {
     name: 'requirement',
-    description: 'Manage project requirements - the foundation of planning workflow. Add requirements first, then propose solutions with `solution` tool to address them. Link requirements to phases for implementation tracking. Use `query` tool to trace requirement coverage. Use vote/unvote to prioritize requirements based on user feedback - each requirement has a votes field (default: 0) that can be incremented/decremented. Actions: add, get, update, list, delete, vote, unvote.',
+    description: 'Manage project requirements - the foundation of planning workflow. Add requirements first, then propose solutions with `solution` tool to address them. Link requirements to phases for implementation tracking. Use `query` tool to trace requirement coverage. Use vote/unvote to prioritize requirements based on user feedback - each requirement has a votes field (default: 0) that can be incremented/decremented. Use reset_all_votes to reset all requirement votes to 0 in a plan. Actions: add, get, update, list, delete, vote, unvote, reset_all_votes.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['add', 'get', 'update', 'list', 'delete', 'vote', 'unvote'],
+          enum: ['add', 'get', 'update', 'list', 'delete', 'vote', 'unvote', 'reset_all_votes'],
         },
         planId: { type: 'string' },
         requirementId: { type: 'string' },
@@ -483,7 +483,7 @@ export const tools = [
   },
   {
     name: 'batch',
-    description: 'Execute multiple planning operations atomically in a single transaction. All operations succeed together or all fail (rollback). Supports temp IDs ($0, $1, $2, ...) for referencing entities created within the same batch. Temp IDs are resolved to real UUIDs after entity creation. Use batch for: creating complex dependency trees, bulk imports, setting up initial project structure. Actions: execute.',
+    description: 'Execute multiple planning operations atomically in a single transaction. All operations succeed together or all fail (rollback). Supports temp IDs ($0, $1, $2, ...) for referencing entities created within the same batch. Temp IDs are resolved to real UUIDs after entity creation. Supports both create and update operations - use action: "update" in payload with id and updates fields to update existing entities. Use batch for: creating complex dependency trees, bulk imports, bulk updates, setting up initial project structure. Actions: execute.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -499,7 +499,7 @@ export const tools = [
               },
               payload: {
                 type: 'object',
-                description: 'Entity-specific payload. For temp ID support, use tempId field. For referencing other entities in the batch, use $0, $1, $2, etc. in ID fields (parentId, addressing, sourceId, targetId, relatedPhaseId, relatedSolutionId, relatedRequirementIds, source.parentId).',
+                description: 'Entity-specific payload. For temp ID support, use tempId field. For referencing other entities in the batch, use $0, $1, $2, etc. in ID fields (parentId, addressing, sourceId, targetId, relatedPhaseId, relatedSolutionId, relatedRequirementIds, source.parentId). For update operations, set action: "update", id: entity_id, and updates: {...fields to update}.',
               },
             },
             required: ['entity_type', 'payload'],
