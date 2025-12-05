@@ -82,6 +82,12 @@ export async function handleToolCall(
           case 'delete':
             result = await requirementService.deleteRequirement(args as any);
             break;
+          case 'vote':
+            result = await requirementService.voteForRequirement(args as any);
+            break;
+          case 'unvote':
+            result = await requirementService.unvoteRequirement(args as any);
+            break;
           default:
             throw new ToolError('InvalidAction', `Unknown action for requirement: ${action}`);
         }

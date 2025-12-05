@@ -50,6 +50,7 @@ describe('Entity Types', () => {
         priority: 'critical',
         category: 'functional',
         status: 'draft',
+        votes: 0,
       };
 
       expect(requirement.type).toBe('requirement');
@@ -73,6 +74,7 @@ describe('Entity Types', () => {
         priority: 'high',
         category: 'non-functional',
         status: 'approved',
+        votes: 0,
         impact: {
           scope: ['api', 'database'],
           complexityEstimate: 7,
