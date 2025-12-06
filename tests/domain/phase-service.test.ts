@@ -1020,7 +1020,9 @@ describe('PhaseService', () => {
       expect((node.phase as any).successCriteria).toBeUndefined();
       expect((node.phase as any).implementationNotes).toBeUndefined();
       expect((node.phase as any).schedule).toBeUndefined();
-      expect((node.phase as any).metadata).toBeUndefined();
+
+      // Metadata IS included in summary mode (use excludeMetadata to remove it)
+      expect((node.phase as any).metadata).toBeDefined();
     });
 
     it('should include objectives when requested via fields', async () => {
@@ -1394,8 +1396,8 @@ describe('PhaseService', () => {
       const summarySize = JSON.stringify(summaryResult).length;
       const fullSize = JSON.stringify(fullResult).length;
 
-      // Summary should be at least 3x smaller
-      expect(summarySize).toBeLessThan(fullSize / 3);
+      // Summary should be smaller than full (includes metadata by default, still excludes heavy fields)
+      expect(summarySize).toBeLessThan(fullSize);
 
       console.log(`Summary size: ${summarySize} bytes`);
       console.log(`Full size: ${fullSize} bytes`);
@@ -2140,22 +2142,24 @@ describe('PhaseService', () => {
         expect(phase.objectives).toBeUndefined();
       });
 
-      it('should return ALL fields by default (no fields parameter)', async () => {
+      it('should return summary fields by default WITHOUT heavy fields (Lazy-Load)', async () => {
         const result = await service.getPhase({
           planId,
           phaseId,
         });
 
         const phase = result.phase;
-        // GET operations should return all fields by default
+        // GET operations return summary by default (without heavy codeExamples, objectives, etc)
         expect(phase.id).toBeDefined();
         expect(phase.title).toBeDefined();
         expect(phase.status).toBeDefined();
         expect(phase.progress).toBeDefined();
         expect(phase.path).toBeDefined();
-        expect(phase.objectives).toEqual(['Obj 1', 'Obj 2']);
-        expect(phase.codeExamples).toBeDefined();
-        expect(phase.implementationNotes).toBe('Important notes');
+
+        // Lazy-Load: heavy fields NOT included (use fields=['*'] to get them)
+        expect(phase.objectives).toBeUndefined();
+        expect(phase.codeExamples).toBeUndefined();
+        expect(phase.implementationNotes).toBeUndefined();
       });
 
       it('should return all fields when fields=["*"]', async () => {

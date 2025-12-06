@@ -795,10 +795,10 @@ describe('Tool Handlers Integration', () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.phaseId).toBeDefined();
 
-      // Verify via get
+      // Verify via get (use fields=['*'] to get schedule)
       const getResult = await handleToolCall(
         'phase',
-        { action: 'get', planId: ctx.planId, phaseId: parsed.phaseId },
+        { action: 'get', planId: ctx.planId, phaseId: parsed.phaseId, fields: ['*'] },
         ctx.services
       );
       const getParsed = JSON.parse(getResult.content[0].text);

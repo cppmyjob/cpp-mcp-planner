@@ -250,10 +250,10 @@ export class ArtifactService {
       }));
     }
 
-    // Apply field filtering - GET operations default to all fields
+    // Apply field filtering - artifacts default to summary (without heavy sourceCode)
     const filtered = filterArtifact(
       artifact,
-      input.fields ?? ['*'],
+      input.fields,
       false,
       input.excludeMetadata
     ) as Artifact;

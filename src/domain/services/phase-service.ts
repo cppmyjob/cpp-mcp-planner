@@ -236,10 +236,10 @@ export class PhaseService {
       throw new Error('Phase not found');
     }
 
-    // Apply field filtering - GET operations default to all fields
+    // Apply field filtering - phases default to summary (without heavy codeExamples)
     const filtered = filterEntity(
       phase,
-      input.fields ?? ['*'],
+      input.fields,
       'phase',
       input.excludeMetadata,
       input.excludeComputed
