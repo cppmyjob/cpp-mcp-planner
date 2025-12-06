@@ -10,6 +10,20 @@ import * as path from 'path';
  * This validates that tool-definitions.ts matches the actual service implementations.
  */
 
+// Helper to retry directory removal on Windows (EBUSY/ENOTEMPTY errors)
+async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+      return;
+    } catch (error: any) {
+      if (i === maxRetries - 1) throw error;
+      // Wait before retry (exponential backoff)
+      await new Promise((resolve) => setTimeout(resolve, 100 * (i + 1)));
+    }
+  }
+}
+
 // Helper to parse MCP tool result
 function parseResult<T>(result: unknown): T {
   const r = result as { content: Array<{ type: string; text: string }> };
@@ -50,7 +64,7 @@ describe('E2E: All MCP Tools Validation', () => {
     cleanup = async () => {
       await client.close();
       await server.close();
-      await fs.rm(storagePath, { recursive: true, force: true });
+      await removeDirectoryWithRetry(storagePath);
     };
   });
 
@@ -1041,7 +1055,7 @@ describe('E2E: All MCP Tools Validation', () => {
         const getParsed = parseResult<{ phase: { status: string } }>(getResult);
         expect(getParsed.phase.status).toBe(status);
       }
-    });
+    }, 10000); // Increase timeout for multiple status transitions
 
     it('action: update_status with progress boundaries (0 and 100)', async () => {
       // Create a test phase for progress testing
