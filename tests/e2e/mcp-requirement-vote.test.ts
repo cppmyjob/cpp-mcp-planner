@@ -22,7 +22,7 @@ describe('E2E: Requirement Voting via MCP Tool', () => {
   let planId: string;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-mcp-vote-' + Date.now());
+    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-vote-' + Date.now());
     await fs.mkdir(storagePath, { recursive: true });
 
     const services = await createServices(storagePath);

@@ -20,7 +20,7 @@ describe('E2E: MCP Server Discovery & Errors', () => {
   let cleanup: () => Promise<void>;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-mcp-server-' + Date.now());
+    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-server-' + Date.now());
     await fs.mkdir(storagePath, { recursive: true });
 
     const services = await createServices(storagePath);
