@@ -46,7 +46,7 @@ describe('E2E: All MCP Tools Validation', () => {
   let linkId: string;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-all-tools-' + Date.now());
+    storagePath = path.join(process.cwd(), '.test-temp', 'all-tools-' + Date.now());
     await fs.mkdir(storagePath, { recursive: true });
 
     const services = await createServices(storagePath);
