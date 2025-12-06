@@ -54,7 +54,7 @@ describe('SolutionService', () => {
       expect(result.solutionId).toBeDefined();
 
       // Verify via getSolution
-      const { solution } = await service.getSolution({ planId, solutionId: result.solutionId });
+      const { solution } = await service.getSolution({ planId, solutionId: result.solutionId, fields: ['*'] });
       expect(solution.title).toBe('Use jsonwebtoken');
       expect(solution.status).toBe('proposed');
     });
@@ -80,7 +80,7 @@ describe('SolutionService', () => {
       });
 
       // Verify via getSolution
-      const { solution } = await service.getSolution({ planId, solutionId: result.solutionId });
+      const { solution } = await service.getSolution({ planId, solutionId: result.solutionId, fields: ['*'] });
       expect(solution.tradeoffs).toHaveLength(2);
       expect(solution.tradeoffs[0].score).toBe(7);
     });
@@ -236,7 +236,7 @@ describe('SolutionService', () => {
       });
 
       // Verify via getSolution
-      const { solution } = await service.getSolution({ planId, solutionId: proposed.solutionId });
+      const { solution } = await service.getSolution({ planId, solutionId: proposed.solutionId, fields: ['*'] });
       expect(solution.status).toBe('selected');
       expect(solution.selectionReason).toBe('Best fit');
     });
@@ -281,7 +281,7 @@ describe('SolutionService', () => {
       const result = await service.selectSolution({ planId, solutionId: s2.solutionId });
 
       // Verify via getSolution
-      const { solution } = await service.getSolution({ planId, solutionId: s2.solutionId });
+      const { solution } = await service.getSolution({ planId, solutionId: s2.solutionId, fields: ['*'] });
       expect(solution.status).toBe('selected');
       expect(result.deselectedIds).toHaveLength(1);
       expect(result.deselectedIds![0]).toBe(s1.solutionId);
@@ -462,6 +462,107 @@ describe('SolutionService', () => {
         expect(result.success).toBe(true);
         expect(result).not.toHaveProperty('solution');
         expect(result).not.toHaveProperty('deselected');
+      });
+    });
+  });
+
+  describe('fields parameter support', () => {
+    let reqId: string;
+    let solId: string;
+
+    beforeEach(async () => {
+      reqId = 'req-123';
+      const result = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'Complete Solution',
+          description: 'Full description',
+          approach: 'Detailed approach',
+          implementationNotes: 'Important implementation notes',
+          addressing: [reqId],
+          tradeoffs: [
+            { aspect: 'performance', pros: ['fast'], cons: ['memory'], score: 8 },
+          ],
+          evaluation: {
+            effortEstimate: { value: 5, unit: 'days', confidence: 'medium' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Medium risk',
+          },
+        },
+      });
+      solId = result.solutionId;
+    });
+
+    describe('getSolution with fields', () => {
+      it('should return only minimal fields when fields=["id","title"]', async () => {
+        const result = await service.getSolution({
+          planId,
+          solutionId: solId,
+          fields: ['id', 'title'],
+        });
+
+        const sol = result.solution as unknown as Record<string, unknown>;
+        expect(sol.id).toBe(solId);
+        expect(sol.title).toBe('Complete Solution');
+        expect(sol.description).toBeUndefined();
+        expect(sol.tradeoffs).toBeUndefined();
+      });
+
+      it('should return summary fields by default', async () => {
+        const result = await service.getSolution({
+          planId,
+          solutionId: solId,
+        });
+
+        const sol = result.solution;
+        expect(sol.id).toBeDefined();
+        expect(sol.title).toBeDefined();
+        expect(sol.description).toBeDefined();
+        expect(sol.status).toBeDefined();
+
+        // Heavy fields not included
+        expect(sol.tradeoffs).toBeUndefined();
+        expect(sol.implementationNotes).toBeUndefined();
+      });
+
+      it('should return all fields when fields=["*"]', async () => {
+        const result = await service.getSolution({
+          planId,
+          solutionId: solId,
+          fields: ['*'],
+        });
+
+        const sol = result.solution;
+        expect(sol.tradeoffs).toBeDefined();
+        expect(sol.implementationNotes).toBe('Important implementation notes');
+        expect(sol.evaluation).toBeDefined();
+      });
+    });
+
+    describe('listSolutions with fields', () => {
+      it('should return summary fields by default', async () => {
+        const result = await service.listSolutions({
+          planId,
+        });
+
+        expect(result.solutions.length).toBeGreaterThan(0);
+        const sol = result.solutions[0];
+        expect(sol.id).toBeDefined();
+        expect(sol.title).toBeDefined();
+        expect(sol.tradeoffs).toBeUndefined();
+      });
+
+      it('should return minimal fields when fields=["id","title","status"]', async () => {
+        const result = await service.listSolutions({
+          planId,
+          fields: ['id', 'title', 'status'],
+        });
+
+        const sol = result.solutions[0] as unknown as Record<string, unknown>;
+        expect(sol.id).toBeDefined();
+        expect(sol.title).toBeDefined();
+        expect(sol.status).toBeDefined();
+        expect(sol.description).toBeUndefined();
       });
     });
   });

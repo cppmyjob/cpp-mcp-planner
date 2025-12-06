@@ -10,6 +10,7 @@ import type {
   Tag,
 } from '../entities/types.js';
 import { validateTags } from './validators.js';
+import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
 // Input types
 export interface AddRequirementInput {
@@ -39,6 +40,7 @@ export interface GetRequirementInput {
   planId: string;
   requirementId: string;
   includeTraceability?: boolean;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
 }
 
 export interface UpdateRequirementInput {
@@ -71,6 +73,7 @@ export interface ListRequirementsInput {
   };
   limit?: number;
   offset?: number;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
 }
 
 export interface DeleteRequirementInput {
@@ -208,7 +211,10 @@ export class RequirementService {
       throw new Error('Requirement not found');
     }
 
-    const result: GetRequirementResult = { requirement };
+    // Apply field filtering
+    const filtered = filterEntity(requirement, input.fields, 'requirement') as Requirement;
+
+    const result: GetRequirementResult = { requirement: filtered };
 
     if (input.includeTraceability) {
       // TODO: Implement traceability when linking is done
@@ -324,8 +330,11 @@ export class RequirementService {
     const limit = input.limit || 50;
     const paginated = requirements.slice(offset, offset + limit);
 
+    // Apply field filtering
+    const filtered = filterEntities(paginated, input.fields, 'requirement') as Requirement[];
+
     return {
-      requirements: paginated,
+      requirements: filtered,
       total,
       hasMore: offset + limit < total,
     };

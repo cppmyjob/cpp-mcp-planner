@@ -10,6 +10,7 @@ import type {
   Tag,
 } from '../entities/types.js';
 import { validateTags, validateArtifactType, validateFileTable, validateTargets, validateCodeRefs } from './validators.js';
+import { filterArtifact } from '../utils/field-filter.js';
 
 /**
  * Converts a title string into a URL-friendly slug
@@ -63,6 +64,7 @@ export interface AddArtifactInput {
 export interface GetArtifactInput {
   planId: string;
   artifactId: string;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
 }
 
 export interface UpdateArtifactInput {
@@ -97,6 +99,7 @@ export interface ListArtifactsInput {
   };
   limit?: number;
   offset?: number;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
 }
 
 export interface DeleteArtifactInput {
@@ -245,7 +248,10 @@ export class ArtifactService {
       }));
     }
 
-    return { artifact };
+    // Apply field filtering (isListOperation=false to allow sourceCode in full mode)
+    const filtered = filterArtifact(artifact, input.fields, false) as Artifact;
+
+    return { artifact: filtered };
   }
 
   async updateArtifact(input: UpdateArtifactInput): Promise<UpdateArtifactResult> {
@@ -327,8 +333,13 @@ export class ArtifactService {
 
     artifacts = artifacts.slice(offset, offset + limit);
 
+    // Apply field filtering with special handling (isListOperation=true to remove sourceCode)
+    const filtered = artifacts.map((artifact) =>
+      filterArtifact(artifact, input.fields, true)
+    ) as Artifact[];
+
     return {
-      artifacts,
+      artifacts: filtered,
       total,
       hasMore: offset + artifacts.length < total,
     };
