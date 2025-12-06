@@ -49,12 +49,14 @@ export interface ListDecisionsInput {
   limit?: number;
   offset?: number;
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface GetDecisionInput {
   planId: string;
   decisionId: string;
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface GetDecisionResult {
@@ -114,8 +116,14 @@ export class DecisionService {
       throw new Error('Decision not found');
     }
 
-    // Apply field filtering
-    const filtered = filterEntity(decision, input.fields, 'decision') as Decision;
+    // Apply field filtering - GET operations default to all fields
+    const filtered = filterEntity(
+      decision,
+      input.fields ?? ['*'],
+      'decision',
+      input.excludeMetadata,
+      false
+    ) as Decision;
 
     return { decision: filtered };
   }
@@ -364,7 +372,13 @@ export class DecisionService {
     const paginated = decisions.slice(offset, offset + limit);
 
     // Apply field filtering
-    const filtered = filterEntities(paginated, input.fields, 'decision') as Decision[];
+    const filtered = filterEntities(
+      paginated,
+      input.fields,
+      'decision',
+      input.excludeMetadata,
+      false
+    ) as Decision[];
 
     return {
       decisions: filtered,

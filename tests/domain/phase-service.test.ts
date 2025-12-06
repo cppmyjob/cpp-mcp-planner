@@ -47,6 +47,7 @@ describe('PhaseService', () => {
       const result = await service.getPhase({
         planId,
         phaseId: added.phaseId,
+        fields: ['*'],
       });
 
       expect(result.phase).toBeDefined();
@@ -460,7 +461,11 @@ describe('PhaseService', () => {
       });
 
       // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      const { phase } = await service.getPhase({
+        planId,
+        phaseId: added.phaseId,
+        fields: ['*'],
+      });
       expect(phase.schedule.actualEffort).toBe(4.5);
     });
   });
@@ -757,7 +762,11 @@ describe('PhaseService', () => {
       });
 
       // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      const { phase } = await service.getPhase({
+        planId,
+        phaseId: result.phaseId,
+        fields: ['*'],
+      });
       expect(phase.codeExamples).toHaveLength(2);
       expect(phase.codeExamples![0].language).toBe('typescript');
       expect(phase.codeExamples![0].filename).toBe('service.ts');
@@ -797,7 +806,11 @@ describe('PhaseService', () => {
       });
 
       // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      const { phase } = await service.getPhase({
+        planId,
+        phaseId: result.phaseId,
+        fields: ['*'],
+      });
       expect(phase.codeRefs).toHaveLength(2);
       expect(phase.codeRefs![0]).toBe('src/services/phase-service.ts:42');
       expect(phase.codeRefs![1]).toBe('tests/domain/phase-service.test.ts:100');
@@ -856,7 +869,11 @@ describe('PhaseService', () => {
       });
 
       // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      const { phase } = await service.getPhase({
+        planId,
+        phaseId: added.phaseId,
+        fields: ['*'],
+      });
       expect(phase.implementationNotes).toBe('## Updated Notes\n- Step 1\n- Step 2');
     });
 
@@ -881,7 +898,11 @@ describe('PhaseService', () => {
       });
 
       // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      const { phase } = await service.getPhase({
+        planId,
+        phaseId: added.phaseId,
+        fields: ['*'],
+      });
       expect(phase.codeExamples).toHaveLength(1);
       expect(phase.codeExamples![0].language).toBe('python');
     });
@@ -930,7 +951,11 @@ describe('PhaseService', () => {
       });
 
       // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      const { phase } = await service.getPhase({
+        planId,
+        phaseId: added.phaseId,
+        fields: ['*'],
+      });
       expect(phase.codeRefs).toHaveLength(2);
       expect(phase.codeRefs![0]).toBe('src/new-file.ts:10');
       expect(phase.codeRefs![1]).toBe('tests/new-test.ts:20');
@@ -1010,19 +1035,20 @@ describe('PhaseService', () => {
         },
       });
 
-      const result = await service.getPhaseTree({ planId, fields: ['objectives'] });
+      const result = await service.getPhaseTree({
+        planId,
+        fields: ['id', 'title', 'status', 'childCount', 'objectives'],
+      });
       const phase = result.tree[0].phase as any;
 
-      // Summary fields always present
+      // Requested fields should be present
       expect(phase.id).toBeDefined();
       expect(phase.title).toBe('Test');
       expect(phase.status).toBe('planned');
       expect(phase.childCount).toBe(0);
-
-      // objectives added via fields
       expect(phase.objectives).toEqual(['Build API', 'Write tests']);
 
-      // deliverables NOT requested - should not be present
+      // NOT requested - should not be present
       expect(phase.deliverables).toBeUndefined();
       expect(phase.description).toBeUndefined();
     });
@@ -1042,21 +1068,19 @@ describe('PhaseService', () => {
 
       const result = await service.getPhaseTree({
         planId,
-        fields: ['objectives', 'deliverables', 'schedule'],
+        fields: ['id', 'title', 'objectives', 'deliverables', 'schedule'],
       });
       const phase = result.tree[0].phase as any;
 
-      // Summary fields
+      // Requested fields should be present
       expect(phase.id).toBeDefined();
       expect(phase.title).toBe('Test');
-
-      // Requested fields
       expect(phase.objectives).toEqual(['obj1', 'obj2']);
       expect(phase.deliverables).toEqual(['del1']);
       expect(phase.schedule).toBeDefined();
       expect(phase.schedule.estimatedEffort.value).toBe(2);
 
-      // NOT requested
+      // NOT requested - should not be present
       expect(phase.successCriteria).toBeUndefined();
       expect(phase.description).toBeUndefined();
     });
@@ -1323,23 +1347,21 @@ describe('PhaseService', () => {
       const result = await service.getPhaseTree({
         planId,
         maxDepth: 0,
-        fields: ['objectives', 'deliverables'],
+        fields: ['id', 'title', 'childCount', 'objectives', 'deliverables'],
       });
 
       expect(result.tree).toHaveLength(1);
 
       const phase = result.tree[0].phase as any;
 
-      // Summary fields
+      // Requested fields should be present
       expect(phase.id).toBeDefined();
       expect(phase.title).toBe('Parent');
       expect(phase.childCount).toBe(1);
-
-      // Requested fields
       expect(phase.objectives).toEqual(['Build parent']);
       expect(phase.deliverables).toEqual(['Parent code']);
 
-      // NOT requested
+      // NOT requested - should not be present
       expect(phase.description).toBeUndefined();
       expect(phase.successCriteria).toBeUndefined();
 
@@ -1859,7 +1881,11 @@ describe('PhaseService', () => {
           actualEffort: 3.5,
         });
 
-        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        const completed = await service.getPhase({
+          planId,
+          phaseId: p1.phaseId,
+          fields: ['*'],
+        });
         expect(completed.phase.schedule.actualEffort).toBe(3.5);
       });
 
@@ -1876,7 +1902,11 @@ describe('PhaseService', () => {
           notes: 'All tests passed',
         });
 
-        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        const completed = await service.getPhase({
+          planId,
+          phaseId: p1.phaseId,
+          fields: ['*'],
+        });
         expect(completed.phase.metadata.annotations).toContainEqual(
           expect.objectContaining({
             text: 'All tests passed',
@@ -1892,10 +1922,16 @@ describe('PhaseService', () => {
         });
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
 
-        const beforeVersion = (await service.getPhase({ planId, phaseId: p1.phaseId })).phase.version;
+        const beforeVersion = (
+          await service.getPhase({ planId, phaseId: p1.phaseId, fields: ['*'] })
+        ).phase.version;
         await service.completeAndAdvance({ planId, phaseId: p1.phaseId });
 
-        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        const completed = await service.getPhase({
+          planId,
+          phaseId: p1.phaseId,
+          fields: ['*'],
+        });
         expect(completed.phase.version).toBe(beforeVersion + 1);
       });
     });
@@ -2104,23 +2140,22 @@ describe('PhaseService', () => {
         expect(phase.objectives).toBeUndefined();
       });
 
-      it('should return summary fields by default', async () => {
+      it('should return ALL fields by default (no fields parameter)', async () => {
         const result = await service.getPhase({
           planId,
           phaseId,
         });
 
         const phase = result.phase;
-        // Summary: id, title, status, progress, path
+        // GET operations should return all fields by default
         expect(phase.id).toBeDefined();
         expect(phase.title).toBeDefined();
         expect(phase.status).toBeDefined();
         expect(phase.progress).toBeDefined();
         expect(phase.path).toBeDefined();
-
-        // Heavy fields not included
-        expect(phase.codeExamples).toBeUndefined();
-        expect(phase.implementationNotes).toBeUndefined();
+        expect(phase.objectives).toEqual(['Obj 1', 'Obj 2']);
+        expect(phase.codeExamples).toBeDefined();
+        expect(phase.implementationNotes).toBe('Important notes');
       });
 
       it('should return all fields when fields=["*"]', async () => {
@@ -2135,6 +2170,195 @@ describe('PhaseService', () => {
         expect(phase.objectives).toEqual(['Obj 1', 'Obj 2']);
         expect(phase.codeExamples).toBeDefined();
         expect(phase.implementationNotes).toBe('Important notes');
+      });
+    });
+  });
+
+  describe('excludeMetadata and excludeComputed parameters (Sprint 2)', () => {
+    let phaseId: string;
+
+    beforeEach(async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase with Metadata',
+          description: 'Testing metadata and computed exclusion',
+          objectives: ['Test objective'],
+          deliverables: ['Test deliverable'],
+          successCriteria: ['Test criterion'],
+        },
+      });
+      phaseId = result.phaseId;
+    });
+
+    describe('getPhase with excludeMetadata', () => {
+      it('should exclude metadata fields when excludeMetadata=true', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['*'],
+          excludeMetadata: true,
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+
+        // Business fields should be present
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBe('Test Phase with Metadata');
+        expect(phase.description).toBe('Testing metadata and computed exclusion');
+
+        // Metadata fields should NOT be present
+        expect(phase.createdAt).toBeUndefined();
+        expect(phase.updatedAt).toBeUndefined();
+        expect(phase.version).toBeUndefined();
+        expect(phase.metadata).toBeUndefined();
+      });
+
+      it('should include metadata fields by default', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['*'],
+        });
+
+        const phase = result.phase;
+
+        // Metadata fields should be present by default
+        expect(phase.createdAt).toBeDefined();
+        expect(phase.updatedAt).toBeDefined();
+        expect(phase.version).toBeDefined();
+        expect(phase.metadata).toBeDefined();
+      });
+    });
+
+    describe('getPhase with excludeComputed', () => {
+      it('should exclude computed fields when excludeComputed=true', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          excludeComputed: true,
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+
+        // Business fields should be present
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBe('Test Phase with Metadata');
+        expect(phase.status).toBeDefined();
+
+        // Computed fields should NOT be present
+        expect(phase.depth).toBeUndefined();
+        expect(phase.path).toBeUndefined();
+        // Note: childCount is not available in getPhase, only in get_tree
+      });
+
+      it('should include computed fields by default', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+        });
+
+        const phase = result.phase;
+
+        // Computed fields should be present by default
+        expect(phase.depth).toBeDefined();
+        expect(phase.path).toBeDefined();
+      });
+    });
+
+    describe('getPhase with both excludeMetadata and excludeComputed', () => {
+      it('should exclude both metadata and computed fields', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['*'],
+          excludeMetadata: true,
+          excludeComputed: true,
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+
+        // Business fields present
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBeDefined();
+        expect(phase.objectives).toBeDefined();
+
+        // Metadata fields excluded
+        expect(phase.createdAt).toBeUndefined();
+        expect(phase.version).toBeUndefined();
+
+        // Computed fields excluded
+        expect(phase.depth).toBeUndefined();
+        expect(phase.path).toBeUndefined();
+      });
+
+      it('should work together with fields parameter', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['id', 'title', 'description', 'path', 'version'],
+          excludeMetadata: true,
+          excludeComputed: true,
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+
+        // Requested non-metadata/non-computed fields should be present
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBeDefined();
+        expect(phase.description).toBeDefined();
+
+        // Metadata and computed fields excluded even if requested
+        expect(phase.version).toBeUndefined();
+        expect(phase.path).toBeUndefined();
+      });
+    });
+
+    describe('getPhaseTree with excludeComputed', () => {
+      beforeEach(async () => {
+        // Add child phase
+        await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child Phase',
+            description: 'Child',
+            parentId: phaseId,
+            objectives: ['Child objective'],
+            deliverables: ['Child deliverable'],
+            successCriteria: ['Child criterion'],
+          },
+        });
+      });
+
+      it('should exclude computed fields from tree when excludeComputed=true', async () => {
+        const result = await service.getPhaseTree({
+          planId,
+          excludeComputed: true,
+        });
+
+        expect(result.tree.length).toBeGreaterThan(0);
+        const phaseNode = result.tree[0].phase as unknown as Record<string, unknown>;
+
+        // Business fields present
+        expect(phaseNode.id).toBeDefined();
+        expect(phaseNode.title).toBeDefined();
+
+        // Computed fields excluded
+        expect(phaseNode.depth).toBeUndefined();
+        expect(phaseNode.path).toBeUndefined();
+        expect(phaseNode.childCount).toBeUndefined();
+      });
+
+      it('should include computed fields in tree by default', async () => {
+        const result = await service.getPhaseTree({
+          planId,
+        });
+
+        const phaseNode = result.tree[0].phase;
+
+        // Computed fields should be present
+        expect(phaseNode.path).toBeDefined();
+        expect((phaseNode as unknown as Record<string, unknown>).childCount).toBeDefined();
       });
     });
   });

@@ -890,7 +890,7 @@ describe('E2E: All MCP Tools Validation', () => {
       expect(phase.metadata).toBeUndefined();
     });
 
-    it('action: get_tree with fields parameter adds requested fields', async () => {
+    it('action: get_tree with fields parameter returns ONLY requested fields', async () => {
       const result = await client.callTool({
         name: 'phase',
         arguments: {
@@ -903,16 +903,16 @@ describe('E2E: All MCP Tools Validation', () => {
       const parsed = parseResult<{ tree: Array<{ phase: Record<string, unknown> }> }>(result);
       const phase = parsed.tree[0].phase;
 
-      // Summary fields
-      expect(phase.id).toBeDefined();
-      expect(phase.title).toBeDefined();
-      expect(phase.childCount).toBeDefined();
-
-      // Requested fields should be present
+      // ONLY requested fields should be present
       expect(phase.objectives).toBeDefined();
       expect(phase.deliverables).toBeDefined();
 
-      // Non-requested fields should NOT be present
+      // Summary fields NOT included when custom fields specified
+      expect(phase.id).toBeUndefined();
+      expect(phase.title).toBeUndefined();
+      expect(phase.childCount).toBeUndefined();
+
+      // Other fields also NOT present
       expect(phase.description).toBeUndefined();
       expect(phase.schedule).toBeUndefined();
     });

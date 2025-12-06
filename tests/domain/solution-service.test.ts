@@ -508,7 +508,7 @@ describe('SolutionService', () => {
         expect(sol.tradeoffs).toBeUndefined();
       });
 
-      it('should return summary fields by default', async () => {
+      it('should return ALL fields by default (no fields parameter)', async () => {
         const result = await service.getSolution({
           planId,
           solutionId: solId,
@@ -520,9 +520,10 @@ describe('SolutionService', () => {
         expect(sol.description).toBeDefined();
         expect(sol.status).toBeDefined();
 
-        // Heavy fields not included
-        expect(sol.tradeoffs).toBeUndefined();
-        expect(sol.implementationNotes).toBeUndefined();
+        // GET operations should return all fields by default
+        expect(sol.tradeoffs).toBeDefined();
+        expect(sol.implementationNotes).toBe('Important implementation notes');
+        expect(sol.evaluation).toBeDefined();
       });
 
       it('should return all fields when fields=["*"]', async () => {
