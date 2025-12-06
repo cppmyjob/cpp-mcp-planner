@@ -1,0 +1,19 @@
+{
+  "id": "f1db554a-3421-4a32-afe9-76427da3aa58",
+  "name": "Plan to Archive",
+  "description": "Will be archived",
+  "status": "archived",
+  "author": "claude-code",
+  "createdAt": "2025-12-06T12:06:13.491Z",
+  "updatedAt": "2025-12-06T12:06:14.154Z",
+  "version": 2,
+  "lockVersion": 1,
+  "statistics": {
+    "totalRequirements": 0,
+    "totalSolutions": 0,
+    "totalDecisions": 0,
+    "totalPhases": 0,
+    "totalArtifacts": 0,
+    "completionPercentage": 0
+  }
+}

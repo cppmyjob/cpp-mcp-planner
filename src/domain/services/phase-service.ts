@@ -102,6 +102,19 @@ export interface GetPhaseResult {
   phase: Phase;
 }
 
+export interface GetPhasesInput {
+  planId: string;
+  phaseIds: string[];
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields
+  excludeComputed?: boolean; // Exclude computed fields
+}
+
+export interface GetPhasesResult {
+  phases: Phase[];
+  notFound: string[]; // IDs that were not found
+}
+
 export interface GetPhaseTreeInput {
   planId: string;
   rootPhaseId?: string;
@@ -246,6 +259,44 @@ export class PhaseService {
     ) as Phase;
 
     return { phase: filtered };
+  }
+
+  async getPhases(input: GetPhasesInput): Promise<GetPhasesResult> {
+    await this.ensurePlanExists(input.planId);
+
+    // Enforce max limit
+    if (input.phaseIds.length > 100) {
+      throw new Error('Cannot fetch more than 100 phases at once');
+    }
+
+    // Handle empty array
+    if (input.phaseIds.length === 0) {
+      return { phases: [], notFound: [] };
+    }
+
+    const allPhases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const foundPhases: Phase[] = [];
+    const notFound: string[] = [];
+
+    // Collect found and not found IDs
+    for (const id of input.phaseIds) {
+      const phase = allPhases.find((p) => p.id === id);
+      if (phase) {
+        // Apply field filtering
+        const filtered = filterEntity(
+          phase,
+          input.fields,
+          'phase',
+          input.excludeMetadata,
+          input.excludeComputed
+        ) as Phase;
+        foundPhases.push(filtered);
+      } else {
+        notFound.push(id);
+      }
+    }
+
+    return { phases: foundPhases, notFound };
   }
 
   async addPhase(input: AddPhaseInput): Promise<AddPhaseResult> {

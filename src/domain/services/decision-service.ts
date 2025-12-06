@@ -63,6 +63,18 @@ export interface GetDecisionResult {
   decision: Decision;
 }
 
+export interface GetDecisionsInput {
+  planId: string;
+  decisionIds: string[];
+  fields?: string[];
+  excludeMetadata?: boolean;
+}
+
+export interface GetDecisionsResult {
+  decisions: Decision[];
+  notFound: string[];
+}
+
 export interface SupersedeDecisionInput {
   planId: string;
   decisionId: string;
@@ -126,6 +138,42 @@ export class DecisionService {
     ) as Decision;
 
     return { decision: filtered };
+  }
+
+  async getDecisions(input: GetDecisionsInput): Promise<GetDecisionsResult> {
+    // Enforce max limit
+    if (input.decisionIds.length > 100) {
+      throw new Error('Cannot fetch more than 100 decisions at once');
+    }
+
+    // Handle empty array
+    if (input.decisionIds.length === 0) {
+      return { decisions: [], notFound: [] };
+    }
+
+    const allDecisions = await this.storage.loadEntities<Decision>(input.planId, 'decisions');
+    const foundDecisions: Decision[] = [];
+    const notFound: string[] = [];
+
+    // Collect found and not found IDs
+    for (const id of input.decisionIds) {
+      const decision = allDecisions.find((d) => d.id === id);
+      if (decision) {
+        // Apply field filtering - decisions default to all fields
+        const filtered = filterEntity(
+          decision,
+          input.fields ?? ['*'],
+          'decision',
+          input.excludeMetadata,
+          false
+        ) as Decision;
+        foundDecisions.push(filtered);
+      } else {
+        notFound.push(id);
+      }
+    }
+
+    return { decisions: foundDecisions, notFound };
   }
 
   async supersedeDecision(input: SupersedeDecisionInput): Promise<SupersedeDecisionResult> {
