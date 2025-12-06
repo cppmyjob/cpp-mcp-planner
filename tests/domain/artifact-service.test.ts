@@ -917,4 +917,108 @@ describe('ArtifactService', () => {
       });
     });
   });
+
+  describe('fields parameter support', () => {
+    let artId: string;
+
+    beforeEach(async () => {
+      const result = await service.addArtifact({
+        planId,
+        artifact: {
+          title: 'Complete Artifact',
+          description: 'Full artifact description',
+          slug: 'complete-artifact',
+          artifactType: 'code',
+          content: {
+            language: 'typescript',
+            sourceCode: 'const x = 1;\nconst y = 2;\n// ... 1000 lines of code',
+            filename: 'test.ts',
+          },
+          targets: [
+            { path: 'src/test.ts', action: 'create', lineNumber: 42, description: 'Main file' },
+          ],
+          relatedPhaseId: 'phase-123',
+          codeRefs: ['src/main.ts:10'],
+        },
+      });
+      artId = result.artifactId;
+    });
+
+    describe('getArtifact with fields', () => {
+      it('should return only minimal fields when fields=["id","title"]', async () => {
+        const result = await service.getArtifact({
+          planId,
+          artifactId: artId,
+          fields: ['id', 'title'],
+        });
+
+        const art = result.artifact as unknown as Record<string, unknown>;
+        expect(art.id).toBe(artId);
+        expect(art.title).toBe('Complete Artifact');
+        expect(art.description).toBeUndefined();
+        expect(art.content).toBeUndefined();
+      });
+
+      it('should return summary fields by default WITHOUT sourceCode', async () => {
+        const result = await service.getArtifact({
+          planId,
+          artifactId: artId,
+        });
+
+        const art = result.artifact;
+        expect(art.id).toBeDefined();
+        expect(art.title).toBeDefined();
+        expect(art.slug).toBeDefined();
+        expect(art.artifactType).toBeDefined();
+        expect(art.status).toBeDefined();
+
+        // Heavy content field not included by default
+        const content = art.content as unknown as Record<string, unknown>;
+        expect(content?.sourceCode).toBeUndefined();
+      });
+
+      it('should return all fields when fields=["*"]', async () => {
+        const result = await service.getArtifact({
+          planId,
+          artifactId: artId,
+          fields: ['*'],
+        });
+
+        const art = result.artifact;
+        expect(art.content.sourceCode).toContain('const x = 1');
+        expect(art.targets).toBeDefined();
+        expect(art.codeRefs).toEqual(['src/main.ts:10']);
+      });
+    });
+
+    describe('listArtifacts with fields', () => {
+      it('should return summary fields by default WITHOUT sourceCode', async () => {
+        const result = await service.listArtifacts({
+          planId,
+        });
+
+        expect(result.artifacts.length).toBeGreaterThan(0);
+        const art = result.artifacts[0];
+        expect(art.id).toBeDefined();
+        expect(art.title).toBeDefined();
+
+        // sourceCode should NEVER be in list even with full mode (too heavy)
+        const content = art.content as unknown as Record<string, unknown>;
+        expect(content?.sourceCode).toBeUndefined();
+      });
+
+      it('should return minimal fields when specified', async () => {
+        const result = await service.listArtifacts({
+          planId,
+          fields: ['id', 'title', 'artifactType'],
+        });
+
+        const art = result.artifacts[0] as unknown as Record<string, unknown>;
+        expect(art.id).toBeDefined();
+        expect(art.title).toBeDefined();
+        expect(art.artifactType).toBeDefined();
+        expect(art.description).toBeUndefined();
+      });
+    });
+  });
 });

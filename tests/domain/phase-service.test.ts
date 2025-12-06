@@ -726,7 +726,7 @@ describe('PhaseService', () => {
       });
 
       // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId, fields: ['*'] });
       expect(phase.implementationNotes).toBe(
         '## TDD Steps\n1. Write failing test\n2. Implement\n3. Refactor'
       );
@@ -2062,6 +2062,79 @@ describe('PhaseService', () => {
         const result = await service.completeAndAdvance({ planId, phaseId: p1.phaseId });
 
         expect(result.nextPhaseId).toBeNull();
+      });
+    });
+  });
+
+  describe('fields parameter support', () => {
+    let phaseId: string;
+
+    beforeEach(async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Complete Phase',
+          description: 'Full description',
+          objectives: ['Obj 1', 'Obj 2'],
+          deliverables: ['Del 1', 'Del 2'],
+          successCriteria: ['SC 1', 'SC 2'],
+          implementationNotes: 'Important notes',
+          codeExamples: [
+            { language: 'typescript', code: 'const x = 1;', description: 'Example' },
+          ],
+          codeRefs: ['src/test.ts:42'],
+          priority: 'high',
+        },
+      });
+      phaseId = result.phaseId;
+    });
+
+    describe('getPhase with fields', () => {
+      it('should return only minimal fields when fields=["id","title"]', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['id', 'title'],
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+        expect(phase.id).toBe(phaseId);
+        expect(phase.title).toBe('Complete Phase');
+        expect(phase.description).toBeUndefined();
+        expect(phase.objectives).toBeUndefined();
+      });
+
+      it('should return summary fields by default', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+        });
+
+        const phase = result.phase;
+        // Summary: id, title, status, progress, path
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBeDefined();
+        expect(phase.status).toBeDefined();
+        expect(phase.progress).toBeDefined();
+        expect(phase.path).toBeDefined();
+
+        // Heavy fields not included
+        expect(phase.codeExamples).toBeUndefined();
+        expect(phase.implementationNotes).toBeUndefined();
+      });
+
+      it('should return all fields when fields=["*"]', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['*'],
+        });
+
+        const phase = result.phase;
+        expect(phase.title).toBe('Complete Phase');
+        expect(phase.objectives).toEqual(['Obj 1', 'Obj 2']);
+        expect(phase.codeExamples).toBeDefined();
+        expect(phase.implementationNotes).toBe('Important notes');
       });
     });
   });

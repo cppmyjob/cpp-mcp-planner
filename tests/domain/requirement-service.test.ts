@@ -110,7 +110,7 @@ describe('RequirementService', () => {
       });
 
       // Verify via getRequirement
-      const { requirement } = await service.getRequirement({ planId, requirementId: result.requirementId });
+      const { requirement } = await service.getRequirement({ planId, requirementId: result.requirementId, fields: ['*'] });
       expect(requirement.rationale).toBe('User experience');
       expect(requirement.impact?.riskLevel).toBe('low');
     });
@@ -199,6 +199,7 @@ describe('RequirementService', () => {
       const result = await service.getRequirement({
         planId,
         requirementId: added.requirementId,
+        fields: ['*'],
       });
 
       expect(result.requirement.version).toBe(2);
@@ -512,6 +513,186 @@ describe('RequirementService', () => {
       await expect(
         service.unvoteRequirement({ planId, requirementId: 'non-existent' })
       ).rejects.toThrow('Requirement not found');
+    });
+  });
+
+  describe('fields parameter support', () => {
+    let requirementId: string;
+
+    beforeEach(async () => {
+      const result = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Complete Requirement',
+          description: 'Full description with all fields',
+          rationale: 'Important business need',
+          source: { type: 'user-request', context: 'User feedback' },
+          acceptanceCriteria: ['Criterion 1', 'Criterion 2', 'Criterion 3'],
+          priority: 'high',
+          category: 'functional',
+          impact: {
+            scope: ['auth', 'api'],
+            complexityEstimate: 7,
+            riskLevel: 'medium',
+          },
+        },
+      });
+      requirementId = result.requirementId;
+    });
+
+    describe('getRequirement with fields', () => {
+      it('should return only minimal fields when fields=["id","title"]', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          fields: ['id', 'title'],
+        });
+
+        const req = result.requirement as unknown as Record<string, unknown>;
+        expect(req.id).toBe(requirementId);
+        expect(req.title).toBe('Complete Requirement');
+
+        // Should NOT include other fields
+        expect(req.description).toBeUndefined();
+        expect(req.rationale).toBeUndefined();
+        expect(req.acceptanceCriteria).toBeUndefined();
+      });
+
+      it('should return summary fields by default (no fields parameter)', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+        });
+
+        const req = result.requirement;
+        // Summary should include: id, title, description, priority, category, status, votes
+        expect(req.id).toBeDefined();
+        expect(req.title).toBeDefined();
+        expect(req.description).toBeDefined();
+        expect(req.priority).toBeDefined();
+        expect(req.category).toBeDefined();
+        expect(req.status).toBeDefined();
+        expect(req.votes).toBeDefined();
+
+        // Should NOT include heavy fields by default
+        expect(req.rationale).toBeUndefined();
+        expect(req.acceptanceCriteria).toBeUndefined();
+        expect(req.impact).toBeUndefined();
+      });
+
+      it('should return all fields when fields=["*"]', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          fields: ['*'],
+        });
+
+        const req = result.requirement;
+        expect(req.id).toBeDefined();
+        expect(req.title).toBe('Complete Requirement');
+        expect(req.description).toBe('Full description with all fields');
+        expect(req.rationale).toBe('Important business need');
+        expect(req.acceptanceCriteria).toEqual(['Criterion 1', 'Criterion 2', 'Criterion 3']);
+        expect(req.impact).toEqual({
+          scope: ['auth', 'api'],
+          complexityEstimate: 7,
+          riskLevel: 'medium',
+        });
+      });
+
+      it('should return ONLY requested fields (no summary addition)', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          fields: ['id', 'title', 'rationale', 'impact'],
+        });
+
+        const req = result.requirement as unknown as Record<string, unknown>;
+        // ONLY requested fields
+        expect(req.id).toBe(requirementId);
+        expect(req.title).toBe('Complete Requirement');
+        expect(req.rationale).toBe('Important business need');
+        expect(req.impact).toBeDefined();
+
+        // Should NOT include non-requested fields (even summary ones)
+        expect(req.description).toBeUndefined();
+        expect(req.acceptanceCriteria).toBeUndefined();
+      });
+    });
+
+    describe('listRequirements with fields', () => {
+      beforeEach(async () => {
+        // Add more requirements
+        await service.addRequirement({
+          planId,
+          requirement: {
+            title: 'Req 2',
+            description: 'Second requirement',
+            source: { type: 'discovered' },
+            acceptanceCriteria: ['AC1'],
+            priority: 'medium',
+            category: 'technical',
+          },
+        });
+      });
+
+      it('should return only minimal fields for all items when fields=["id","title"]', async () => {
+        const result = await service.listRequirements({
+          planId,
+          fields: ['id', 'title'],
+        });
+
+        expect(result.requirements.length).toBeGreaterThan(0);
+        const req = result.requirements[0] as unknown as Record<string, unknown>;
+        expect(req.id).toBeDefined();
+        expect(req.title).toBeDefined();
+        expect(req.description).toBeUndefined();
+      });
+
+      it('should return summary fields by default for list', async () => {
+        const result = await service.listRequirements({
+          planId,
+        });
+
+        expect(result.requirements.length).toBeGreaterThan(0);
+        const req = result.requirements[0];
+
+        // Summary fields present
+        expect(req.id).toBeDefined();
+        expect(req.title).toBeDefined();
+        expect(req.description).toBeDefined();
+        expect(req.priority).toBeDefined();
+
+        // Heavy fields NOT present
+        expect(req.acceptanceCriteria).toBeUndefined();
+        expect(req.impact).toBeUndefined();
+      });
+
+      it('should return all fields when fields=["*"]', async () => {
+        const result = await service.listRequirements({
+          planId,
+          fields: ['*'],
+        });
+
+        const fullReq = result.requirements.find((r) => r.title === 'Complete Requirement');
+        expect(fullReq).toBeDefined();
+        expect(fullReq!.acceptanceCriteria).toBeDefined();
+        expect(fullReq!.impact).toBeDefined();
+      });
+
+      it('should combine fields with filters', async () => {
+        const result = await service.listRequirements({
+          planId,
+          filters: { priority: 'high' },
+          fields: ['id', 'title', 'priority'],
+        });
+
+        expect(result.requirements.length).toBe(1);
+        const req = result.requirements[0] as unknown as Record<string, unknown>;
+        expect(req.title).toBe('Complete Requirement');
+        expect(req.priority).toBe('high');
+        expect(req.description).toBeUndefined();
+      });
     });
   });
 });

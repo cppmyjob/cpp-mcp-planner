@@ -3,6 +3,7 @@ import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
 import type { Decision, DecisionStatus, AlternativeConsidered, Tag } from '../entities/types.js';
 import { validateAlternativesConsidered, validateTags } from './validators.js';
+import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
 // Input types
 export interface RecordDecisionInput {
@@ -47,11 +48,13 @@ export interface ListDecisionsInput {
   };
   limit?: number;
   offset?: number;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
 }
 
 export interface GetDecisionInput {
   planId: string;
   decisionId: string;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
 }
 
 export interface GetDecisionResult {
@@ -111,7 +114,10 @@ export class DecisionService {
       throw new Error('Decision not found');
     }
 
-    return { decision };
+    // Apply field filtering
+    const filtered = filterEntity(decision, input.fields, 'decision') as Decision;
+
+    return { decision: filtered };
   }
 
   async supersedeDecision(input: SupersedeDecisionInput): Promise<SupersedeDecisionResult> {
@@ -357,8 +363,11 @@ export class DecisionService {
     const limit = input.limit || 50;
     const paginated = decisions.slice(offset, offset + limit);
 
+    // Apply field filtering
+    const filtered = filterEntities(paginated, input.fields, 'decision') as Decision[];
+
     return {
-      decisions: paginated,
+      decisions: filtered,
       total,
       hasMore: offset + limit < total,
     };

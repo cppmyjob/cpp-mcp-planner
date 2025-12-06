@@ -3,6 +3,7 @@ import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, CodeExample, PhasePriority } from '../entities/types.js';
 import { validateEffortEstimate, validateTags, validateCodeExamples, validatePriority, validateCodeRefs } from './validators.js';
+import { filterEntity } from '../utils/field-filter.js';
 
 /**
  * Calculate the next valid order for a phase.
@@ -92,6 +93,7 @@ export interface MovePhaseInput {
 export interface GetPhaseInput {
   planId: string;
   phaseId: string;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
 }
 
 export interface GetPhaseResult {
@@ -230,7 +232,10 @@ export class PhaseService {
       throw new Error('Phase not found');
     }
 
-    return { phase };
+    // Apply field filtering
+    const filtered = filterEntity(phase, input.fields, 'phase') as Phase;
+
+    return { phase: filtered };
   }
 
   async addPhase(input: AddPhaseInput): Promise<AddPhaseResult> {

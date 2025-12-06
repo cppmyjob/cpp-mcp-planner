@@ -49,7 +49,7 @@ describe('DecisionService', () => {
       expect(result.decisionId).toBeDefined();
 
       // Verify via getDecision
-      const { decision } = await service.getDecision({ planId, decisionId: result.decisionId });
+      const { decision } = await service.getDecision({ planId, decisionId: result.decisionId, fields: ['*'] });
       expect(decision.title).toBe('JWT Library Selection');
       expect(decision.status).toBe('active');
     });
@@ -70,7 +70,7 @@ describe('DecisionService', () => {
       });
 
       // Verify via getDecision
-      const { decision } = await service.getDecision({ planId, decisionId: result.decisionId });
+      const { decision } = await service.getDecision({ planId, decisionId: result.decisionId, fields: ['*'] });
       expect(decision.alternativesConsidered).toHaveLength(2);
     });
   });
@@ -137,8 +137,8 @@ describe('DecisionService', () => {
       });
 
       // Verify via getDecision
-      const { decision: newDecision } = await service.getDecision({ planId, decisionId: result.decisionId });
-      const { decision: oldDecision } = await service.getDecision({ planId, decisionId: original.decisionId });
+      const { decision: newDecision } = await service.getDecision({ planId, decisionId: result.decisionId, fields: ['*'] });
+      const { decision: oldDecision } = await service.getDecision({ planId, decisionId: original.decisionId, fields: ['*'] });
 
       expect(newDecision.decision).toBe('jose');
       expect(newDecision.status).toBe('active');
@@ -168,7 +168,7 @@ describe('DecisionService', () => {
       });
 
       // Verify via getDecision
-      const { decision: newDecision } = await service.getDecision({ planId, decisionId: result.decisionId });
+      const { decision: newDecision } = await service.getDecision({ planId, decisionId: result.decisionId, fields: ['*'] });
 
       const oldInAlternatives = newDecision.alternativesConsidered.find(
         (a) => a.option === 'Option A'

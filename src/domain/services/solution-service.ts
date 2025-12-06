@@ -3,6 +3,7 @@ import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
 import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag } from '../entities/types.js';
 import { validateEffortEstimate, validateTags } from './validators.js';
+import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
 // Input types
 export interface ProposeSolutionInput {
@@ -52,6 +53,7 @@ export interface ListSolutionsInput {
   };
   limit?: number;
   offset?: number;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
 }
 
 export interface DeleteSolutionInput {
@@ -63,6 +65,7 @@ export interface DeleteSolutionInput {
 export interface GetSolutionInput {
   planId: string;
   solutionId: string;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
 }
 
 export interface GetSolutionResult {
@@ -131,7 +134,10 @@ export class SolutionService {
       throw new Error('Solution not found');
     }
 
-    return { solution };
+    // Apply field filtering
+    const filtered = filterEntity(solution, input.fields, 'solution') as Solution;
+
+    return { solution: filtered };
   }
 
   async proposeSolution(input: ProposeSolutionInput): Promise<ProposeSolutionResult> {
@@ -351,8 +357,11 @@ export class SolutionService {
     const limit = input.limit || 50;
     const paginated = solutions.slice(offset, offset + limit);
 
+    // Apply field filtering
+    const filtered = filterEntities(paginated, input.fields, 'solution') as Solution[];
+
     return {
-      solutions: paginated,
+      solutions: filtered,
       total,
       hasMore: offset + limit < total,
     };
