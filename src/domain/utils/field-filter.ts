@@ -90,10 +90,10 @@ export function filterEntity<T>(
     let fieldsToInclude: string[];
 
     if (!fields || fields.length === 0) {
-      // Summary mode: use default summary fields
-      fieldsToInclude = SUMMARY_FIELDS[entityType];
+      // Summary mode: use summary fields + metadata fields (metadata removed later if excludeMetadata=true)
+      fieldsToInclude = [...SUMMARY_FIELDS[entityType], ...METADATA_FIELDS];
     } else {
-      // Custom mode: ONLY use requested fields (no summary addition)
+      // Custom mode: ONLY use requested fields (no automatic additions)
       fieldsToInclude = fields;
     }
 

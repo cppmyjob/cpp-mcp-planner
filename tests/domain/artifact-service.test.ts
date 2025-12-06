@@ -157,8 +157,8 @@ describe('ArtifactService', () => {
         },
       });
 
-      // Verify via getArtifact
-      const { artifact } = await service.getArtifact({ planId, artifactId: added.artifactId });
+      // Verify via getArtifact (use fields=['*'] to get sourceCode)
+      const { artifact } = await service.getArtifact({ planId, artifactId: added.artifactId, fields: ['*'] });
       expect(artifact.title).toBe('Updated');
       expect(artifact.content.sourceCode).toBe('const y = 2;');
       expect(artifact.version).toBe(2);
@@ -959,7 +959,7 @@ describe('ArtifactService', () => {
         expect(art.content).toBeUndefined();
       });
 
-      it('should return ALL fields by default INCLUDING sourceCode', async () => {
+      it('should return summary fields by default WITHOUT heavy sourceCode (Lazy-Load)', async () => {
         const result = await service.getArtifact({
           planId,
           artifactId: artId,
@@ -972,8 +972,8 @@ describe('ArtifactService', () => {
         expect(art.artifactType).toBeDefined();
         expect(art.status).toBeDefined();
 
-        // GET operations should return all fields including heavy sourceCode
-        expect(art.content.sourceCode).toContain('const x = 1');
+        // Lazy-Load: sourceCode NOT included by default (use fields=['*'] to get it)
+        expect(art.content.sourceCode).toBeUndefined();
         expect(art.targets).toBeDefined();
         expect(art.codeRefs).toEqual(['src/main.ts:10']);
       });

@@ -887,7 +887,9 @@ describe('E2E: All MCP Tools Validation', () => {
       // Full fields should NOT be present in summary mode
       expect(phase.description).toBeUndefined();
       expect(phase.schedule).toBeUndefined();
-      expect(phase.metadata).toBeUndefined();
+
+      // Metadata IS included in summary mode by default
+      expect(phase.metadata).toBeDefined();
     });
 
     it('action: get_tree with fields parameter returns ONLY requested fields', async () => {
