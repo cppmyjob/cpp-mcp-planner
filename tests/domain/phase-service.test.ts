@@ -2366,4 +2366,153 @@ describe('PhaseService', () => {
       });
     });
   });
+
+  describe('get_many operation (Sprint 4: Batch Read)', () => {
+    it('should get multiple phases by IDs', async () => {
+      const phase1 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 1',
+          description: 'First phase',
+          objectives: ['Obj 1'],
+          deliverables: ['Del 1'],
+          successCriteria: ['Criteria 1'],
+        },
+      });
+
+      const phase2 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 2',
+          description: 'Second phase',
+          objectives: ['Obj 2'],
+          deliverables: ['Del 2'],
+          successCriteria: ['Criteria 2'],
+        },
+      });
+
+      const phase3 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 3',
+          description: 'Third phase',
+          objectives: ['Obj 3'],
+          deliverables: ['Del 3'],
+          successCriteria: ['Criteria 3'],
+        },
+      });
+
+      const result = await service.getPhases({
+        planId,
+        phaseIds: [phase1.phaseId, phase2.phaseId, phase3.phaseId],
+      });
+
+      expect(result.phases).toHaveLength(3);
+      expect(result.phases[0].title).toBe('Phase 1');
+      expect(result.phases[1].title).toBe('Phase 2');
+      expect(result.phases[2].title).toBe('Phase 3');
+    });
+
+    it('should support fields parameter in get_many', async () => {
+      const phase1 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 1',
+          description: 'First phase',
+          objectives: ['Obj 1'],
+          deliverables: ['Del 1'],
+          successCriteria: ['Criteria 1'],
+        },
+      });
+
+      const phase2 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 2',
+          description: 'Second phase',
+          objectives: ['Obj 2'],
+          deliverables: ['Del 2'],
+          successCriteria: ['Criteria 2'],
+        },
+      });
+
+      const result = await service.getPhases({
+        planId,
+        phaseIds: [phase1.phaseId, phase2.phaseId],
+        fields: ['id', 'title'],
+      });
+
+      expect(result.phases).toHaveLength(2);
+      expect(result.phases[0].id).toBeDefined();
+      expect(result.phases[0].title).toBeDefined();
+      expect((result.phases[0] as unknown as Record<string, unknown>).description).toBeUndefined();
+      expect((result.phases[0] as unknown as Record<string, unknown>).objectives).toBeUndefined();
+    });
+
+    it('should handle partial success when some IDs not found', async () => {
+      const phase1 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 1',
+          description: 'First phase',
+          objectives: ['Obj 1'],
+          deliverables: ['Del 1'],
+          successCriteria: ['Criteria 1'],
+        },
+      });
+
+      const result = await service.getPhases({
+        planId,
+        phaseIds: [phase1.phaseId, 'non-existent-id', 'another-fake-id'],
+      });
+
+      expect(result.phases).toHaveLength(1);
+      expect(result.phases[0].title).toBe('Phase 1');
+      expect(result.notFound).toEqual(['non-existent-id', 'another-fake-id']);
+    });
+
+    it('should enforce max limit of 100 IDs', async () => {
+      const manyIds = Array.from({ length: 101 }, (_, i) => `id-${i}`);
+
+      await expect(
+        service.getPhases({
+          planId,
+          phaseIds: manyIds,
+        })
+      ).rejects.toThrow('Cannot fetch more than 100 phases at once');
+    });
+
+    it('should return empty array when no IDs provided', async () => {
+      const result = await service.getPhases({
+        planId,
+        phaseIds: [],
+      });
+
+      expect(result.phases).toEqual([]);
+      expect(result.notFound).toEqual([]);
+    });
+
+    it('should support excludeMetadata in get_many', async () => {
+      const phase1 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 1',
+          description: 'First phase',
+          objectives: ['Obj 1'],
+          deliverables: ['Del 1'],
+          successCriteria: ['Criteria 1'],
+        },
+      });
+
+      const result = await service.getPhases({
+        planId,
+        phaseIds: [phase1.phaseId],
+        excludeMetadata: true,
+      });
+
+      expect(result.phases).toHaveLength(1);
+      expect((result.phases[0] as unknown as Record<string, unknown>).createdAt).toBeUndefined();
+      expect((result.phases[0] as unknown as Record<string, unknown>).metadata).toBeUndefined();
+    });
+  });
 });

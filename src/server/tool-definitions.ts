@@ -48,16 +48,21 @@ export const tools = [
   },
   {
     name: 'requirement',
-    description: 'Manage project requirements - the foundation of planning workflow. Add requirements first, then propose solutions with `solution` tool to address them. Link requirements to phases for implementation tracking. Use `query` tool to trace requirement coverage. Use vote/unvote to prioritize requirements based on user feedback - each requirement has a votes field (default: 0) that can be incremented/decremented. Actions: add, get, update, list, delete, vote, unvote.',
+    description: 'Manage project requirements - the foundation of planning workflow. Add requirements first, then propose solutions with `solution` tool to address them. Link requirements to phases for implementation tracking. Use `query` tool to trace requirement coverage. Use vote/unvote to prioritize requirements based on user feedback - each requirement has a votes field (default: 0) that can be incremented/decremented. Actions: add, get, get_many, update, list, delete, vote, unvote.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['add', 'get', 'update', 'list', 'delete', 'vote', 'unvote'],
+          enum: ['add', 'get', 'get_many', 'update', 'list', 'delete', 'vote', 'unvote'],
         },
         planId: { type: 'string' },
         requirementId: { type: 'string' },
+        requirementIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of requirement IDs for get_many action. Max 100 IDs.',
+        },
         requirement: {
           type: 'object',
           properties: {
@@ -115,17 +120,21 @@ export const tools = [
   },
   {
     name: 'solution',
-    description: 'Manage solution proposals for requirements. Propose multiple solutions with tradeoff analysis, compare them to evaluate options, then select the best one. Use `decision` tool to record selection rationale. Selected solutions guide phase implementation. Actions: propose, get, update, list, compare, select, delete.',
+    description: 'Manage solution proposals for requirements. Propose multiple solutions with tradeoff analysis, compare them to evaluate options, then select the best one. Use `decision` tool to record selection rationale. Selected solutions guide phase implementation. Actions: propose, get, get_many, update, list, compare, select, delete.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['propose', 'get', 'update', 'list', 'compare', 'select', 'delete'],
+          enum: ['propose', 'get', 'get_many', 'update', 'list', 'compare', 'select', 'delete'],
         },
         planId: { type: 'string' },
         solutionId: { type: 'string' },
-        solutionIds: { type: 'array', items: { type: 'string' } },
+        solutionIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of solution IDs for get_many or compare actions. Max 100 IDs for get_many.',
+        },
         solution: {
           type: 'object',
           properties: {
@@ -184,16 +193,21 @@ export const tools = [
   },
   {
     name: 'decision',
-    description: 'Record architectural decisions (ADR pattern) with context and alternatives considered. Use after solution selection or for any significant technical choice. Decisions can be superseded when context changes, maintaining decision history. Link decisions to requirements/solutions for traceability. Actions: record, get, update, list, supersede.',
+    description: 'Record architectural decisions (ADR pattern) with context and alternatives considered. Use after solution selection or for any significant technical choice. Decisions can be superseded when context changes, maintaining decision history. Link decisions to requirements/solutions for traceability. Actions: record, get, get_many, update, list, supersede.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['record', 'get', 'update', 'list', 'supersede'],
+          enum: ['record', 'get', 'get_many', 'update', 'list', 'supersede'],
         },
         planId: { type: 'string' },
         decisionId: { type: 'string' },
+        decisionIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of decision IDs for get_many action. Max 100 IDs.',
+        },
         decision: {
           type: 'object',
           properties: {
@@ -244,16 +258,21 @@ export const tools = [
   },
   {
     name: 'phase',
-    description: 'Manage implementation phases/tasks in hierarchical structure. Break selected solutions into phases with objectives, deliverables, and estimates. Track progress, update status (planned/in_progress/completed/blocked), and get next actionable items. For plan overview/summary, use get_tree with fields parameter to get compact tree. Use link tool with depends_on relation to create phase dependencies with cycle detection. Use after solution selection. Actions: add, get, get_tree, update, update_status, move, delete, get_next_actions, complete_and_advance.',
+    description: 'Manage implementation phases/tasks in hierarchical structure. Break selected solutions into phases with objectives, deliverables, and estimates. Track progress, update status (planned/in_progress/completed/blocked), and get next actionable items. For plan overview/summary, use get_tree with fields parameter to get compact tree. Use link tool with depends_on relation to create phase dependencies with cycle detection. Use after solution selection. Actions: add, get, get_many, get_tree, update, update_status, move, delete, get_next_actions, complete_and_advance.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['add', 'get', 'get_tree', 'update', 'update_status', 'move', 'delete', 'get_next_actions', 'complete_and_advance'],
+          enum: ['add', 'get', 'get_many', 'get_tree', 'update', 'update_status', 'move', 'delete', 'get_next_actions', 'complete_and_advance'],
         },
         planId: { type: 'string' },
         phaseId: { type: 'string' },
+        phaseIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of phase IDs for get_many action. Max 100 IDs.',
+        },
         phase: {
           type: 'object',
           properties: {

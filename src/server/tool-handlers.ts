@@ -73,6 +73,9 @@ export async function handleToolCall(
           case 'get':
             result = await requirementService.getRequirement(args as any);
             break;
+          case 'get_many':
+            result = await requirementService.getRequirements(args as any);
+            break;
           case 'update':
             result = await requirementService.updateRequirement(args as any);
             break;
@@ -100,6 +103,9 @@ export async function handleToolCall(
             break;
           case 'get':
             result = await solutionService.getSolution(args as any);
+            break;
+          case 'get_many':
+            result = await solutionService.getSolutions(args as any);
             break;
           case 'update':
             result = await solutionService.updateSolution(args as any);
@@ -129,6 +135,9 @@ export async function handleToolCall(
           case 'get':
             result = await decisionService.getDecision(args as any);
             break;
+          case 'get_many':
+            result = await decisionService.getDecisions(args as any);
+            break;
           case 'update':
             result = await decisionService.updateDecision(args as any);
             break;
@@ -150,6 +159,9 @@ export async function handleToolCall(
             break;
           case 'get':
             result = await phaseService.getPhase(args as any);
+            break;
+          case 'get_many':
+            result = await phaseService.getPhases(args as any);
             break;
           case 'get_tree':
             result = await phaseService.getPhaseTree(args as any);

@@ -1,0 +1,19 @@
+{
+  "id": "02ee2f48-3706-47b9-a8b6-f38de48786e2",
+  "name": "Updated Plan Name",
+  "description": "Updated description",
+  "status": "active",
+  "author": "claude-code",
+  "createdAt": "2025-12-06T12:06:10.778Z",
+  "updatedAt": "2025-12-06T12:06:19.428Z",
+  "version": 2,
+  "lockVersion": 1,
+  "statistics": {
+    "totalRequirements": 4,
+    "totalSolutions": 2,
+    "totalDecisions": 1,
+    "totalPhases": 0,
+    "totalArtifacts": 0,
+    "completionPercentage": 0
+  }
+}

@@ -74,6 +74,18 @@ export interface GetSolutionResult {
   solution: Solution;
 }
 
+export interface GetSolutionsInput {
+  planId: string;
+  solutionIds: string[];
+  fields?: string[];
+  excludeMetadata?: boolean;
+}
+
+export interface GetSolutionsResult {
+  solutions: Solution[];
+  notFound: string[];
+}
+
 // Output types
 export interface ProposeSolutionResult {
   solutionId: string;
@@ -146,6 +158,42 @@ export class SolutionService {
     ) as Solution;
 
     return { solution: filtered };
+  }
+
+  async getSolutions(input: GetSolutionsInput): Promise<GetSolutionsResult> {
+    // Enforce max limit
+    if (input.solutionIds.length > 100) {
+      throw new Error('Cannot fetch more than 100 solutions at once');
+    }
+
+    // Handle empty array
+    if (input.solutionIds.length === 0) {
+      return { solutions: [], notFound: [] };
+    }
+
+    const allSolutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
+    const foundSolutions: Solution[] = [];
+    const notFound: string[] = [];
+
+    // Collect found and not found IDs
+    for (const id of input.solutionIds) {
+      const solution = allSolutions.find((s) => s.id === id);
+      if (solution) {
+        // Apply field filtering - solutions default to all fields
+        const filtered = filterEntity(
+          solution,
+          input.fields ?? ['*'],
+          'solution',
+          input.excludeMetadata,
+          false
+        ) as Solution;
+        foundSolutions.push(filtered);
+      } else {
+        notFound.push(id);
+      }
+    }
+
+    return { solutions: foundSolutions, notFound };
   }
 
   async proposeSolution(input: ProposeSolutionInput): Promise<ProposeSolutionResult> {

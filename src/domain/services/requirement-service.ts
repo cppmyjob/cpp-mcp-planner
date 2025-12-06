@@ -110,6 +110,18 @@ export interface GetRequirementResult {
   };
 }
 
+export interface GetRequirementsInput {
+  planId: string;
+  requirementIds: string[];
+  fields?: string[];
+  excludeMetadata?: boolean;
+}
+
+export interface GetRequirementsResult {
+  requirements: Requirement[];
+  notFound: string[];
+}
+
 export interface UpdateRequirementResult {
   success: boolean;
   requirementId: string;
@@ -236,6 +248,46 @@ export class RequirementService {
     }
 
     return result;
+  }
+
+  async getRequirements(input: GetRequirementsInput): Promise<GetRequirementsResult> {
+    // Enforce max limit
+    if (input.requirementIds.length > 100) {
+      throw new Error('Cannot fetch more than 100 requirements at once');
+    }
+
+    // Handle empty array
+    if (input.requirementIds.length === 0) {
+      return { requirements: [], notFound: [] };
+    }
+
+    const allRequirements = await this.storage.loadEntities<Requirement>(
+      input.planId,
+      'requirements'
+    );
+
+    const foundRequirements: Requirement[] = [];
+    const notFound: string[] = [];
+
+    // Collect found and not found IDs
+    for (const id of input.requirementIds) {
+      const requirement = allRequirements.find((r) => r.id === id);
+      if (requirement) {
+        // Apply field filtering - requirements default to all fields
+        const filtered = filterEntity(
+          requirement,
+          input.fields ?? ['*'],
+          'requirement',
+          input.excludeMetadata,
+          false
+        ) as Requirement;
+        foundRequirements.push(filtered);
+      } else {
+        notFound.push(id);
+      }
+    }
+
+    return { requirements: foundRequirements, notFound };
   }
 
   async updateRequirement(
