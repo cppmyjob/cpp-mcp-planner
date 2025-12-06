@@ -54,6 +54,7 @@ export interface ListSolutionsInput {
   limit?: number;
   offset?: number;
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface DeleteSolutionInput {
@@ -66,6 +67,7 @@ export interface GetSolutionInput {
   planId: string;
   solutionId: string;
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface GetSolutionResult {
@@ -134,8 +136,14 @@ export class SolutionService {
       throw new Error('Solution not found');
     }
 
-    // Apply field filtering
-    const filtered = filterEntity(solution, input.fields, 'solution') as Solution;
+    // Apply field filtering - GET operations default to all fields
+    const filtered = filterEntity(
+      solution,
+      input.fields ?? ['*'],
+      'solution',
+      input.excludeMetadata,
+      false
+    ) as Solution;
 
     return { solution: filtered };
   }
@@ -358,7 +366,13 @@ export class SolutionService {
     const paginated = solutions.slice(offset, offset + limit);
 
     // Apply field filtering
-    const filtered = filterEntities(paginated, input.fields, 'solution') as Solution[];
+    const filtered = filterEntities(
+      paginated,
+      input.fields,
+      'solution',
+      input.excludeMetadata,
+      false
+    ) as Solution[];
 
     return {
       solutions: filtered,

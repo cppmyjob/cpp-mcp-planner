@@ -41,6 +41,7 @@ export interface GetRequirementInput {
   requirementId: string;
   includeTraceability?: boolean;
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface UpdateRequirementInput {
@@ -74,6 +75,7 @@ export interface ListRequirementsInput {
   limit?: number;
   offset?: number;
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface DeleteRequirementInput {
@@ -211,8 +213,14 @@ export class RequirementService {
       throw new Error('Requirement not found');
     }
 
-    // Apply field filtering
-    const filtered = filterEntity(requirement, input.fields, 'requirement') as Requirement;
+    // Apply field filtering - GET operations default to all fields
+    const filtered = filterEntity(
+      requirement,
+      input.fields ?? ['*'],
+      'requirement',
+      input.excludeMetadata,
+      false
+    ) as Requirement;
 
     const result: GetRequirementResult = { requirement: filtered };
 
@@ -331,7 +339,13 @@ export class RequirementService {
     const paginated = requirements.slice(offset, offset + limit);
 
     // Apply field filtering
-    const filtered = filterEntities(paginated, input.fields, 'requirement') as Requirement[];
+    const filtered = filterEntities(
+      paginated,
+      input.fields,
+      'requirement',
+      input.excludeMetadata,
+      false
+    ) as Requirement[];
 
     return {
       requirements: filtered,

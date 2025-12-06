@@ -65,6 +65,7 @@ export interface GetArtifactInput {
   planId: string;
   artifactId: string;
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface UpdateArtifactInput {
@@ -100,6 +101,7 @@ export interface ListArtifactsInput {
   limit?: number;
   offset?: number;
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface DeleteArtifactInput {
@@ -248,8 +250,13 @@ export class ArtifactService {
       }));
     }
 
-    // Apply field filtering (isListOperation=false to allow sourceCode in full mode)
-    const filtered = filterArtifact(artifact, input.fields, false) as Artifact;
+    // Apply field filtering - GET operations default to all fields
+    const filtered = filterArtifact(
+      artifact,
+      input.fields ?? ['*'],
+      false,
+      input.excludeMetadata
+    ) as Artifact;
 
     return { artifact: filtered };
   }
@@ -335,7 +342,7 @@ export class ArtifactService {
 
     // Apply field filtering with special handling (isListOperation=true to remove sourceCode)
     const filtered = artifacts.map((artifact) =>
-      filterArtifact(artifact, input.fields, true)
+      filterArtifact(artifact, input.fields, true, input.excludeMetadata)
     ) as Artifact[];
 
     return {

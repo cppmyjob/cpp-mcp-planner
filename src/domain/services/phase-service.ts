@@ -94,6 +94,8 @@ export interface GetPhaseInput {
   planId: string;
   phaseId: string;
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
+  excludeComputed?: boolean; // Exclude computed fields (depth, path, childCount)
 }
 
 export interface GetPhaseResult {
@@ -106,6 +108,8 @@ export interface GetPhaseTreeInput {
   includeCompleted?: boolean;
   fields?: string[];  // Summary by default; ['*'] for all, or specific fields
   maxDepth?: number;  // Limit tree depth (0 = root only)
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
+  excludeComputed?: boolean; // Exclude computed fields (depth, path, childCount)
 }
 
 export interface DeletePhaseInput {
@@ -232,8 +236,14 @@ export class PhaseService {
       throw new Error('Phase not found');
     }
 
-    // Apply field filtering
-    const filtered = filterEntity(phase, input.fields, 'phase') as Phase;
+    // Apply field filtering - GET operations default to all fields
+    const filtered = filterEntity(
+      phase,
+      input.fields ?? ['*'],
+      'phase',
+      input.excludeMetadata,
+      input.excludeComputed
+    ) as Phase;
 
     return { phase: filtered };
   }
@@ -448,32 +458,22 @@ export class PhaseService {
 
     // Build phase data based on fields parameter
     const buildPhaseData = (phase: Phase): Phase | PhaseSummary => {
-      if (isFullMode) {
-        // Return full phase with childCount added
-        return {
-          ...phase,
-          childCount: childCounts.get(phase.id) || 0,
-        } as Phase & { childCount: number };
-      }
-
-      // Summary mode: only essential fields + requested additional fields
-      const summary: PhaseSummary = {
-        id: phase.id,
-        title: phase.title,
-        status: phase.status,
-        progress: phase.progress,
-        path: phase.path,
+      // Add childCount to phase (computed field)
+      const phaseWithChildCount = {
+        ...phase,
         childCount: childCounts.get(phase.id) || 0,
       };
 
-      // Add requested additional fields (ignore unknown fields)
-      for (const field of requestedFields) {
-        if (field in phase) {
-          summary[field] = (phase as unknown as Record<string, unknown>)[field];
-        }
-      }
+      // Apply field filtering with exclusions
+      const filtered = filterEntity(
+        phaseWithChildCount,
+        input.fields,
+        'phase',
+        input.excludeMetadata,
+        input.excludeComputed
+      ) as Phase | PhaseSummary;
 
-      return summary;
+      return filtered;
     };
 
     const buildTree = (parentId: string | null, currentDepth: number): PhaseTreeNode[] => {

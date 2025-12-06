@@ -105,6 +105,10 @@ export const tools = [
           items: { type: 'string' },
           description: 'Fields to include. Default returns summary (id, title, description, priority, category, status, votes). Available fields: "rationale", "source", "acceptanceCriteria", "impact", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
         },
+        excludeMetadata: {
+          type: 'boolean',
+          description: 'Exclude metadata fields (createdAt, updatedAt, version, metadata, type) from response. Saves ~162 bytes per entity.',
+        },
       },
       required: ['action', 'planId'],
     },
@@ -170,6 +174,10 @@ export const tools = [
           items: { type: 'string' },
           description: 'Fields to include. Default returns summary (id, title, description, status, addressing). Available fields: "approach", "implementationNotes", "tradeoffs", "evaluation", "selectedAt", "selectedBy", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
         },
+        excludeMetadata: {
+          type: 'boolean',
+          description: 'Exclude metadata fields (createdAt, updatedAt, version, metadata, type) from response. Saves ~162 bytes per entity.',
+        },
       },
       required: ['action', 'planId'],
     },
@@ -225,6 +233,10 @@ export const tools = [
           type: 'array',
           items: { type: 'string' },
           description: 'Fields to include. Default returns summary (id, title, question, decision, status). Available fields: "context", "consequences", "alternativesConsidered", "supersededBy", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
+        },
+        excludeMetadata: {
+          type: 'boolean',
+          description: 'Exclude metadata fields (createdAt, updatedAt, version, metadata, type) from response. Saves ~162 bytes per entity.',
         },
       },
       required: ['action', 'planId'],
@@ -338,6 +350,14 @@ export const tools = [
           items: { type: 'string' },
           description: 'Fields to include. Default returns summary (id, title, status, progress, path, childCount). Available fields: "description", "parentId", "order", "depth", "objectives", "deliverables", "successCriteria", "schedule", "startedAt", "completedAt", "milestones", "blockers", "implementationNotes", "codeExamples", "codeRefs", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
         },
+        excludeMetadata: {
+          type: 'boolean',
+          description: 'Exclude metadata fields (createdAt, updatedAt, version, metadata, type) from response. Saves ~162 bytes per entity.',
+        },
+        excludeComputed: {
+          type: 'boolean',
+          description: 'Exclude computed fields (depth, path, childCount) from response. Saves ~50 bytes per entity. Only applies to phase entities.',
+        },
         limit: { type: 'number' },
       },
       required: ['action', 'planId'],
@@ -445,6 +465,10 @@ export const tools = [
           type: 'array',
           items: { type: 'string' },
           description: 'Fields to include. Default returns summary (id, title, slug, artifactType, status). Available fields: "description", "content" (excluding sourceCode unless fields=["*"]), "fileTable", "targets", "relatedPhaseId", "relatedSolutionId", "relatedRequirementIds", "codeRefs", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields including sourceCode (WARNING: sourceCode can be 5-50KB, returns large output, may pollute context).',
+        },
+        excludeMetadata: {
+          type: 'boolean',
+          description: 'Exclude metadata fields (createdAt, updatedAt, version, metadata, type) from response. Saves ~162 bytes per entity.',
         },
       },
       required: ['action', 'planId'],

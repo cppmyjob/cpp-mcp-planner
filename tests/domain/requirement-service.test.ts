@@ -558,14 +558,14 @@ describe('RequirementService', () => {
         expect(req.acceptanceCriteria).toBeUndefined();
       });
 
-      it('should return summary fields by default (no fields parameter)', async () => {
+      it('should return ALL fields by default (no fields parameter)', async () => {
         const result = await service.getRequirement({
           planId,
           requirementId,
         });
 
         const req = result.requirement;
-        // Summary should include: id, title, description, priority, category, status, votes
+        // GET operations should return all fields by default
         expect(req.id).toBeDefined();
         expect(req.title).toBeDefined();
         expect(req.description).toBeDefined();
@@ -574,10 +574,10 @@ describe('RequirementService', () => {
         expect(req.status).toBeDefined();
         expect(req.votes).toBeDefined();
 
-        // Should NOT include heavy fields by default
-        expect(req.rationale).toBeUndefined();
-        expect(req.acceptanceCriteria).toBeUndefined();
-        expect(req.impact).toBeUndefined();
+        // All fields should be included in GET by default
+        expect(req.rationale).toBeDefined();
+        expect(req.acceptanceCriteria).toBeDefined();
+        expect(req.impact).toBeDefined();
       });
 
       it('should return all fields when fields=["*"]', async () => {
@@ -692,6 +692,144 @@ describe('RequirementService', () => {
         expect(req.title).toBe('Complete Requirement');
         expect(req.priority).toBe('high');
         expect(req.description).toBeUndefined();
+      });
+    });
+  });
+
+  describe('excludeMetadata parameter support (Sprint 2)', () => {
+    let requirementId: string;
+
+    beforeEach(async () => {
+      const result = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement with Metadata',
+          description: 'Testing metadata exclusion',
+          source: { type: 'user-request' },
+          acceptanceCriteria: ['Test criterion'],
+          priority: 'medium',
+          category: 'functional',
+        },
+      });
+      requirementId = result.requirementId;
+    });
+
+    describe('getRequirement with excludeMetadata', () => {
+      it('should exclude metadata fields when excludeMetadata=true', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          excludeMetadata: true,
+        });
+
+        const req = result.requirement as unknown as Record<string, unknown>;
+
+        // Business fields should be present
+        expect(req.id).toBeDefined();
+        expect(req.title).toBe('Test Requirement with Metadata');
+        expect(req.description).toBe('Testing metadata exclusion');
+
+        // Metadata fields should NOT be present
+        expect(req.createdAt).toBeUndefined();
+        expect(req.updatedAt).toBeUndefined();
+        expect(req.version).toBeUndefined();
+        expect(req.metadata).toBeUndefined();
+      });
+
+      it('should include metadata fields by default (excludeMetadata=false)', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          fields: ['*'],
+        });
+
+        const req = result.requirement;
+
+        // Metadata fields should be present by default
+        expect(req.createdAt).toBeDefined();
+        expect(req.updatedAt).toBeDefined();
+        expect(req.version).toBeDefined();
+        expect(req.metadata).toBeDefined();
+      });
+
+      it('should work together with fields parameter', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          fields: ['id', 'title', 'description', 'createdAt', 'version'],
+          excludeMetadata: true,
+        });
+
+        const req = result.requirement as unknown as Record<string, unknown>;
+
+        // Requested non-metadata fields should be present
+        expect(req.id).toBeDefined();
+        expect(req.title).toBeDefined();
+        expect(req.description).toBeDefined();
+
+        // Metadata fields should be excluded even though requested in fields
+        expect(req.createdAt).toBeUndefined();
+        expect(req.version).toBeUndefined();
+        expect(req.metadata).toBeUndefined();
+      });
+    });
+
+    describe('listRequirements with excludeMetadata', () => {
+      beforeEach(async () => {
+        // Add another requirement
+        await service.addRequirement({
+          planId,
+          requirement: {
+            title: 'Second Requirement',
+            description: 'Another test',
+            source: { type: 'discovered' },
+            acceptanceCriteria: [],
+            priority: 'low',
+            category: 'technical',
+          },
+        });
+      });
+
+      it('should exclude metadata from all items when excludeMetadata=true', async () => {
+        const result = await service.listRequirements({
+          planId,
+          excludeMetadata: true,
+        });
+
+        expect(result.requirements.length).toBeGreaterThan(0);
+
+        for (const req of result.requirements) {
+          const r = req as unknown as Record<string, unknown>;
+          expect(r.createdAt).toBeUndefined();
+          expect(r.updatedAt).toBeUndefined();
+          expect(r.version).toBeUndefined();
+          expect(r.metadata).toBeUndefined();
+
+          // Business fields should still be present
+          expect(r.id).toBeDefined();
+          expect(r.title).toBeDefined();
+        }
+      });
+
+      it('should combine excludeMetadata with fields and filters', async () => {
+        const result = await service.listRequirements({
+          planId,
+          fields: ['id', 'title', 'priority', 'version'],
+          filters: { priority: 'medium' },
+          excludeMetadata: true,
+        });
+
+        expect(result.requirements.length).toBe(1);
+        const req = result.requirements[0] as unknown as Record<string, unknown>;
+
+        // Only requested non-metadata fields
+        expect(req.id).toBeDefined();
+        expect(req.title).toBe('Test Requirement with Metadata');
+        expect(req.priority).toBe('medium');
+
+        // Metadata excluded despite being in fields
+        expect(req.version).toBeUndefined();
+        expect(req.createdAt).toBeUndefined();
       });
     });
   });

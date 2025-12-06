@@ -959,7 +959,7 @@ describe('ArtifactService', () => {
         expect(art.content).toBeUndefined();
       });
 
-      it('should return summary fields by default WITHOUT sourceCode', async () => {
+      it('should return ALL fields by default INCLUDING sourceCode', async () => {
         const result = await service.getArtifact({
           planId,
           artifactId: artId,
@@ -972,9 +972,10 @@ describe('ArtifactService', () => {
         expect(art.artifactType).toBeDefined();
         expect(art.status).toBeDefined();
 
-        // Heavy content field not included by default
-        const content = art.content as unknown as Record<string, unknown>;
-        expect(content?.sourceCode).toBeUndefined();
+        // GET operations should return all fields including heavy sourceCode
+        expect(art.content.sourceCode).toContain('const x = 1');
+        expect(art.targets).toBeDefined();
+        expect(art.codeRefs).toEqual(['src/main.ts:10']);
       });
 
       it('should return all fields when fields=["*"]', async () => {
