@@ -2515,4 +2515,168 @@ describe('PhaseService', () => {
       expect((result.phases[0] as unknown as Record<string, unknown>).metadata).toBeUndefined();
     });
   });
+
+  describe('Sprint 5: Array Field Operations', () => {
+    it('should append item to objectives array', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: ['Objective 1', 'Objective 2'],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await service.arrayAppend({
+        planId,
+        phaseId,
+        field: 'objectives',
+        value: 'Objective 3',
+      });
+
+      const result = await service.getPhase({ planId, phaseId, fields: ['*'] });
+      expect(result.phase.objectives).toEqual(['Objective 1', 'Objective 2', 'Objective 3']);
+    });
+
+    it('should prepend item to deliverables array', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: [],
+          deliverables: ['Item 2', 'Item 3'],
+          successCriteria: [],
+        },
+      });
+
+      await service.arrayPrepend({
+        planId,
+        phaseId,
+        field: 'deliverables',
+        value: 'Item 1',
+      });
+
+      const result = await service.getPhase({ planId, phaseId, fields: ['*'] });
+      expect(result.phase.deliverables).toEqual(['Item 1', 'Item 2', 'Item 3']);
+    });
+
+    it('should insert item at specific index in successCriteria array', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: [],
+          deliverables: [],
+          successCriteria: ['Criteria 1', 'Criteria 3'],
+        },
+      });
+
+      await service.arrayInsertAt({
+        planId,
+        phaseId,
+        field: 'successCriteria',
+        index: 1,
+        value: 'Criteria 2',
+      });
+
+      const result = await service.getPhase({ planId, phaseId, fields: ['*'] });
+      expect(result.phase.successCriteria).toEqual(['Criteria 1', 'Criteria 2', 'Criteria 3']);
+    });
+
+    it('should update item at specific index', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: ['Old objective', 'Keep this'],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await service.arrayUpdateAt({
+        planId,
+        phaseId,
+        field: 'objectives',
+        index: 0,
+        value: 'New objective',
+      });
+
+      const result = await service.getPhase({ planId, phaseId, fields: ['*'] });
+      expect(result.phase.objectives).toEqual(['New objective', 'Keep this']);
+    });
+
+    it('should remove item at specific index', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: ['Item 1', 'Item 2', 'Item 3'],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await service.arrayRemoveAt({
+        planId,
+        phaseId,
+        field: 'objectives',
+        index: 1,
+      });
+
+      const result = await service.getPhase({ planId, phaseId, fields: ['*'] });
+      expect(result.phase.objectives).toEqual(['Item 1', 'Item 3']);
+    });
+
+    it('should throw error when index is out of bounds for insert_at', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: ['Item 1'],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await expect(
+        service.arrayInsertAt({
+          planId,
+          phaseId,
+          field: 'objectives',
+          index: 10,
+          value: 'New item',
+        })
+      ).rejects.toThrow('Index 10 is out of bounds');
+    });
+
+    it('should throw error when field is not an array field', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await expect(
+        service.arrayAppend({
+          planId,
+          phaseId,
+          field: 'title' as any,
+          value: 'Invalid',
+        })
+      ).rejects.toThrow('Field title is not a valid array field');
+    });
+  });
 });

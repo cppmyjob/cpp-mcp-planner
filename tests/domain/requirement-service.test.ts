@@ -833,4 +833,128 @@ describe('RequirementService', () => {
       });
     });
   });
+
+  describe('Sprint 5: Array Field Operations', () => {
+    it('should append item to acceptanceCriteria array', async () => {
+      const { requirementId } = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: ['Criteria 1', 'Criteria 2'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      await service.arrayAppend({
+        planId,
+        requirementId,
+        field: 'acceptanceCriteria',
+        value: 'Criteria 3',
+      });
+
+      const result = await service.getRequirement({ planId, requirementId, fields: ['*'] });
+      expect(result.requirement.acceptanceCriteria).toEqual(['Criteria 1', 'Criteria 2', 'Criteria 3']);
+    });
+
+    it('should prepend item to acceptanceCriteria array', async () => {
+      const { requirementId } = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: ['Criteria 2', 'Criteria 3'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      await service.arrayPrepend({
+        planId,
+        requirementId,
+        field: 'acceptanceCriteria',
+        value: 'Criteria 1',
+      });
+
+      const result = await service.getRequirement({ planId, requirementId, fields: ['*'] });
+      expect(result.requirement.acceptanceCriteria).toEqual(['Criteria 1', 'Criteria 2', 'Criteria 3']);
+    });
+
+    it('should insert item at specific index', async () => {
+      const { requirementId } = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: ['Criteria 1', 'Criteria 3'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      await service.arrayInsertAt({
+        planId,
+        requirementId,
+        field: 'acceptanceCriteria',
+        index: 1,
+        value: 'Criteria 2',
+      });
+
+      const result = await service.getRequirement({ planId, requirementId, fields: ['*'] });
+      expect(result.requirement.acceptanceCriteria).toEqual(['Criteria 1', 'Criteria 2', 'Criteria 3']);
+    });
+
+    it('should update item at specific index', async () => {
+      const { requirementId } = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: ['Criteria 1', 'Old Criteria', 'Criteria 3'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      await service.arrayUpdateAt({
+        planId,
+        requirementId,
+        field: 'acceptanceCriteria',
+        index: 1,
+        value: 'Criteria 2',
+      });
+
+      const result = await service.getRequirement({ planId, requirementId, fields: ['*'] });
+      expect(result.requirement.acceptanceCriteria).toEqual(['Criteria 1', 'Criteria 2', 'Criteria 3']);
+    });
+
+    it('should remove item at specific index', async () => {
+      const { requirementId } = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: ['Criteria 1', 'Extra Criteria', 'Criteria 2'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      await service.arrayRemoveAt({
+        planId,
+        requirementId,
+        field: 'acceptanceCriteria',
+        index: 1,
+      });
+
+      const result = await service.getRequirement({ planId, requirementId, fields: ['*'] });
+      expect(result.requirement.acceptanceCriteria).toEqual(['Criteria 1', 'Criteria 2']);
+    });
+  });
 });

@@ -149,6 +149,52 @@ export interface UnvoteRequirementResult {
   votes: number;
 }
 
+// Sprint 5: Array Field Operations interfaces
+export type RequirementArrayField = 'acceptanceCriteria';
+
+export interface ArrayAppendInput {
+  planId: string;
+  requirementId: string;
+  field: RequirementArrayField;
+  value: string;
+}
+
+export interface ArrayPrependInput {
+  planId: string;
+  requirementId: string;
+  field: RequirementArrayField;
+  value: string;
+}
+
+export interface ArrayInsertAtInput {
+  planId: string;
+  requirementId: string;
+  field: RequirementArrayField;
+  index: number;
+  value: string;
+}
+
+export interface ArrayUpdateAtInput {
+  planId: string;
+  requirementId: string;
+  field: RequirementArrayField;
+  index: number;
+  value: string;
+}
+
+export interface ArrayRemoveAtInput {
+  planId: string;
+  requirementId: string;
+  field: RequirementArrayField;
+  index: number;
+}
+
+export interface ArrayOperationResult {
+  success: true;
+  field: RequirementArrayField;
+  newLength: number;
+}
+
 export class RequirementService {
   constructor(
     private storage: FileStorage,
@@ -498,6 +544,144 @@ export class RequirementService {
       success: true,
       votes: requirement.votes,
     };
+  }
+
+  /**
+   * Sprint 5: Array Field Operations
+   * Validate that field is a valid array field for Requirement
+   */
+  private validateArrayField(field: string): asserts field is RequirementArrayField {
+    const validFields: RequirementArrayField[] = ['acceptanceCriteria'];
+    if (!validFields.includes(field as RequirementArrayField)) {
+      throw new Error(`Field ${field} is not a valid array field. Valid fields: ${validFields.join(', ')}`);
+    }
+  }
+
+  /**
+   * Execute an array operation with common load/save logic
+   * @param planId - Plan identifier
+   * @param requirementId - Requirement identifier
+   * @param field - Array field to modify
+   * @param operation - Function that transforms the current array to new array
+   * @returns Operation result with success status and new array length
+   */
+  private async executeArrayOperation(
+    planId: string,
+    requirementId: string,
+    field: RequirementArrayField,
+    operation: (currentArray: string[]) => string[]
+  ): Promise<ArrayOperationResult> {
+    const exists = await this.storage.planExists(planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    const requirements = await this.storage.loadEntities<Requirement>(planId, 'requirements');
+    const requirement = requirements.find((r) => r.id === requirementId);
+    if (!requirement) {
+      throw new Error('Requirement not found');
+    }
+
+    const currentArray = requirement[field] || [];
+    const newArray = operation(currentArray);
+
+    requirement[field] = newArray;
+    requirement.updatedAt = new Date().toISOString();
+    requirement.version += 1;
+
+    await this.storage.saveEntities(planId, 'requirements', requirements);
+
+    return {
+      success: true,
+      field,
+      newLength: newArray.length,
+    };
+  }
+
+  /**
+   * Append item to end of array field
+   */
+  async arrayAppend(input: ArrayAppendInput): Promise<ArrayOperationResult> {
+    this.validateArrayField(input.field);
+    return this.executeArrayOperation(
+      input.planId,
+      input.requirementId,
+      input.field,
+      (currentArray) => [...currentArray, input.value]
+    );
+  }
+
+  /**
+   * Prepend item to beginning of array field
+   */
+  async arrayPrepend(input: ArrayPrependInput): Promise<ArrayOperationResult> {
+    this.validateArrayField(input.field);
+    return this.executeArrayOperation(
+      input.planId,
+      input.requirementId,
+      input.field,
+      (currentArray) => [input.value, ...currentArray]
+    );
+  }
+
+  /**
+   * Insert item at specific index in array field
+   */
+  async arrayInsertAt(input: ArrayInsertAtInput): Promise<ArrayOperationResult> {
+    this.validateArrayField(input.field);
+    return this.executeArrayOperation(
+      input.planId,
+      input.requirementId,
+      input.field,
+      (currentArray) => {
+        if (input.index < 0 || input.index > currentArray.length) {
+          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+        }
+        const newArray = [...currentArray];
+        newArray.splice(input.index, 0, input.value);
+        return newArray;
+      }
+    );
+  }
+
+  /**
+   * Update item at specific index in array field
+   */
+  async arrayUpdateAt(input: ArrayUpdateAtInput): Promise<ArrayOperationResult> {
+    this.validateArrayField(input.field);
+    return this.executeArrayOperation(
+      input.planId,
+      input.requirementId,
+      input.field,
+      (currentArray) => {
+        if (input.index < 0 || input.index >= currentArray.length) {
+          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+        }
+        const newArray = [...currentArray];
+        newArray[input.index] = input.value;
+        return newArray;
+      }
+    );
+  }
+
+  /**
+   * Remove item at specific index in array field
+   */
+  async arrayRemoveAt(input: ArrayRemoveAtInput): Promise<ArrayOperationResult> {
+    this.validateArrayField(input.field);
+    return this.executeArrayOperation(
+      input.planId,
+      input.requirementId,
+      input.field,
+      (currentArray) => {
+        if (input.index < 0 || input.index >= currentArray.length) {
+          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+        }
+        const newArray = [...currentArray];
+        newArray.splice(input.index, 1);
+        return newArray;
+      }
+    );
   }
 }
 
