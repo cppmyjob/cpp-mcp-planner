@@ -4,6 +4,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer, createServices } from '../../src/server/index.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 /**
  * Comprehensive test of ALL MCP tools and ALL their actions.
@@ -46,7 +47,7 @@ describe('E2E: All MCP Tools Validation', () => {
   let linkId: string;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-temp', 'all-tools-' + Date.now());
+    storagePath = path.join(process.cwd(), '.test-temp', 'all-tools-' + Date.now() + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
 
     const services = await createServices(storagePath);

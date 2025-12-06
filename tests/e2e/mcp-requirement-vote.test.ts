@@ -4,6 +4,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer, createServices } from '../../src/server/index.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 // Helper to parse MCP tool result
 function parseResult<T>(result: unknown): T {
@@ -22,7 +23,7 @@ describe('E2E: Requirement Voting via MCP Tool', () => {
   let planId: string;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-vote-' + Date.now());
+    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-vote-' + Date.now() + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
 
     const services = await createServices(storagePath);

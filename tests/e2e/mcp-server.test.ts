@@ -4,6 +4,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer, createServices } from '../../src/server/index.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 /**
  * MCP Server Discovery and Error Handling tests.
@@ -20,7 +21,7 @@ describe('E2E: MCP Server Discovery & Errors', () => {
   let cleanup: () => Promise<void>;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-server-' + Date.now());
+    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-server-' + Date.now() + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
 
     const services = await createServices(storagePath);

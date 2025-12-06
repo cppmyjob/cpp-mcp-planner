@@ -4,6 +4,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer, createServices } from '../../src/server/index.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 // Helper to parse MCP tool result
 function parseResult<T>(result: unknown): T {
@@ -20,7 +21,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
   let storagePath: string;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-plan-persistence-' + Date.now());
+    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-plan-persistence-' + Date.now() + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
   });
 
