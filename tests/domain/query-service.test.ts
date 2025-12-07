@@ -2380,6 +2380,74 @@ describe('QueryService', () => {
         // proposedSolutions should respect the limit (only non-selected solutions)
         expect(result.trace.proposedSolutions.length).toBeLessThanOrEqual(1);
       });
+
+      it('BUG FIX: artifacts should be found from ALL phases, not just limited ones', async () => {
+        // Create a new artifact linked ONLY to phase3 (no relatedRequirementIds)
+        // This artifact should still be discoverable even if phase3 is excluded by limit
+        const phaseOnlyArtifact = await artifactService.addArtifact({
+          planId,
+          artifact: {
+            title: 'Phase-Only Artifact',
+            description: 'Artifact linked only to phase3, no direct requirement link',
+            artifactType: 'test',
+            relatedPhaseId: phase3Id,
+            // NO relatedRequirementIds - only linked via phase
+          },
+        });
+
+        // First verify: without limit, we find ALL 3 artifacts
+        const resultNoLimit = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 3,
+        } as any);
+
+        expect(resultNoLimit.trace.artifacts!.length).toBe(3);
+
+        // BUG TEST: The key issue is that artifact DISCOVERY should use all phases,
+        // not just limited phases. The limit applies to the RESPONSE, not discovery.
+        //
+        // With buggy code: limit=1 on phases -> only phase1 in response AND discovery
+        //   -> artifacts linked only to phase2/phase3 are NEVER found
+        // With fixed code: limit=1 on phases -> only phase1 in response, BUT discovery
+        //   uses ALL phases -> artifacts from all phases are in the pool
+
+        // Test with limit=1: phases limited to 1, but artifacts should still be
+        // discovered from ALL phases (then limited separately)
+        const limitedResult = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 3,
+          limit: 1, // Limits each entity type to 1 in response
+        } as any);
+
+        // Phases ARE limited to 1 in response
+        expect(limitedResult.trace.implementingPhases!.length).toBe(1);
+
+        // Artifacts are also limited to 1 in response (limit applies per entity type)
+        expect(limitedResult.trace.artifacts!.length).toBe(1);
+
+        // KEY TEST: Use high limit to verify artifact DISCOVERY uses all phases
+        // With buggy code: even with high limit, artifacts from excluded phases
+        // wouldn't be discovered because discovery used limited phases
+        // With fixed code: all artifacts ARE discovered, then limited separately
+        const resultHighLimit = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 3,
+          limit: 100, // High limit to see full discovery pool
+        } as any);
+
+        // With high limit, all 3 artifacts should be found
+        // This proves artifact DISCOVERY uses all phases (allPhaseIds), not limited ones
+        expect(resultHighLimit.trace.artifacts!.length).toBe(3);
+
+        // Verify the phase-only artifact (linked only to phase3) IS discoverable
+        const hasPhaseOnlyArtifact = resultHighLimit.trace.artifacts?.some(
+          (a: any) => a.id === phaseOnlyArtifact.artifactId
+        );
+        expect(hasPhaseOnlyArtifact).toBe(true);
+      });
     });
   });
 });

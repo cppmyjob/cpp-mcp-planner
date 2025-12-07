@@ -315,13 +315,14 @@ export class QueryService {
     // ========================================================================
 
     let implementingPhases: Phase[] = [];
+    let allPhaseIds: Set<string> = new Set(); // For artifact discovery (before limit)
 
     if (depth >= TRACE_DEPTH.PHASES && includePhases) {
       const addressesLinks = links.filter(
         (l) => l.targetId === input.requirementId && l.relationType === 'addresses'
       );
-      const phaseIds = new Set(addressesLinks.map((l) => l.sourceId));
-      const rawPhases = entities.phases.filter((p) => phaseIds.has(p.id));
+      allPhaseIds = new Set(addressesLinks.map((l) => l.sourceId));
+      const rawPhases = entities.phases.filter((p) => allPhaseIds.has(p.id));
 
       // Apply filters (limit, fields, excludeMetadata)
       implementingPhases = this.applyEntityFilters(rawPhases, {
@@ -338,17 +339,19 @@ export class QueryService {
     let artifacts: Artifact[] = [];
 
     if (depth >= TRACE_DEPTH.ARTIFACTS && includeArtifacts) {
-      // Create Set of phase IDs for O(1) lookup performance
-      const implementingPhaseIds = new Set(implementingPhases.map((p) => p.id));
+      // IMPORTANT: Use ALL phases (allPhaseIds) for artifact discovery, not limited implementingPhases
+      // This follows the principle "limit applies per entity type independently"
+      // Artifact discovery should consider all phases addressing the requirement,
+      // then artifacts are limited separately
 
-      // Find artifacts related to this requirement or its phases
+      // Find artifacts related to this requirement or ANY of its phases (before limit)
       const rawArtifacts = entities.artifacts.filter((a) => {
         // Artifact directly related to requirement
         if (a.relatedRequirementIds?.includes(input.requirementId)) {
           return true;
         }
-        // Artifact related to implementing phases (O(1) lookup via Set)
-        if (a.relatedPhaseId && implementingPhaseIds.has(a.relatedPhaseId)) {
+        // Artifact related to ANY phase addressing the requirement (O(1) lookup)
+        if (a.relatedPhaseId && allPhaseIds.has(a.relatedPhaseId)) {
           return true;
         }
         return false;

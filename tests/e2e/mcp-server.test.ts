@@ -81,11 +81,11 @@ describe('E2E: MCP Server Discovery & Errors', () => {
 
       const expectedActions: Record<string, string[]> = {
         plan: ['create', 'list', 'get', 'update', 'archive', 'set_active', 'get_active', 'get_summary'],
-        requirement: ['add', 'get', 'get_many', 'update', 'list', 'delete', 'vote', 'unvote'],
-        solution: ['propose', 'get', 'get_many', 'update', 'list', 'compare', 'select', 'delete'],
-        decision: ['record', 'get', 'get_many', 'update', 'list', 'supersede'],
-        phase: ['add', 'get', 'get_many', 'get_tree', 'update', 'update_status', 'move', 'delete', 'get_next_actions', 'complete_and_advance'],
-        artifact: ['add', 'get', 'update', 'list', 'delete'],
+        requirement: ['add', 'get', 'get_many', 'update', 'list', 'delete', 'vote', 'unvote', 'get_history', 'diff'],
+        solution: ['propose', 'get', 'get_many', 'update', 'list', 'compare', 'select', 'delete', 'get_history', 'diff'],
+        decision: ['record', 'get', 'get_many', 'update', 'list', 'supersede', 'get_history', 'diff'],
+        phase: ['add', 'get', 'get_many', 'get_tree', 'update', 'update_status', 'move', 'delete', 'get_next_actions', 'complete_and_advance', 'get_history', 'diff'],
+        artifact: ['add', 'get', 'update', 'list', 'delete', 'get_history', 'diff'],
         link: ['create', 'get', 'delete'],
         query: ['search', 'trace', 'validate', 'export', 'health'],
       };
