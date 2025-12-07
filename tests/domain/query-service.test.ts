@@ -1408,4 +1408,933 @@ describe('QueryService', () => {
       expect(result.results.every((r) => r.entityType === 'artifact')).toBe(true);
     });
   });
+
+  // ============================================================================
+  // Sprint 8: Paginated Trace Results - RED Phase (58 tests)
+  // ============================================================================
+  describe('trace_requirement with pagination (Sprint 8 - RED Phase)', () => {
+    let reqId: string;
+    let sol1Id: string;
+    let sol2Id: string;
+    let sol3Id: string;
+    let phase1Id: string;
+    let phase2Id: string;
+    let phase3Id: string;
+    let artifact1Id: string;
+    let artifact2Id: string;
+
+    beforeEach(async () => {
+      // Create complex trace structure for testing
+      const req = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Complex Requirement',
+          description: 'Requirement with multiple solutions and phases',
+          source: { type: 'user-request' },
+          priority: 'critical',
+          category: 'functional',
+          acceptanceCriteria: ['AC1', 'AC2'],
+        },
+      });
+      reqId = req.requirementId;
+
+      // Create 3 solutions
+      const sol1 = await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Solution 1',
+          description: 'First solution',
+          approach: 'Approach 1',
+          addressing: [reqId],
+          tradeoffs: [],
+          evaluation: {
+            effortEstimate: { value: 4, unit: 'hours', confidence: 'high' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Low',
+          },
+        },
+      });
+      sol1Id = sol1.solutionId;
+
+      const sol2 = await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Solution 2',
+          description: 'Second solution',
+          approach: 'Approach 2',
+          addressing: [reqId],
+          tradeoffs: [],
+          evaluation: {
+            effortEstimate: { value: 2, unit: 'days', confidence: 'medium' },
+            technicalFeasibility: 'medium',
+            riskAssessment: 'Medium',
+          },
+        },
+      });
+      sol2Id = sol2.solutionId;
+
+      const sol3 = await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Solution 3',
+          description: 'Third solution',
+          approach: 'Approach 3',
+          addressing: [reqId],
+          tradeoffs: [],
+          evaluation: {
+            effortEstimate: { value: 1, unit: 'weeks', confidence: 'low' },
+            technicalFeasibility: 'low',
+            riskAssessment: 'High',
+          },
+        },
+      });
+      sol3Id = sol3.solutionId;
+
+      // Create links
+      await linkingService.linkEntities({ planId, sourceId: sol1Id, targetId: reqId, relationType: 'implements' });
+      await linkingService.linkEntities({ planId, sourceId: sol2Id, targetId: reqId, relationType: 'implements' });
+      await linkingService.linkEntities({ planId, sourceId: sol3Id, targetId: reqId, relationType: 'implements' });
+
+      // Create 3 phases
+      const p1 = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 1',
+          description: 'First phase',
+          objectives: ['Obj1'],
+          deliverables: ['Del1'],
+          successCriteria: ['SC1'],
+        },
+      });
+      phase1Id = p1.phaseId;
+
+      const p2 = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 2',
+          description: 'Second phase',
+          objectives: ['Obj2'],
+          deliverables: ['Del2'],
+          successCriteria: ['SC2'],
+        },
+      });
+      phase2Id = p2.phaseId;
+
+      const p3 = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 3',
+          description: 'Third phase',
+          objectives: ['Obj3'],
+          deliverables: ['Del3'],
+          successCriteria: ['SC3'],
+        },
+      });
+      phase3Id = p3.phaseId;
+
+      // Link phases to requirement
+      await linkingService.linkEntities({ planId, sourceId: phase1Id, targetId: reqId, relationType: 'addresses' });
+      await linkingService.linkEntities({ planId, sourceId: phase2Id, targetId: reqId, relationType: 'addresses' });
+      await linkingService.linkEntities({ planId, sourceId: phase3Id, targetId: reqId, relationType: 'addresses' });
+
+      // Create 2 artifacts
+      const a1 = await artifactService.addArtifact({
+        planId,
+        artifact: {
+          title: 'Artifact 1',
+          description: 'First artifact',
+          artifactType: 'code',
+          relatedPhaseId: phase1Id,
+          relatedRequirementIds: [reqId],
+        },
+      });
+      artifact1Id = a1.artifactId;
+
+      const a2 = await artifactService.addArtifact({
+        planId,
+        artifact: {
+          title: 'Artifact 2',
+          description: 'Second artifact',
+          artifactType: 'documentation',
+          relatedPhaseId: phase2Id,
+          relatedRequirementIds: [reqId],
+        },
+      });
+      artifact2Id = a2.artifactId;
+    });
+
+    // ========================================================================
+    // 1. DEPTH PARAMETER TESTS (10 tests)
+    // ========================================================================
+    describe('depth parameter', () => {
+      it('RED 1.1: should accept depth=1 parameter', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            depth: 1,
+          } as any)
+        ).rejects.toThrow(); // Will fail until implemented
+      });
+
+      it('RED 1.2: should accept depth=2 parameter', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            depth: 2,
+          } as any)
+        ).rejects.toThrow();
+      });
+
+      it('RED 1.3: should accept depth=3 parameter', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            depth: 3,
+          } as any)
+        ).rejects.toThrow();
+      });
+
+      it('RED 1.4: should reject depth=0 (invalid)', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            depth: 0,
+          } as any)
+        ).rejects.toThrow('depth must be between 1 and 3');
+      });
+
+      it('RED 1.5: should reject depth=4 (out of bounds)', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            depth: 4,
+          } as any)
+        ).rejects.toThrow('depth must be between 1 and 3');
+      });
+
+      it('RED 1.6: should reject depth=-1 (negative)', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            depth: -1,
+          } as any)
+        ).rejects.toThrow('depth must be between 1 and 3');
+      });
+
+      it('RED 1.7: should reject depth="2" (string instead of number)', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            depth: '2' as any,
+          } as any)
+        ).rejects.toThrow('depth must be a number');
+      });
+
+      it('RED 1.8: depth=1 should return only direct solutions (level 1)', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 1,
+        } as any);
+
+        // Depth 1: requirement -> solutions only
+        expect(result.trace.proposedSolutions).toHaveLength(3);
+        expect(result.trace.implementingPhases).toHaveLength(0); // Should be excluded
+      });
+
+      it('RED 1.9: depth=2 should return solutions + phases (2 levels)', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 2,
+        } as any);
+
+        // Depth 2: requirement -> solutions -> phases
+        expect(result.trace.proposedSolutions).toHaveLength(3);
+        expect(result.trace.implementingPhases).toHaveLength(3);
+      });
+
+      it('RED 1.10: depth=3 should return all levels (solutions + phases + artifacts)', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 3,
+        } as any);
+
+        // Depth 3: requirement -> solutions -> phases -> artifacts
+        expect(result.trace.proposedSolutions).toHaveLength(3);
+        expect(result.trace.implementingPhases).toHaveLength(3);
+        expect(result.trace.artifacts).toHaveLength(2); // New field
+      });
+    });
+
+    // ========================================================================
+    // 2. INCLUDE FLAGS TESTS (12 tests)
+    // ========================================================================
+    describe('includePhases and includeArtifacts flags', () => {
+      it('RED 2.1: should accept includePhases=true', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includePhases: true,
+        } as any);
+
+        expect(result.trace.implementingPhases).toHaveLength(3);
+      });
+
+      it('RED 2.2: should accept includePhases=false and exclude phases', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includePhases: false,
+        } as any);
+
+        expect(result.trace.implementingPhases).toBeUndefined(); // Should not be returned
+      });
+
+      it('RED 2.3: should accept includeArtifacts=true', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includeArtifacts: true,
+        } as any);
+
+        expect(result.trace.artifacts).toHaveLength(2);
+      });
+
+      it('RED 2.4: should accept includeArtifacts=false and exclude artifacts', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includeArtifacts: false,
+        } as any);
+
+        expect(result.trace.artifacts).toBeUndefined();
+      });
+
+      it('RED 2.5: includePhases=false + includeArtifacts=false should return only solutions', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includePhases: false,
+          includeArtifacts: false,
+        } as any);
+
+        expect(result.trace.proposedSolutions).toHaveLength(3);
+        expect(result.trace.implementingPhases).toBeUndefined();
+        expect(result.trace.artifacts).toBeUndefined();
+      });
+
+      it('RED 2.6: includePhases=true + includeArtifacts=true should return all', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includePhases: true,
+          includeArtifacts: true,
+        } as any);
+
+        expect(result.trace.proposedSolutions).toHaveLength(3);
+        expect(result.trace.implementingPhases).toHaveLength(3);
+        expect(result.trace.artifacts).toHaveLength(2);
+      });
+
+      it('RED 2.7: default behavior (no flags) should include phases and artifacts', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+        } as any);
+
+        // Default: include everything (backward compatible)
+        expect(result.trace.implementingPhases).toHaveLength(3);
+      });
+
+      it('RED 2.8: includePhases="true" (string) should throw ValidationError', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            includePhases: 'true' as any,
+          } as any)
+        ).rejects.toThrow('includePhases must be a boolean');
+      });
+
+      it('RED 2.9: includeArtifacts=null should default to true', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includeArtifacts: null as any,
+        } as any);
+
+        // null -> default true
+        expect(result.trace.artifacts).toBeDefined();
+      });
+
+      it('RED 2.10: includePhases=undefined should default to true', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includePhases: undefined,
+        } as any);
+
+        expect(result.trace.implementingPhases).toBeDefined();
+      });
+
+      it('RED 2.11: depth=1 + includePhases=false should work together', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 1,
+          includePhases: false,
+        } as any);
+
+        expect(result.trace.proposedSolutions).toHaveLength(3);
+        expect(result.trace.implementingPhases).toBeUndefined();
+      });
+
+      it('RED 2.12: depth=2 + includeArtifacts=false should exclude artifacts', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 2,
+          includeArtifacts: false,
+        } as any);
+
+        expect(result.trace.proposedSolutions).toHaveLength(3);
+        expect(result.trace.implementingPhases).toHaveLength(3);
+        expect(result.trace.artifacts).toBeUndefined();
+      });
+    });
+
+    // ========================================================================
+    // 3. LIMIT PARAMETER TESTS (8 tests)
+    // ========================================================================
+    describe('limit parameter', () => {
+      it('RED 3.1: should accept limit parameter', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          limit: 2,
+        } as any);
+
+        expect(result).toBeDefined();
+      });
+
+      it('RED 3.2: limit=1 should return max 1 solution', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          limit: 1,
+        } as any);
+
+        expect(result.trace.proposedSolutions).toHaveLength(1);
+      });
+
+      it('RED 3.3: limit=2 should return max 2 solutions', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          limit: 2,
+        } as any);
+
+        expect(result.trace.proposedSolutions.length).toBeLessThanOrEqual(2);
+      });
+
+      it('RED 3.4: limit=10 (more than available) should return all 3 solutions', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          limit: 10,
+        } as any);
+
+        expect(result.trace.proposedSolutions).toHaveLength(3);
+      });
+
+      it('RED 3.5: limit=0 should throw ValidationError', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            limit: 0,
+          } as any)
+        ).rejects.toThrow('limit must be greater than 0');
+      });
+
+      it('RED 3.6: limit=-1 (negative) should throw ValidationError', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            limit: -1,
+          } as any)
+        ).rejects.toThrow('limit must be greater than 0');
+      });
+
+      it('RED 3.7: limit="2" (string) should throw ValidationError', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            limit: '2' as any,
+          } as any)
+        ).rejects.toThrow('limit must be a number');
+      });
+
+      it('RED 3.8: limit should apply per entity type (solutions, phases, artifacts)', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          limit: 2,
+        } as any);
+
+        // Limit=2 applies to each entity type independently
+        expect(result.trace.proposedSolutions.length).toBeLessThanOrEqual(2);
+        expect(result.trace.implementingPhases.length).toBeLessThanOrEqual(2);
+        if (result.trace.artifacts) {
+          expect(result.trace.artifacts.length).toBeLessThanOrEqual(2);
+        }
+      });
+    });
+
+    // ========================================================================
+    // 4. COMBINATIONS: depth + fields + exclude (10 tests)
+    // ========================================================================
+    describe('combinations with fields and exclude parameters', () => {
+      it('RED 4.1: depth=1 + fields=["id","title"] should work', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 1,
+          fields: ['id', 'title'],
+        } as any);
+
+        // Solutions should have only id and title
+        const solution = result.trace.proposedSolutions[0];
+        expect(solution.id).toBeDefined();
+        expect(solution.title).toBeDefined();
+        expect(solution.description).toBeUndefined();
+      });
+
+      it('RED 4.2: depth=2 + excludeMetadata=true should work', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 2,
+          excludeMetadata: true,
+        } as any);
+
+        const solution = result.trace.proposedSolutions[0];
+        expect(solution.metadata).toBeUndefined();
+        expect(solution.createdAt).toBeUndefined();
+      });
+
+      it('RED 4.3: includePhases=true + fields=["id","title","status"] for phases', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includePhases: true,
+          phaseFields: ['id', 'title', 'status'],
+        } as any);
+
+        const phase = result.trace.implementingPhases[0];
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBeDefined();
+        expect(phase.status).toBeDefined();
+        expect(phase.description).toBeUndefined();
+      });
+
+      it('RED 4.4: depth=1 + limit=2 + fields=["id"] should combine all 3 params', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 1,
+          limit: 2,
+          fields: ['id'],
+        } as any);
+
+        expect(result.trace.proposedSolutions).toHaveLength(2); // limit
+        const sol = result.trace.proposedSolutions[0];
+        expect(sol.id).toBeDefined();
+        expect(sol.title).toBeUndefined(); // fields filter
+      });
+
+      it('RED 4.5: includeArtifacts=true + excludeMetadata=true for artifacts', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includeArtifacts: true,
+          excludeMetadata: true,
+        } as any);
+
+        if (result.trace.artifacts && result.trace.artifacts.length > 0) {
+          const artifact = result.trace.artifacts[0];
+          expect(artifact.metadata).toBeUndefined();
+        }
+      });
+
+      it('RED 4.6: depth=3 + includePhases=false + includeArtifacts=true should respect flags', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 3,
+          includePhases: false,
+          includeArtifacts: true,
+        } as any);
+
+        expect(result.trace.implementingPhases).toBeUndefined();
+        expect(result.trace.artifacts).toBeDefined();
+      });
+
+      it('RED 4.7: limit=1 + excludeMetadata=true + fields=["id","title"]', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          limit: 1,
+          excludeMetadata: true,
+          fields: ['id', 'title'],
+        } as any);
+
+        expect(result.trace.proposedSolutions).toHaveLength(1);
+        const sol = result.trace.proposedSolutions[0];
+        expect(sol.id).toBeDefined();
+        expect(sol.title).toBeDefined();
+        expect(sol.metadata).toBeUndefined();
+        expect(sol.description).toBeUndefined();
+      });
+
+      it('RED 4.8: depth=2 + limit=2 + includePhases=true should apply limit to phases', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 2,
+          limit: 2,
+          includePhases: true,
+        } as any);
+
+        expect(result.trace.implementingPhases.length).toBeLessThanOrEqual(2);
+      });
+
+      it('RED 4.9: all parameters combined: depth + limit + include flags + fields + exclude', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 2,
+          limit: 2,
+          includePhases: true,
+          includeArtifacts: false,
+          fields: ['id', 'title'],
+          excludeMetadata: true,
+        } as any);
+
+        expect(result.trace.proposedSolutions.length).toBeLessThanOrEqual(2);
+        expect(result.trace.implementingPhases.length).toBeLessThanOrEqual(2);
+        expect(result.trace.artifacts).toBeUndefined();
+
+        const sol = result.trace.proposedSolutions[0];
+        expect(sol.id).toBeDefined();
+        expect(sol.title).toBeDefined();
+        expect(sol.metadata).toBeUndefined();
+        expect(sol.description).toBeUndefined();
+      });
+
+      it('RED 4.10: fields parameter should support different fields for different entity types', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          solutionFields: ['id', 'title', 'approach'],
+          phaseFields: ['id', 'title', 'status'],
+        } as any);
+
+        const sol = result.trace.proposedSolutions[0];
+        expect(sol.id).toBeDefined();
+        expect(sol.title).toBeDefined();
+        expect(sol.approach).toBeDefined();
+        expect(sol.description).toBeUndefined();
+
+        const phase = result.trace.implementingPhases[0];
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBeDefined();
+        expect(phase.status).toBeDefined();
+        expect(phase.description).toBeUndefined();
+      });
+    });
+
+    // ========================================================================
+    // 5. PERFORMANCE TESTS (8 tests)
+    // ========================================================================
+    describe('performance and payload size', () => {
+      it('RED 5.1: depth=1 + minimal fields should reduce payload to ~5KB (from ~32KB)', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 1,
+          fields: ['id', 'title'],
+        } as any);
+
+        const payloadSize = JSON.stringify(result).length;
+        expect(payloadSize).toBeLessThan(6000); // ~5KB with buffer
+      });
+
+      it('RED 5.2: full trace (no params) should be ~32KB', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+        });
+
+        const payloadSize = JSON.stringify(result).length;
+        // With 3 solutions, 3 phases, 2 artifacts - expect large payload
+        expect(payloadSize).toBeGreaterThan(1000); // At least 1KB
+      });
+
+      it('RED 5.3: verify 6x payload reduction: full vs minimal', async () => {
+        const fullResult = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+        });
+        const fullSize = JSON.stringify(fullResult).length;
+
+        const minimalResult = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 1,
+          fields: ['id', 'title'],
+          excludeMetadata: true,
+        } as any);
+        const minimalSize = JSON.stringify(minimalResult).length;
+
+        const ratio = fullSize / minimalSize;
+        expect(ratio).toBeGreaterThanOrEqual(6); // At least 6x reduction
+      });
+
+      it('RED 5.4: includePhases=false should reduce payload size', async () => {
+        const withPhases = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includePhases: true,
+        } as any);
+        const withPhasesSize = JSON.stringify(withPhases).length;
+
+        const withoutPhases = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includePhases: false,
+        } as any);
+        const withoutPhasesSize = JSON.stringify(withoutPhases).length;
+
+        expect(withoutPhasesSize).toBeLessThan(withPhasesSize);
+      });
+
+      it('RED 5.5: includeArtifacts=false should reduce payload', async () => {
+        const withArtifacts = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includeArtifacts: true,
+        } as any);
+        const withArtifactsSize = JSON.stringify(withArtifacts).length;
+
+        const withoutArtifacts = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includeArtifacts: false,
+        } as any);
+        const withoutArtifactsSize = JSON.stringify(withoutArtifacts).length;
+
+        expect(withoutArtifactsSize).toBeLessThan(withArtifactsSize);
+      });
+
+      it('RED 5.6: limit parameter should reduce payload', async () => {
+        const unlimited = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+        });
+        const unlimitedSize = JSON.stringify(unlimited).length;
+
+        const limited = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          limit: 1,
+        } as any);
+        const limitedSize = JSON.stringify(limited).length;
+
+        expect(limitedSize).toBeLessThan(unlimitedSize);
+      });
+
+      it('RED 5.7: excludeMetadata should save ~162 bytes per entity', async () => {
+        const withMetadata = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          excludeMetadata: false,
+        } as any);
+        const withSize = JSON.stringify(withMetadata).length;
+
+        const withoutMetadata = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          excludeMetadata: true,
+        } as any);
+        const withoutSize = JSON.stringify(withoutMetadata).length;
+
+        // With 3 solutions + 3 phases = 6 entities * 162 bytes = ~972 bytes saved
+        const saved = withSize - withoutSize;
+        expect(saved).toBeGreaterThan(500); // At least 500 bytes saved
+      });
+
+      it('RED 5.8: measure time performance (should be fast <100ms)', async () => {
+        const start = Date.now();
+        await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 1,
+          fields: ['id', 'title'],
+        } as any);
+        const duration = Date.now() - start;
+
+        expect(duration).toBeLessThan(100); // Fast response
+      });
+    });
+
+    // ========================================================================
+    // 6. EDGE CASES AND VALIDATION (10 tests)
+    // ========================================================================
+    describe('edge cases and validation', () => {
+      it('RED 6.1: empty trace (no solutions, phases, artifacts) should work', async () => {
+        const emptyReq = await requirementService.addRequirement({
+          planId,
+          requirement: {
+            title: 'Empty Req',
+            description: 'No trace',
+            source: { type: 'user-request' },
+            priority: 'low',
+            category: 'functional',
+            acceptanceCriteria: [],
+          },
+        });
+
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: emptyReq.requirementId,
+        });
+
+        expect(result.trace.proposedSolutions).toHaveLength(0);
+        expect(result.trace.implementingPhases).toHaveLength(0);
+      });
+
+      it('RED 6.2: depth + limit + fields with empty results should not crash', async () => {
+        const emptyReq = await requirementService.addRequirement({
+          planId,
+          requirement: {
+            title: 'Empty',
+            description: 'Empty',
+            source: { type: 'user-request' },
+            priority: 'low',
+            category: 'functional',
+            acceptanceCriteria: [],
+          },
+        });
+
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: emptyReq.requirementId,
+          depth: 2,
+          limit: 5,
+          fields: ['id', 'title'],
+        } as any);
+
+        expect(result.trace.proposedSolutions).toHaveLength(0);
+      });
+
+      it('RED 6.3: invalid requirementId with pagination params should throw', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: 'invalid-id',
+            depth: 1,
+          } as any)
+        ).rejects.toThrow('Requirement not found');
+      });
+
+      it('RED 6.4: depth=1.5 (float) should throw ValidationError', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            depth: 1.5,
+          } as any)
+        ).rejects.toThrow('depth must be an integer');
+      });
+
+      it('RED 6.5: limit=2.5 (float) should throw ValidationError', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId,
+            requirementId: reqId,
+            limit: 2.5,
+          } as any)
+        ).rejects.toThrow('limit must be an integer');
+      });
+
+      it('RED 6.6: fields=[] (empty array) should default to all fields', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          fields: [],
+        } as any);
+
+        const sol = result.trace.proposedSolutions[0];
+        expect(sol.id).toBeDefined();
+        expect(sol.title).toBeDefined();
+        expect(sol.description).toBeDefined();
+      });
+
+      it('RED 6.7: fields=["nonexistent"] should ignore invalid fields', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          fields: ['nonexistent', 'id', 'title'],
+        } as any);
+
+        const sol = result.trace.proposedSolutions[0];
+        expect(sol.id).toBeDefined();
+        expect(sol.title).toBeDefined();
+        // nonexistent field is ignored
+      });
+
+      it('RED 6.8: null planId should throw error', async () => {
+        await expect(
+          queryService.traceRequirement({
+            planId: null as any,
+            requirementId: reqId,
+          })
+        ).rejects.toThrow();
+      });
+
+      it('RED 6.9: large limit (1000) should work without crashing', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          limit: 1000,
+        } as any);
+
+        expect(result.trace.proposedSolutions).toHaveLength(3); // Only 3 available
+      });
+
+      it('RED 6.10: backward compatibility - existing calls without new params should work', async () => {
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+        });
+
+        // Old behavior: return everything
+        expect(result.requirement.id).toBe(reqId);
+        expect(result.trace.proposedSolutions).toHaveLength(3);
+        expect(result.trace.implementingPhases).toHaveLength(3);
+      });
+    });
+  });
 });

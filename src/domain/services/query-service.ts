@@ -30,6 +30,14 @@ export interface SearchEntitiesInput {
 export interface TraceRequirementInput {
   planId: string;
   requirementId: string;
+  depth?: number;
+  includePhases?: boolean;
+  includeArtifacts?: boolean;
+  limit?: number;
+  fields?: string[];
+  solutionFields?: string[];
+  phaseFields?: string[];
+  excludeMetadata?: boolean;
 }
 
 export interface ValidatePlanInput {
@@ -68,6 +76,7 @@ export interface TraceRequirementResult {
     alternativeSolutions: Solution[];
     decisions: Decision[];
     implementingPhases: Phase[];
+    artifacts?: Artifact[];
     completionStatus: {
       isAddressed: boolean;
       isImplemented: boolean;
@@ -237,6 +246,7 @@ export class QueryService {
         alternativeSolutions,
         decisions,
         implementingPhases,
+        artifacts: [], // TODO: Sprint 8 - implement artifact tracing
         completionStatus: {
           isAddressed,
           isImplemented,
