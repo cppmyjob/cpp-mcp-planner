@@ -216,8 +216,8 @@ export class QueryService {
       if (!Number.isInteger(input.depth)) {
         throw new Error('depth must be an integer');
       }
-      if (input.depth < 1 || input.depth > 3) {
-        throw new Error('depth must be between 1 and 3');
+      if (input.depth < TRACE_DEPTH.MIN || input.depth > TRACE_DEPTH.MAX) {
+        throw new Error(`depth must be between ${TRACE_DEPTH.MIN} and ${TRACE_DEPTH.MAX}`);
       }
     }
 
@@ -853,41 +853,8 @@ export class QueryService {
   }
 
   // ========================================================================
-  // Sprint 8: Helper Methods for Validation, Fields Filtering and Metadata Removal
+  // Sprint 8: Helper Methods for Fields Filtering and Metadata Removal
   // ========================================================================
-
-  /**
-   * Validate an integer parameter with range checking
-   * @param value - The value to validate
-   * @param name - Parameter name for error messages
-   * @param min - Minimum allowed value (optional)
-   * @param max - Maximum allowed value (optional)
-   * @throws Error if validation fails
-   */
-  private validateIntegerParam(
-    value: unknown,
-    name: string,
-    min?: number,
-    max?: number
-  ): void {
-    if (value === undefined) return;
-
-    if (typeof value !== 'number') {
-      throw new Error(`${name} must be a number`);
-    }
-    if (!Number.isInteger(value)) {
-      throw new Error(`${name} must be an integer`);
-    }
-    if (min !== undefined && value < min) {
-      throw new Error(`${name} must be at least ${min}`);
-    }
-    if (max !== undefined && value > max) {
-      throw new Error(`${name} must be at most ${max}`);
-    }
-    if (min !== undefined && max !== undefined && (value < min || value > max)) {
-      throw new Error(`${name} must be between ${min} and ${max}`);
-    }
-  }
 
   /**
    * Apply limit, fields filtering, and excludeMetadata to an array of entities
