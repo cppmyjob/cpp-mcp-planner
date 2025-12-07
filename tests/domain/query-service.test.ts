@@ -1825,6 +1825,57 @@ describe('QueryService', () => {
         expect(result.trace.implementingPhases).toHaveLength(3);
         expect(result.trace.artifacts).toBeUndefined();
       });
+
+      /**
+       * BUG FIX TEST: Artifact discovery broken when phases excluded from trace output
+       *
+       * The allPhaseIds set used for artifact discovery is only populated when both
+       * depth >= PHASES AND includePhases is true. However, artifacts should be
+       * discoverable through phases even when includePhases=false.
+       *
+       * When depth=3, includePhases=false, includeArtifacts=true, the allPhaseIds
+       * remains empty, preventing artifacts linked only to phases from being found.
+       * The phase IDs should be computed independently of whether phases are included
+       * in the response, since they're needed for artifact discovery.
+       */
+      it('RED 2.13 (BUGFIX): includePhases=false + includeArtifacts=true should still find phase-linked artifacts', async () => {
+        // Create an artifact linked ONLY to a phase (no relatedRequirementIds)
+        const phaseOnlyArtifact = await artifactService.addArtifact({
+          planId,
+          artifact: {
+            title: 'Phase-Only Artifact',
+            description: 'Artifact linked only to phase, not directly to requirement',
+            artifactType: 'code',
+            relatedPhaseId: phase3Id,
+            // NOTE: No relatedRequirementIds - can ONLY be found via phase relationship
+          },
+        });
+
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 3,
+          includePhases: false,
+          includeArtifacts: true,
+        } as any);
+
+        // Phases should NOT be in the output (includePhases=false)
+        expect(result.trace.implementingPhases).toBeUndefined();
+
+        // But artifacts should include the phase-linked artifact
+        // because artifact discovery should work independently of includePhases flag
+        expect(result.trace.artifacts).toBeDefined();
+
+        // Should find: 2 artifacts with relatedRequirementIds + 1 phase-only artifact = 3 total
+        expect(result.trace.artifacts!.length).toBe(3);
+
+        // Verify the phase-only artifact is included
+        const foundPhaseOnlyArtifact = result.trace.artifacts!.find(
+          (a: any) => a.id === phaseOnlyArtifact.artifactId
+        );
+        expect(foundPhaseOnlyArtifact).toBeDefined();
+        expect(foundPhaseOnlyArtifact!.title).toBe('Phase-Only Artifact');
+      });
     });
 
     // ========================================================================

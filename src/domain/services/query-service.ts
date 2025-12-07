@@ -317,19 +317,26 @@ export class QueryService {
     let implementingPhases: Phase[] = [];
     let allPhaseIds: Set<string> = new Set(); // For artifact discovery (before limit)
 
-    if (depth >= TRACE_DEPTH.PHASES && includePhases) {
+    // BUGFIX: Compute allPhaseIds if depth >= PHASES, regardless of includePhases flag
+    // This is needed for artifact discovery (Level 3), which depends on phase relationships
+    // even when phases are excluded from the output
+    if (depth >= TRACE_DEPTH.PHASES) {
       const addressesLinks = links.filter(
         (l) => l.targetId === input.requirementId && l.relationType === 'addresses'
       );
       allPhaseIds = new Set(addressesLinks.map((l) => l.sourceId));
-      const rawPhases = entities.phases.filter((p) => allPhaseIds.has(p.id));
 
-      // Apply filters (limit, fields, excludeMetadata)
-      implementingPhases = this.applyEntityFilters(rawPhases, {
-        limit,
-        fields: input.phaseFields || input.fields,
-        excludeMetadata,
-      });
+      // Only populate implementingPhases if they should be included in the result
+      if (includePhases) {
+        const rawPhases = entities.phases.filter((p) => allPhaseIds.has(p.id));
+
+        // Apply filters (limit, fields, excludeMetadata)
+        implementingPhases = this.applyEntityFilters(rawPhases, {
+          limit,
+          fields: input.phaseFields || input.fields,
+          excludeMetadata,
+        });
+      }
     }
 
     // ========================================================================
