@@ -2,8 +2,8 @@ import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
-import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, CodeExample, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
-import { validateEffortEstimate, validateTags, validateCodeExamples, validatePriority, validateCodeRefs } from './validators.js';
+import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
+import { validateEffortEstimate, validateTags, validatePriority } from './validators.js';
 import { filterEntity, filterPhase } from '../utils/field-filter.js';
 import { bulkUpdateEntities } from '../utils/bulk-operations.js';
 
@@ -53,8 +53,6 @@ export interface AddPhaseInput {
     };
     tags?: Tag[];
     implementationNotes?: string;
-    codeExamples?: CodeExample[];
-    codeRefs?: string[];
     priority?: PhasePriority;
   };
 }
@@ -79,8 +77,6 @@ export interface UpdatePhaseInput {
     milestones: Milestone[];
     tags: Tag[];
     implementationNotes: string;
-    codeExamples: CodeExample[];
-    codeRefs: string[];
     priority: PhasePriority;
   }>;
 }
@@ -98,7 +94,6 @@ export interface GetPhaseInput {
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
   excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
   excludeComputed?: boolean; // Exclude computed fields (depth, path, childCount)
-  includeCodeExamples?: boolean; // Include heavy codeExamples field (default: false for Lazy-Load)
 }
 
 export interface GetPhaseResult {
@@ -111,7 +106,6 @@ export interface GetPhasesInput {
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
   excludeMetadata?: boolean; // Exclude metadata fields
   excludeComputed?: boolean; // Exclude computed fields
-  includeCodeExamples?: boolean; // Include heavy codeExamples field (default: false)
 }
 
 export interface GetPhasesResult {
@@ -125,7 +119,6 @@ export interface GetPhaseTreeInput {
   includeCompleted?: boolean;
   fields?: string[];  // Summary by default; ['*'] for all, or specific fields
   maxDepth?: number;  // Limit tree depth (0 = root only)
-  includeCodeExamples?: boolean; // Include heavy codeExamples in all tree nodes (default: false)
   excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
   excludeComputed?: boolean; // Exclude computed fields (depth, path, childCount)
 }
@@ -350,8 +343,7 @@ export class PhaseService {
       phase,
       input.fields,
       input.excludeMetadata,
-      input.excludeComputed,
-      input.includeCodeExamples ?? false // default: false (Lazy-Load)
+      input.excludeComputed
     ) as Phase;
 
     return { phase: filtered };
@@ -383,8 +375,7 @@ export class PhaseService {
           phase,
           input.fields,
           input.excludeMetadata,
-          input.excludeComputed,
-          input.includeCodeExamples ?? false
+          input.excludeComputed
         ) as Phase;
         foundPhases.push(filtered);
       } else {
@@ -401,14 +392,10 @@ export class PhaseService {
     validateEffortEstimate(effort, 'estimatedEffort');
     // Validate tags format
     validateTags(input.phase.tags || []);
-    // Validate codeExamples format
-    validateCodeExamples(input.phase.codeExamples || []);
     // Validate priority if provided
     if (input.phase.priority !== undefined) {
       validatePriority(input.phase.priority);
     }
-    // Validate codeRefs format
-    validateCodeRefs(input.phase.codeRefs || []);
 
     const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
     const phaseId = uuidv4();
@@ -457,8 +444,6 @@ export class PhaseService {
       status: 'planned',
       progress: 0,
       implementationNotes: input.phase.implementationNotes,
-      codeExamples: input.phase.codeExamples,
-      codeRefs: input.phase.codeRefs,
       priority: input.phase.priority ?? 'medium',
     };
 
@@ -513,14 +498,6 @@ export class PhaseService {
     }
     if (input.updates.implementationNotes !== undefined) {
       phase.implementationNotes = input.updates.implementationNotes;
-    }
-    if (input.updates.codeExamples !== undefined) {
-      validateCodeExamples(input.updates.codeExamples);
-      phase.codeExamples = input.updates.codeExamples;
-    }
-    if (input.updates.codeRefs !== undefined) {
-      validateCodeRefs(input.updates.codeRefs);
-      phase.codeRefs = input.updates.codeRefs;
     }
     if (input.updates.priority !== undefined) {
       validatePriority(input.updates.priority);
@@ -631,8 +608,7 @@ export class PhaseService {
         phaseWithChildCount,
         input.fields,
         input.excludeMetadata,
-        input.excludeComputed,
-        input.includeCodeExamples ?? false
+        input.excludeComputed
       ) as Phase | PhaseSummary;
 
       return filtered;

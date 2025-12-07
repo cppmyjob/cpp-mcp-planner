@@ -190,47 +190,19 @@ export function filterArtifact<T>(
 }
 
 /**
- * Special handling for phase codeExamples field with Lazy-Load support.
- * codeExamples are heavy (2-5KB) and excluded by default (includeCodeExamples=false).
+ * Filter phase entity with standard field filtering.
  *
  * @param phase - The phase to filter
  * @param fields - Array of field names
  * @param excludeMetadata - If true, exclude metadata fields
  * @param excludeComputed - If true, exclude computed fields (depth, path, childCount)
- * @param includeCodeExamples - If true, include codeExamples (default: false for Lazy-Load)
- * @returns Filtered phase with codeExamples handling
+ * @returns Filtered phase
  */
 export function filterPhase<T>(
   phase: T,
   fields: string[] | undefined,
   excludeMetadata: boolean = false,
-  excludeComputed: boolean = false,
-  includeCodeExamples: boolean = false
+  excludeComputed: boolean = false
 ): T | Partial<T> {
-  // FIX #2: includeCodeExamples has priority (Variant B - explicit control)
-  // includeCodeExamples explicitly controls codeExamples inclusion for performance
-  // fields=['*'] loads all fields, BUT codeExamples still requires explicit includeCodeExamples=true
-
-  // Apply standard filtering first (handles summary+metadata correctly)
-  const filtered = filterEntity(phase, fields, 'phase', excludeMetadata, excludeComputed);
-  const filteredObj = filtered as Record<string, unknown>;
-  const phaseObj = phase as Record<string, unknown>;
-
-  // Handle codeExamples separately for Lazy-Load
-  if (includeCodeExamples && 'codeExamples' in phaseObj) {
-    // Add codeExamples ONLY if not explicitly excluded from fields
-    const shouldAddCodeExamples =
-      !fields || // undefined → can add (summary mode)
-      fields.includes('*') || // all fields → can add
-      fields.includes('codeExamples'); // explicitly included → can add
-
-    if (shouldAddCodeExamples) {
-      filteredObj.codeExamples = phaseObj.codeExamples;
-    }
-  } else if (!includeCodeExamples && 'codeExamples' in filteredObj) {
-    // Remove codeExamples if not requested (Lazy-Load)
-    delete filteredObj.codeExamples;
-  }
-
-  return filtered;
+  return filterEntity(phase, fields, 'phase', excludeMetadata, excludeComputed);
 }

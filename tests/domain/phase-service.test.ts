@@ -737,117 +737,10 @@ describe('PhaseService', () => {
       );
     });
 
-    it('should add phase with codeExamples', async () => {
-      const result = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Code Phase',
-          description: 'Phase with code examples',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-          codeExamples: [
-            {
-              language: 'typescript',
-              filename: 'service.ts',
-              code: 'export class MyService {}',
-              description: 'Service skeleton',
-            },
-            {
-              language: 'typescript',
-              code: 'it("should work", () => expect(true).toBe(true));',
-            },
-          ],
-        },
-      });
 
-      // Verify via getPhase (use includeCodeExamples=true to get codeExamples)
-      const { phase } = await service.getPhase({
-        planId,
-        phaseId: result.phaseId,
-        fields: ['*'],
-        includeCodeExamples: true, // Required for codeExamples (Variant B: explicit control)
-      });
-      expect(phase.codeExamples).toHaveLength(2);
-      expect(phase.codeExamples![0].language).toBe('typescript');
-      expect(phase.codeExamples![0].filename).toBe('service.ts');
-      expect(phase.codeExamples![1].code).toContain('expect(true)');
-    });
 
-    it('should validate codeExamples structure', async () => {
-      await expect(
-        service.addPhase({
-          planId,
-          phase: {
-            title: 'Invalid',
-            description: '',
-            objectives: [],
-            deliverables: [],
-            successCriteria: [],
-            codeExamples: [{ lang: 'ts', src: 'code' } as any],
-          },
-        })
-      ).rejects.toThrow(/language/i);
-    });
 
-    it('should add phase with codeRefs', async () => {
-      const result = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Phase with refs',
-          description: '',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-          codeRefs: [
-            'src/services/phase-service.ts:42',
-            'tests/domain/phase-service.test.ts:100',
-          ],
-        },
-      });
 
-      // Verify via getPhase
-      const { phase } = await service.getPhase({
-        planId,
-        phaseId: result.phaseId,
-        fields: ['*'],
-      });
-      expect(phase.codeRefs).toHaveLength(2);
-      expect(phase.codeRefs![0]).toBe('src/services/phase-service.ts:42');
-      expect(phase.codeRefs![1]).toBe('tests/domain/phase-service.test.ts:100');
-    });
-
-    it('should validate codeRefs structure', async () => {
-      await expect(
-        service.addPhase({
-          planId,
-          phase: {
-            title: 'Invalid refs',
-            description: '',
-            objectives: [],
-            deliverables: [],
-            successCriteria: [],
-            codeRefs: ['invalid-no-line-number'],
-          },
-        })
-      ).rejects.toThrow(/must be in format/i);
-    });
-
-    it('should validate codeRefs line number', async () => {
-      await expect(
-        service.addPhase({
-          planId,
-          phase: {
-            title: 'Invalid line',
-            description: '',
-            objectives: [],
-            deliverables: [],
-            successCriteria: [],
-            codeRefs: ['src/file.ts:0'],
-          },
-        })
-      ).rejects.toThrow(/line number must be a positive integer/i);
-    });
 
     it('should update phase with implementationNotes', async () => {
       const added = await service.addPhase({
@@ -878,113 +771,9 @@ describe('PhaseService', () => {
       expect(phase.implementationNotes).toBe('## Updated Notes\n- Step 1\n- Step 2');
     });
 
-    it('should update phase with codeExamples', async () => {
-      const added = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Test',
-          description: '',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-        },
-      });
 
-      await service.updatePhase({
-        planId,
-        phaseId: added.phaseId,
-        updates: {
-          codeExamples: [{ language: 'python', code: 'print("hello")' }],
-        },
-      });
 
-      // Verify via getPhase (use includeCodeExamples=true to get codeExamples)
-      const { phase } = await service.getPhase({
-        planId,
-        phaseId: added.phaseId,
-        fields: ['*'],
-        includeCodeExamples: true, // Required for codeExamples (Variant B: explicit control)
-      });
-      expect(phase.codeExamples).toHaveLength(1);
-      expect(phase.codeExamples![0].language).toBe('python');
-    });
 
-    it('should validate codeExamples on update', async () => {
-      const phase = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Test',
-          description: '',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-        },
-      });
-
-      await expect(
-        service.updatePhase({
-          planId,
-          phaseId: phase.phaseId,
-          updates: {
-            codeExamples: [{ language: '', code: 'x' }],
-          },
-        })
-      ).rejects.toThrow(/language/i);
-    });
-
-    it('should update phase with codeRefs', async () => {
-      const added = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Test',
-          description: '',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-        },
-      });
-
-      await service.updatePhase({
-        planId,
-        phaseId: added.phaseId,
-        updates: {
-          codeRefs: ['src/new-file.ts:10', 'tests/new-test.ts:20'],
-        },
-      });
-
-      // Verify via getPhase
-      const { phase } = await service.getPhase({
-        planId,
-        phaseId: added.phaseId,
-        fields: ['*'],
-      });
-      expect(phase.codeRefs).toHaveLength(2);
-      expect(phase.codeRefs![0]).toBe('src/new-file.ts:10');
-      expect(phase.codeRefs![1]).toBe('tests/new-test.ts:20');
-    });
-
-    it('should validate codeRefs on update', async () => {
-      const phase = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Test',
-          description: '',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-        },
-      });
-
-      await expect(
-        service.updatePhase({
-          planId,
-          phaseId: phase.phaseId,
-          updates: {
-            codeRefs: ['no-line-number'],
-          },
-        })
-      ).rejects.toThrow(/must be in format/i);
-    });
   });
 
   describe('get_tree summary mode (Phase 1.9)', () => {
@@ -2119,10 +1908,6 @@ describe('PhaseService', () => {
           deliverables: ['Del 1', 'Del 2'],
           successCriteria: ['SC 1', 'SC 2'],
           implementationNotes: 'Important notes',
-          codeExamples: [
-            { language: 'typescript', code: 'const x = 1;', description: 'Example' },
-          ],
-          codeRefs: ['src/test.ts:42'],
           priority: 'high',
         },
       });
@@ -2151,7 +1936,7 @@ describe('PhaseService', () => {
         });
 
         const phase = result.phase;
-        // GET operations return summary by default (without heavy codeExamples, objectives, etc)
+        // GET operations return summary by default (without heavy fields like objectives, etc)
         expect(phase.id).toBeDefined();
         expect(phase.title).toBeDefined();
         expect(phase.status).toBeDefined();
@@ -2160,22 +1945,19 @@ describe('PhaseService', () => {
 
         // Lazy-Load: heavy fields NOT included (use fields=['*'] to get them)
         expect(phase.objectives).toBeUndefined();
-        expect(phase.codeExamples).toBeUndefined();
         expect(phase.implementationNotes).toBeUndefined();
       });
 
-      it('should return all fields when fields=["*"] and includeCodeExamples=true', async () => {
+      it('should return all fields when fields=["*"]', async () => {
         const result = await service.getPhase({
           planId,
           phaseId,
           fields: ['*'],
-          includeCodeExamples: true, // Required for codeExamples (Variant B: explicit control)
         });
 
         const phase = result.phase;
         expect(phase.title).toBe('Complete Phase');
         expect(phase.objectives).toEqual(['Obj 1', 'Obj 2']);
-        expect(phase.codeExamples).toBeDefined();
         expect(phase.implementationNotes).toBe('Important notes');
       });
     });
@@ -2683,280 +2465,6 @@ describe('PhaseService', () => {
     });
   });
 
-  // Sprint 3 RED: includeCodeExamples parameter for explicit Lazy-Load control
-  describe('Sprint 3 RED: includeCodeExamples parameter for Lazy-Load', () => {
-    let phaseId: string;
-
-    beforeEach(async () => {
-      const result = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Phase with Heavy Code Examples',
-          description: 'Phase with multiple large code examples',
-          objectives: ['Implement feature'],
-          deliverables: ['Code artifact'],
-          successCriteria: ['Tests pass'],
-          estimatedEffort: { value: 3, unit: 'days', confidence: 'medium' },
-          codeExamples: [
-            {
-              language: 'typescript',
-              filename: 'service.ts',
-              code: '// Large code example 1\n' + 'x'.repeat(2000),
-              description: 'Service implementation',
-            },
-            {
-              language: 'typescript',
-              filename: 'test.ts',
-              code: '// Large code example 2\n' + 'y'.repeat(3000),
-              description: 'Test implementation',
-            },
-          ],
-        },
-      });
-      phaseId = result.phaseId;
-    });
-
-    describe('getPhase with includeCodeExamples', () => {
-      it('RED: should NOT include codeExamples by default (includeCodeExamples=false implicit)', async () => {
-        const result = await service.getPhase({
-          planId,
-          phaseId,
-        });
-
-        const phase = result.phase;
-        expect(phase.title).toBe('Phase with Heavy Code Examples');
-        expect(phase.status).toBeDefined(); // status is in summary fields
-        // RED: codeExamples should be excluded by default (Lazy-Load)
-        expect(phase.codeExamples).toBeUndefined();
-      });
-
-      it('RED: should NOT include codeExamples when includeCodeExamples=false', async () => {
-        const result = await service.getPhase({
-          planId,
-          phaseId,
-          includeCodeExamples: false,
-        });
-
-        expect(result.phase.codeExamples).toBeUndefined();
-      });
-
-      it('RED: should include codeExamples when includeCodeExamples=true', async () => {
-        const result = await service.getPhase({
-          planId,
-          phaseId,
-          includeCodeExamples: true,
-        });
-
-        const phase = result.phase;
-        expect(phase.codeExamples).toBeDefined();
-        expect(phase.codeExamples).toHaveLength(2);
-        expect(phase.codeExamples![0].code).toContain('Large code example 1');
-        expect(phase.codeExamples![0].code!.length).toBeGreaterThan(2000);
-      });
-
-      it('RED: should include metadata fields when includeCodeExamples=true without explicit fields', async () => {
-        const result = await service.getPhase({
-          planId,
-          phaseId,
-          includeCodeExamples: true,
-        });
-
-        const phase = result.phase as unknown as Record<string, unknown>;
-
-        // Should include summary fields
-        expect(phase.id).toBe(phaseId);
-        expect(phase.title).toBe('Phase with Heavy Code Examples');
-        expect(phase.status).toBe('planned');
-
-        // BUG FIX: Should include metadata fields (not excluded by default)
-        expect(phase.createdAt).toBeDefined();
-        expect(phase.updatedAt).toBeDefined();
-        expect(phase.version).toBeDefined();
-        expect(phase.metadata).toBeDefined();
-
-        // Should include codeExamples
-        expect(phase.codeExamples).toBeDefined();
-      });
-
-      it('RED: includeCodeExamples=true should work with fields parameter', async () => {
-        const result = await service.getPhase({
-          planId,
-          phaseId,
-          fields: ['id', 'title', 'codeExamples'],
-          includeCodeExamples: true,
-        });
-
-        const phase = result.phase as unknown as Record<string, unknown>;
-        expect(phase.id).toBe(phaseId);
-        expect(phase.title).toBe('Phase with Heavy Code Examples');
-        expect(phase.objectives).toBeUndefined(); // not in fields
-
-        const codeExamples = phase.codeExamples as Array<{ code?: string }>;
-        expect(codeExamples).toBeDefined();
-        expect(codeExamples).toHaveLength(2);
-      });
-
-      it('RED: includeCodeExamples=true should NOT add codeExamples when explicitly excluded from fields', async () => {
-        const result = await service.getPhase({
-          planId,
-          phaseId,
-          fields: ['id', 'title', 'status'], // codeExamples NOT in fields
-          includeCodeExamples: true, // This should NOT override explicit field selection
-        });
-
-        const phase = result.phase as unknown as Record<string, unknown>;
-
-        // Should only include requested fields
-        expect(phase.id).toBe(phaseId);
-        expect(phase.title).toBe('Phase with Heavy Code Examples');
-        expect(phase.status).toBe('planned');
-
-        // BUG FIX: codeExamples should NOT appear because it was explicitly excluded from fields
-        // includeCodeExamples only works when fields is undefined, ['*'], or includes 'codeExamples'
-        expect(phase.codeExamples).toBeUndefined();
-
-        // Other fields should also be undefined
-        expect(phase.objectives).toBeUndefined();
-        expect(phase.description).toBeUndefined();
-      });
-
-      it('RED: includeCodeExamples=false should override fields=["*"]', async () => {
-        const result = await service.getPhase({
-          planId,
-          phaseId,
-          fields: ['*'],
-          includeCodeExamples: false,
-        });
-
-        const phase = result.phase;
-        // All fields should be present
-        expect(phase.title).toBe('Phase with Heavy Code Examples');
-        expect(phase.objectives).toBeDefined();
-        // But codeExamples should be excluded due to includeCodeExamples=false
-        expect(phase.codeExamples).toBeUndefined();
-      });
-
-      it('RED: should work with excludeMetadata + includeCodeExamples=true', async () => {
-        const result = await service.getPhase({
-          planId,
-          phaseId,
-          excludeMetadata: true,
-          includeCodeExamples: true,
-        });
-
-        const phase = result.phase as unknown as Record<string, unknown>;
-        // Metadata excluded
-        expect(phase.createdAt).toBeUndefined();
-        expect(phase.updatedAt).toBeUndefined();
-        // But codeExamples included
-        const codeExamples = phase.codeExamples as Array<{ code?: string }>;
-        expect(codeExamples).toBeDefined();
-      });
-    });
-
-    describe('getTree with includeCodeExamples', () => {
-      let childId: string;
-
-      beforeEach(async () => {
-        const child = await service.addPhase({
-          planId,
-          phase: {
-            title: 'Child Phase',
-            description: 'Child with code',
-            parentId: phaseId,
-            objectives: ['Child obj'],
-            deliverables: ['Child del'],
-            successCriteria: ['Child criteria'],
-            estimatedEffort: { value: 1, unit: 'days', confidence: 'high' },
-            codeExamples: [
-              {
-                language: 'javascript',
-                code: '// Child code\n' + 'z'.repeat(1000),
-              },
-            ],
-          },
-        });
-        childId = child.phaseId;
-      });
-
-      it('RED: should NOT include codeExamples in tree nodes by default', async () => {
-        const result = await service.getPhaseTree({
-          planId,
-        });
-
-        // Find our phases in tree
-        const parentPhase = result.tree.find((p: any) => p.phase.id === phaseId);
-        expect(parentPhase).toBeDefined();
-        expect(parentPhase!.phase.codeExamples).toBeUndefined();
-
-        const childPhase = parentPhase!.children[0];
-        expect(childPhase.phase.codeExamples).toBeUndefined();
-      });
-
-      it('RED: should include codeExamples in all tree nodes when includeCodeExamples=true', async () => {
-        const result = await service.getPhaseTree({
-          planId,
-          includeCodeExamples: true,
-        });
-
-        const parentPhase = result.tree.find((p: any) => p.phase.id === phaseId);
-        expect(parentPhase!.phase.codeExamples).toBeDefined();
-        expect(parentPhase!.phase.codeExamples).toHaveLength(2);
-
-        const childPhase = parentPhase!.children[0];
-        expect(childPhase.phase.codeExamples).toBeDefined();
-        expect(childPhase.phase.codeExamples).toHaveLength(1);
-      });
-    });
-
-    describe('Edge cases for includeCodeExamples', () => {
-      it('RED: should handle phase without codeExamples + includeCodeExamples=true', async () => {
-        const noCodeResult = await service.addPhase({
-          planId,
-          phase: {
-            title: 'Phase without code',
-            description: 'No examples',
-            objectives: ['Obj'],
-            deliverables: ['Del'],
-            successCriteria: ['Criteria'],
-            estimatedEffort: { value: 1, unit: 'days', confidence: 'medium' },
-          },
-        });
-
-        const result = await service.getPhase({
-          planId,
-          phaseId: noCodeResult.phaseId,
-          includeCodeExamples: true,
-        });
-
-        // Should return empty array or undefined, not crash
-        const codeExamples = result.phase.codeExamples;
-        expect(codeExamples === undefined || codeExamples.length === 0).toBe(true);
-      });
-
-      it('RED: should measure payload size difference (with vs without codeExamples)', async () => {
-        const withoutCode = await service.getPhase({
-          planId,
-          phaseId,
-          includeCodeExamples: false,
-        });
-
-        const withCode = await service.getPhase({
-          planId,
-          phaseId,
-          includeCodeExamples: true,
-        });
-
-        const withoutSize = JSON.stringify(withoutCode.phase).length;
-        const withSize = JSON.stringify(withCode.phase).length;
-
-        // Verify significant size difference (6x as per sprint requirements)
-        expect(withSize).toBeGreaterThan(withoutSize * 5); // At least 5x
-        expect(withoutSize).toBeLessThan(2000); // Less than 2KB without codeExamples
-        expect(withSize).toBeGreaterThan(5000); // Greater than 5KB with codeExamples
-      });
-    });
-  });
 
   describe('bulk_update (Sprint 9 - RED Phase)', () => {
     let phase1Id: string;

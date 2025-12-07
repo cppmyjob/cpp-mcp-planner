@@ -117,14 +117,6 @@ export interface Decision extends Entity {
 export type PhaseStatus = 'planned' | 'in_progress' | 'completed' | 'blocked' | 'skipped';
 export type PhasePriority = 'critical' | 'high' | 'medium' | 'low';
 
-// Code example for phases
-export interface CodeExample {
-  language: string;
-  filename?: string;
-  code: string;
-  description?: string;
-}
-
 export interface Milestone {
   id: string;
   title: string;
@@ -175,8 +167,6 @@ export interface Phase extends Entity {
 
   // Implementation details
   implementationNotes?: string;
-  codeExamples?: CodeExample[];
-  codeRefs?: string[];  // Code references in format "file_path:line_number"
   priority?: PhasePriority;
 }
 

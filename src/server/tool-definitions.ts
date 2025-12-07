@@ -292,24 +292,6 @@ export const tools = [
               required: ['value', 'unit', 'confidence'],
             },
             implementationNotes: { type: 'string' },
-            codeExamples: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  language: { type: 'string' },
-                  filename: { type: 'string' },
-                  code: { type: 'string' },
-                  description: { type: 'string' },
-                },
-                required: ['language', 'code'],
-              },
-            },
-            codeRefs: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Code references in format "file_path:line_number" (e.g., "src/services/phase-service.ts:42")',
-            },
             priority: {
               type: 'string',
               enum: ['critical', 'high', 'medium', 'low'],
@@ -330,24 +312,6 @@ export const tools = [
             blockingReason: { type: 'string' },
             progress: { type: 'number', minimum: 0, maximum: 100 },
             implementationNotes: { type: 'string' },
-            codeExamples: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  language: { type: 'string' },
-                  filename: { type: 'string' },
-                  code: { type: 'string' },
-                  description: { type: 'string' },
-                },
-                required: ['language', 'code'],
-              },
-            },
-            codeRefs: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Code references in format "file_path:line_number" (e.g., "src/services/phase-service.ts:42")',
-            },
             priority: {
               type: 'string',
               enum: ['critical', 'high', 'medium', 'low'],
@@ -367,7 +331,7 @@ export const tools = [
         fields: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Fields to include. Default returns summary (id, title, status, progress, path, childCount). Available fields: "description", "parentId", "order", "depth", "objectives", "deliverables", "successCriteria", "schedule", "startedAt", "completedAt", "milestones", "blockers", "implementationNotes", "codeExamples", "codeRefs", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
+          description: 'Fields to include. Default returns summary (id, title, status, progress, path, childCount). Available fields: "description", "parentId", "order", "depth", "objectives", "deliverables", "successCriteria", "schedule", "startedAt", "completedAt", "milestones", "blockers", "implementationNotes", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
         },
         excludeMetadata: {
           type: 'boolean',
@@ -376,10 +340,6 @@ export const tools = [
         excludeComputed: {
           type: 'boolean',
           description: 'Exclude computed fields (depth, path, childCount) from response. Saves ~50 bytes per entity. Only applies to phase entities.',
-        },
-        includeCodeExamples: {
-          type: 'boolean',
-          description: 'Include heavy codeExamples field (default: false for Lazy-Load). Each codeExample is 2-5KB with implementation details. Excluded by default to minimize payload. Use includeCodeExamples=true ONLY when you need to see actual code implementation examples. Applies to get, get_many, and get_tree operations.',
         },
         limit: { type: 'number' },
       },
