@@ -168,6 +168,7 @@ export interface Phase extends Entity {
   // Implementation details
   implementationNotes?: string;
   priority?: PhasePriority;
+  blockingReason?: string;  // Quick status text when status='blocked'
 }
 
 // Artifact types - for storing generated content (code, configs, docs)
