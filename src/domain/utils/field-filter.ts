@@ -211,26 +211,17 @@ export function filterPhase<T>(
   // includeCodeExamples explicitly controls codeExamples inclusion for performance
   // fields=['*'] loads all fields, BUT codeExamples still requires explicit includeCodeExamples=true
 
-  // Adjust fields to include codeExamples if requested
-  let adjustedFields = fields;
-
-  if (includeCodeExamples) {
-    // If includeCodeExamples=true, ensure codeExamples is in fields
-    if (!fields) {
-      // No fields specified (using summary mode) - add codeExamples to summary fields
-      adjustedFields = [...SUMMARY_FIELDS['phase'], 'codeExamples'];
-    } else if (!fields.includes('*') && !fields.includes('codeExamples')) {
-      // Custom fields specified - add codeExamples
-      adjustedFields = [...fields, 'codeExamples'];
-    }
-    // If fields includes '*', codeExamples already included via filterEntity
-  }
-
-  const filtered = filterEntity(phase, adjustedFields, 'phase', excludeMetadata, excludeComputed);
+  // Apply standard filtering first (handles summary+metadata correctly)
+  const filtered = filterEntity(phase, fields, 'phase', excludeMetadata, excludeComputed);
   const filteredObj = filtered as Record<string, unknown>;
+  const phaseObj = phase as Record<string, unknown>;
 
-  // Lazy-Load logic: Remove codeExamples if not requested
-  if (!includeCodeExamples && 'codeExamples' in filteredObj) {
+  // Handle codeExamples separately for Lazy-Load
+  if (includeCodeExamples && 'codeExamples' in phaseObj) {
+    // Add codeExamples to the already filtered result
+    filteredObj.codeExamples = phaseObj.codeExamples;
+  } else if (!includeCodeExamples && 'codeExamples' in filteredObj) {
+    // Remove codeExamples if not requested (Lazy-Load)
     delete filteredObj.codeExamples;
   }
 

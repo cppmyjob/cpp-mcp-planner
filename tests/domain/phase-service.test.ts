@@ -2754,6 +2754,30 @@ describe('PhaseService', () => {
         expect(phase.codeExamples![0].code!.length).toBeGreaterThan(2000);
       });
 
+      it('RED: should include metadata fields when includeCodeExamples=true without explicit fields', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          includeCodeExamples: true,
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+
+        // Should include summary fields
+        expect(phase.id).toBe(phaseId);
+        expect(phase.title).toBe('Phase with Heavy Code Examples');
+        expect(phase.status).toBe('planned');
+
+        // BUG FIX: Should include metadata fields (not excluded by default)
+        expect(phase.createdAt).toBeDefined();
+        expect(phase.updatedAt).toBeDefined();
+        expect(phase.version).toBeDefined();
+        expect(phase.metadata).toBeDefined();
+
+        // Should include codeExamples
+        expect(phase.codeExamples).toBeDefined();
+      });
+
       it('RED: includeCodeExamples=true should work with fields parameter', async () => {
         const result = await service.getPhase({
           planId,
