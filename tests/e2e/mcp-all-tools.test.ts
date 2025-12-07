@@ -84,6 +84,8 @@ describe('E2E: All MCP Tools Validation', () => {
           action: 'create',
           name: 'All Tools Test Plan',
           description: 'Testing all MCP tools',
+          enableHistory: true, // Sprint 7: Enable version history
+          maxHistoryDepth: 10, // Sprint 7: Keep last 10 versions
         },
       });
 
@@ -252,7 +254,7 @@ describe('E2E: All MCP Tools Validation', () => {
   });
 
   // ============================================================
-  // TOOL: requirement (5 actions)
+  // TOOL: requirement (10 actions: add, get, get_many, update, list, delete, vote, unvote, get_history, diff)
   // ============================================================
   describe('Tool: requirement', () => {
     it('action: add', async () => {
@@ -445,10 +447,131 @@ describe('E2E: All MCP Tools Validation', () => {
       const parsed = parseResult<{ success: boolean }>(result);
       expect(parsed.success).toBe(true);
     });
+
+    it('action: get_history (Sprint 7)', async () => {
+      // First, make some updates to create version history
+      await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'update',
+          planId,
+          requirementId,
+          updates: { title: 'Updated Title V2' },
+        },
+      });
+
+      await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'update',
+          planId,
+          requirementId,
+          updates: { priority: 'low' },
+        },
+      });
+
+      // Get version history
+      const result = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'get_history',
+          planId,
+          requirementId,
+        },
+      });
+
+      const parsed = parseResult<{
+        entityId: string;
+        entityType: string;
+        currentVersion: number;
+        versions: Array<{ version: number; data: any; timestamp: string }>;
+        total: number;
+        hasMore?: boolean;
+      }>(result);
+
+      expect(parsed.entityId).toBe(requirementId);
+      expect(parsed.entityType).toBe('requirement');
+      expect(parsed.versions).toBeDefined();
+      expect(parsed.versions.length).toBeGreaterThan(0);
+      expect(parsed.total).toBeGreaterThan(0);
+      expect(parsed.currentVersion).toBeGreaterThan(0);
+
+      // Verify versions are in reverse chronological order (newest first)
+      if (parsed.versions.length > 1) {
+        expect(parsed.versions[0].version).toBeGreaterThan(parsed.versions[1].version);
+      }
+    });
+
+    it('action: diff (Sprint 7)', async () => {
+      // Create another update to ensure we have at least 2 versions
+      await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'update',
+          planId,
+          requirementId,
+          updates: { description: 'Updated description for diff test' },
+        },
+      });
+
+      // Get version history to find version numbers
+      const historyResult = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'get_history',
+          planId,
+          requirementId,
+        },
+      });
+
+      const history = parseResult<{
+        versions: Array<{ version: number }>;
+      }>(historyResult);
+
+      expect(history.versions.length).toBeGreaterThanOrEqual(2);
+
+      // Compare two versions
+      const version1 = history.versions[1].version; // Older version
+      const version2 = history.versions[0].version; // Newer version
+
+      const result = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'diff',
+          planId,
+          requirementId,
+          version1,
+          version2,
+        },
+      });
+
+      const parsed = parseResult<{
+        entityId: string;
+        entityType: string;
+        version1: { version: number; timestamp: string };
+        version2: { version: number; timestamp: string };
+        changes: Record<string, { from: any; to: any; changed: boolean }>;
+      }>(result);
+
+      expect(parsed.entityId).toBe(requirementId);
+      expect(parsed.entityType).toBe('requirement');
+      expect(parsed.version1.version).toBe(version1);
+      expect(parsed.version2.version).toBe(version2);
+      expect(parsed.changes).toBeDefined();
+
+      // Verify changes only contains fields that actually changed
+      const changedFields = Object.keys(parsed.changes);
+      expect(changedFields.length).toBeGreaterThan(0);
+
+      // Metadata fields should NOT appear in changes (Sprint 7 fix)
+      expect(parsed.changes.updatedAt).toBeUndefined();
+      expect(parsed.changes.version).toBeUndefined();
+      expect(parsed.changes.createdAt).toBeUndefined();
+    });
   });
 
   // ============================================================
-  // TOOL: solution (7 actions)
+  // TOOL: solution (9 actions: propose, get, get_many, update, list, compare, select, delete, get_history, diff)
   // ============================================================
   describe('Tool: solution', () => {
     it('action: propose', async () => {
@@ -651,10 +774,84 @@ describe('E2E: All MCP Tools Validation', () => {
       const parsed = parseResult<{ success: boolean }>(result);
       expect(parsed.success).toBe(true);
     });
+
+    it('action: get_history (Sprint 7)', async () => {
+      // Make updates to create version history
+      await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'update',
+          planId,
+          solutionId,
+          updates: { title: 'Updated Solution Title' },
+        },
+      });
+
+      const result = await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'get_history',
+          planId,
+          solutionId,
+        },
+      });
+
+      const parsed = parseResult<{
+        entityId: string;
+        entityType: string;
+        versions: Array<{ version: number }>;
+        total: number;
+      }>(result);
+
+      expect(parsed.entityId).toBe(solutionId);
+      expect(parsed.entityType).toBe('solution');
+      expect(parsed.versions).toBeDefined();
+      expect(parsed.total).toBeGreaterThan(0);
+    });
+
+    it('action: diff (Sprint 7)', async () => {
+      // Create another version
+      await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'update',
+          planId,
+          solutionId,
+          updates: { description: 'Updated solution description' },
+        },
+      });
+
+      const historyResult = await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'get_history',
+          planId,
+          solutionId,
+        },
+      });
+
+      const history = parseResult<{ versions: Array<{ version: number }> }>(historyResult);
+      expect(history.versions.length).toBeGreaterThanOrEqual(2);
+
+      const result = await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'diff',
+          planId,
+          solutionId,
+          version1: history.versions[1].version,
+          version2: history.versions[0].version,
+        },
+      });
+
+      const parsed = parseResult<{ entityId: string; changes: Record<string, any> }>(result);
+      expect(parsed.entityId).toBe(solutionId);
+      expect(parsed.changes).toBeDefined();
+    });
   });
 
   // ============================================================
-  // TOOL: decision (5 actions)
+  // TOOL: decision (8 actions: record, get, get_many, update, list, supersede, get_history, diff)
   // ============================================================
   describe('Tool: decision', () => {
     it('action: record', async () => {
@@ -810,10 +1007,84 @@ describe('E2E: All MCP Tools Validation', () => {
       const newDecision = parseResult<{ decision: { id: string } }>(newDecisionResult);
       expect(newDecision.decision.id).toBe(parsed.newDecisionId);
     });
+
+    it('action: get_history (Sprint 7)', async () => {
+      // Make updates to create version history
+      await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'update',
+          planId,
+          decisionId,
+          updates: { title: 'Updated Decision Title' },
+        },
+      });
+
+      const result = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'get_history',
+          planId,
+          decisionId,
+        },
+      });
+
+      const parsed = parseResult<{
+        entityId: string;
+        entityType: string;
+        versions: Array<{ version: number }>;
+        total: number;
+      }>(result);
+
+      expect(parsed.entityId).toBe(decisionId);
+      expect(parsed.entityType).toBe('decision');
+      expect(parsed.versions).toBeDefined();
+      expect(parsed.total).toBeGreaterThan(0);
+    });
+
+    it('action: diff (Sprint 7)', async () => {
+      // Create another version
+      await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'update',
+          planId,
+          decisionId,
+          updates: { context: 'Updated context for diff test' },
+        },
+      });
+
+      const historyResult = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'get_history',
+          planId,
+          decisionId,
+        },
+      });
+
+      const history = parseResult<{ versions: Array<{ version: number }> }>(historyResult);
+      expect(history.versions.length).toBeGreaterThanOrEqual(2);
+
+      const result = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'diff',
+          planId,
+          decisionId,
+          version1: history.versions[1].version,
+          version2: history.versions[0].version,
+        },
+      });
+
+      const parsed = parseResult<{ entityId: string; changes: Record<string, any> }>(result);
+      expect(parsed.entityId).toBe(decisionId);
+      expect(parsed.changes).toBeDefined();
+    });
   });
 
   // ============================================================
-  // TOOL: phase (6 actions)
+  // TOOL: phase (12 actions: add, get, get_many, get_tree, update, update_status, move, delete, get_next_actions, complete_and_advance, get_history, diff)
   // ============================================================
   describe('Tool: phase', () => {
     it('action: add', async () => {
@@ -1560,6 +1831,80 @@ describe('E2E: All MCP Tools Validation', () => {
         expect(pAutoData.phase.order).toBe(101);
         expect(pAutoData.phase.path).toBe('101');
       });
+    });
+
+    it('action: get_history (Sprint 7)', async () => {
+      // Make updates to create version history
+      await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'update',
+          planId,
+          phaseId,
+          updates: { title: 'Updated Phase Title' },
+        },
+      });
+
+      const result = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'get_history',
+          planId,
+          phaseId,
+        },
+      });
+
+      const parsed = parseResult<{
+        entityId: string;
+        entityType: string;
+        versions: Array<{ version: number }>;
+        total: number;
+      }>(result);
+
+      expect(parsed.entityId).toBe(phaseId);
+      expect(parsed.entityType).toBe('phase');
+      expect(parsed.versions).toBeDefined();
+      expect(parsed.total).toBeGreaterThan(0);
+    });
+
+    it('action: diff (Sprint 7)', async () => {
+      // Create another version
+      await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'update',
+          planId,
+          phaseId,
+          updates: { description: 'Updated phase description' },
+        },
+      });
+
+      const historyResult = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'get_history',
+          planId,
+          phaseId,
+        },
+      });
+
+      const history = parseResult<{ versions: Array<{ version: number }> }>(historyResult);
+      expect(history.versions.length).toBeGreaterThanOrEqual(2);
+
+      const result = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'diff',
+          planId,
+          phaseId,
+          version1: history.versions[1].version,
+          version2: history.versions[0].version,
+        },
+      });
+
+      const parsed = parseResult<{ entityId: string; changes: Record<string, any> }>(result);
+      expect(parsed.entityId).toBe(phaseId);
+      expect(parsed.changes).toBeDefined();
     });
   });
 

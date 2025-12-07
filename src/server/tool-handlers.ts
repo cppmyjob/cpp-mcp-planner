@@ -91,6 +91,12 @@ export async function handleToolCall(
           case 'unvote':
             result = await requirementService.unvoteRequirement(args as any);
             break;
+          case 'get_history':
+            result = await requirementService.getHistory(args as any);
+            break;
+          case 'diff':
+            result = await requirementService.diff(args as any);
+            break;
           default:
             throw new ToolError('InvalidAction', `Unknown action for requirement: ${action}`);
         }
@@ -122,6 +128,12 @@ export async function handleToolCall(
           case 'delete':
             result = await solutionService.deleteSolution(args as any);
             break;
+          case 'get_history':
+            result = await solutionService.getHistory(args as any);
+            break;
+          case 'diff':
+            result = await solutionService.diff(args as any);
+            break;
           default:
             throw new ToolError('InvalidAction', `Unknown action for solution: ${action}`);
         }
@@ -146,6 +158,12 @@ export async function handleToolCall(
             break;
           case 'supersede':
             result = await decisionService.supersedeDecision(args as any);
+            break;
+          case 'get_history':
+            result = await decisionService.getHistory(args as any);
+            break;
+          case 'diff':
+            result = await decisionService.diff(args as any);
             break;
           default:
             throw new ToolError('InvalidAction', `Unknown action for decision: ${action}`);
@@ -184,6 +202,12 @@ export async function handleToolCall(
           case 'complete_and_advance':
             result = await phaseService.completeAndAdvance(args as any);
             break;
+          case 'get_history':
+            result = await phaseService.getHistory(args as any);
+            break;
+          case 'diff':
+            result = await phaseService.diff(args as any);
+            break;
           default:
             throw new ToolError('InvalidAction', `Unknown action for phase: ${action}`);
         }
@@ -205,6 +229,12 @@ export async function handleToolCall(
             break;
           case 'delete':
             result = await artifactService.deleteArtifact(args as any);
+            break;
+          case 'get_history':
+            result = await artifactService.getHistory(args as any);
+            break;
+          case 'diff':
+            result = await artifactService.diff(args as any);
             break;
           default:
             throw new ToolError('InvalidAction', `Unknown action for artifact: ${action}`);
