@@ -66,6 +66,7 @@ export interface GetArtifactInput {
   artifactId: string;
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
   excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
+  includeContent?: boolean; // Include heavy sourceCode field (default: false for Lazy-Load)
 }
 
 export interface UpdateArtifactInput {
@@ -102,6 +103,7 @@ export interface ListArtifactsInput {
   offset?: number;
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
   excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
+  includeContent?: boolean; // IGNORED in list operations (sourceCode never returned in lists for security)
 }
 
 export interface DeleteArtifactInput {
@@ -250,12 +252,13 @@ export class ArtifactService {
       }));
     }
 
-    // Apply field filtering - artifacts default to summary (without heavy sourceCode)
+    // Apply field filtering with Lazy-Load support
     const filtered = filterArtifact(
       artifact,
       input.fields,
-      false,
-      input.excludeMetadata
+      false, // isListOperation
+      input.excludeMetadata,
+      input.includeContent ?? false // default: false (Lazy-Load)
     ) as Artifact;
 
     return { artifact: filtered };
@@ -340,9 +343,15 @@ export class ArtifactService {
 
     artifacts = artifacts.slice(offset, offset + limit);
 
-    // Apply field filtering with special handling (isListOperation=true to remove sourceCode)
+    // Apply field filtering with Lazy-Load (list operations NEVER return sourceCode)
     const filtered = artifacts.map((artifact) =>
-      filterArtifact(artifact, input.fields, true, input.excludeMetadata)
+      filterArtifact(
+        artifact,
+        input.fields,
+        true, // isListOperation
+        input.excludeMetadata,
+        false // includeContent IGNORED for list operations (security)
+      )
     ) as Artifact[];
 
     return {

@@ -149,27 +149,36 @@ export function filterEntities<T>(
 }
 
 /**
- * Special handling for artifact sourceCode field.
- * sourceCode should NEVER be included in list operations, even with fields=['*'].
- * It should only be included in get operations when explicitly requested.
+ * Special handling for artifact sourceCode field with Lazy-Load support.
+ * sourceCode should NEVER be included in list operations, even with includeContent=true (security).
+ * For get operations, sourceCode is included only when includeContent=true (default: false).
  *
  * @param artifact - The artifact to filter
  * @param fields - Array of field names
  * @param isListOperation - Whether this is a list operation (vs get)
  * @param excludeMetadata - If true, exclude metadata fields
+ * @param includeContent - If true, include sourceCode (default: false). IGNORED for list operations.
  * @returns Filtered artifact with sourceCode handling
  */
 export function filterArtifact<T>(
   artifact: T,
   fields: string[] | undefined,
   isListOperation: boolean,
-  excludeMetadata: boolean = false
+  excludeMetadata: boolean = false,
+  includeContent: boolean = false
 ): T | Partial<T> {
   const filtered = filterEntity(artifact, fields, 'artifact', excludeMetadata, false);
   const filteredObj = filtered as Record<string, unknown>;
 
-  // Remove sourceCode from list operations
-  if (isListOperation && filteredObj.content) {
+  // FIX #2: includeContent has priority (Variant B - explicit security control)
+  // includeContent explicitly controls sourceCode inclusion for security/performance
+  // fields=['*'] loads all fields, BUT sourceCode still requires explicit includeContent=true
+
+  // Lazy-Load logic: Remove sourceCode UNLESS includeContent=true
+  // For list operations, ALWAYS remove sourceCode (security: even with includeContent=true)
+  const shouldRemoveSourceCode = isListOperation || !includeContent;
+
+  if (shouldRemoveSourceCode && filteredObj.content) {
     const content = filteredObj.content as Record<string, unknown>;
     if ('sourceCode' in content) {
       const { sourceCode, ...restContent } = content;
@@ -177,13 +186,52 @@ export function filterArtifact<T>(
     }
   }
 
-  // Remove sourceCode from get operations unless in full mode
-  if (!isListOperation && filteredObj.content && (!fields || !fields.includes('*'))) {
-    const content = filteredObj.content as Record<string, unknown>;
-    if ('sourceCode' in content) {
-      const { sourceCode, ...restContent } = content;
-      filteredObj.content = restContent;
+  return filtered;
+}
+
+/**
+ * Special handling for phase codeExamples field with Lazy-Load support.
+ * codeExamples are heavy (2-5KB) and excluded by default (includeCodeExamples=false).
+ *
+ * @param phase - The phase to filter
+ * @param fields - Array of field names
+ * @param excludeMetadata - If true, exclude metadata fields
+ * @param excludeComputed - If true, exclude computed fields (depth, path, childCount)
+ * @param includeCodeExamples - If true, include codeExamples (default: false for Lazy-Load)
+ * @returns Filtered phase with codeExamples handling
+ */
+export function filterPhase<T>(
+  phase: T,
+  fields: string[] | undefined,
+  excludeMetadata: boolean = false,
+  excludeComputed: boolean = false,
+  includeCodeExamples: boolean = false
+): T | Partial<T> {
+  // FIX #2: includeCodeExamples has priority (Variant B - explicit control)
+  // includeCodeExamples explicitly controls codeExamples inclusion for performance
+  // fields=['*'] loads all fields, BUT codeExamples still requires explicit includeCodeExamples=true
+
+  // Adjust fields to include codeExamples if requested
+  let adjustedFields = fields;
+
+  if (includeCodeExamples) {
+    // If includeCodeExamples=true, ensure codeExamples is in fields
+    if (!fields) {
+      // No fields specified (using summary mode) - add codeExamples to summary fields
+      adjustedFields = [...SUMMARY_FIELDS['phase'], 'codeExamples'];
+    } else if (!fields.includes('*') && !fields.includes('codeExamples')) {
+      // Custom fields specified - add codeExamples
+      adjustedFields = [...fields, 'codeExamples'];
     }
+    // If fields includes '*', codeExamples already included via filterEntity
+  }
+
+  const filtered = filterEntity(phase, adjustedFields, 'phase', excludeMetadata, excludeComputed);
+  const filteredObj = filtered as Record<string, unknown>;
+
+  // Lazy-Load logic: Remove codeExamples if not requested
+  if (!includeCodeExamples && 'codeExamples' in filteredObj) {
+    delete filteredObj.codeExamples;
   }
 
   return filtered;

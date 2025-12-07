@@ -761,11 +761,12 @@ describe('PhaseService', () => {
         },
       });
 
-      // Verify via getPhase
+      // Verify via getPhase (use includeCodeExamples=true to get codeExamples)
       const { phase } = await service.getPhase({
         planId,
         phaseId: result.phaseId,
         fields: ['*'],
+        includeCodeExamples: true, // Required for codeExamples (Variant B: explicit control)
       });
       expect(phase.codeExamples).toHaveLength(2);
       expect(phase.codeExamples![0].language).toBe('typescript');
@@ -897,11 +898,12 @@ describe('PhaseService', () => {
         },
       });
 
-      // Verify via getPhase
+      // Verify via getPhase (use includeCodeExamples=true to get codeExamples)
       const { phase } = await service.getPhase({
         planId,
         phaseId: added.phaseId,
         fields: ['*'],
+        includeCodeExamples: true, // Required for codeExamples (Variant B: explicit control)
       });
       expect(phase.codeExamples).toHaveLength(1);
       expect(phase.codeExamples![0].language).toBe('python');
@@ -2162,11 +2164,12 @@ describe('PhaseService', () => {
         expect(phase.implementationNotes).toBeUndefined();
       });
 
-      it('should return all fields when fields=["*"]', async () => {
+      it('should return all fields when fields=["*"] and includeCodeExamples=true', async () => {
         const result = await service.getPhase({
           planId,
           phaseId,
           fields: ['*'],
+          includeCodeExamples: true, // Required for codeExamples (Variant B: explicit control)
         });
 
         const phase = result.phase;
@@ -2677,6 +2680,233 @@ describe('PhaseService', () => {
           value: 'Invalid',
         })
       ).rejects.toThrow('Field title is not a valid array field');
+    });
+  });
+
+  // Sprint 3 RED: includeCodeExamples parameter for explicit Lazy-Load control
+  describe('Sprint 3 RED: includeCodeExamples parameter for Lazy-Load', () => {
+    let phaseId: string;
+
+    beforeEach(async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase with Heavy Code Examples',
+          description: 'Phase with multiple large code examples',
+          objectives: ['Implement feature'],
+          deliverables: ['Code artifact'],
+          successCriteria: ['Tests pass'],
+          estimatedEffort: { value: 3, unit: 'days', confidence: 'medium' },
+          codeExamples: [
+            {
+              language: 'typescript',
+              filename: 'service.ts',
+              code: '// Large code example 1\n' + 'x'.repeat(2000),
+              description: 'Service implementation',
+            },
+            {
+              language: 'typescript',
+              filename: 'test.ts',
+              code: '// Large code example 2\n' + 'y'.repeat(3000),
+              description: 'Test implementation',
+            },
+          ],
+        },
+      });
+      phaseId = result.phaseId;
+    });
+
+    describe('getPhase with includeCodeExamples', () => {
+      it('RED: should NOT include codeExamples by default (includeCodeExamples=false implicit)', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+        });
+
+        const phase = result.phase;
+        expect(phase.title).toBe('Phase with Heavy Code Examples');
+        expect(phase.status).toBeDefined(); // status is in summary fields
+        // RED: codeExamples should be excluded by default (Lazy-Load)
+        expect(phase.codeExamples).toBeUndefined();
+      });
+
+      it('RED: should NOT include codeExamples when includeCodeExamples=false', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          includeCodeExamples: false,
+        });
+
+        expect(result.phase.codeExamples).toBeUndefined();
+      });
+
+      it('RED: should include codeExamples when includeCodeExamples=true', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          includeCodeExamples: true,
+        });
+
+        const phase = result.phase;
+        expect(phase.codeExamples).toBeDefined();
+        expect(phase.codeExamples).toHaveLength(2);
+        expect(phase.codeExamples![0].code).toContain('Large code example 1');
+        expect(phase.codeExamples![0].code!.length).toBeGreaterThan(2000);
+      });
+
+      it('RED: includeCodeExamples=true should work with fields parameter', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['id', 'title', 'codeExamples'],
+          includeCodeExamples: true,
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+        expect(phase.id).toBe(phaseId);
+        expect(phase.title).toBe('Phase with Heavy Code Examples');
+        expect(phase.objectives).toBeUndefined(); // not in fields
+
+        const codeExamples = phase.codeExamples as Array<{ code?: string }>;
+        expect(codeExamples).toBeDefined();
+        expect(codeExamples).toHaveLength(2);
+      });
+
+      it('RED: includeCodeExamples=false should override fields=["*"]', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['*'],
+          includeCodeExamples: false,
+        });
+
+        const phase = result.phase;
+        // All fields should be present
+        expect(phase.title).toBe('Phase with Heavy Code Examples');
+        expect(phase.objectives).toBeDefined();
+        // But codeExamples should be excluded due to includeCodeExamples=false
+        expect(phase.codeExamples).toBeUndefined();
+      });
+
+      it('RED: should work with excludeMetadata + includeCodeExamples=true', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          excludeMetadata: true,
+          includeCodeExamples: true,
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+        // Metadata excluded
+        expect(phase.createdAt).toBeUndefined();
+        expect(phase.updatedAt).toBeUndefined();
+        // But codeExamples included
+        const codeExamples = phase.codeExamples as Array<{ code?: string }>;
+        expect(codeExamples).toBeDefined();
+      });
+    });
+
+    describe('getTree with includeCodeExamples', () => {
+      let childId: string;
+
+      beforeEach(async () => {
+        const child = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child Phase',
+            description: 'Child with code',
+            parentId: phaseId,
+            objectives: ['Child obj'],
+            deliverables: ['Child del'],
+            successCriteria: ['Child criteria'],
+            estimatedEffort: { value: 1, unit: 'days', confidence: 'high' },
+            codeExamples: [
+              {
+                language: 'javascript',
+                code: '// Child code\n' + 'z'.repeat(1000),
+              },
+            ],
+          },
+        });
+        childId = child.phaseId;
+      });
+
+      it('RED: should NOT include codeExamples in tree nodes by default', async () => {
+        const result = await service.getPhaseTree({
+          planId,
+        });
+
+        // Find our phases in tree
+        const parentPhase = result.tree.find((p: any) => p.phase.id === phaseId);
+        expect(parentPhase).toBeDefined();
+        expect(parentPhase!.phase.codeExamples).toBeUndefined();
+
+        const childPhase = parentPhase!.children[0];
+        expect(childPhase.phase.codeExamples).toBeUndefined();
+      });
+
+      it('RED: should include codeExamples in all tree nodes when includeCodeExamples=true', async () => {
+        const result = await service.getPhaseTree({
+          planId,
+          includeCodeExamples: true,
+        });
+
+        const parentPhase = result.tree.find((p: any) => p.phase.id === phaseId);
+        expect(parentPhase!.phase.codeExamples).toBeDefined();
+        expect(parentPhase!.phase.codeExamples).toHaveLength(2);
+
+        const childPhase = parentPhase!.children[0];
+        expect(childPhase.phase.codeExamples).toBeDefined();
+        expect(childPhase.phase.codeExamples).toHaveLength(1);
+      });
+    });
+
+    describe('Edge cases for includeCodeExamples', () => {
+      it('RED: should handle phase without codeExamples + includeCodeExamples=true', async () => {
+        const noCodeResult = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Phase without code',
+            description: 'No examples',
+            objectives: ['Obj'],
+            deliverables: ['Del'],
+            successCriteria: ['Criteria'],
+            estimatedEffort: { value: 1, unit: 'days', confidence: 'medium' },
+          },
+        });
+
+        const result = await service.getPhase({
+          planId,
+          phaseId: noCodeResult.phaseId,
+          includeCodeExamples: true,
+        });
+
+        // Should return empty array or undefined, not crash
+        const codeExamples = result.phase.codeExamples;
+        expect(codeExamples === undefined || codeExamples.length === 0).toBe(true);
+      });
+
+      it('RED: should measure payload size difference (with vs without codeExamples)', async () => {
+        const withoutCode = await service.getPhase({
+          planId,
+          phaseId,
+          includeCodeExamples: false,
+        });
+
+        const withCode = await service.getPhase({
+          planId,
+          phaseId,
+          includeCodeExamples: true,
+        });
+
+        const withoutSize = JSON.stringify(withoutCode.phase).length;
+        const withSize = JSON.stringify(withCode.phase).length;
+
+        // Verify significant size difference (6x as per sprint requirements)
+        expect(withSize).toBeGreaterThan(withoutSize * 5); // At least 5x
+        expect(withoutSize).toBeLessThan(2000); // Less than 2KB without codeExamples
+        expect(withSize).toBeGreaterThan(5000); // Greater than 5KB with codeExamples
+      });
     });
   });
 });

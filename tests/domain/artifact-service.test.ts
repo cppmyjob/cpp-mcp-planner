@@ -157,8 +157,8 @@ describe('ArtifactService', () => {
         },
       });
 
-      // Verify via getArtifact (use fields=['*'] to get sourceCode)
-      const { artifact } = await service.getArtifact({ planId, artifactId: added.artifactId, fields: ['*'] });
+      // Verify via getArtifact (use includeContent=true to get sourceCode)
+      const { artifact } = await service.getArtifact({ planId, artifactId: added.artifactId, fields: ['*'], includeContent: true });
       expect(artifact.title).toBe('Updated');
       expect(artifact.content.sourceCode).toBe('const y = 2;');
       expect(artifact.version).toBe(2);
@@ -978,11 +978,12 @@ describe('ArtifactService', () => {
         expect(art.codeRefs).toEqual(['src/main.ts:10']);
       });
 
-      it('should return all fields when fields=["*"]', async () => {
+      it('should return all fields when fields=["*"] and includeContent=true', async () => {
         const result = await service.getArtifact({
           planId,
           artifactId: artId,
           fields: ['*'],
+          includeContent: true, // Required for sourceCode (Variant B: explicit control)
         });
 
         const art = result.artifact;
@@ -1019,6 +1020,170 @@ describe('ArtifactService', () => {
         expect(art.title).toBeDefined();
         expect(art.artifactType).toBeDefined();
         expect(art.description).toBeUndefined();
+      });
+    });
+  });
+
+  // Sprint 3 RED: includeContent parameter for explicit Lazy-Load control
+  describe('Sprint 3 RED: includeContent parameter for Lazy-Load', () => {
+    let artId: string;
+
+    beforeEach(async () => {
+      const result = await service.addArtifact({
+        planId,
+        artifact: {
+          title: 'Heavy Artifact',
+          description: 'Artifact with large sourceCode',
+          artifactType: 'code',
+          content: {
+            language: 'typescript',
+            sourceCode: '// Large source code (50KB)\n' + 'x'.repeat(50000),
+            filename: 'heavy.ts',
+          },
+        },
+      });
+      artId = result.artifactId;
+    });
+
+    describe('getArtifact with includeContent', () => {
+      it('RED: should NOT include sourceCode by default (includeContent=false implicit)', async () => {
+        const result = await service.getArtifact({
+          planId,
+          artifactId: artId,
+        });
+
+        const art = result.artifact;
+        expect(art.content).toBeDefined();
+        expect(art.content.language).toBe('typescript');
+        expect(art.content.filename).toBe('heavy.ts');
+        // RED: sourceCode should be excluded by default (Lazy-Load)
+        expect(art.content.sourceCode).toBeUndefined();
+      });
+
+      it('RED: should NOT include sourceCode when includeContent=false', async () => {
+        const result = await service.getArtifact({
+          planId,
+          artifactId: artId,
+          includeContent: false,
+        });
+
+        expect(result.artifact.content.sourceCode).toBeUndefined();
+      });
+
+      it('RED: should include sourceCode when includeContent=true', async () => {
+        const result = await service.getArtifact({
+          planId,
+          artifactId: artId,
+          includeContent: true,
+        });
+
+        const art = result.artifact;
+        expect(art.content.sourceCode).toBeDefined();
+        expect(art.content.sourceCode).toContain('Large source code');
+        expect(art.content.sourceCode!.length).toBeGreaterThan(50000);
+      });
+
+      it('RED: includeContent=true should work with fields parameter', async () => {
+        const result = await service.getArtifact({
+          planId,
+          artifactId: artId,
+          fields: ['id', 'title', 'content'],
+          includeContent: true,
+        });
+
+        const art = result.artifact as unknown as Record<string, unknown>;
+        expect(art.id).toBe(artId);
+        expect(art.title).toBe('Heavy Artifact');
+        expect(art.description).toBeUndefined(); // not in fields
+
+        const content = art.content as { sourceCode?: string; language?: string };
+        expect(content.sourceCode).toBeDefined();
+      });
+
+      it('RED: includeContent=false should override fields=["*"]', async () => {
+        const result = await service.getArtifact({
+          planId,
+          artifactId: artId,
+          fields: ['*'],
+          includeContent: false,
+        });
+
+        const art = result.artifact;
+        // All fields should be present
+        expect(art.title).toBe('Heavy Artifact');
+        expect(art.description).toBe('Artifact with large sourceCode');
+        // But sourceCode should be excluded due to includeContent=false
+        expect(art.content.sourceCode).toBeUndefined();
+      });
+    });
+
+    describe('listArtifacts with includeContent', () => {
+      it('RED: should NOT include sourceCode in list by default', async () => {
+        const result = await service.listArtifacts({
+          planId,
+        });
+
+        const art = result.artifacts.find((a) => a.id === artId);
+        expect(art).toBeDefined();
+        expect(art!.content.sourceCode).toBeUndefined();
+      });
+
+      it('RED: should IGNORE includeContent=true in list (security: never return sourceCode in list)', async () => {
+        const result = await service.listArtifacts({
+          planId,
+          includeContent: true,
+        });
+
+        const art = result.artifacts.find((a) => a.id === artId);
+        // Even with includeContent=true, list should NEVER return sourceCode
+        expect(art!.content.sourceCode).toBeUndefined();
+      });
+    });
+
+    describe('Edge cases for includeContent', () => {
+      it('RED: should handle artifact without sourceCode + includeContent=true', async () => {
+        const noCodeResult = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Config File',
+            description: 'No source code',
+            artifactType: 'config',
+            content: {
+              filename: 'config.json',
+            },
+          },
+        });
+
+        const result = await service.getArtifact({
+          planId,
+          artifactId: noCodeResult.artifactId,
+          includeContent: true,
+        });
+
+        // Should not crash, just return undefined sourceCode
+        expect(result.artifact.content.sourceCode).toBeUndefined();
+      });
+
+      it('RED: should measure payload size difference (with vs without sourceCode)', async () => {
+        const withoutCode = await service.getArtifact({
+          planId,
+          artifactId: artId,
+          includeContent: false,
+        });
+
+        const withCode = await service.getArtifact({
+          planId,
+          artifactId: artId,
+          includeContent: true,
+        });
+
+        const withoutSize = JSON.stringify(withoutCode.artifact).length;
+        const withSize = JSON.stringify(withCode.artifact).length;
+
+        // Verify significant size difference (100x as per sprint requirements)
+        expect(withSize).toBeGreaterThan(withoutSize * 10); // At least 10x
+        expect(withoutSize).toBeLessThan(2000); // Less than 2KB without sourceCode
+        expect(withSize).toBeGreaterThan(50000); // Greater than 50KB with sourceCode
       });
     });
   });

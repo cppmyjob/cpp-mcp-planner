@@ -3,7 +3,7 @@ import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, CodeExample, PhasePriority } from '../entities/types.js';
 import { validateEffortEstimate, validateTags, validateCodeExamples, validatePriority, validateCodeRefs } from './validators.js';
-import { filterEntity } from '../utils/field-filter.js';
+import { filterEntity, filterPhase } from '../utils/field-filter.js';
 
 /**
  * Calculate the next valid order for a phase.
@@ -96,6 +96,7 @@ export interface GetPhaseInput {
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
   excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
   excludeComputed?: boolean; // Exclude computed fields (depth, path, childCount)
+  includeCodeExamples?: boolean; // Include heavy codeExamples field (default: false for Lazy-Load)
 }
 
 export interface GetPhaseResult {
@@ -108,6 +109,7 @@ export interface GetPhasesInput {
   fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
   excludeMetadata?: boolean; // Exclude metadata fields
   excludeComputed?: boolean; // Exclude computed fields
+  includeCodeExamples?: boolean; // Include heavy codeExamples field (default: false)
 }
 
 export interface GetPhasesResult {
@@ -121,6 +123,7 @@ export interface GetPhaseTreeInput {
   includeCompleted?: boolean;
   fields?: string[];  // Summary by default; ['*'] for all, or specific fields
   maxDepth?: number;  // Limit tree depth (0 = root only)
+  includeCodeExamples?: boolean; // Include heavy codeExamples in all tree nodes (default: false)
   excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
   excludeComputed?: boolean; // Exclude computed fields (depth, path, childCount)
 }
@@ -295,13 +298,13 @@ export class PhaseService {
       throw new Error('Phase not found');
     }
 
-    // Apply field filtering - phases default to summary (without heavy codeExamples)
-    const filtered = filterEntity(
+    // Apply field filtering with Lazy-Load support
+    const filtered = filterPhase(
       phase,
       input.fields,
-      'phase',
       input.excludeMetadata,
-      input.excludeComputed
+      input.excludeComputed,
+      input.includeCodeExamples ?? false // default: false (Lazy-Load)
     ) as Phase;
 
     return { phase: filtered };
@@ -328,13 +331,13 @@ export class PhaseService {
     for (const id of input.phaseIds) {
       const phase = allPhases.find((p) => p.id === id);
       if (phase) {
-        // Apply field filtering
-        const filtered = filterEntity(
+        // Apply field filtering with Lazy-Load
+        const filtered = filterPhase(
           phase,
           input.fields,
-          'phase',
           input.excludeMetadata,
-          input.excludeComputed
+          input.excludeComputed,
+          input.includeCodeExamples ?? false
         ) as Phase;
         foundPhases.push(filtered);
       } else {
@@ -561,13 +564,13 @@ export class PhaseService {
         childCount: childCounts.get(phase.id) || 0,
       };
 
-      // Apply field filtering with exclusions
-      const filtered = filterEntity(
+      // Apply field filtering with Lazy-Load support
+      const filtered = filterPhase(
         phaseWithChildCount,
         input.fields,
-        'phase',
         input.excludeMetadata,
-        input.excludeComputed
+        input.excludeComputed,
+        input.includeCodeExamples ?? false
       ) as Phase | PhaseSummary;
 
       return filtered;

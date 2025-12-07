@@ -377,6 +377,10 @@ export const tools = [
           type: 'boolean',
           description: 'Exclude computed fields (depth, path, childCount) from response. Saves ~50 bytes per entity. Only applies to phase entities.',
         },
+        includeCodeExamples: {
+          type: 'boolean',
+          description: 'Include heavy codeExamples field (default: false for Lazy-Load). Each codeExample is 2-5KB with implementation details. Excluded by default to minimize payload. Use includeCodeExamples=true ONLY when you need to see actual code implementation examples. Applies to get, get_many, and get_tree operations.',
+        },
         limit: { type: 'number' },
       },
       required: ['action', 'planId'],
@@ -488,6 +492,10 @@ export const tools = [
         excludeMetadata: {
           type: 'boolean',
           description: 'Exclude metadata fields (createdAt, updatedAt, version, metadata, type) from response. Saves ~162 bytes per entity.',
+        },
+        includeContent: {
+          type: 'boolean',
+          description: 'Include heavy sourceCode field (default: false for Lazy-Load). sourceCode can be 5-50KB and is excluded by default to minimize payload. Use includeContent=true ONLY when you need to read the actual source code. IMPORTANT: list operations NEVER return sourceCode even with includeContent=true (security measure).',
         },
       },
       required: ['action', 'planId'],
