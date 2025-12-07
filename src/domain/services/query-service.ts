@@ -945,12 +945,12 @@ export class QueryService {
 
   /**
    * Remove metadata fields from entity
-   * Removes: metadata, createdAt, updatedAt, version
+   * Removes: metadata, createdAt, updatedAt, version, type
    * @param entity - Entity to process
    * @returns Entity without metadata fields
    */
   private removeMetadataFields<T extends Entity>(entity: T): T {
-    const { metadata, createdAt, updatedAt, version, ...rest } = entity as any;
+    const { metadata, createdAt, updatedAt, version, type, ...rest } = entity as any;
     return rest as T;
   }
 }

@@ -2001,6 +2001,32 @@ describe('QueryService', () => {
         expect(solution.createdAt).toBeUndefined();
       });
 
+      it('RED (BUGFIX): excludeMetadata=true should remove type field per API documentation', async () => {
+        /**
+         * BUG: The API documentation in tool-definitions.ts states that excludeMetadata
+         * should remove: "createdAt, updatedAt, version, metadata, type"
+         *
+         * Current implementation (query-service.ts:953) only removes:
+         *   const { metadata, createdAt, updatedAt, version, ...rest } = entity as any;
+         *
+         * Missing: type field is not being removed despite documentation
+         */
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          depth: 2,
+          excludeMetadata: true,
+        } as any);
+
+        const solution = result.trace.proposedSolutions[0];
+        // Per API docs, excludeMetadata should remove: createdAt, updatedAt, version, metadata, type
+        expect(solution.metadata).toBeUndefined();
+        expect(solution.createdAt).toBeUndefined();
+        expect(solution.updatedAt).toBeUndefined();
+        expect(solution.version).toBeUndefined();
+        expect((solution as any).type).toBeUndefined(); // BUGFIX: type should also be removed
+      });
+
       it('RED 4.3: includePhases=true + fields=["id","title","status"] for phases', async () => {
         const result = await queryService.traceRequirement({
           planId,
