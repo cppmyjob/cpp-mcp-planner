@@ -33,7 +33,7 @@ const VALID_PHASE_FIELDS = new Set([
   'title', 'description', 'parentId', 'order', 'depth', 'path',
   'objectives', 'deliverables', 'successCriteria', 'schedule',
   'status', 'progress', 'startedAt', 'completedAt',
-  'milestones', 'blockers', 'implementationNotes', 'priority',
+  'milestones', 'blockers', 'blockingReason', 'implementationNotes', 'priority',
   'childCount', // computed field
 ]);
 
