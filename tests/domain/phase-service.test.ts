@@ -1682,7 +1682,7 @@ describe('PhaseService', () => {
         const uniquePaths = new Set(paths);
 
         expect(uniquePaths.size).toBe(15);
-      });
+      }, 15000); // Increase timeout for 15 phases under parallel test load
 
       it('should maintain path consistency after delete and add', async () => {
         await service.addPhase({

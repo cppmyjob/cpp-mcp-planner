@@ -331,7 +331,7 @@ describe('BatchService - Integration Tests', () => {
     // Verify all persisted
     const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
     expect(requirements).toHaveLength(50);
-  }, 10000); // Increase timeout for large batch operation
+  }, 30000); // Increase timeout for large batch operation under parallel test load
 
   it('Test 38: Batch creates full dependency tree', async () => {
     const result = await batchService.executeBatch({

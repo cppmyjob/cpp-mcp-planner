@@ -3,7 +3,6 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   ErrorCode,
-  McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 import { tools } from './tool-definitions.js';
 import { handleToolCall, ToolError } from './tool-handlers.js';
@@ -38,11 +37,22 @@ export function createMcpServer(services: Services): McpServer {
     try {
       return await handleToolCall(name, args as Record<string, unknown>, services);
     } catch (error) {
+      // IMPORTANT: Do NOT throw McpError here! The SDK will wrap any error automatically.
+      // Throwing McpError causes double-wrapping: "MCP error -32603: MCP error -32603: message"
+      // Instead, throw a plain Error with code/data properties that the SDK extracts.
+
       if (error instanceof ToolError) {
         const code = error.code === 'MethodNotFound' ? ErrorCode.MethodNotFound : ErrorCode.InternalError;
-        throw new McpError(code, error.message);
+        const err = new Error(error.message) as Error & { code: number };
+        err.code = code;
+        throw err;
       }
-      throw error;
+
+      // Non-ToolError: wrap with proper error code for MCP SDK
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      const err = new Error(message) as Error & { code: number };
+      err.code = ErrorCode.InternalError;
+      throw err;
     }
   });
 

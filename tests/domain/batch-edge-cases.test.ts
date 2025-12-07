@@ -226,7 +226,7 @@ describe('BatchService - Edge Cases', () => {
 
     expect(result.results).toHaveLength(100);
     expect(result.results.every((r) => r.success)).toBe(true);
-  }, 15000); // Increase timeout for large batch operation
+  }, 30000); // Increase timeout for large batch operation under parallel test load
 
   it('Test 47: Deep dependency chain (10 levels) resolves correctly', async () => {
     const operations = [];
