@@ -278,4 +278,78 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       expect(artifact.artifact.relatedPhaseId).toBe(phaseResult.phaseId);
     });
   });
+
+  // ============================================================================
+  // 5. Backward Compatibility: Legacy data filtering (2 tests)
+  // ============================================================================
+
+  describe('5. Backward Compatibility - Legacy Data Filtering', () => {
+    it('5.1 should strip codeExamples from legacy phase data when reading with fields=["*"]', async () => {
+      // Create phase normally
+      const phaseResult = await phaseService.addPhase({
+        planId: testPlanId,
+        phase: {
+          title: 'Legacy Phase',
+          description: 'Phase that might have legacy data',
+          objectives: ['Test'],
+          deliverables: ['Test'],
+          successCriteria: ['Test'],
+        },
+      });
+
+      // Simulate legacy data: manually inject codeExamples into storage
+      const phases = await storage.loadEntities<any>(testPlanId, 'phases');
+      const legacyPhase = phases.find((p: any) => p.id === phaseResult.phaseId);
+      if (legacyPhase) {
+        legacyPhase.codeExamples = [
+          { language: 'typescript', code: 'legacy code', description: 'old example' },
+        ];
+        await storage.saveEntities(testPlanId, 'phases', phases);
+      }
+
+      // Read phase with fields=['*'] - should NOT include codeExamples
+      const result = await phaseService.getPhase({
+        planId: testPlanId,
+        phaseId: phaseResult.phaseId,
+        fields: ['*'],
+      });
+
+      // CRITICAL: codeExamples should be stripped from response
+      expect((result.phase as any).codeExamples).toBeUndefined();
+      expect(result.phase.title).toBe('Legacy Phase');
+    });
+
+    it('5.2 should strip codeRefs from legacy phase data when reading with fields=["*"]', async () => {
+      // Create phase normally
+      const phaseResult = await phaseService.addPhase({
+        planId: testPlanId,
+        phase: {
+          title: 'Legacy Phase with Refs',
+          description: 'Phase with legacy codeRefs',
+          objectives: ['Test'],
+          deliverables: ['Test'],
+          successCriteria: ['Test'],
+        },
+      });
+
+      // Simulate legacy data: manually inject codeRefs into storage
+      const phases = await storage.loadEntities<any>(testPlanId, 'phases');
+      const legacyPhase = phases.find((p: any) => p.id === phaseResult.phaseId);
+      if (legacyPhase) {
+        legacyPhase.codeRefs = ['src/legacy.ts:42', 'tests/old.test.ts:100'];
+        await storage.saveEntities(testPlanId, 'phases', phases);
+      }
+
+      // Read phase with fields=['*'] - should NOT include codeRefs
+      const result = await phaseService.getPhase({
+        planId: testPlanId,
+        phaseId: phaseResult.phaseId,
+        fields: ['*'],
+      });
+
+      // CRITICAL: codeRefs should be stripped from response
+      expect((result.phase as any).codeRefs).toBeUndefined();
+      expect(result.phase.title).toBe('Legacy Phase with Refs');
+    });
+  });
 });

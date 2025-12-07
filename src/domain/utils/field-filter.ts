@@ -25,6 +25,19 @@ export const METADATA_FIELDS = ['createdAt', 'updatedAt', 'version', 'metadata',
 export const COMPUTED_FIELDS = ['depth', 'path', 'childCount'];
 
 /**
+ * All valid fields for Phase entity (whitelist for backward compatibility).
+ * Any fields from legacy data NOT in this list will be stripped.
+ */
+const VALID_PHASE_FIELDS = new Set([
+  'id', 'type', 'createdAt', 'updatedAt', 'version', 'metadata',
+  'title', 'description', 'parentId', 'order', 'depth', 'path',
+  'objectives', 'deliverables', 'successCriteria', 'schedule',
+  'status', 'progress', 'startedAt', 'completedAt',
+  'milestones', 'blockers', 'implementationNotes', 'priority',
+  'childCount', // computed field
+]);
+
+/**
  * Summary field presets for each entity type.
  * These are the essential fields returned by default to minimize payload.
  */
@@ -191,12 +204,13 @@ export function filterArtifact<T>(
 
 /**
  * Filter phase entity with standard field filtering.
+ * IMPORTANT: Enforces schema validation - only valid Phase fields are returned.
  *
  * @param phase - The phase to filter
  * @param fields - Array of field names
  * @param excludeMetadata - If true, exclude metadata fields
  * @param excludeComputed - If true, exclude computed fields (depth, path, childCount)
- * @returns Filtered phase
+ * @returns Filtered phase (only valid fields, legacy fields removed)
  */
 export function filterPhase<T>(
   phase: T,
@@ -204,5 +218,16 @@ export function filterPhase<T>(
   excludeMetadata: boolean = false,
   excludeComputed: boolean = false
 ): T | Partial<T> {
-  return filterEntity(phase, fields, 'phase', excludeMetadata, excludeComputed);
+  const filtered = filterEntity(phase, fields, 'phase', excludeMetadata, excludeComputed);
+  const filteredObj = filtered as Record<string, unknown>;
+
+  // Backward compatibility: Remove any fields not in current Phase schema
+  // This handles legacy data that may contain deprecated fields
+  for (const key of Object.keys(filteredObj)) {
+    if (!VALID_PHASE_FIELDS.has(key)) {
+      delete filteredObj[key];
+    }
+  }
+
+  return filtered;
 }
