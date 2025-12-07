@@ -7,8 +7,22 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 
 /**
- * Comprehensive test of ALL MCP tools and ALL their actions.
- * This validates that tool-definitions.ts matches the actual service implementations.
+ * Comprehensive E2E test of ALL MCP tools and ALL their actions.
+ * Coverage: 9/9 tools (100%)
+ *
+ * Tools tested:
+ * 1. plan (8 actions)
+ * 2. requirement (10 actions)
+ * 3. solution (9 actions)
+ * 4. decision (8 actions)
+ * 5. phase (12 actions)
+ * 6. link (3 actions)
+ * 7. artifact (5 actions) - Sprint 12
+ * 8. query (5 actions)
+ * 9. batch (1 action: execute with temp ID resolution) - Sprint 12
+ *
+ * This validates that tool-definitions.ts matches the actual service implementations
+ * and that all MCP tools work correctly through the full client-server stack.
  */
 
 // Helper to retry directory removal on Windows (EBUSY/ENOTEMPTY errors)
@@ -2036,6 +2050,259 @@ describe('E2E: All MCP Tools Validation', () => {
   });
 
   // ============================================================
+  // TOOL: artifact (5 actions: add, get, update, list, delete)
+  // ============================================================
+  describe('Tool: artifact', () => {
+    let artifactId: string;
+
+    it('action: add with code artifact', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'add',
+          planId,
+          artifact: {
+            title: 'User Authentication Module',
+            description: 'JWT authentication implementation',
+            artifactType: 'code',
+            content: {
+              language: 'typescript',
+              sourceCode: `export class AuthService {
+  async login(username: string, password: string): Promise<string> {
+    // Validate credentials
+    const user = await this.validateUser(username, password);
+    // Generate JWT token
+    return this.generateToken(user);
+  }
+}`,
+              filename: 'auth-service.ts',
+            },
+            fileTable: [
+              {
+                path: 'src/services/auth-service.ts',
+                action: 'create',
+                description: 'Create new auth service',
+              },
+            ],
+            targets: [
+              {
+                path: 'src/services/auth-service.ts',
+                action: 'create',
+                description: 'Implement JWT authentication',
+              },
+            ],
+            relatedPhaseId: phaseId,
+            relatedRequirementIds: [requirementId],
+            codeRefs: ['src/services/auth-service.ts:1'],
+          },
+        },
+      });
+
+      const parsed = parseResult<{ artifactId: string }>(result);
+      expect(parsed.artifactId).toBeDefined();
+      artifactId = parsed.artifactId;
+    });
+
+    it('action: add with all artifactTypes', async () => {
+      const artifactTypes = ['config', 'migration', 'documentation', 'test', 'script', 'other'];
+
+      for (const artifactType of artifactTypes) {
+        const result = await client.callTool({
+          name: 'artifact',
+          arguments: {
+            action: 'add',
+            planId,
+            artifact: {
+              title: `${artifactType} artifact`,
+              description: `Testing ${artifactType} type`,
+              artifactType,
+              content: {
+                language: artifactType === 'documentation' ? 'markdown' : 'typescript',
+                sourceCode: `// ${artifactType} example`,
+                filename: `example.${artifactType}`,
+              },
+            },
+          },
+        });
+
+        const parsed = parseResult<{ artifactId: string }>(result);
+        expect(parsed.artifactId).toBeDefined();
+      }
+    });
+
+    it('action: get', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'get',
+          planId,
+          artifactId,
+          fields: ['*'],
+        },
+      });
+
+      const parsed = parseResult<{ artifact: { id: string; title: string } }>(result);
+      expect(parsed.artifact.id).toBe(artifactId);
+      expect(parsed.artifact.title).toBe('User Authentication Module');
+    });
+
+    it('action: get with fields parameter', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'get',
+          planId,
+          artifactId,
+          fields: ['id', 'title', 'artifactType'],
+        },
+      });
+
+      const parsed = parseResult<{ artifact: Record<string, unknown> }>(result);
+      expect(parsed.artifact.id).toBeDefined();
+      expect(parsed.artifact.title).toBeDefined();
+      expect(parsed.artifact.artifactType).toBeDefined();
+      // Other fields should not be present
+      expect(parsed.artifact.description).toBeUndefined();
+      expect(parsed.artifact.content).toBeUndefined();
+    });
+
+    it('action: get with includeContent=true', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'get',
+          planId,
+          artifactId,
+          includeContent: true,
+          fields: ['*'],
+        },
+      });
+
+      const parsed = parseResult<{ artifact: { id: string; content: { sourceCode: string } } }>(result);
+      expect(parsed.artifact.id).toBe(artifactId);
+      expect(parsed.artifact.content).toBeDefined();
+      expect(parsed.artifact.content.sourceCode).toContain('AuthService');
+    });
+
+    it('action: update', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'update',
+          planId,
+          artifactId,
+          updates: {
+            title: 'Updated Authentication Module',
+            description: 'Updated JWT implementation with refresh tokens',
+            status: 'draft',
+          },
+        },
+      });
+
+      const parsed = parseResult<{ success: boolean }>(result);
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'get',
+          planId,
+          artifactId,
+          fields: ['*'],
+        },
+      });
+      const getParsed = parseResult<{ artifact: { title: string; description: string } }>(getResult);
+      expect(getParsed.artifact.title).toBe('Updated Authentication Module');
+      expect(getParsed.artifact.description).toBe('Updated JWT implementation with refresh tokens');
+    });
+
+    it('action: list', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'list',
+          planId,
+        },
+      });
+
+      const parsed = parseResult<{ artifacts: Array<{ id: string }>; total: number }>(result);
+      expect(parsed.artifacts.length).toBeGreaterThan(0);
+      expect(parsed.total).toBeGreaterThan(0);
+      expect(parsed.artifacts.some((a) => a.id === artifactId)).toBe(true);
+    });
+
+    it('action: list with filters', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'list',
+          planId,
+          filters: {
+            artifactType: 'code',
+          },
+        },
+      });
+
+      const parsed = parseResult<{ artifacts: Array<{ id: string }>; total: number }>(result);
+      expect(parsed.artifacts).toBeDefined();
+      expect(parsed.total).toBeGreaterThanOrEqual(0);
+    });
+
+    it('action: list with relatedPhaseId filter', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'list',
+          planId,
+          filters: {
+            relatedPhaseId: phaseId,
+          },
+        },
+      });
+
+      const parsed = parseResult<{ artifacts: Array<{ id: string }>; total: number }>(result);
+      expect(parsed.artifacts).toBeDefined();
+      // Should find at least our created artifact
+      expect(parsed.artifacts.length).toBeGreaterThan(0);
+    });
+
+    it('action: delete', async () => {
+      // Create an artifact to delete
+      const createResult = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'add',
+          planId,
+          artifact: {
+            title: 'Artifact to Delete',
+            description: 'Will be deleted',
+            artifactType: 'other',
+            content: {
+              language: 'text',
+              sourceCode: 'delete me',
+              filename: 'temp.txt',
+            },
+          },
+        },
+      });
+      const created = parseResult<{ artifactId: string }>(createResult);
+
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'delete',
+          planId,
+          artifactId: created.artifactId,
+        },
+      });
+
+      const parsed = parseResult<{ success: boolean }>(result);
+      expect(parsed.success).toBe(true);
+    });
+  });
+
+  // ============================================================
   // TOOL: query (5 actions)
   // ============================================================
   describe('Tool: query', () => {
@@ -2145,6 +2412,390 @@ describe('E2E: All MCP Tools Validation', () => {
       expect(parsed.status).toBe('healthy');
       expect(parsed.version).toBe('1.0.0');
       expect(parsed.storagePath).toBe(storagePath);
+    });
+  });
+
+  // ============================================================
+  // TOOL: batch (1 action: execute)
+  // ============================================================
+  describe('Tool: batch', () => {
+    it('action: execute with single entity creation', async () => {
+      const result = await client.callTool({
+        name: 'batch',
+        arguments: {
+          planId,
+          operations: [
+            {
+              entity_type: 'requirement',
+              payload: {
+                title: 'Batch Test Requirement',
+                description: 'Created via batch operation',
+                source: { type: 'user-request' },
+                acceptanceCriteria: ['AC1'],
+                priority: 'medium',
+                category: 'functional',
+              },
+            },
+          ],
+        },
+      });
+
+      const parsed = parseResult<{
+        results: Array<{ success: boolean; id?: string }>;
+        tempIdMapping: Record<string, string>;
+      }>(result);
+
+      expect(parsed.results).toHaveLength(1);
+      expect(parsed.results[0].success).toBe(true);
+      expect(parsed.results[0].id).toBeDefined();
+    });
+
+    it('action: execute with multiple entities and temp IDs', async () => {
+      const result = await client.callTool({
+        name: 'batch',
+        arguments: {
+          planId,
+          operations: [
+            {
+              entity_type: 'requirement',
+              payload: {
+                tempId: '$0',
+                title: 'Batch Requirement 1',
+                description: 'First requirement',
+                source: { type: 'user-request' },
+                acceptanceCriteria: ['AC1'],
+                priority: 'high',
+                category: 'functional',
+              },
+            },
+            {
+              entity_type: 'requirement',
+              payload: {
+                tempId: '$1',
+                title: 'Batch Requirement 2',
+                description: 'Second requirement',
+                source: { type: 'user-request' },
+                acceptanceCriteria: ['AC1'],
+                priority: 'medium',
+                category: 'functional',
+              },
+            },
+            {
+              entity_type: 'solution',
+              payload: {
+                tempId: '$2',
+                title: 'Batch Solution',
+                description: 'Solution addressing both requirements',
+                approach: 'Unified approach',
+                addressing: ['$0', '$1'], // Reference temp IDs
+                tradeoffs: [],
+                evaluation: {
+                  effortEstimate: { value: 5, unit: 'days', confidence: 'medium' },
+                  technicalFeasibility: 'high',
+                  riskAssessment: 'Low',
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      const parsed = parseResult<{
+        results: Array<{ success: boolean; id?: string }>;
+        tempIdMapping: Record<string, string>;
+      }>(result);
+
+      expect(parsed.results).toHaveLength(3);
+      expect(parsed.results[0].success).toBe(true);
+      expect(parsed.results[1].success).toBe(true);
+      expect(parsed.results[2].success).toBe(true);
+
+      // Verify temp ID mapping
+      expect(parsed.tempIdMapping['$0']).toBeDefined();
+      expect(parsed.tempIdMapping['$1']).toBeDefined();
+      expect(parsed.tempIdMapping['$2']).toBeDefined();
+
+      // Verify all operations returned IDs
+      expect(parsed.results[0].id).toBeDefined();
+      expect(parsed.results[1].id).toBeDefined();
+      expect(parsed.results[2].id).toBeDefined();
+
+      // Verify solution references were resolved - get solution and check addressing
+      const solutionResult = await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'get',
+          planId,
+          solutionId: parsed.tempIdMapping['$2'],
+          fields: ['*'],
+        },
+      });
+
+      const solution = parseResult<{ solution: { addressing: string[] } }>(solutionResult);
+      expect(solution.solution.addressing).toHaveLength(2);
+      expect(solution.solution.addressing).toContain(parsed.tempIdMapping['$0']);
+      expect(solution.solution.addressing).toContain(parsed.tempIdMapping['$1']);
+    });
+
+    it('action: execute with cross-entity references (requirement → phase → link)', async () => {
+      const result = await client.callTool({
+        name: 'batch',
+        arguments: {
+          planId,
+          operations: [
+            {
+              entity_type: 'requirement',
+              payload: {
+                tempId: '$0',
+                title: 'Cross-ref Requirement',
+                description: 'Testing cross-references',
+                source: { type: 'user-request' },
+                acceptanceCriteria: ['AC1'],
+                priority: 'high',
+                category: 'functional',
+              },
+            },
+            {
+              entity_type: 'phase',
+              payload: {
+                tempId: '$1',
+                title: 'Cross-ref Phase',
+                description: 'Phase referencing requirement',
+                objectives: ['Implement requirement'],
+                deliverables: ['Code'],
+                successCriteria: ['Tests pass'],
+              },
+            },
+            {
+              entity_type: 'link',
+              payload: {
+                sourceId: '$1', // Phase
+                targetId: '$0', // Requirement
+                relationType: 'addresses',
+                metadata: { batch_test: true },
+              },
+            },
+          ],
+        },
+      });
+
+      const parsed = parseResult<{
+        results: Array<{ success: boolean; id?: string }>;
+        tempIdMapping: Record<string, string>;
+      }>(result);
+
+      expect(parsed.results).toHaveLength(3);
+      expect(parsed.results[0].success).toBe(true);
+      expect(parsed.results[1].success).toBe(true);
+      expect(parsed.results[2].success).toBe(true);
+
+      // Verify link was created with resolved IDs
+      const linkResult = await client.callTool({
+        name: 'link',
+        arguments: {
+          action: 'get',
+          planId,
+          entityId: parsed.tempIdMapping['$1'], // Phase ID
+          direction: 'both',
+        },
+      });
+
+      const links = parseResult<{ links: Array<{ sourceId: string; targetId: string }> }>(linkResult);
+      expect(links.links.length).toBeGreaterThan(0);
+      const createdLink = links.links.find(
+        (l) => l.sourceId === parsed.tempIdMapping['$1'] && l.targetId === parsed.tempIdMapping['$0']
+      );
+      expect(createdLink).toBeDefined();
+    });
+
+    it('action: execute with all entity types (requirement, solution, phase, link, decision, artifact)', async () => {
+      const result = await client.callTool({
+        name: 'batch',
+        arguments: {
+          planId,
+          operations: [
+            {
+              entity_type: 'requirement',
+              payload: {
+                tempId: '$0',
+                title: 'All Types Requirement',
+                description: 'Testing all entity types',
+                source: { type: 'user-request' },
+                acceptanceCriteria: ['AC1'],
+                priority: 'high',
+                category: 'functional',
+              },
+            },
+            {
+              entity_type: 'solution',
+              payload: {
+                tempId: '$1',
+                title: 'All Types Solution',
+                description: 'Solution for requirement',
+                approach: 'Approach',
+                addressing: ['$0'],
+                tradeoffs: [],
+                evaluation: {
+                  effortEstimate: { value: 3, unit: 'days', confidence: 'high' },
+                  technicalFeasibility: 'high',
+                  riskAssessment: 'Low',
+                },
+              },
+            },
+            {
+              entity_type: 'decision',
+              payload: {
+                tempId: '$2',
+                title: 'All Types Decision',
+                question: 'Which approach?',
+                context: 'Testing batch',
+                decision: 'Use batch approach',
+                alternativesConsidered: [],
+                consequences: 'Faster setup',
+              },
+            },
+            {
+              entity_type: 'phase',
+              payload: {
+                tempId: '$3',
+                title: 'All Types Phase',
+                description: 'Implementation phase',
+                objectives: ['Implement'],
+                deliverables: ['Code'],
+                successCriteria: ['Tests pass'],
+              },
+            },
+            {
+              entity_type: 'artifact',
+              payload: {
+                tempId: '$4',
+                title: 'All Types Artifact',
+                description: 'Generated code',
+                artifactType: 'code',
+                content: {
+                  language: 'typescript',
+                  sourceCode: '// batch test',
+                  filename: 'batch.ts',
+                },
+                relatedPhaseId: '$3',
+                relatedRequirementIds: ['$0'],
+              },
+            },
+            {
+              entity_type: 'link',
+              payload: {
+                sourceId: '$1', // Solution
+                targetId: '$0', // Requirement
+                relationType: 'implements',
+              },
+            },
+          ],
+        },
+      });
+
+      const parsed = parseResult<{
+        results: Array<{ success: boolean; id?: string }>;
+        tempIdMapping: Record<string, string>;
+      }>(result);
+
+      expect(parsed.results).toHaveLength(6);
+
+      // Verify all operations succeeded
+      parsed.results.forEach((r) => {
+        expect(r.success).toBe(true);
+        expect(r.id).toBeDefined();
+      });
+
+      // Verify all temp IDs were mapped
+      expect(parsed.tempIdMapping['$0']).toBeDefined();
+      expect(parsed.tempIdMapping['$1']).toBeDefined();
+      expect(parsed.tempIdMapping['$2']).toBeDefined();
+      expect(parsed.tempIdMapping['$3']).toBeDefined();
+      expect(parsed.tempIdMapping['$4']).toBeDefined();
+
+      // Verify artifact has resolved relatedPhaseId
+      const artifactResult = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'get',
+          planId,
+          artifactId: parsed.tempIdMapping['$4'],
+          fields: ['*'],
+        },
+      });
+
+      const artifact = parseResult<{
+        artifact: { relatedPhaseId: string; relatedRequirementIds: string[] };
+      }>(artifactResult);
+      expect(artifact.artifact.relatedPhaseId).toBe(parsed.tempIdMapping['$3']); // Resolved from $3
+      expect(artifact.artifact.relatedRequirementIds).toContain(parsed.tempIdMapping['$0']); // Resolved from $0
+    });
+
+    it('action: execute with rollback on error (atomic transaction)', async () => {
+      // Get count of requirements before batch
+      const beforeList = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'list',
+          planId,
+        },
+      });
+      const beforeCount = parseResult<{ total: number }>(beforeList).total;
+
+      // Try to create batch with an invalid operation (should fail and rollback)
+      try {
+        await client.callTool({
+          name: 'batch',
+          arguments: {
+            planId,
+            operations: [
+              {
+                entity_type: 'requirement',
+                payload: {
+                  title: 'Valid Requirement',
+                  description: 'Should be rolled back',
+                  source: { type: 'user-request' },
+                  acceptanceCriteria: ['AC1'],
+                  priority: 'high',
+                  category: 'functional',
+                },
+              },
+              {
+                entity_type: 'solution',
+                payload: {
+                  title: 'Invalid Solution',
+                  description: 'Invalid evaluation format',
+                  addressing: [],
+                  tradeoffs: [],
+                  evaluation: {
+                    effortEstimate: {
+                      value: -999, // Invalid negative value
+                      unit: 'invalid_unit', // Invalid unit
+                      confidence: 'invalid', // Invalid confidence
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        });
+
+        // Should not reach here
+        throw new Error('Expected batch to fail but it succeeded');
+      } catch (error: any) {
+        // Expected error - verify rollback
+        const afterList = await client.callTool({
+          name: 'requirement',
+          arguments: {
+            action: 'list',
+            planId,
+          },
+        });
+        const afterCount = parseResult<{ total: number }>(afterList).total;
+
+        // Count should be unchanged (rollback worked)
+        expect(afterCount).toBe(beforeCount);
+      }
     });
   });
 });
