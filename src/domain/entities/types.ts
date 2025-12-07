@@ -280,6 +280,8 @@ export interface PlanManifest {
   updatedAt: string;
   version: number;
   lockVersion: number; // For optimistic locking
+  enableHistory?: boolean; // Sprint 7: Enable version history tracking
+  maxHistoryDepth?: number; // Sprint 7: Maximum versions to keep (0-10), 0 means unlimited
   statistics: {
     totalRequirements: number;
     totalSolutions: number;
@@ -309,3 +311,39 @@ export interface ActivePlanMapping {
 }
 
 export type ActivePlansIndex = Record<string, ActivePlanMapping>;
+
+// Sprint 7: Version History types
+export interface VersionSnapshot<T = any> {
+  version: number;
+  data: T;
+  timestamp: string;
+  author?: string;
+  changeNote?: string;
+}
+
+export interface VersionHistory<T = any> {
+  entityId: string;
+  entityType: 'requirement' | 'solution' | 'decision' | 'phase' | 'artifact';
+  currentVersion: number;
+  versions: VersionSnapshot<T>[];
+  total: number;
+  hasMore?: boolean; // Indicates if there are more versions beyond the current page
+}
+
+export interface VersionDiff {
+  entityId: string;
+  entityType: 'requirement' | 'solution' | 'decision' | 'phase' | 'artifact';
+  version1: {
+    version: number;
+    timestamp: string;
+  };
+  version2: {
+    version: number;
+    timestamp: string;
+  };
+  changes: Record<string, {
+    from: any;
+    to: any;
+    changed: boolean;
+  }>;
+}

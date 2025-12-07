@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
+import type { VersionHistoryService } from './version-history-service.js';
 import type {
   Requirement,
   RequirementSource,
@@ -8,6 +9,8 @@ import type {
   RequirementCategory,
   RequirementStatus,
   Tag,
+  VersionHistory,
+  VersionDiff,
 } from '../entities/types.js';
 import { validateTags } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
@@ -195,10 +198,26 @@ export interface ArrayOperationResult {
   newLength: number;
 }
 
+// Sprint 7: Version History input/output types
+export interface GetRequirementHistoryInput {
+  planId: string;
+  requirementId: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface DiffRequirementInput {
+  planId: string;
+  requirementId: string;
+  version1: number;
+  version2: number;
+}
+
 export class RequirementService {
   constructor(
     private storage: FileStorage,
-    private planService: PlanService
+    private planService: PlanService,
+    private versionHistoryService?: VersionHistoryService // Sprint 7: Optional for backward compatibility
   ) {}
 
   async addRequirement(input: AddRequirementInput): Promise<AddRequirementResult> {
@@ -351,6 +370,21 @@ export class RequirementService {
 
     const requirement = requirements[index];
     const now = new Date().toISOString();
+
+    // Sprint 7: Save current version to history BEFORE updating
+    if (this.versionHistoryService) {
+      // Create a deep copy of the current requirement state
+      const currentSnapshot = JSON.parse(JSON.stringify(requirement));
+      await this.versionHistoryService.saveVersion(
+        input.planId,
+        input.requirementId,
+        'requirement',
+        currentSnapshot,
+        requirement.version, // Save with current version number
+        'claude-code',
+        'Auto-saved before update'
+      );
+    }
 
     // Apply updates
     if (input.updates.title !== undefined) {
@@ -682,6 +716,64 @@ export class RequirementService {
         return newArray;
       }
     );
+  }
+
+  /**
+   * Sprint 7: Get version history for a requirement
+   * Note: Can retrieve history even for deleted requirements
+   */
+  async getHistory(input: GetRequirementHistoryInput): Promise<VersionHistory<Requirement>> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    return this.versionHistoryService.getHistory({
+      planId: input.planId,
+      entityId: input.requirementId,
+      entityType: 'requirement',
+      limit: input.limit,
+      offset: input.offset,
+    });
+  }
+
+  /**
+   * Sprint 7: Compare two versions of a requirement
+   */
+  async diff(input: DiffRequirementInput): Promise<VersionDiff> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    // Load current requirement to support diffing with current version
+    const requirements = await this.storage.loadEntities<Requirement>(
+      input.planId,
+      'requirements'
+    );
+    const currentRequirement = requirements.find((r) => r.id === input.requirementId);
+
+    if (!currentRequirement) {
+      throw new Error('Requirement not found');
+    }
+
+    return this.versionHistoryService.diff({
+      planId: input.planId,
+      entityId: input.requirementId,
+      entityType: 'requirement',
+      version1: input.version1,
+      version2: input.version2,
+      currentEntityData: currentRequirement,
+      currentVersion: currentRequirement.version,
+    });
   }
 }
 

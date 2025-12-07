@@ -37,6 +37,13 @@ export class FileStorage {
     await fs.mkdir(path.join(planDir, 'entities'), { recursive: true });
     await fs.mkdir(path.join(planDir, 'versions'), { recursive: true });
     await fs.mkdir(path.join(planDir, 'exports'), { recursive: true });
+    // Sprint 7: Create history directories for each entity type
+    await fs.mkdir(path.join(planDir, 'history'), { recursive: true });
+    await fs.mkdir(path.join(planDir, 'history', 'requirement'), { recursive: true });
+    await fs.mkdir(path.join(planDir, 'history', 'solution'), { recursive: true });
+    await fs.mkdir(path.join(planDir, 'history', 'decision'), { recursive: true });
+    await fs.mkdir(path.join(planDir, 'history', 'phase'), { recursive: true });
+    await fs.mkdir(path.join(planDir, 'history', 'artifact'), { recursive: true });
   }
 
   async deletePlan(planId: string): Promise<void> {
@@ -259,6 +266,26 @@ export class FileStorage {
   // Get base directory
   getBaseDir(): string {
     return this.baseDir;
+  }
+
+  // Sprint 7: Generic JSON read/write operations for version history
+  async readJSON<T>(relativePath: string): Promise<T> {
+    const fullPath = path.join(this.plansDir, relativePath);
+    const content = await fs.readFile(fullPath, 'utf-8');
+    return JSON.parse(content) as T;
+  }
+
+  async writeJSON(relativePath: string, data: unknown): Promise<void> {
+    const fullPath = path.join(this.plansDir, relativePath);
+    // Ensure directory exists
+    const dir = path.dirname(fullPath);
+    await fs.mkdir(dir, { recursive: true });
+    await this.atomicWrite(fullPath, data);
+  }
+
+  async deleteFile(relativePath: string): Promise<void> {
+    const fullPath = path.join(this.plansDir, relativePath);
+    await fs.unlink(fullPath);
   }
 }
 

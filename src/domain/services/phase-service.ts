@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
-import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, CodeExample, PhasePriority } from '../entities/types.js';
+import type { VersionHistoryService } from './version-history-service.js';
+import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, CodeExample, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
 import { validateEffortEstimate, validateTags, validateCodeExamples, validatePriority, validateCodeRefs } from './validators.js';
 import { filterEntity, filterPhase } from '../utils/field-filter.js';
 
@@ -278,7 +279,8 @@ export interface UpdatePhaseStatusResult {
 export class PhaseService {
   constructor(
     private storage: FileStorage,
-    private planService: PlanService
+    private planService: PlanService,
+    private versionHistoryService?: VersionHistoryService
   ) {}
 
   private async ensurePlanExists(planId: string): Promise<void> {
@@ -432,6 +434,21 @@ export class PhaseService {
 
     const phase = phases[index];
     const now = new Date().toISOString();
+
+    // Sprint 7: Save current version to history BEFORE updating
+    if (this.versionHistoryService) {
+      const currentSnapshot = JSON.parse(JSON.stringify(phase));
+      await this.versionHistoryService.saveVersion(
+        input.planId,
+        input.phaseId,
+        'phase',
+        currentSnapshot,
+        phase.version,
+        'claude-code',
+        'Auto-saved before update'
+      );
+    }
+
 
     if (input.updates.title !== undefined) phase.title = input.updates.title;
     if (input.updates.description !== undefined) phase.description = input.updates.description;
@@ -1040,6 +1057,63 @@ export class PhaseService {
       }
     );
   }
+
+  /**
+   * Sprint 7: Get version history
+   */
+  async getHistory(input: { planId: string; phaseId: string; limit?: number; offset?: number }): Promise<VersionHistory<Phase>> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    return this.versionHistoryService.getHistory({
+      planId: input.planId,
+      entityId: input.phaseId,
+      entityType: 'phase',
+      limit: input.limit,
+      offset: input.offset,
+    });
+  }
+
+  /**
+   * Sprint 7: Compare two versions
+   */
+  async diff(input: { planId: string; phaseId: string; version1: number; version2: number }): Promise<VersionDiff> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    const entities = await this.storage.loadEntities<Phase>(
+      input.planId,
+      'phases'
+    );
+    const current = entities.find((e) => e.id === input.phaseId);
+
+    if (!current) {
+      throw new Error('Phase not found');
+    }
+
+    return this.versionHistoryService.diff({
+      planId: input.planId,
+      entityId: input.phaseId,
+      entityType: 'phase',
+      version1: input.version1,
+      version2: input.version2,
+      currentEntityData: current,
+      currentVersion: current.version,
+    });
+  }
+
 }
 
 export default PhaseService;

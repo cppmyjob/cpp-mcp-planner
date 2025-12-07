@@ -19,6 +19,8 @@ export interface CreatePlanInput {
   name: string;
   description: string;
   author?: string;
+  enableHistory?: boolean; // Sprint 7: Enable version history tracking (default: false)
+  maxHistoryDepth?: number; // Sprint 7: Maximum versions to keep (0-10), 0 means unlimited
 }
 
 export interface ListPlansInput {
@@ -41,6 +43,8 @@ export interface UpdatePlanInput {
     name?: string;
     description?: string;
     status?: PlanStatus;
+    enableHistory?: boolean; // Sprint 7: Update history settings
+    maxHistoryDepth?: number; // Sprint 7: Update max history depth (0-10)
   };
 }
 
@@ -153,6 +157,16 @@ export class PlanService {
     const planId = uuidv4();
     const now = new Date().toISOString();
 
+    // Sprint 7: Validate history settings
+    if (input.maxHistoryDepth !== undefined) {
+      if (input.maxHistoryDepth < 0 || input.maxHistoryDepth > 10) {
+        throw new Error('maxHistoryDepth must be between 0 and 10');
+      }
+      if (!Number.isInteger(input.maxHistoryDepth)) {
+        throw new Error('maxHistoryDepth must be an integer');
+      }
+    }
+
     const manifest: PlanManifest = {
       id: planId,
       name: input.name,
@@ -172,6 +186,24 @@ export class PlanService {
         completionPercentage: 0,
       },
     };
+
+    // Sprint 7: Configure history settings
+    // Priority: explicit values > inferred from each other > defaults
+    if (input.enableHistory !== undefined) {
+      manifest.enableHistory = input.enableHistory;
+
+      // If enableHistory is explicitly set and maxHistoryDepth is not provided, set defaults
+      if (input.maxHistoryDepth === undefined) {
+        manifest.maxHistoryDepth = input.enableHistory ? 5 : 0; // Default: 5 when enabled, 0 when disabled
+      } else {
+        manifest.maxHistoryDepth = input.maxHistoryDepth;
+      }
+    } else if (input.maxHistoryDepth !== undefined) {
+      // If only maxHistoryDepth is provided, infer enableHistory from it
+      manifest.maxHistoryDepth = input.maxHistoryDepth;
+      manifest.enableHistory = input.maxHistoryDepth > 0;
+    }
+    // If neither is provided, history remains disabled (fields are undefined)
 
     await this.storage.createPlanDirectory(planId);
     await this.storage.saveManifest(planId, manifest);
@@ -307,8 +339,24 @@ export class PlanService {
       manifest.status = input.updates.status;
     }
 
+    // Sprint 7: Update history settings
+    if (input.updates.enableHistory !== undefined) {
+      manifest.enableHistory = input.updates.enableHistory;
+    }
+    if (input.updates.maxHistoryDepth !== undefined) {
+      // Validate maxHistoryDepth
+      if (input.updates.maxHistoryDepth < 0 || input.updates.maxHistoryDepth > 10) {
+        throw new Error('maxHistoryDepth must be between 0 and 10');
+      }
+      if (!Number.isInteger(input.updates.maxHistoryDepth)) {
+        throw new Error('maxHistoryDepth must be an integer');
+      }
+      manifest.maxHistoryDepth = input.updates.maxHistoryDepth;
+    }
+
     manifest.updatedAt = now;
     manifest.version += 1;
+    manifest.lockVersion += 1;  // Sprint 7 fix: Increment lockVersion for optimistic locking
 
     await this.storage.saveManifest(input.planId, manifest);
 

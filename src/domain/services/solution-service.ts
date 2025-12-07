@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
-import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag } from '../entities/types.js';
+import type { VersionHistoryService } from './version-history-service.js';
+import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
 import { validateEffortEstimate, validateTags } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
@@ -137,7 +138,8 @@ export interface DeleteSolutionResult {
 export class SolutionService {
   constructor(
     private storage: FileStorage,
-    private planService: PlanService
+    private planService: PlanService,
+    private versionHistoryService?: VersionHistoryService
   ) {}
 
   async getSolution(input: GetSolutionInput): Promise<GetSolutionResult> {
@@ -365,6 +367,21 @@ export class SolutionService {
     const solution = solutions[index];
     const now = new Date().toISOString();
 
+    // Sprint 7: Save current version to history BEFORE updating
+    if (this.versionHistoryService) {
+      const currentSnapshot = JSON.parse(JSON.stringify(solution));
+      await this.versionHistoryService.saveVersion(
+        input.planId,
+        input.solutionId,
+        'solution',
+        currentSnapshot,
+        solution.version,
+        'claude-code',
+        'Auto-saved before update'
+      );
+    }
+
+
     // Apply updates
     if (input.updates.title !== undefined) solution.title = input.updates.title;
     if (input.updates.description !== undefined) solution.description = input.updates.description;
@@ -480,6 +497,63 @@ export class SolutionService {
       }
     }
   }
+
+  /**
+   * Sprint 7: Get version history
+   */
+  async getHistory(input: { planId: string; solutionId: string; limit?: number; offset?: number }): Promise<VersionHistory<Solution>> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    return this.versionHistoryService.getHistory({
+      planId: input.planId,
+      entityId: input.solutionId,
+      entityType: 'solution',
+      limit: input.limit,
+      offset: input.offset,
+    });
+  }
+
+  /**
+   * Sprint 7: Compare two versions
+   */
+  async diff(input: { planId: string; solutionId: string; version1: number; version2: number }): Promise<VersionDiff> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    const entities = await this.storage.loadEntities<Solution>(
+      input.planId,
+      'solutions'
+    );
+    const current = entities.find((e) => e.id === input.solutionId);
+
+    if (!current) {
+      throw new Error('Solution not found');
+    }
+
+    return this.versionHistoryService.diff({
+      planId: input.planId,
+      entityId: input.solutionId,
+      entityType: 'solution',
+      version1: input.version1,
+      version2: input.version2,
+      currentEntityData: current,
+      currentVersion: current.version,
+    });
+  }
+
 }
 
 export default SolutionService;

@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
+import type { VersionHistoryService } from './version-history-service.js';
 import type {
   Artifact,
   ArtifactType,
@@ -8,6 +9,8 @@ import type {
   FileEntry,
   ArtifactTarget,
   Tag,
+  VersionHistory,
+  VersionDiff,
 } from '../entities/types.js';
 import { validateTags, validateArtifactType, validateFileTable, validateTargets, validateCodeRefs } from './validators.js';
 import { filterArtifact } from '../utils/field-filter.js';
@@ -139,7 +142,8 @@ export interface DeleteArtifactResult {
 export class ArtifactService {
   constructor(
     private storage: FileStorage,
-    private planService: PlanService
+    private planService: PlanService,
+    private versionHistoryService?: VersionHistoryService
   ) {}
 
   private async ensurePlanExists(planId: string): Promise<void> {
@@ -291,6 +295,20 @@ export class ArtifactService {
     const artifact = artifacts[index];
     const now = new Date().toISOString();
 
+    // Sprint 7: Save current version to history BEFORE updating
+    if (this.versionHistoryService) {
+      const currentSnapshot = JSON.parse(JSON.stringify(artifact));
+      await this.versionHistoryService.saveVersion(
+        input.planId,
+        input.artifactId,
+        'artifact',
+        currentSnapshot,
+        artifact.version,
+        'claude-code',
+        'Auto-saved before update'
+      );
+    }
+
     if (input.updates.title !== undefined) artifact.title = input.updates.title;
     if (input.updates.description !== undefined) artifact.description = input.updates.description;
     if (input.updates.slug !== undefined) {
@@ -379,6 +397,64 @@ export class ArtifactService {
       success: true,
       message: 'Artifact deleted successfully',
     };
+  }
+
+  /**
+   * Sprint 7: Get version history for an artifact
+   * Note: Can retrieve history even for deleted artifacts
+   */
+  async getHistory(input: { planId: string; artifactId: string; limit?: number; offset?: number }): Promise<VersionHistory<Artifact>> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    return this.versionHistoryService.getHistory({
+      planId: input.planId,
+      entityId: input.artifactId,
+      entityType: 'artifact',
+      limit: input.limit,
+      offset: input.offset,
+    });
+  }
+
+  /**
+   * Sprint 7: Compare two versions of an artifact
+   */
+  async diff(input: { planId: string; artifactId: string; version1: number; version2: number }): Promise<VersionDiff> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    // Load current artifact to support diffing with current version
+    const artifacts = await this.storage.loadEntities<Artifact>(
+      input.planId,
+      'artifacts'
+    );
+    const currentArtifact = artifacts.find((a) => a.id === input.artifactId);
+
+    if (!currentArtifact) {
+      throw new Error('Artifact not found');
+    }
+
+    return this.versionHistoryService.diff({
+      planId: input.planId,
+      entityId: input.artifactId,
+      entityType: 'artifact',
+      version1: input.version1,
+      version2: input.version2,
+      currentEntityData: currentArtifact,
+      currentVersion: currentArtifact.version,
+    });
   }
 }
 
