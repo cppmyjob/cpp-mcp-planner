@@ -402,7 +402,9 @@ export class QueryService {
     // ========================================================================
 
     const trace: any = {
-      proposedSolutions: alternativeSolutions,
+      // BUGFIX: proposedSolutions should include ALL solutions (selected + alternatives)
+      // for backward compatibility and correct API semantics
+      proposedSolutions: allSolutions,
       selectedSolution,
       alternativeSolutions,
       decisions,

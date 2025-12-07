@@ -2428,8 +2428,10 @@ describe('QueryService', () => {
         expect(result.trace.selectedSolution).not.toBeNull();
         expect(result.trace.selectedSolution?.id).toBe(sol3Id);
 
-        // proposedSolutions should respect the limit (only non-selected solutions)
-        expect(result.trace.proposedSolutions.length).toBeLessThanOrEqual(1);
+        // proposedSolutions = selectedSolution + limited alternativeSolutions
+        // With limit=1: selectedSolution (sol3) + 1 alternative (sol1) = 2 total
+        expect(result.trace.proposedSolutions.length).toBe(2);
+        expect(result.trace.alternativeSolutions.length).toBe(1); // limit applies to alternatives
       });
 
       it('BUG FIX: artifacts should be found from ALL phases, not just limited ones', async () => {
@@ -2498,6 +2500,55 @@ describe('QueryService', () => {
           (a: any) => a.id === phaseOnlyArtifact.artifactId
         );
         expect(hasPhaseOnlyArtifact).toBe(true);
+      });
+
+      it('BUGFIX: proposedSolutions should include selected solution (backward compatibility)', async () => {
+        /**
+         * API CONTRACT BUG: proposedSolutions field currently excludes selected solution
+         *
+         * Current code (query-service.ts:405):
+         *   proposedSolutions: alternativeSolutions,  // ❌ excludes selected!
+         *
+         * This breaks the API contract and backward compatibility:
+         * - proposedSolutions should contain ALL solutions (selected + alternatives)
+         * - This field represents "all proposed solutions for this requirement"
+         * - Separate fields exist for selectedSolution and alternativeSolutions
+         *
+         * Expected behavior:
+         * - proposedSolutions: [sol1, sol2, sol3] - ALL solutions
+         * - selectedSolution: sol2 - only the selected one
+         * - alternativeSolutions: [sol1, sol3] - only alternatives
+         */
+
+        // Select sol2 as the chosen solution
+        await solutionService.selectSolution({
+          planId,
+          solutionId: sol2Id,
+          reason: 'Best approach',
+        });
+
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+        } as any);
+
+        // BUGFIX TEST: proposedSolutions MUST include selected solution
+        expect(result.trace.proposedSolutions).toHaveLength(3); // ALL solutions
+        expect(result.trace.selectedSolution).not.toBeNull();
+        expect(result.trace.selectedSolution!.id).toBe(sol2Id);
+        expect(result.trace.alternativeSolutions).toHaveLength(2); // only alternatives
+
+        // Verify selected solution IS in proposedSolutions
+        const selectedInProposed = result.trace.proposedSolutions.some(
+          (s: any) => s.id === sol2Id
+        );
+        expect(selectedInProposed).toBe(true); // MUST be true for backward compatibility
+
+        // Verify proposedSolutions contains all 3 solution IDs
+        const solutionIds = result.trace.proposedSolutions.map((s: any) => s.id);
+        expect(solutionIds).toContain(sol1Id);
+        expect(solutionIds).toContain(sol2Id); // selected
+        expect(solutionIds).toContain(sol3Id);
       });
     });
   });
