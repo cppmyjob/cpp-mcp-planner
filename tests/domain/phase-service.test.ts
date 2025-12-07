@@ -2796,6 +2796,30 @@ describe('PhaseService', () => {
         expect(codeExamples).toHaveLength(2);
       });
 
+      it('RED: includeCodeExamples=true should NOT add codeExamples when explicitly excluded from fields', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['id', 'title', 'status'], // codeExamples NOT in fields
+          includeCodeExamples: true, // This should NOT override explicit field selection
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+
+        // Should only include requested fields
+        expect(phase.id).toBe(phaseId);
+        expect(phase.title).toBe('Phase with Heavy Code Examples');
+        expect(phase.status).toBe('planned');
+
+        // BUG FIX: codeExamples should NOT appear because it was explicitly excluded from fields
+        // includeCodeExamples only works when fields is undefined, ['*'], or includes 'codeExamples'
+        expect(phase.codeExamples).toBeUndefined();
+
+        // Other fields should also be undefined
+        expect(phase.objectives).toBeUndefined();
+        expect(phase.description).toBeUndefined();
+      });
+
       it('RED: includeCodeExamples=false should override fields=["*"]', async () => {
         const result = await service.getPhase({
           planId,

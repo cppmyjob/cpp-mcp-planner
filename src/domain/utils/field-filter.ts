@@ -218,8 +218,15 @@ export function filterPhase<T>(
 
   // Handle codeExamples separately for Lazy-Load
   if (includeCodeExamples && 'codeExamples' in phaseObj) {
-    // Add codeExamples to the already filtered result
-    filteredObj.codeExamples = phaseObj.codeExamples;
+    // Add codeExamples ONLY if not explicitly excluded from fields
+    const shouldAddCodeExamples =
+      !fields || // undefined → can add (summary mode)
+      fields.includes('*') || // all fields → can add
+      fields.includes('codeExamples'); // explicitly included → can add
+
+    if (shouldAddCodeExamples) {
+      filteredObj.codeExamples = phaseObj.codeExamples;
+    }
   } else if (!includeCodeExamples && 'codeExamples' in filteredObj) {
     // Remove codeExamples if not requested (Lazy-Load)
     delete filteredObj.codeExamples;
