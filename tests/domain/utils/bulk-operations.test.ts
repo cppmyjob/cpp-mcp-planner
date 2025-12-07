@@ -180,5 +180,66 @@ describe('bulkUpdateEntities utility', () => {
       expect(rollbackSnapshot[1].priority).toBe('medium');
       expect(rollbackSnapshot[1].category).toBe('technical');
     });
+
+    it('RED (BUGFIX): should capture both original error and rollback failure', async () => {
+      /**
+       * BUG: In atomic mode, if an update fails and then the rollback saveEntities also throws,
+       * the original update error is lost. The caller only sees the rollback error, making it
+       * impossible to diagnose why the update actually failed.
+       *
+       * Current code (bulk-operations.ts:99-102):
+       *   } catch (error: any) {
+       *     await storage.saveEntities(planId, entityType, snapshot);  // <-- if this throws
+       *     throw new Error(`Atomic bulk update failed: ${error.message}...`); // original error is lost!
+       *   }
+       *
+       * If saveEntities throws during rollback, the original error is masked.
+       *
+       * Expected: Error handling should capture BOTH the original error and any rollback failure
+       * to provide complete diagnostic information.
+       */
+
+      const mockStorage = {
+        loadEntities: jest.fn().mockResolvedValue([
+          { id: 'req-1', title: 'Original 1' },
+          { id: 'req-2', title: 'Original 2' },
+        ]),
+        // Rollback will also fail!
+        saveEntities: jest.fn().mockRejectedValue(new Error('Rollback failed: disk full')),
+      };
+
+      const mockUpdateFn = jest
+        .fn()
+        .mockResolvedValueOnce(undefined) // req-1 succeeds
+        .mockRejectedValueOnce(new Error('Validation error: invalid title format')); // req-2 fails
+
+      // Attempt atomic bulk update where both update AND rollback fail
+      // The thrown error should contain information about BOTH failures:
+      // 1. The original validation error
+      // 2. The rollback failure
+      try {
+        await bulkUpdateEntities({
+          entityType: 'requirements',
+          entityIdField: 'requirementId',
+          updateFn: mockUpdateFn,
+          planId: 'test-plan',
+          updates: [
+            { requirementId: 'req-1', updates: { title: 'Updated 1' } },
+            { requirementId: 'req-2', updates: { title: 'Updated 2' } },
+          ],
+          atomic: true,
+          storage: mockStorage,
+        });
+        throw new Error('Expected bulkUpdateEntities to throw');
+      } catch (error: any) {
+        // Skip if it's our own assertion error
+        if (error.message === 'Expected bulkUpdateEntities to throw') {
+          throw error;
+        }
+        // CRITICAL: Error message should mention BOTH the original error and rollback failure
+        expect(error.message).toMatch(/validation error.*invalid title format/i);
+        expect(error.message).toMatch(/rollback.*failed.*disk full/i);
+      }
+    });
   });
 });

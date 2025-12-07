@@ -98,8 +98,17 @@ export async function bulkUpdateEntities<TIdField extends string>(
       }
     } catch (error: any) {
       // CRITICAL: Rollback all changes by restoring snapshot
-      await storage.saveEntities(planId, entityType, snapshot);
-      throw new Error(`Atomic bulk update failed: ${error.message} (rolled back all changes)`);
+      // BUGFIX: Capture both original error and any rollback failure for complete diagnostics
+      try {
+        await storage.saveEntities(planId, entityType, snapshot);
+        throw new Error(`Atomic bulk update failed: ${error.message} (rolled back all changes)`);
+      } catch (rollbackError: any) {
+        // If rollback also fails, include BOTH errors in the message
+        throw new Error(
+          `Atomic bulk update failed: ${error.message}. ` +
+          `Rollback also failed: ${rollbackError.message}`
+        );
+      }
     }
   } else {
     // Non-atomic mode: process each update independently
