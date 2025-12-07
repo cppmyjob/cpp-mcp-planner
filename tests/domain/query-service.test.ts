@@ -1714,6 +1714,52 @@ describe('QueryService', () => {
         expect(result.trace.implementingPhases).toBeUndefined(); // Should not be returned
       });
 
+      it('RED (BUGFIX): completion status should be calculated even when includePhases=false', async () => {
+        /**
+         * BUG: When includePhases=false, the implementingPhases array remains empty
+         * (initialized but never populated). However, calculateAverageProgress() is still
+         * called with this empty array to compute completion status. This causes:
+         * - isImplemented to always be false (even when phases exist and are completed)
+         * - completionPercentage to always be 0
+         *
+         * The phases used for completion calculation should be determined independently
+         * of whether they're included in the response.
+         *
+         * Current code (query-service.ts:334-340):
+         *   if (depth >= TRACE_DEPTH.PHASES && includePhases) {
+         *     // rawPhases is populated here
+         *     implementingPhases = this.applyEntityFilters(rawPhases, {...});
+         *   }
+         *   // Later: calculateAverageProgress(implementingPhases) uses empty array!
+         *
+         * Expected: Completion should be calculated from ALL phases, regardless of includePhases
+         */
+
+        // First, mark all 3 phases as completed
+        await phaseService.updatePhaseStatus({ planId, phaseId: phase1Id, status: 'completed', progress: 100 });
+        await phaseService.updatePhaseStatus({ planId, phaseId: phase2Id, status: 'completed', progress: 100 });
+        await phaseService.updatePhaseStatus({ planId, phaseId: phase3Id, status: 'completed', progress: 100 });
+
+        // Call with includePhases=false (phases should NOT be in output)
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          includePhases: false,
+        } as any);
+
+        // Phases should not be in output
+        expect(result.trace.implementingPhases).toBeUndefined();
+
+        // BUT completion status SHOULD reflect the actual phase completion
+        expect(result.trace.completionStatus.isImplemented).toBe(true);
+        expect(result.trace.completionStatus.completionPercentage).toBe(100);
+
+        // Reset phases back to planned for other tests
+        await phaseService.updatePhaseStatus({ planId, phaseId: phase1Id, status: 'planned', progress: 0 });
+        await phaseService.updatePhaseStatus({ planId, phaseId: phase2Id, status: 'planned', progress: 0 });
+        await phaseService.updatePhaseStatus({ planId, phaseId: phase3Id, status: 'planned', progress: 0 });
+      });
+
       it('RED 2.3: should accept includeArtifacts=true', async () => {
         const result = await queryService.traceRequirement({
           planId,

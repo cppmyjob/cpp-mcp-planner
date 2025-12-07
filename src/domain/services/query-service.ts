@@ -316,6 +316,7 @@ export class QueryService {
 
     let implementingPhases: Phase[] = [];
     let allPhaseIds: Set<string> = new Set(); // For artifact discovery (before limit)
+    let phasesForCompletion: Phase[] = []; // For completion calculation (unfiltered)
 
     // BUGFIX: Compute allPhaseIds if depth >= PHASES, regardless of includePhases flag
     // This is needed for artifact discovery (Level 3), which depends on phase relationships
@@ -326,10 +327,13 @@ export class QueryService {
       );
       allPhaseIds = new Set(addressesLinks.map((l) => l.sourceId));
 
+      // BUGFIX: Always load phases for completion calculation, regardless of includePhases
+      // Completion status should reflect actual implementation state, independent of output filtering
+      const rawPhases = entities.phases.filter((p) => allPhaseIds.has(p.id));
+      phasesForCompletion = rawPhases;
+
       // Only populate implementingPhases if they should be included in the result
       if (includePhases) {
-        const rawPhases = entities.phases.filter((p) => allPhaseIds.has(p.id));
-
         // Apply filters (limit, fields, excludeMetadata)
         implementingPhases = this.applyEntityFilters(rawPhases, {
           limit,
@@ -394,8 +398,10 @@ export class QueryService {
     // ========================================================================
 
     const isAddressed = allSolutions.length > 0;
-    const isImplemented = implementingPhases.some((p) => p.status === 'completed');
-    const completionPercentage = this.calculateAverageProgress(implementingPhases);
+    // BUGFIX: Use phasesForCompletion (unfiltered) for accurate completion status,
+    // not implementingPhases which may be empty when includePhases=false
+    const isImplemented = phasesForCompletion.some((p) => p.status === 'completed');
+    const completionPercentage = this.calculateAverageProgress(phasesForCompletion);
 
     // ========================================================================
     // Build Result (conditionally include fields based on depth and flags)
