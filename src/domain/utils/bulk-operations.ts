@@ -11,7 +11,9 @@ export interface BulkUpdateConfig<TIdField extends string> {
   updates: Array<Record<TIdField, string> & { updates: any }>;
   atomic?: boolean;
   storage?: {
-    loadEntities: (planId: string, entityType: string) => Promise<Array<{ id: string }>>;
+    // BUGFIX: loadEntities must return full entities (not just { id }), so snapshot/rollback
+    // preserves ALL fields. Previously declared Array<{ id: string }> which was too narrow.
+    loadEntities: (planId: string, entityType: string) => Promise<any[]>;
     saveEntities: (planId: string, entityType: string, entities: any[]) => Promise<void>;
   };
 }
