@@ -36,7 +36,7 @@ export const tools = [
         workspacePath: { type: 'string' },
         includeGuide: {
           type: 'boolean',
-          description: 'Include usage guide in get_active response. Default: true (omit this parameter to get guide). The guide provides essential commands, formatting instructions, and best practices for working with the planner. Only set to false if you have already seen the guide in this session.',
+          description: 'Include usage guide in get_active response. Default: false (omit this parameter to exclude guide, saving ~2.5KB). The guide provides essential commands, formatting instructions, and best practices for working with the planner. Set to true on first call to see the guide, then omit or use false for subsequent calls.',
         },
         includeEntities: { type: 'boolean' },
         includeLinks: { type: 'boolean' },

@@ -372,9 +372,43 @@ export class PlanService {
     };
   }
 
+  /**
+   * Get the active plan for the specified workspace.
+   *
+   * @param input - Configuration for retrieving the active plan
+   * @param input.workspacePath - The workspace path (defaults to current working directory)
+   * @param input.includeGuide - Include usage guide in response (default: false)
+   *
+   * @returns The active plan with optional usage guide
+   *
+   * @remarks
+   * **Best Practice (Sprint 6):**
+   * - Omit `includeGuide` parameter or set to `false` for regular calls (saves ~2.5KB)
+   * - Set `includeGuide: true` only on first call or when you need to reference the guide
+   * - The guide contains essential commands, formatting instructions, and best practices
+   *
+   * **Performance Impact:**
+   * - Without guide: ~500 bytes payload
+   * - With guide: ~3000 bytes payload (5x larger)
+   *
+   * @example
+   * ```typescript
+   * // First call - get guide
+   * const result = await planService.getActivePlan({
+   *   workspacePath: '/my/project',
+   *   includeGuide: true  // Get guide for reference
+   * });
+   *
+   * // Subsequent calls - omit guide for better performance
+   * const result = await planService.getActivePlan({
+   *   workspacePath: '/my/project'
+   *   // includeGuide defaults to false
+   * });
+   * ```
+   */
   async getActivePlan(input: GetActivePlanInput): Promise<GetActivePlanResult> {
     const workspacePath = input.workspacePath || process.cwd();
-    const includeGuide = input.includeGuide !== false; // Default: true
+    const includeGuide = input.includeGuide === true; // Default: false (Sprint 6 change)
     const activePlans = await this.storage.loadActivePlans();
 
     const mapping = activePlans[workspacePath];

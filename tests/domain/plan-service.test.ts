@@ -229,14 +229,18 @@ describe('PlanService', () => {
   });
 
   describe('getActivePlan with usageGuide (Sprint 9)', () => {
-    it('should return usageGuide by default', async () => {
+    it('should return usageGuide when explicitly requested with includeGuide=true', async () => {
       const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
       await service.setActivePlan({
         planId: created.planId,
         workspacePath: '/test/workspace',
       });
 
-      const result = await service.getActivePlan({ workspacePath: '/test/workspace' });
+      // Sprint 6: Default changed to false, must explicitly request guide
+      const result = await service.getActivePlan({
+        workspacePath: '/test/workspace',
+        includeGuide: true
+      });
 
       expect(result.activePlan).toBeDefined();
       expect(result.activePlan!.usageGuide).toBeDefined();
@@ -268,7 +272,11 @@ describe('PlanService', () => {
         workspacePath: '/test/workspace',
       });
 
-      const result = await service.getActivePlan({ workspacePath: '/test/workspace' });
+      // Sprint 6: Must explicitly request guide with includeGuide=true
+      const result = await service.getActivePlan({
+        workspacePath: '/test/workspace',
+        includeGuide: true
+      });
       const guide = result.activePlan!.usageGuide!;
 
       expect(guide.quickStart).toBeTruthy();
@@ -281,6 +289,204 @@ describe('PlanService', () => {
       const cmd = guide.commands.overview[0];
       expect(cmd.cmd).toBeTruthy();
       expect(cmd.desc).toBeTruthy();
+    });
+  });
+
+  // Sprint 6: Change includeGuide default from true to false
+  describe('Sprint 6: includeGuide default=false (RED phase - these tests will fail initially)', () => {
+    // Test 1: Default behavior (no includeGuide parameter) should NOT include guide
+    it('should NOT include usageGuide by default when includeGuide parameter is omitted (new behavior)', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace-sprint6-1',
+      });
+
+      const result = await service.getActivePlan({ workspacePath: '/test/workspace-sprint6-1' });
+
+      expect(result.activePlan).toBeDefined();
+      expect(result.activePlan!.usageGuide).toBeUndefined(); // Will FAIL with current default=true
+      expect(result.activePlan!.planId).toBe(created.planId);
+      expect(result.activePlan!.plan).toBeDefined();
+    });
+
+    // Test 2: Explicit includeGuide=false should NOT include guide
+    it('should NOT include usageGuide when includeGuide=false (existing behavior)', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace-sprint6-2',
+      });
+
+      const result = await service.getActivePlan({
+        workspacePath: '/test/workspace-sprint6-2',
+        includeGuide: false,
+      });
+
+      expect(result.activePlan).toBeDefined();
+      expect(result.activePlan!.usageGuide).toBeUndefined(); // Should PASS already
+    });
+
+    // Test 3: Explicit includeGuide=true should include guide (backward compatibility)
+    it('should include usageGuide when includeGuide=true (backward compatibility)', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace-sprint6-3',
+      });
+
+      const result = await service.getActivePlan({
+        workspacePath: '/test/workspace-sprint6-3',
+        includeGuide: true,
+      });
+
+      expect(result.activePlan).toBeDefined();
+      expect(result.activePlan!.usageGuide).toBeDefined(); // Should PASS with any default
+      expect(result.activePlan!.usageGuide!.quickStart).toContain('phase get_tree');
+    });
+
+    // Test 4: Measure payload size difference
+    it('should have significant payload reduction without guide (~500 bytes vs ~3000 bytes)', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace-sprint6-4',
+      });
+
+      // Get result WITHOUT guide (new default)
+      const resultWithoutGuide = await service.getActivePlan({
+        workspacePath: '/test/workspace-sprint6-4',
+        includeGuide: false,
+      });
+      const sizeWithoutGuide = JSON.stringify(resultWithoutGuide).length;
+
+      // Get result WITH guide
+      const resultWithGuide = await service.getActivePlan({
+        workspacePath: '/test/workspace-sprint6-4',
+        includeGuide: true,
+      });
+      const sizeWithGuide = JSON.stringify(resultWithGuide).length;
+
+      // Verify size difference is significant (guide adds ~2.5KB)
+      expect(sizeWithoutGuide).toBeLessThan(1000); // ~500 bytes
+      expect(sizeWithGuide).toBeGreaterThan(2500); // ~3000 bytes
+      expect(sizeWithGuide - sizeWithoutGuide).toBeGreaterThan(2000); // Difference > 2KB (5x reduction)
+    });
+
+    // Test 5: All other fields should be present without guide
+    it('should include all other fields (planId, plan, lastUpdated) when guide is excluded', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace-sprint6-5',
+      });
+
+      const result = await service.getActivePlan({
+        workspacePath: '/test/workspace-sprint6-5',
+        includeGuide: false,
+      });
+
+      expect(result.activePlan).toBeDefined();
+      expect(result.activePlan!.planId).toBe(created.planId);
+      expect(result.activePlan!.plan).toBeDefined();
+      expect(result.activePlan!.plan.name).toBe('Test Plan');
+      expect(result.activePlan!.lastUpdated).toBeDefined();
+      expect(result.activePlan!.usageGuide).toBeUndefined();
+    });
+
+    // Test 6: includeGuide=null should use default (false)
+    it('should NOT include guide when includeGuide=null (uses default=false)', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace-sprint6-6',
+      });
+
+      const result = await service.getActivePlan({
+        workspacePath: '/test/workspace-sprint6-6',
+        includeGuide: null as any, // Explicitly pass null
+      });
+
+      expect(result.activePlan).toBeDefined();
+      expect(result.activePlan!.usageGuide).toBeUndefined(); // Will FAIL with current default=true
+    });
+
+    // Test 7: includeGuide=undefined should use default (false)
+    it('should NOT include guide when includeGuide=undefined (uses default=false)', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace-sprint6-7',
+      });
+
+      const result = await service.getActivePlan({
+        workspacePath: '/test/workspace-sprint6-7',
+        includeGuide: undefined,
+      });
+
+      expect(result.activePlan).toBeDefined();
+      expect(result.activePlan!.usageGuide).toBeUndefined(); // Will FAIL with current default=true
+    });
+
+    // Test 8: includeGuide as string should be handled with strict type checking
+    it('should use strict type checking for includeGuide (only boolean true includes guide)', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace-sprint6-8',
+      });
+
+      // TypeScript compilation prevents this, but test runtime behavior
+      // String 'true' is NOT strictly equal to boolean true, so guide should NOT be included
+      const result = await service.getActivePlan({
+        workspacePath: '/test/workspace-sprint6-8',
+        includeGuide: 'true' as any,
+      });
+
+      // Sprint 6: Strict checking (=== true) means string 'true' does NOT include guide
+      expect(result.activePlan).toBeDefined();
+      expect(result.activePlan!.usageGuide).toBeUndefined();
+    });
+
+    // Test 9: Backward compatibility - existing code with includeGuide=true
+    it('should support existing clients that explicitly pass includeGuide=true', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace-sprint6-9',
+      });
+
+      // Simulate existing client code that explicitly requests guide
+      const result = await service.getActivePlan({
+        workspacePath: '/test/workspace-sprint6-9',
+        includeGuide: true,
+      });
+
+      expect(result.activePlan).toBeDefined();
+      expect(result.activePlan!.usageGuide).toBeDefined(); // Should ALWAYS work
+      expect(result.activePlan!.usageGuide!.commands).toBeDefined();
+    });
+
+    // Test 10: Verify default behavior matches new expectation
+    it('should confirm new default behavior: omitted parameter = no guide', async () => {
+      const created = await service.createPlan({ name: 'Test Plan', description: 'Test' });
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace-sprint6-10',
+      });
+
+      // Call without includeGuide parameter at all
+      const result = await service.getActivePlan({
+        workspacePath: '/test/workspace-sprint6-10',
+      });
+
+      // After implementation, omitting includeGuide should mean NO guide (default=false)
+      expect(result.activePlan).toBeDefined();
+      expect(result.activePlan!.usageGuide).toBeUndefined(); // Will FAIL until default changes
+
+      // But all other data should be present
+      expect(result.activePlan!.planId).toBe(created.planId);
+      expect(result.activePlan!.plan.name).toBe('Test Plan');
     });
   });
 
