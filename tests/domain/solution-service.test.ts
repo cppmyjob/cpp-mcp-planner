@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { SolutionService } from '../../src/domain/services/solution-service.js';
 import { RequirementService } from '../../src/domain/services/requirement-service.js';
+import { DecisionService } from '../../src/domain/services/decision-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
 import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import * as fs from 'fs/promises';
@@ -10,6 +11,7 @@ import * as os from 'os';
 describe('SolutionService', () => {
   let service: SolutionService;
   let requirementService: RequirementService;
+  let decisionService: DecisionService;
   let planService: PlanService;
   let storage: FileStorage;
   let testDir: string;
@@ -20,7 +22,8 @@ describe('SolutionService', () => {
     storage = new FileStorage(testDir);
     await storage.initialize();
     planService = new PlanService(storage);
-    service = new SolutionService(storage, planService);
+    decisionService = new DecisionService(storage, planService);
+    service = new SolutionService(storage, planService, undefined, decisionService);
     requirementService = new RequirementService(storage, planService);
 
     const plan = await planService.createPlan({
@@ -288,6 +291,264 @@ describe('SolutionService', () => {
       expect(solution.status).toBe('selected');
       expect(result.deselectedIds).toHaveLength(1);
       expect(result.deselectedIds![0]).toBe(s1.solutionId);
+    });
+  });
+
+  // TDD Sprint: Solution-to-Decision Auto-Creation
+  describe('select_solution with createDecisionRecord', () => {
+    it('should automatically create Decision when createDecisionRecord=true', async () => {
+      const proposed = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'Use JWT Authentication',
+          description: 'Implement JWT-based authentication',
+          approach: 'Use jsonwebtoken library with secure token generation',
+          tradeoffs: [
+            { aspect: 'Security', pros: ['Stateless', 'Scalable'], cons: ['Token management'], score: 8 },
+          ],
+          addressing: ['req-auth-001'],
+          evaluation: {
+            effortEstimate: { value: 8, unit: 'hours', confidence: 'high' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Low risk - well established pattern',
+          },
+        },
+      });
+
+      const result = await service.selectSolution({
+        planId,
+        solutionId: proposed.solutionId,
+        reason: 'Best security and scalability',
+        createDecisionRecord: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.decisionId).toBeDefined();
+
+      // Verify Decision was created
+      const decisions = await decisionService.listDecisions({ planId });
+      expect(decisions.total).toBe(1);
+      expect(decisions.decisions[0].title).toContain('JWT Authentication');
+    });
+
+    it('should NOT create Decision when createDecisionRecord=false', async () => {
+      const proposed = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'Solution A',
+          description: 'Description A',
+          approach: 'Approach A',
+          tradeoffs: [],
+          addressing: ['req-001'],
+          evaluation: {
+            effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Low',
+          },
+        },
+      });
+
+      const result = await service.selectSolution({
+        planId,
+        solutionId: proposed.solutionId,
+        createDecisionRecord: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.decisionId).toBeUndefined();
+
+      // Verify no Decision was created
+      const decisions = await decisionService.listDecisions({ planId });
+      expect(decisions.total).toBe(0);
+    });
+
+    it('should NOT create Decision when createDecisionRecord is undefined (backward compatibility)', async () => {
+      const proposed = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'Solution B',
+          description: 'Description B',
+          approach: 'Approach B',
+          tradeoffs: [],
+          addressing: ['req-002'],
+          evaluation: {
+            effortEstimate: { value: 2, unit: 'hours', confidence: 'medium' },
+            technicalFeasibility: 'medium',
+            riskAssessment: 'Medium',
+          },
+        },
+      });
+
+      const result = await service.selectSolution({
+        planId,
+        solutionId: proposed.solutionId,
+        reason: 'Good choice',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.decisionId).toBeUndefined();
+
+      // Verify no Decision was created
+      const decisions = await decisionService.listDecisions({ planId });
+      expect(decisions.total).toBe(0);
+    });
+
+    it('should populate Decision with correct data from Solution', async () => {
+      const proposed = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'GraphQL API',
+          description: 'Modern API with GraphQL',
+          approach: 'Use Apollo Server with TypeScript',
+          implementationNotes: 'Setup resolvers and schema',
+          tradeoffs: [
+            { aspect: 'Flexibility', pros: ['Query what you need'], cons: ['Learning curve'], score: 9 },
+            { aspect: 'Performance', pros: ['Efficient'], cons: ['Complexity'], score: 7 },
+          ],
+          addressing: ['req-api-001', 'req-api-002'],
+          evaluation: {
+            effortEstimate: { value: 3, unit: 'days', confidence: 'medium' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Medium risk - team learning required',
+          },
+        },
+      });
+
+      const result = await service.selectSolution({
+        planId,
+        solutionId: proposed.solutionId,
+        reason: 'Future-proof and flexible',
+        createDecisionRecord: true,
+      });
+
+      const { decision } = await decisionService.getDecision({
+        planId,
+        decisionId: result.decisionId!,
+        fields: ['*'],
+      });
+
+      // Verify Decision fields
+      expect(decision.title).toContain('GraphQL API');
+      expect(decision.question).toContain('solution');
+      expect(decision.context).toContain('Modern API with GraphQL');
+      expect(decision.context).toContain('Apollo Server');
+      expect(decision.decision).toContain('GraphQL API');
+      expect(decision.consequences).toContain('risk');
+      expect(decision.impactScope).toContain('req-api-001');
+      expect(decision.impactScope).toContain('req-api-002');
+      expect(decision.status).toBe('active');
+    });
+
+    it('should include deselected solutions in alternativesConsidered', async () => {
+      // Create three solutions for the same requirement
+      const sol1 = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'REST API',
+          description: 'Traditional REST',
+          approach: 'Express.js REST endpoints',
+          tradeoffs: [
+            { aspect: 'Simplicity', pros: ['Well known'], cons: ['Over-fetching'], score: 6 },
+          ],
+          addressing: ['req-api-001'],
+          evaluation: {
+            effortEstimate: { value: 2, unit: 'days', confidence: 'high' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Low',
+          },
+        },
+      });
+
+      const sol2 = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'GraphQL',
+          description: 'Modern GraphQL',
+          approach: 'Apollo Server',
+          tradeoffs: [
+            { aspect: 'Flexibility', pros: ['Efficient'], cons: ['Complex'], score: 9 },
+          ],
+          addressing: ['req-api-001'],
+          evaluation: {
+            effortEstimate: { value: 3, unit: 'days', confidence: 'medium' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Medium',
+          },
+        },
+      });
+
+      const sol3 = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'gRPC',
+          description: 'High performance gRPC',
+          approach: 'Protocol Buffers',
+          tradeoffs: [
+            { aspect: 'Performance', pros: ['Very fast'], cons: ['Steep learning'], score: 7 },
+          ],
+          addressing: ['req-api-001'],
+          evaluation: {
+            effortEstimate: { value: 5, unit: 'days', confidence: 'low' },
+            technicalFeasibility: 'medium',
+            riskAssessment: 'High',
+          },
+        },
+      });
+
+      // Select GraphQL - should deselect REST and gRPC
+      const result = await service.selectSolution({
+        planId,
+        solutionId: sol2.solutionId,
+        reason: 'Best balance of flexibility and feasibility',
+        createDecisionRecord: true,
+      });
+
+      const { decision } = await decisionService.getDecision({
+        planId,
+        decisionId: result.decisionId!,
+        fields: ['*'],
+      });
+
+      // Verify alternativesConsidered contains deselected solutions
+      expect(decision.alternativesConsidered).toBeDefined();
+      expect(decision.alternativesConsidered.length).toBeGreaterThanOrEqual(2);
+
+      const alternativeTitles = decision.alternativesConsidered.map((alt: any) => alt.option);
+      expect(alternativeTitles).toContain('REST API');
+      expect(alternativeTitles).toContain('gRPC');
+    });
+
+    it('should handle selection with no alternatives', async () => {
+      const proposed = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'Only Solution',
+          description: 'The only option',
+          approach: 'Do it this way',
+          tradeoffs: [],
+          addressing: ['req-unique-001'],
+          evaluation: {
+            effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Low',
+          },
+        },
+      });
+
+      const result = await service.selectSolution({
+        planId,
+        solutionId: proposed.solutionId,
+        createDecisionRecord: true,
+      });
+
+      const { decision } = await decisionService.getDecision({
+        planId,
+        decisionId: result.decisionId!,
+        fields: ['*'],
+      });
+
+      // alternativesConsidered can be empty or minimal
+      expect(decision.alternativesConsidered).toBeDefined();
     });
   });
 

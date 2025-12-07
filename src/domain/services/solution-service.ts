@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
+import type { DecisionService } from './decision-service.js';
 import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
 import { validateEffortEstimate, validateTags } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
@@ -34,10 +35,27 @@ export interface CompareSolutionsInput {
   aspects?: string[];
 }
 
+/**
+ * Input for selecting a solution
+ */
 export interface SelectSolutionInput {
   planId: string;
   solutionId: string;
+  /** Reason for selecting this solution (stored in solution.selectionReason) */
   reason?: string;
+  /**
+   * Automatically create an ADR Decision record documenting this solution selection.
+   * The Decision will include:
+   * - title: "Solution Selection: {solution.title}"
+   * - context: solution description and approach
+   * - decision: selected solution with reason
+   * - alternativesConsidered: other solutions addressing same requirements
+   * - consequences: from solution.evaluation.riskAssessment
+   * - impactScope: solution.addressing (requirement IDs)
+   *
+   * @default false
+   */
+  createDecisionRecord?: boolean;
 }
 
 export interface UpdateSolutionInput {
@@ -155,10 +173,19 @@ export interface CompareSolutionsResult {
   };
 }
 
+/**
+ * Result of solution selection
+ */
 export interface SelectSolutionResult {
   success: boolean;
   solutionId: string;
+  /** IDs of solutions that were deselected (rejected) because they addressed same requirements */
   deselectedIds?: string[];
+  /**
+   * ID of automatically created Decision record (only present when createDecisionRecord=true)
+   * Use this ID to retrieve the full Decision record via DecisionService.getDecision()
+   */
+  decisionId?: string;
 }
 
 export interface UpdateSolutionResult {
@@ -181,7 +208,8 @@ export class SolutionService {
   constructor(
     private storage: FileStorage,
     private planService: PlanService,
-    private versionHistoryService?: VersionHistoryService
+    private versionHistoryService?: VersionHistoryService,
+    private decisionService?: DecisionService // TDD Sprint: Optional DecisionService for auto-creating Decision records
   ) {}
 
   async getSolution(input: GetSolutionInput): Promise<GetSolutionResult> {
@@ -356,6 +384,27 @@ export class SolutionService {
     };
   }
 
+  /**
+   * Select a solution and optionally create an ADR Decision record
+   *
+   * This method:
+   * 1. Marks the specified solution as 'selected'
+   * 2. Deselects (rejects) other solutions addressing the same requirements
+   * 3. Optionally creates a Decision record documenting the selection (when createDecisionRecord=true)
+   *
+   * @param input - Selection parameters including optional createDecisionRecord flag
+   * @returns Selection result with optional decisionId
+   *
+   * @example
+   * // Select solution and create Decision record
+   * const result = await service.selectSolution({
+   *   planId: 'plan-123',
+   *   solutionId: 'sol-456',
+   *   reason: 'Best balance of performance and maintainability',
+   *   createDecisionRecord: true
+   * });
+   * console.log(result.decisionId); // ID of created Decision record
+   */
   async selectSolution(input: SelectSolutionInput): Promise<SelectSolutionResult> {
     const solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
     const index = solutions.findIndex((s) => s.id === input.solutionId);
@@ -391,10 +440,18 @@ export class SolutionService {
     solutions[index] = solution;
     await this.storage.saveEntities(input.planId, 'solutions', solutions);
 
+    // TDD Sprint: Auto-create Decision record if requested
+    const decisionId = await this.createDecisionRecordIfRequested(
+      input,
+      solution,
+      solutions
+    );
+
     return {
       success: true,
       solutionId: input.solutionId,
       deselectedIds: deselected.length > 0 ? deselected.map((s) => s.id) : undefined,
+      decisionId,
     };
   }
 
@@ -611,6 +668,65 @@ export class SolutionService {
       atomic: input.atomic,
       storage: this.storage,
     });
+  }
+
+  /**
+   * TDD Sprint: Create Decision record from Solution selection (private helper)
+   *
+   * This method automatically creates an ADR Decision record documenting the solution selection.
+   * It extracts relevant information from the selected solution and related alternatives.
+   *
+   * @param input - Original selectSolution input
+   * @param selectedSolution - The solution that was selected
+   * @param allSolutions - All solutions in the plan (for finding alternatives)
+   * @returns Decision ID if created, undefined otherwise
+   */
+  private async createDecisionRecordIfRequested(
+    input: SelectSolutionInput,
+    selectedSolution: Solution,
+    allSolutions: Solution[]
+  ): Promise<string | undefined> {
+    if (!input.createDecisionRecord || !this.decisionService) {
+      return undefined;
+    }
+
+    // Collect all solutions addressing the same requirements for alternativesConsidered
+    const allSolutionsForRequirements = allSolutions.filter((s) =>
+      s.addressing.some((req) => selectedSolution.addressing.includes(req))
+    );
+
+    // Build alternativesConsidered from other solutions (excluding the selected one)
+    const alternativesConsidered = allSolutionsForRequirements
+      .filter((s) => s.id !== input.solutionId)
+      .map((altSolution) => ({
+        option: altSolution.title,
+        reasoning: altSolution.description || altSolution.approach,
+        whyNotChosen:
+          altSolution.status === 'rejected'
+            ? `Rejected in favor of ${selectedSolution.title}`
+            : 'Not selected',
+      }));
+
+    // Create Decision record
+    const decisionInput = {
+      planId: input.planId,
+      decision: {
+        title: `Solution Selection: ${selectedSolution.title}`,
+        question: `Which solution should be selected for requirements ${selectedSolution.addressing.join(', ')}?`,
+        context: `${selectedSolution.description}\n\nApproach: ${selectedSolution.approach}${
+          selectedSolution.implementationNotes
+            ? `\n\nImplementation Notes: ${selectedSolution.implementationNotes}`
+            : ''
+        }`,
+        decision: `Selected: ${selectedSolution.title}${input.reason ? ` - ${input.reason}` : ''}`,
+        alternativesConsidered,
+        consequences: selectedSolution.evaluation?.riskAssessment || 'To be determined',
+        impactScope: selectedSolution.addressing,
+      },
+    };
+
+    const decisionResult = await this.decisionService.recordDecision(decisionInput);
+    return decisionResult.decisionId;
   }
 
 }
