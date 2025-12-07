@@ -220,6 +220,50 @@ export interface ArrayRemoveAtInput {
   index: number;
 }
 
+export interface BulkUpdatePhasesInput {
+  planId: string;
+  updates: Array<{
+    phaseId: string;
+    updates: Partial<{
+      title: string;
+      description: string;
+      objectives: string[];
+      deliverables: string[];
+      successCriteria: string[];
+      implementationNotes: string;
+      estimatedEffort: {
+        value: number;
+        unit: 'hours' | 'days' | 'weeks' | 'story-points' | 'minutes';
+        confidence: 'low' | 'medium' | 'high';
+      };
+      actualEffort: {
+        value: number;
+        unit: 'hours' | 'days' | 'weeks' | 'story-points' | 'minutes';
+      };
+      schedule: {
+        startDate: string;
+        endDate: string;
+        milestones: Array<{ date: string; description: string }>;
+      };
+      status: string;
+      progress: number;
+      priority: 'critical' | 'high' | 'medium' | 'low';
+      blockers: Array<{ description: string; severity: 'high' | 'medium' | 'low' }>;
+    }>;
+  }>;
+  atomic?: boolean;
+}
+
+export interface BulkUpdatePhasesResult {
+  updated: number;
+  failed: number;
+  results: Array<{
+    phaseId: string;
+    success: boolean;
+    error?: string;
+  }>;
+}
+
 export interface ArrayOperationResult {
   success: true;
   field: PhaseArrayField;
@@ -1112,6 +1156,67 @@ export class PhaseService {
       currentEntityData: current,
       currentVersion: current.version,
     });
+  }
+
+  /**
+   * Sprint 9: Bulk update multiple phases in one call
+   */
+  async bulkUpdatePhases(input: BulkUpdatePhasesInput): Promise<BulkUpdatePhasesResult> {
+    const atomic = input.atomic ?? false;
+    const results: Array<{ phaseId: string; success: boolean; error?: string }> = [];
+    let updated = 0;
+    let failed = 0;
+
+    // Atomic mode: validate all phases exist first
+    if (atomic) {
+      const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+      const phaseMap = new Map(phases.map((p) => [p.id, p]));
+
+      for (const update of input.updates) {
+        if (!phaseMap.has(update.phaseId)) {
+          throw new Error(
+            `Phase ${update.phaseId} not found (atomic mode - rolling back)`
+          );
+        }
+      }
+
+      // All validated - perform updates
+      for (const update of input.updates) {
+        try {
+          await this.updatePhase({
+            planId: input.planId,
+            phaseId: update.phaseId,
+            updates: update.updates as any,
+          });
+          results.push({ phaseId: update.phaseId, success: true });
+          updated++;
+        } catch (error: any) {
+          throw new Error(`Atomic bulk update failed: ${error.message}`);
+        }
+      }
+    } else {
+      // Non-atomic mode: process each update independently
+      for (const update of input.updates) {
+        try {
+          await this.updatePhase({
+            planId: input.planId,
+            phaseId: update.phaseId,
+            updates: update.updates as any,
+          });
+          results.push({ phaseId: update.phaseId, success: true });
+          updated++;
+        } catch (error: any) {
+          results.push({
+            phaseId: update.phaseId,
+            success: false,
+            error: error.message,
+          });
+          failed++;
+        }
+      }
+    }
+
+    return { updated, failed, results };
   }
 
 }

@@ -97,6 +97,29 @@ export interface UnvoteRequirementInput {
   requirementId: string;
 }
 
+export interface BulkUpdateRequirementsInput {
+  planId: string;
+  updates: Array<{
+    requirementId: string;
+    updates: Partial<{
+      title: string;
+      description: string;
+      rationale: string;
+      acceptanceCriteria: string[];
+      priority: RequirementPriority;
+      category: RequirementCategory;
+      status: RequirementStatus;
+      impact: {
+        scope: string[];
+        complexityEstimate: number;
+        riskLevel: 'low' | 'medium' | 'high';
+      };
+      tags: Tag[];
+    }>;
+  }>;
+  atomic?: boolean; // Default: false (non-atomic mode)
+}
+
 // Output types
 export interface AddRequirementResult {
   requirementId: string;
@@ -145,6 +168,16 @@ export interface DeleteRequirementResult {
 export interface VoteForRequirementResult {
   success: boolean;
   votes: number;
+}
+
+export interface BulkUpdateRequirementsResult {
+  updated: number;
+  failed: number;
+  results: Array<{
+    requirementId: string;
+    success: boolean;
+    error?: string;
+  }>;
 }
 
 export interface UnvoteRequirementResult {
@@ -774,6 +807,73 @@ export class RequirementService {
       currentEntityData: currentRequirement,
       currentVersion: currentRequirement.version,
     });
+  }
+
+  /**
+   * Sprint 9: Bulk update multiple requirements in one call
+   */
+  async bulkUpdateRequirements(
+    input: BulkUpdateRequirementsInput
+  ): Promise<BulkUpdateRequirementsResult> {
+    const atomic = input.atomic ?? false;
+    const results: Array<{ requirementId: string; success: boolean; error?: string }> = [];
+    let updated = 0;
+    let failed = 0;
+
+    // Atomic mode: validate all requirements exist first
+    if (atomic) {
+      const requirements = await this.storage.loadEntities<Requirement>(
+        input.planId,
+        'requirements'
+      );
+      const reqMap = new Map(requirements.map((r) => [r.id, r]));
+
+      for (const update of input.updates) {
+        if (!reqMap.has(update.requirementId)) {
+          throw new Error(
+            `Requirement ${update.requirementId} not found (atomic mode - rolling back)`
+          );
+        }
+      }
+
+      // All validated - perform updates
+      for (const update of input.updates) {
+        try {
+          await this.updateRequirement({
+            planId: input.planId,
+            requirementId: update.requirementId,
+            updates: update.updates,
+          });
+          results.push({ requirementId: update.requirementId, success: true });
+          updated++;
+        } catch (error: any) {
+          // In atomic mode, if any update fails, rollback and throw
+          throw new Error(`Atomic bulk update failed: ${error.message}`);
+        }
+      }
+    } else {
+      // Non-atomic mode: process each update independently
+      for (const update of input.updates) {
+        try {
+          await this.updateRequirement({
+            planId: input.planId,
+            requirementId: update.requirementId,
+            updates: update.updates,
+          });
+          results.push({ requirementId: update.requirementId, success: true });
+          updated++;
+        } catch (error: any) {
+          results.push({
+            requirementId: update.requirementId,
+            success: false,
+            error: error.message,
+          });
+          failed++;
+        }
+      }
+    }
+
+    return { updated, failed, results };
   }
 }
 

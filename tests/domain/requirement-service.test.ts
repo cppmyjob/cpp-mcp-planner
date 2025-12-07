@@ -957,4 +957,195 @@ describe('RequirementService', () => {
       expect(result.requirement.acceptanceCriteria).toEqual(['Criteria 1', 'Criteria 2']);
     });
   });
+
+  describe('bulk_update (Sprint 9 - RED Phase)', () => {
+    it('RED 9.1: should update multiple requirements in one call', async () => {
+      // Create 3 requirements
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Requirement 1',
+          description: 'First requirement',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: ['AC1'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const req2 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Requirement 2',
+          description: 'Second requirement',
+          category: 'technical',
+          priority: 'medium',
+          acceptanceCriteria: ['AC2'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const req3 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Requirement 3',
+          description: 'Third requirement',
+          category: 'functional',
+          priority: 'low',
+          acceptanceCriteria: ['AC3'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      // Bulk update all 3 requirements
+      const result = await service.bulkUpdateRequirements({
+        planId,
+        updates: [
+          { requirementId: req1.requirementId, updates: { priority: 'critical' } },
+          { requirementId: req2.requirementId, updates: { status: 'approved' } },
+          { requirementId: req3.requirementId, updates: { category: 'technical' } },
+        ],
+      });
+
+      // Verify results
+      expect(result.updated).toBe(3);
+      expect(result.failed).toBe(0);
+      expect(result.results).toHaveLength(3);
+
+      // Verify actual updates
+      const updated1 = await service.getRequirement({ planId, requirementId: req1.requirementId });
+      expect(updated1.requirement.priority).toBe('critical');
+
+      const updated2 = await service.getRequirement({ planId, requirementId: req2.requirementId });
+      expect(updated2.requirement.status).toBe('approved');
+
+      const updated3 = await service.getRequirement({ planId, requirementId: req3.requirementId });
+      expect(updated3.requirement.category).toBe('technical');
+    });
+
+    it('RED 9.2: should return success/error for each update', async () => {
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Valid Requirement',
+          description: 'Valid',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const result = await service.bulkUpdateRequirements({
+        planId,
+        updates: [
+          { requirementId: req1.requirementId, updates: { priority: 'low' } },
+          { requirementId: 'non-existent-id', updates: { priority: 'high' } },
+        ],
+      });
+
+      expect(result.updated).toBe(1);
+      expect(result.failed).toBe(1);
+      expect(result.results).toHaveLength(2);
+
+      expect(result.results[0].success).toBe(true);
+      expect(result.results[0].requirementId).toBe(req1.requirementId);
+
+      expect(result.results[1].success).toBe(false);
+      expect(result.results[1].error).toBeDefined();
+    });
+
+    it('RED 9.3: should support atomic mode (all-or-nothing)', async () => {
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 1',
+          description: 'Test',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const req2 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 2',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      // Attempt bulk update with one invalid ID (atomic mode)
+      await expect(
+        service.bulkUpdateRequirements({
+          planId,
+          updates: [
+            { requirementId: req1.requirementId, updates: { priority: 'critical' } },
+            { requirementId: 'invalid-id', updates: { priority: 'low' } },
+          ],
+          atomic: true,
+        })
+      ).rejects.toThrow();
+
+      // Verify no changes were applied (rollback)
+      const check1 = await service.getRequirement({ planId, requirementId: req1.requirementId });
+      expect(check1.requirement.priority).toBe('high'); // unchanged
+
+      const check2 = await service.getRequirement({ planId, requirementId: req2.requirementId });
+      expect(check2.requirement.priority).toBe('medium'); // unchanged
+    });
+
+    it('RED 9.4: should handle empty updates array', async () => {
+      const result = await service.bulkUpdateRequirements({
+        planId,
+        updates: [],
+      });
+
+      expect(result.updated).toBe(0);
+      expect(result.failed).toBe(0);
+      expect(result.results).toHaveLength(0);
+    });
+
+    it('RED 9.5: should update requirements with different field combinations', async () => {
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test',
+          description: 'Test',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: ['AC1'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const result = await service.bulkUpdateRequirements({
+        planId,
+        updates: [
+          {
+            requirementId: req1.requirementId,
+            updates: {
+              title: 'Updated Title',
+              description: 'Updated Description',
+              priority: 'critical',
+              acceptanceCriteria: ['Updated AC1', 'Updated AC2'],
+            },
+          },
+        ],
+      });
+
+      expect(result.updated).toBe(1);
+
+      const updated = await service.getRequirement({ planId, requirementId: req1.requirementId });
+      expect(updated.requirement.title).toBe('Updated Title');
+      expect(updated.requirement.description).toBe('Updated Description');
+      expect(updated.requirement.priority).toBe('critical');
+      expect(updated.requirement.acceptanceCriteria).toEqual(['Updated AC1', 'Updated AC2']);
+    });
+  });
 });

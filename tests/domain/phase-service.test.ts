@@ -2957,4 +2957,118 @@ describe('PhaseService', () => {
       });
     });
   });
+
+  describe('bulk_update (Sprint 9 - RED Phase)', () => {
+    let phase1Id: string;
+    let phase2Id: string;
+    let phase3Id: string;
+
+    beforeEach(async () => {
+      // Create test phases
+      const p1 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 1',
+          description: 'First phase',
+          objectives: ['Obj1'],
+          deliverables: ['Del1'],
+          successCriteria: ['SC1'],
+        },
+      });
+      phase1Id = p1.phaseId;
+
+      const p2 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 2',
+          description: 'Second phase',
+          objectives: ['Obj2'],
+          deliverables: ['Del2'],
+          successCriteria: ['SC2'],
+        },
+      });
+      phase2Id = p2.phaseId;
+
+      const p3 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 3',
+          description: 'Third phase',
+          objectives: ['Obj3'],
+          deliverables: ['Del3'],
+          successCriteria: ['SC3'],
+        },
+      });
+      phase3Id = p3.phaseId;
+    });
+
+    it('RED 9.6: should update multiple phases in one call', async () => {
+      const result = await service.bulkUpdatePhases({
+        planId,
+        updates: [
+          { phaseId: phase1Id, updates: { status: 'in_progress' } },
+          { phaseId: phase2Id, updates: { progress: 50 } },
+          { phaseId: phase3Id, updates: { status: 'completed', progress: 100 } },
+        ],
+      });
+
+      expect(result.updated).toBe(3);
+      expect(result.failed).toBe(0);
+      expect(result.results).toHaveLength(3);
+
+      const updated1 = await service.getPhase({ planId, phaseId: phase1Id });
+      expect(updated1.phase.status).toBe('in_progress');
+
+      const updated2 = await service.getPhase({ planId, phaseId: phase2Id });
+      expect(updated2.phase.progress).toBe(50);
+
+      const updated3 = await service.getPhase({ planId, phaseId: phase3Id });
+      expect(updated3.phase.status).toBe('completed');
+      expect(updated3.phase.progress).toBe(100);
+    });
+
+    it('RED 9.7: should handle partial failures in non-atomic mode', async () => {
+      const result = await service.bulkUpdatePhases({
+        planId,
+        updates: [
+          { phaseId: phase1Id, updates: { status: 'completed' } },
+          { phaseId: 'invalid-id', updates: { status: 'in_progress' } },
+          { phaseId: phase3Id, updates: { progress: 75 } },
+        ],
+        atomic: false,
+      });
+
+      expect(result.updated).toBe(2);
+      expect(result.failed).toBe(1);
+      expect(result.results).toHaveLength(3);
+
+      expect(result.results[0].success).toBe(true);
+      expect(result.results[1].success).toBe(false);
+      expect(result.results[2].success).toBe(true);
+
+      // Verify successful updates were applied
+      const check1 = await service.getPhase({ planId, phaseId: phase1Id });
+      expect(check1.phase.status).toBe('completed');
+
+      const check3 = await service.getPhase({ planId, phaseId: phase3Id });
+      expect(check3.phase.progress).toBe(75);
+    });
+
+    it('RED 9.8: should rollback all changes in atomic mode on error', async () => {
+      await expect(
+        service.bulkUpdatePhases({
+          planId,
+          updates: [
+            { phaseId: phase1Id, updates: { status: 'completed' } },
+            { phaseId: 'invalid-id', updates: { status: 'in_progress' } },
+          ],
+          atomic: true,
+        })
+      ).rejects.toThrow();
+
+      // Verify no changes were applied
+      const check1 = await service.getPhase({ planId, phaseId: phase1Id });
+      expect(check1.phase.status).toBe('planned'); // unchanged
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { SolutionService } from '../../src/domain/services/solution-service.js';
+import { RequirementService } from '../../src/domain/services/requirement-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
 import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import * as fs from 'fs/promises';
@@ -8,6 +9,7 @@ import * as os from 'os';
 
 describe('SolutionService', () => {
   let service: SolutionService;
+  let requirementService: RequirementService;
   let planService: PlanService;
   let storage: FileStorage;
   let testDir: string;
@@ -19,6 +21,7 @@ describe('SolutionService', () => {
     await storage.initialize();
     planService = new PlanService(storage);
     service = new SolutionService(storage, planService);
+    requirementService = new RequirementService(storage, planService);
 
     const plan = await planService.createPlan({
       name: 'Test Plan',
@@ -565,6 +568,143 @@ describe('SolutionService', () => {
         expect(sol.status).toBeDefined();
         expect(sol.description).toBeUndefined();
       });
+    });
+  });
+
+  describe('bulk_update (Sprint 9 - RED Phase)', () => {
+    let reqId: string;
+    let sol1Id: string;
+    let sol2Id: string;
+    let sol3Id: string;
+
+    beforeEach(async () => {
+      // Create a requirement first
+      const req = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'For testing',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+      reqId = req.requirementId;
+
+      // Create test solutions
+      const s1 = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'Solution 1',
+          description: 'First solution',
+          approach: 'Approach 1',
+          addressing: [reqId],
+          tradeoffs: [],
+          evaluation: {
+            technicalFeasibility: 'high',
+            effortEstimate: { value: 1, unit: 'days', confidence: 'medium' },
+            riskAssessment: 'Low risk',
+          },
+        },
+      });
+      sol1Id = s1.solutionId;
+
+      const s2 = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'Solution 2',
+          description: 'Second solution',
+          approach: 'Approach 2',
+          addressing: [reqId],
+          tradeoffs: [],
+          evaluation: {
+            technicalFeasibility: 'medium',
+            effortEstimate: { value: 2, unit: 'days', confidence: 'medium' },
+            riskAssessment: 'Medium risk',
+          },
+        },
+      });
+      sol2Id = s2.solutionId;
+
+      const s3 = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'Solution 3',
+          description: 'Third solution',
+          approach: 'Approach 3',
+          addressing: [reqId],
+          tradeoffs: [],
+          evaluation: {
+            technicalFeasibility: 'low',
+            effortEstimate: { value: 3, unit: 'days', confidence: 'low' },
+            riskAssessment: 'High risk',
+          },
+        },
+      });
+      sol3Id = s3.solutionId;
+    });
+
+    it('RED 9.9: should update multiple solutions in one call', async () => {
+      const result = await service.bulkUpdateSolutions({
+        planId,
+        updates: [
+          { solutionId: sol1Id, updates: { approach: 'Updated Approach 1' } },
+          { solutionId: sol2Id, updates: { title: 'Updated Solution 2' } },
+          { solutionId: sol3Id, updates: { description: 'Updated description' } },
+        ],
+      });
+
+      expect(result.updated).toBe(3);
+      expect(result.failed).toBe(0);
+      expect(result.results).toHaveLength(3);
+
+      const updated1 = await service.getSolution({ planId, solutionId: sol1Id });
+      expect(updated1.solution.approach).toBe('Updated Approach 1');
+
+      const updated2 = await service.getSolution({ planId, solutionId: sol2Id });
+      expect(updated2.solution.title).toBe('Updated Solution 2');
+
+      const updated3 = await service.getSolution({ planId, solutionId: sol3Id });
+      expect(updated3.solution.description).toBe('Updated description');
+    });
+
+    it('RED 9.10: should return individual results with success/error', async () => {
+      const result = await service.bulkUpdateSolutions({
+        planId,
+        updates: [
+          { solutionId: sol1Id, updates: { title: 'Valid Update' } },
+          { solutionId: 'non-existent-id', updates: { title: 'Invalid' } },
+          { solutionId: sol3Id, updates: { approach: 'New Approach' } },
+        ],
+        atomic: false,
+      });
+
+      expect(result.updated).toBe(2);
+      expect(result.failed).toBe(1);
+      expect(result.results).toHaveLength(3);
+
+      expect(result.results[0].success).toBe(true);
+      expect(result.results[1].success).toBe(false);
+      expect(result.results[1].error).toBeDefined();
+      expect(result.results[2].success).toBe(true);
+    });
+
+    it('RED 9.11: should support atomic transaction mode', async () => {
+      await expect(
+        service.bulkUpdateSolutions({
+          planId,
+          updates: [
+            { solutionId: sol1Id, updates: { title: 'Updated' } },
+            { solutionId: 'invalid-id', updates: { title: 'Fail' } },
+          ],
+          atomic: true,
+        })
+      ).rejects.toThrow();
+
+      // Verify rollback - no changes applied
+      const check = await service.getSolution({ planId, solutionId: sol1Id });
+      expect(check.solution.title).toBe('Solution 1'); // unchanged
     });
   });
 });

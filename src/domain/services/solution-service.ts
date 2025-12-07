@@ -82,6 +82,47 @@ export interface GetSolutionsInput {
   excludeMetadata?: boolean;
 }
 
+export interface BulkUpdateSolutionsInput {
+  planId: string;
+  updates: Array<{
+    solutionId: string;
+    updates: Partial<{
+      title: string;
+      description: string;
+      approach: string;
+      addressing: string[];
+      implementationNotes: string;
+      tradeoffs: Array<{
+        aspect: string;
+        pros: string[];
+        cons: string[];
+        score?: number;
+      }>;
+      evaluation: {
+        technicalFeasibility: 'high' | 'medium' | 'low';
+        effortEstimate: {
+          value: number;
+          unit: 'hours' | 'days' | 'weeks' | 'story-points' | 'minutes';
+          confidence: 'low' | 'medium' | 'high';
+        };
+        riskAssessment: string;
+      };
+      status: 'proposed' | 'selected' | 'rejected';
+    }>;
+  }>;
+  atomic?: boolean;
+}
+
+export interface BulkUpdateSolutionsResult {
+  updated: number;
+  failed: number;
+  results: Array<{
+    solutionId: string;
+    success: boolean;
+    error?: string;
+  }>;
+}
+
 export interface GetSolutionsResult {
   solutions: Solution[];
   notFound: string[];
@@ -552,6 +593,67 @@ export class SolutionService {
       currentEntityData: current,
       currentVersion: current.version,
     });
+  }
+
+  /**
+   * Sprint 9: Bulk update multiple solutions in one call
+   */
+  async bulkUpdateSolutions(input: BulkUpdateSolutionsInput): Promise<BulkUpdateSolutionsResult> {
+    const atomic = input.atomic ?? false;
+    const results: Array<{ solutionId: string; success: boolean; error?: string }> = [];
+    let updated = 0;
+    let failed = 0;
+
+    // Atomic mode: validate all solutions exist first
+    if (atomic) {
+      const solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
+      const solutionMap = new Map(solutions.map((s) => [s.id, s]));
+
+      for (const update of input.updates) {
+        if (!solutionMap.has(update.solutionId)) {
+          throw new Error(
+            `Solution ${update.solutionId} not found (atomic mode - rolling back)`
+          );
+        }
+      }
+
+      // All validated - perform updates
+      for (const update of input.updates) {
+        try {
+          await this.updateSolution({
+            planId: input.planId,
+            solutionId: update.solutionId,
+            updates: update.updates,
+          });
+          results.push({ solutionId: update.solutionId, success: true });
+          updated++;
+        } catch (error: any) {
+          throw new Error(`Atomic bulk update failed: ${error.message}`);
+        }
+      }
+    } else {
+      // Non-atomic mode: process each update independently
+      for (const update of input.updates) {
+        try {
+          await this.updateSolution({
+            planId: input.planId,
+            solutionId: update.solutionId,
+            updates: update.updates,
+          });
+          results.push({ solutionId: update.solutionId, success: true });
+          updated++;
+        } catch (error: any) {
+          results.push({
+            solutionId: update.solutionId,
+            success: false,
+            error: error.message,
+          });
+          failed++;
+        }
+      }
+    }
+
+    return { updated, failed, results };
   }
 
 }
