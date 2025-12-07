@@ -1115,6 +1115,31 @@ describe('ArtifactService', () => {
         // But sourceCode should be excluded due to includeContent=false
         expect(art.content.sourceCode).toBeUndefined();
       });
+
+      it('PREVENTIVE: includeContent=true should NOT add content when explicitly excluded from fields', async () => {
+        const result = await service.getArtifact({
+          planId,
+          artifactId: artId,
+          fields: ['id', 'title', 'artifactType'], // content NOT in fields
+          includeContent: true, // Should NOT override explicit field selection
+        });
+
+        const art = result.artifact as unknown as Record<string, unknown>;
+
+        // Should only include requested fields
+        expect(art.id).toBe(artId);
+        expect(art.title).toBe('Heavy Artifact');
+        expect(art.artifactType).toBe('code');
+
+        // PREVENTIVE CHECK: content should NOT appear because it was explicitly excluded from fields
+        // This test prevents regression - ensures includeContent respects fields parameter
+        // (Different from filterPhase bug: filterArtifact has different architecture)
+        expect(art.content).toBeUndefined();
+
+        // Other fields should also be undefined
+        expect(art.description).toBeUndefined();
+        expect(art.slug).toBeUndefined();
+      });
     });
 
     describe('listArtifacts with includeContent', () => {
