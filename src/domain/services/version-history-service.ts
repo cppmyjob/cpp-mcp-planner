@@ -80,7 +80,6 @@ export class VersionHistoryService {
 
     // Add new snapshot
     history.versions.push(snapshot);
-    history.total = history.versions.length;
     history.currentVersion = version;  // Sprint 7 fix: Update currentVersion to latest
 
     // Apply rotation if maxDepth is set and exceeded
@@ -88,6 +87,9 @@ export class VersionHistoryService {
       const excess = history.versions.length - maxDepth;
       history.versions.splice(0, excess); // Remove oldest versions
     }
+
+    // Update total AFTER rotation to reflect actual count
+    history.total = history.versions.length;
 
     await this.saveHistory(planId, entityId, entityType, history);
   }

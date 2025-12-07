@@ -877,6 +877,41 @@ describe('Version History Service (Sprint 7)', () => {
       expect(history.versions[0].data.title).toBe('V2');
     });
 
+    // Test 31.5: RED - history.total should be updated after rotation (Bug Fix)
+    it('should update history.total correctly after automatic rotation', async () => {
+      const plan = await planService.createPlan({
+        name: 'Test Plan',
+        description: 'Test',
+        maxHistoryDepth: 3
+      });
+
+      const req = await requirementService.addRequirement({
+        planId: plan.planId,
+        requirement: createRequirement('V1', { description: 'Test', priority: 'high', category: 'functional' })
+      });
+
+      // Create 5 versions total (should trigger rotation, keeping only 3)
+      for (let i = 2; i <= 5; i++) {
+        await requirementService.updateRequirement({
+          planId: plan.planId,
+          requirementId: req.requirementId,
+          updates: { title: `V${i}` }
+        });
+      }
+
+      const history = await requirementService.getHistory({
+        planId: plan.planId,
+        requirementId: req.requirementId
+      });
+
+      // BUG: history.total should be 3 (after rotation), not 5 (before rotation)
+      expect(history.total).toBe(3); // SHOULD FAIL initially
+      expect(history.versions).toHaveLength(3);
+
+      // Verify hasMore flag is also correct (should be false since we got all 3)
+      expect(history.hasMore).toBe(false);
+    });
+
     // Test 32: Concurrent updates should not corrupt rotation
     // Skip on Windows due to file locking issues with concurrent writes
     (process.platform === 'win32' ? it.skip : it)('should handle concurrent updates without corrupting history rotation', async () => {
