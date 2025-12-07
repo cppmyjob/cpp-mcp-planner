@@ -282,15 +282,33 @@ export class QueryService {
     const solutionIds = new Set(implementsLinks.map((l) => l.sourceId));
     const rawSolutions = entities.solutions.filter((s) => solutionIds.has(s.id));
 
-    // Apply filters (limit, fields, excludeMetadata)
-    const allSolutions = this.applyEntityFilters(rawSolutions, {
+    // IMPORTANT: Find selectedSolution BEFORE applying limit
+    // selectedSolution is a semantic singleton and must always be found
+    // from the full set of solutions, regardless of pagination
+    const rawSelected = rawSolutions.find((s) => s.status === 'selected');
+    const rawAlternatives = rawSolutions.filter((s) => s.status !== 'selected');
+
+    // Apply filters (limit, fields, excludeMetadata) only to alternatives
+    const filteredAlternatives = this.applyEntityFilters(rawAlternatives, {
       limit,
       fields: input.solutionFields || input.fields,
       excludeMetadata,
     });
 
-    const selectedSolution = allSolutions.find((s) => s.status === 'selected') || null;
-    const alternativeSolutions = allSolutions.filter((s) => s.status !== 'selected');
+    // Apply fields/metadata filters to selectedSolution (but NOT limit)
+    let selectedSolution: Solution | null = null;
+    if (rawSelected) {
+      const filtered = this.applyEntityFilters([rawSelected], {
+        fields: input.solutionFields || input.fields,
+        excludeMetadata,
+      });
+      selectedSolution = filtered[0] || null;
+    }
+
+    const alternativeSolutions = filteredAlternatives;
+    const allSolutions = selectedSolution
+      ? [selectedSolution, ...alternativeSolutions]
+      : alternativeSolutions;
 
     // ========================================================================
     // Level 2: Find Phases (depth >= PHASES and includePhases)
@@ -374,7 +392,7 @@ export class QueryService {
     // ========================================================================
 
     const trace: any = {
-      proposedSolutions: allSolutions,
+      proposedSolutions: alternativeSolutions,
       selectedSolution,
       alternativeSolutions,
       decisions,

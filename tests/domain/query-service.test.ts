@@ -2355,6 +2355,31 @@ describe('QueryService', () => {
         expect(result.trace.proposedSolutions).toHaveLength(3);
         expect(result.trace.implementingPhases).toHaveLength(3);
       });
+
+      it('BUG FIX: selectedSolution should be found even when beyond limit', async () => {
+        // Select the 3rd solution (sol3Id is the last one created)
+        await solutionService.selectSolution({
+          planId,
+          solutionId: sol3Id,
+          reason: 'Best approach',
+        });
+
+        // Apply limit=1 - only first solution will be in proposedSolutions
+        const result = await queryService.traceRequirement({
+          planId,
+          requirementId: reqId,
+          limit: 1,
+        } as any);
+
+        // BUG: selectedSolution should NOT be null even though it's beyond limit
+        // The selectedSolution is a semantic singleton and should always be found
+        // from the full set of solutions, regardless of pagination
+        expect(result.trace.selectedSolution).not.toBeNull();
+        expect(result.trace.selectedSolution?.id).toBe(sol3Id);
+
+        // proposedSolutions should respect the limit (only non-selected solutions)
+        expect(result.trace.proposedSolutions.length).toBeLessThanOrEqual(1);
+      });
     });
   });
 });
