@@ -5,6 +5,7 @@ import type { VersionHistoryService } from './version-history-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, CodeExample, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
 import { validateEffortEstimate, validateTags, validateCodeExamples, validatePriority, validateCodeRefs } from './validators.js';
 import { filterEntity, filterPhase } from '../utils/field-filter.js';
+import { bulkUpdateEntities } from '../utils/bulk-operations.js';
 
 /**
  * Calculate the next valid order for a phase.
@@ -1160,63 +1161,19 @@ export class PhaseService {
 
   /**
    * Sprint 9: Bulk update multiple phases in one call
+   * REFACTOR: Uses common bulkUpdateEntities utility
    */
   async bulkUpdatePhases(input: BulkUpdatePhasesInput): Promise<BulkUpdatePhasesResult> {
-    const atomic = input.atomic ?? false;
-    const results: Array<{ phaseId: string; success: boolean; error?: string }> = [];
-    let updated = 0;
-    let failed = 0;
-
-    // Atomic mode: validate all phases exist first
-    if (atomic) {
-      const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
-      const phaseMap = new Map(phases.map((p) => [p.id, p]));
-
-      for (const update of input.updates) {
-        if (!phaseMap.has(update.phaseId)) {
-          throw new Error(
-            `Phase ${update.phaseId} not found (atomic mode - rolling back)`
-          );
-        }
-      }
-
-      // All validated - perform updates
-      for (const update of input.updates) {
-        try {
-          await this.updatePhase({
-            planId: input.planId,
-            phaseId: update.phaseId,
-            updates: update.updates as any,
-          });
-          results.push({ phaseId: update.phaseId, success: true });
-          updated++;
-        } catch (error: any) {
-          throw new Error(`Atomic bulk update failed: ${error.message}`);
-        }
-      }
-    } else {
-      // Non-atomic mode: process each update independently
-      for (const update of input.updates) {
-        try {
-          await this.updatePhase({
-            planId: input.planId,
-            phaseId: update.phaseId,
-            updates: update.updates as any,
-          });
-          results.push({ phaseId: update.phaseId, success: true });
-          updated++;
-        } catch (error: any) {
-          results.push({
-            phaseId: update.phaseId,
-            success: false,
-            error: error.message,
-          });
-          failed++;
-        }
-      }
-    }
-
-    return { updated, failed, results };
+    return bulkUpdateEntities<'phaseId'>({
+      entityType: 'phases',
+      entityIdField: 'phaseId',
+      updateFn: (phaseId, updates) =>
+        this.updatePhase({ planId: input.planId, phaseId, updates }).then(() => {}),
+      planId: input.planId,
+      updates: input.updates,
+      atomic: input.atomic,
+      storage: this.storage,
+    });
   }
 
 }

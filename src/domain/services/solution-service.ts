@@ -5,6 +5,7 @@ import type { VersionHistoryService } from './version-history-service.js';
 import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
 import { validateEffortEstimate, validateTags } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
+import { bulkUpdateEntities } from '../utils/bulk-operations.js';
 
 // Input types
 export interface ProposeSolutionInput {
@@ -597,63 +598,19 @@ export class SolutionService {
 
   /**
    * Sprint 9: Bulk update multiple solutions in one call
+   * REFACTOR: Uses common bulkUpdateEntities utility
    */
   async bulkUpdateSolutions(input: BulkUpdateSolutionsInput): Promise<BulkUpdateSolutionsResult> {
-    const atomic = input.atomic ?? false;
-    const results: Array<{ solutionId: string; success: boolean; error?: string }> = [];
-    let updated = 0;
-    let failed = 0;
-
-    // Atomic mode: validate all solutions exist first
-    if (atomic) {
-      const solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
-      const solutionMap = new Map(solutions.map((s) => [s.id, s]));
-
-      for (const update of input.updates) {
-        if (!solutionMap.has(update.solutionId)) {
-          throw new Error(
-            `Solution ${update.solutionId} not found (atomic mode - rolling back)`
-          );
-        }
-      }
-
-      // All validated - perform updates
-      for (const update of input.updates) {
-        try {
-          await this.updateSolution({
-            planId: input.planId,
-            solutionId: update.solutionId,
-            updates: update.updates,
-          });
-          results.push({ solutionId: update.solutionId, success: true });
-          updated++;
-        } catch (error: any) {
-          throw new Error(`Atomic bulk update failed: ${error.message}`);
-        }
-      }
-    } else {
-      // Non-atomic mode: process each update independently
-      for (const update of input.updates) {
-        try {
-          await this.updateSolution({
-            planId: input.planId,
-            solutionId: update.solutionId,
-            updates: update.updates,
-          });
-          results.push({ solutionId: update.solutionId, success: true });
-          updated++;
-        } catch (error: any) {
-          results.push({
-            solutionId: update.solutionId,
-            success: false,
-            error: error.message,
-          });
-          failed++;
-        }
-      }
-    }
-
-    return { updated, failed, results };
+    return bulkUpdateEntities<'solutionId'>({
+      entityType: 'solutions',
+      entityIdField: 'solutionId',
+      updateFn: (solutionId, updates) =>
+        this.updateSolution({ planId: input.planId, solutionId, updates }).then(() => {}),
+      planId: input.planId,
+      updates: input.updates,
+      atomic: input.atomic,
+      storage: this.storage,
+    });
   }
 
 }
