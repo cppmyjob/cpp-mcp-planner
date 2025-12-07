@@ -59,6 +59,11 @@ export async function bulkUpdateEntities<TIdField extends string>(
 ): Promise<BulkUpdateResult<TIdField>> {
   const { entityType, entityIdField, updateFn, planId, updates, atomic = false, storage } = config;
 
+  // API contract validation: atomic mode requires storage for snapshot/rollback
+  if (atomic && !storage) {
+    throw new Error('storage is required for atomic mode (needed for snapshot/rollback)');
+  }
+
   const results: Array<Record<TIdField, string> & { success: boolean; error?: string }> = [];
   let updated = 0;
   let failed = 0;
