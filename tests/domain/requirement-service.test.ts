@@ -1100,6 +1100,70 @@ describe('RequirementService', () => {
       expect(check2.requirement.priority).toBe('medium'); // unchanged
     });
 
+    it('RED 9.3b (BUGFIX): atomic mode should rollback partial updates when validation fails mid-execution', async () => {
+      /**
+       * CRITICAL BUG: Current atomic implementation validates entity existence upfront,
+       * but each updateFn() call immediately persists changes to disk via storage.saveEntities().
+       * If update #1 succeeds but update #2 fails validation, update #1 remains persisted.
+       *
+       * Example scenario:
+       * - req1.priority = 'high'
+       * - Bulk update with atomic=true:
+       *   1. Update req1.priority to 'critical' → succeeds, saves to disk
+       *   2. Update req2.tags to invalid format → fails validation
+       * - Expected: Both updates rolled back (req1.priority still 'high')
+       * - Actual BUG: req1.priority changed to 'critical' (partial modification persisted)
+       *
+       * Fix requires: Collect all changes in memory, validate all, then single atomic write.
+       */
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 1',
+          description: 'Test',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const req2 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 2',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+          tags: [{ key: 'env', value: 'prod' }],
+        },
+      });
+
+      // Attempt bulk update where:
+      // - First update is valid (req1: priority change)
+      // - Second update has invalid data (req2: malformed tags - missing 'key' field)
+      await expect(
+        service.bulkUpdateRequirements({
+          planId,
+          updates: [
+            { requirementId: req1.requirementId, updates: { priority: 'critical' } },
+            { requirementId: req2.requirementId, updates: { tags: [{ invalidField: 'test' }] as any } },
+          ],
+          atomic: true,
+        })
+      ).rejects.toThrow();
+
+      // BUGFIX TEST: Verify req1 was NOT modified (true atomicity)
+      const check1 = await service.getRequirement({ planId, requirementId: req1.requirementId });
+      expect(check1.requirement.priority).toBe('high'); // Should remain unchanged due to atomic rollback
+
+      // req2 should also be unchanged
+      const check2 = await service.getRequirement({ planId, requirementId: req2.requirementId });
+      expect(check2.requirement.metadata.tags).toEqual([{ key: 'env', value: 'prod' }]); // unchanged
+    });
+
     it('RED 9.4: should handle empty updates array', async () => {
       const result = await service.bulkUpdateRequirements({
         planId,
