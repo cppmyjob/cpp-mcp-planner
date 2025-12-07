@@ -14,6 +14,25 @@ import type {
   Tag,
 } from '../entities/types.js';
 
+// ============================================================================
+// Sprint 8: Trace Depth Constants
+// ============================================================================
+
+/**
+ * Trace depth levels for hierarchical requirement tracing:
+ * - SOLUTIONS (1): requirement → solutions only
+ * - PHASES (2): requirement → solutions → phases
+ * - ARTIFACTS (3): requirement → solutions → phases → artifacts (full trace)
+ */
+const TRACE_DEPTH = {
+  SOLUTIONS: 1,
+  PHASES: 2,
+  ARTIFACTS: 3,
+  MIN: 1,
+  MAX: 3,
+  DEFAULT: 3,
+} as const;
+
 // Input types
 export interface SearchEntitiesInput {
   planId: string;
@@ -246,121 +265,101 @@ export class QueryService {
     // Sprint 8: Depth and Include Flags (default behavior)
     // ========================================================================
 
-    const depth = input.depth !== undefined ? input.depth : 3; // Default: full depth
-    const includePhases = input.includePhases !== undefined ? input.includePhases : true; // Default: include
-    const includeArtifacts = (input.includeArtifacts !== undefined && input.includeArtifacts !== null) ? input.includeArtifacts : true; // Default: include (null treated as true)
-    const limit = input.limit; // Optional limit
+    const depth = input.depth ?? TRACE_DEPTH.DEFAULT;
+    const includePhases = input.includePhases ?? true;
+    const includeArtifacts = (input.includeArtifacts !== undefined && input.includeArtifacts !== null)
+      ? input.includeArtifacts
+      : true;
+    const { limit, excludeMetadata } = input;
 
     // ========================================================================
-    // Level 1: Find Solutions (always included)
+    // Level 1: Find Solutions (always included at any depth)
     // ========================================================================
 
     const implementsLinks = links.filter(
       (l) => l.targetId === input.requirementId && l.relationType === 'implements'
     );
-    const solutionIds = implementsLinks.map((l) => l.sourceId);
-    let allSolutions = entities.solutions.filter((s) => solutionIds.includes(s.id));
+    const solutionIds = new Set(implementsLinks.map((l) => l.sourceId));
+    const rawSolutions = entities.solutions.filter((s) => solutionIds.has(s.id));
 
-    // Apply limit to solutions
-    if (limit !== undefined) {
-      allSolutions = allSolutions.slice(0, limit);
-    }
-
-    // Apply fields filtering to solutions
-    if (input.solutionFields || input.fields) {
-      const fields = input.solutionFields || input.fields;
-      allSolutions = allSolutions.map((s) => this.filterFields(s, fields));
-    }
-
-    // Apply excludeMetadata to solutions
-    if (input.excludeMetadata) {
-      allSolutions = allSolutions.map((s) => this.removeMetadataFields(s));
-    }
+    // Apply filters (limit, fields, excludeMetadata)
+    const allSolutions = this.applyEntityFilters(rawSolutions, {
+      limit,
+      fields: input.solutionFields || input.fields,
+      excludeMetadata,
+    });
 
     const selectedSolution = allSolutions.find((s) => s.status === 'selected') || null;
     const alternativeSolutions = allSolutions.filter((s) => s.status !== 'selected');
 
     // ========================================================================
-    // Level 2: Find Phases (conditional based on depth and includePhases)
+    // Level 2: Find Phases (depth >= PHASES and includePhases)
     // ========================================================================
 
     let implementingPhases: Phase[] = [];
 
-    if (depth >= 2 && includePhases) {
+    if (depth >= TRACE_DEPTH.PHASES && includePhases) {
       const addressesLinks = links.filter(
         (l) => l.targetId === input.requirementId && l.relationType === 'addresses'
       );
-      const phaseIds = addressesLinks.map((l) => l.sourceId);
-      implementingPhases = entities.phases.filter((p) => phaseIds.includes(p.id));
+      const phaseIds = new Set(addressesLinks.map((l) => l.sourceId));
+      const rawPhases = entities.phases.filter((p) => phaseIds.has(p.id));
 
-      // Apply limit to phases
-      if (limit !== undefined) {
-        implementingPhases = implementingPhases.slice(0, limit);
-      }
-
-      // Apply fields filtering to phases
-      if (input.phaseFields) {
-        implementingPhases = implementingPhases.map((p) => this.filterFields(p, input.phaseFields));
-      } else if (input.fields) {
-        implementingPhases = implementingPhases.map((p) => this.filterFields(p, input.fields));
-      }
-
-      // Apply excludeMetadata to phases
-      if (input.excludeMetadata) {
-        implementingPhases = implementingPhases.map((p) => this.removeMetadataFields(p));
-      }
+      // Apply filters (limit, fields, excludeMetadata)
+      implementingPhases = this.applyEntityFilters(rawPhases, {
+        limit,
+        fields: input.phaseFields || input.fields,
+        excludeMetadata,
+      });
     }
 
     // ========================================================================
-    // Level 3: Find Artifacts (conditional based on depth and includeArtifacts)
+    // Level 3: Find Artifacts (depth >= ARTIFACTS and includeArtifacts)
     // ========================================================================
 
     let artifacts: Artifact[] = [];
 
-    if (depth >= 3 && includeArtifacts) {
+    if (depth >= TRACE_DEPTH.ARTIFACTS && includeArtifacts) {
+      // Create Set of phase IDs for O(1) lookup performance
+      const implementingPhaseIds = new Set(implementingPhases.map((p) => p.id));
+
       // Find artifacts related to this requirement or its phases
-      artifacts = entities.artifacts.filter((a) => {
+      const rawArtifacts = entities.artifacts.filter((a) => {
         // Artifact directly related to requirement
-        if (a.relatedRequirementIds && a.relatedRequirementIds.includes(input.requirementId)) {
+        if (a.relatedRequirementIds?.includes(input.requirementId)) {
           return true;
         }
-        // Artifact related to implementing phases
-        if (a.relatedPhaseId && implementingPhases.some((p) => p.id === a.relatedPhaseId)) {
+        // Artifact related to implementing phases (O(1) lookup via Set)
+        if (a.relatedPhaseId && implementingPhaseIds.has(a.relatedPhaseId)) {
           return true;
         }
         return false;
       });
 
-      // Apply limit to artifacts
-      if (limit !== undefined) {
-        artifacts = artifacts.slice(0, limit);
-      }
-
-      // Apply fields filtering to artifacts
-      if (input.fields) {
-        artifacts = artifacts.map((a) => this.filterFields(a, input.fields));
-      }
-
-      // Apply excludeMetadata to artifacts
-      if (input.excludeMetadata) {
-        artifacts = artifacts.map((a) => this.removeMetadataFields(a));
-      }
+      // Apply filters (limit, fields, excludeMetadata)
+      artifacts = this.applyEntityFilters(rawArtifacts, {
+        limit,
+        fields: input.fields,
+        excludeMetadata,
+      });
     }
 
     // ========================================================================
     // Find Related Decisions (always included)
     // ========================================================================
 
+    // Create Set of decision IDs for O(1) lookup
+    const decisionIdSet = new Set(entities.decisions.map((d) => d.id));
+
     const decisionLinks = links.filter(
       (l) =>
         (l.sourceId === input.requirementId || l.targetId === input.requirementId) &&
-        (entities.decisions.some((d) => d.id === l.sourceId) ||
-          entities.decisions.some((d) => d.id === l.targetId))
+        (decisionIdSet.has(l.sourceId) || decisionIdSet.has(l.targetId))
     );
-    const decisionIds = new Set(
+    const relatedDecisionIds = new Set(
       decisionLinks.flatMap((l) => [l.sourceId, l.targetId])
     );
-    const decisions = entities.decisions.filter((d) => decisionIds.has(d.id));
+    const decisions = entities.decisions.filter((d) => relatedDecisionIds.has(d.id));
 
     // ========================================================================
     // Calculate Completion Status
@@ -368,16 +367,10 @@ export class QueryService {
 
     const isAddressed = allSolutions.length > 0;
     const isImplemented = implementingPhases.some((p) => p.status === 'completed');
-    const completionPercentage =
-      implementingPhases.length > 0
-        ? Math.round(
-            implementingPhases.reduce((sum, p) => sum + p.progress, 0) /
-              implementingPhases.length
-          )
-        : 0;
+    const completionPercentage = this.calculateAverageProgress(implementingPhases);
 
     // ========================================================================
-    // Return Result (conditionally include fields based on flags)
+    // Build Result (conditionally include fields based on depth and flags)
     // ========================================================================
 
     const trace: any = {
@@ -392,20 +385,28 @@ export class QueryService {
       },
     };
 
-    // Only include implementingPhases if depth >= 2 AND includePhases is true
-    if (depth >= 2 && includePhases) {
+    // Include implementingPhases if depth >= PHASES AND includePhases is true
+    if (depth >= TRACE_DEPTH.PHASES && includePhases) {
       trace.implementingPhases = implementingPhases;
     }
 
-    // Only include artifacts if depth >= 3 AND includeArtifacts is true
-    if (depth >= 3 && includeArtifacts) {
+    // Include artifacts if depth >= ARTIFACTS AND includeArtifacts is true
+    if (depth >= TRACE_DEPTH.ARTIFACTS && includeArtifacts) {
       trace.artifacts = artifacts;
     }
 
-    return {
-      requirement,
-      trace,
-    };
+    return { requirement, trace };
+  }
+
+  /**
+   * Calculate average progress percentage from phases
+   * @param phases - Array of phases with progress values
+   * @returns Average progress percentage (0-100), or 0 if no phases
+   */
+  private calculateAverageProgress(phases: Phase[]): number {
+    if (phases.length === 0) return 0;
+    const totalProgress = phases.reduce((sum, p) => sum + (p.progress || 0), 0);
+    return Math.round(totalProgress / phases.length);
   }
 
   async validatePlan(input: ValidatePlanInput): Promise<ValidatePlanResult> {
@@ -852,8 +853,76 @@ export class QueryService {
   }
 
   // ========================================================================
-  // Sprint 8: Helper Methods for Fields Filtering and Metadata Removal
+  // Sprint 8: Helper Methods for Validation, Fields Filtering and Metadata Removal
   // ========================================================================
+
+  /**
+   * Validate an integer parameter with range checking
+   * @param value - The value to validate
+   * @param name - Parameter name for error messages
+   * @param min - Minimum allowed value (optional)
+   * @param max - Maximum allowed value (optional)
+   * @throws Error if validation fails
+   */
+  private validateIntegerParam(
+    value: unknown,
+    name: string,
+    min?: number,
+    max?: number
+  ): void {
+    if (value === undefined) return;
+
+    if (typeof value !== 'number') {
+      throw new Error(`${name} must be a number`);
+    }
+    if (!Number.isInteger(value)) {
+      throw new Error(`${name} must be an integer`);
+    }
+    if (min !== undefined && value < min) {
+      throw new Error(`${name} must be at least ${min}`);
+    }
+    if (max !== undefined && value > max) {
+      throw new Error(`${name} must be at most ${max}`);
+    }
+    if (min !== undefined && max !== undefined && (value < min || value > max)) {
+      throw new Error(`${name} must be between ${min} and ${max}`);
+    }
+  }
+
+  /**
+   * Apply limit, fields filtering, and excludeMetadata to an array of entities
+   * Consolidates repeated filtering logic into a single reusable method
+   * @param entities - Array of entities to filter
+   * @param options - Filtering options (limit, fields, excludeMetadata)
+   * @returns Filtered array of entities
+   */
+  private applyEntityFilters<T extends Entity>(
+    entities: T[],
+    options: {
+      limit?: number;
+      fields?: string[];
+      excludeMetadata?: boolean;
+    }
+  ): T[] {
+    let result = entities;
+
+    // Apply limit
+    if (options.limit !== undefined) {
+      result = result.slice(0, options.limit);
+    }
+
+    // Apply fields filtering
+    if (options.fields && options.fields.length > 0) {
+      result = result.map((e) => this.filterFields(e, options.fields));
+    }
+
+    // Apply excludeMetadata
+    if (options.excludeMetadata) {
+      result = result.map((e) => this.removeMetadataFields(e));
+    }
+
+    return result;
+  }
 
   /**
    * Filter entity fields based on provided field list
