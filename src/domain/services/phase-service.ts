@@ -1,8 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
-import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, CodeExample, PhasePriority } from '../entities/types.js';
-import { validateEffortEstimate, validateTags, validateCodeExamples, validatePriority, validateCodeRefs } from './validators.js';
+import type { VersionHistoryService } from './version-history-service.js';
+import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
+import { validateEffortEstimate, validateTags, validatePriority } from './validators.js';
+import { filterEntity, filterPhase } from '../utils/field-filter.js';
+import { bulkUpdateEntities } from '../utils/bulk-operations.js';
 
 /**
  * Calculate the next valid order for a phase.
@@ -50,8 +53,6 @@ export interface AddPhaseInput {
     };
     tags?: Tag[];
     implementationNotes?: string;
-    codeExamples?: CodeExample[];
-    codeRefs?: string[];
     priority?: PhasePriority;
   };
 }
@@ -76,8 +77,6 @@ export interface UpdatePhaseInput {
     milestones: Milestone[];
     tags: Tag[];
     implementationNotes: string;
-    codeExamples: CodeExample[];
-    codeRefs: string[];
     priority: PhasePriority;
   }>;
 }
@@ -92,10 +91,26 @@ export interface MovePhaseInput {
 export interface GetPhaseInput {
   planId: string;
   phaseId: string;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
+  excludeComputed?: boolean; // Exclude computed fields (depth, path, childCount)
 }
 
 export interface GetPhaseResult {
   phase: Phase;
+}
+
+export interface GetPhasesInput {
+  planId: string;
+  phaseIds: string[];
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields
+  excludeComputed?: boolean; // Exclude computed fields
+}
+
+export interface GetPhasesResult {
+  phases: Phase[];
+  notFound: string[]; // IDs that were not found
 }
 
 export interface GetPhaseTreeInput {
@@ -104,6 +119,8 @@ export interface GetPhaseTreeInput {
   includeCompleted?: boolean;
   fields?: string[];  // Summary by default; ['*'] for all, or specific fields
   maxDepth?: number;  // Limit tree depth (0 = root only)
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
+  excludeComputed?: boolean; // Exclude computed fields (depth, path, childCount)
 }
 
 export interface DeletePhaseInput {
@@ -155,6 +172,96 @@ export interface CompleteAndAdvanceResult {
   completedPhaseId: string;
   nextPhaseId: string | null;
   success: true;
+}
+
+// Sprint 5: Array Field Operations interfaces
+export type PhaseArrayField = 'objectives' | 'deliverables' | 'successCriteria';
+
+export interface ArrayAppendInput {
+  planId: string;
+  phaseId: string;
+  field: PhaseArrayField;
+  value: string;
+}
+
+export interface ArrayPrependInput {
+  planId: string;
+  phaseId: string;
+  field: PhaseArrayField;
+  value: string;
+}
+
+export interface ArrayInsertAtInput {
+  planId: string;
+  phaseId: string;
+  field: PhaseArrayField;
+  index: number;
+  value: string;
+}
+
+export interface ArrayUpdateAtInput {
+  planId: string;
+  phaseId: string;
+  field: PhaseArrayField;
+  index: number;
+  value: string;
+}
+
+export interface ArrayRemoveAtInput {
+  planId: string;
+  phaseId: string;
+  field: PhaseArrayField;
+  index: number;
+}
+
+export interface BulkUpdatePhasesInput {
+  planId: string;
+  updates: Array<{
+    phaseId: string;
+    updates: Partial<{
+      title: string;
+      description: string;
+      objectives: string[];
+      deliverables: string[];
+      successCriteria: string[];
+      implementationNotes: string;
+      estimatedEffort: {
+        value: number;
+        unit: 'hours' | 'days' | 'weeks' | 'story-points' | 'minutes';
+        confidence: 'low' | 'medium' | 'high';
+      };
+      actualEffort: {
+        value: number;
+        unit: 'hours' | 'days' | 'weeks' | 'story-points' | 'minutes';
+      };
+      schedule: {
+        startDate: string;
+        endDate: string;
+        milestones: Array<{ date: string; description: string }>;
+      };
+      status: string;
+      progress: number;
+      priority: 'critical' | 'high' | 'medium' | 'low';
+      blockers: Array<{ description: string; severity: 'high' | 'medium' | 'low' }>;
+    }>;
+  }>;
+  atomic?: boolean;
+}
+
+export interface BulkUpdatePhasesResult {
+  updated: number;
+  failed: number;
+  results: Array<{
+    phaseId: string;
+    success: boolean;
+    error?: string;
+  }>;
+}
+
+export interface ArrayOperationResult {
+  success: true;
+  field: PhaseArrayField;
+  newLength: number;
 }
 
 // Summary phase contains only essential fields for tree navigation
@@ -210,7 +317,8 @@ export interface UpdatePhaseStatusResult {
 export class PhaseService {
   constructor(
     private storage: FileStorage,
-    private planService: PlanService
+    private planService: PlanService,
+    private versionHistoryService?: VersionHistoryService
   ) {}
 
   private async ensurePlanExists(planId: string): Promise<void> {
@@ -230,7 +338,52 @@ export class PhaseService {
       throw new Error('Phase not found');
     }
 
-    return { phase };
+    // Apply field filtering with Lazy-Load support
+    const filtered = filterPhase(
+      phase,
+      input.fields,
+      input.excludeMetadata,
+      input.excludeComputed
+    ) as Phase;
+
+    return { phase: filtered };
+  }
+
+  async getPhases(input: GetPhasesInput): Promise<GetPhasesResult> {
+    await this.ensurePlanExists(input.planId);
+
+    // Enforce max limit
+    if (input.phaseIds.length > 100) {
+      throw new Error('Cannot fetch more than 100 phases at once');
+    }
+
+    // Handle empty array
+    if (input.phaseIds.length === 0) {
+      return { phases: [], notFound: [] };
+    }
+
+    const allPhases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const foundPhases: Phase[] = [];
+    const notFound: string[] = [];
+
+    // Collect found and not found IDs
+    for (const id of input.phaseIds) {
+      const phase = allPhases.find((p) => p.id === id);
+      if (phase) {
+        // Apply field filtering with Lazy-Load
+        const filtered = filterPhase(
+          phase,
+          input.fields,
+          input.excludeMetadata,
+          input.excludeComputed
+        ) as Phase;
+        foundPhases.push(filtered);
+      } else {
+        notFound.push(id);
+      }
+    }
+
+    return { phases: foundPhases, notFound };
   }
 
   async addPhase(input: AddPhaseInput): Promise<AddPhaseResult> {
@@ -239,14 +392,10 @@ export class PhaseService {
     validateEffortEstimate(effort, 'estimatedEffort');
     // Validate tags format
     validateTags(input.phase.tags || []);
-    // Validate codeExamples format
-    validateCodeExamples(input.phase.codeExamples || []);
     // Validate priority if provided
     if (input.phase.priority !== undefined) {
       validatePriority(input.phase.priority);
     }
-    // Validate codeRefs format
-    validateCodeRefs(input.phase.codeRefs || []);
 
     const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
     const phaseId = uuidv4();
@@ -295,8 +444,6 @@ export class PhaseService {
       status: 'planned',
       progress: 0,
       implementationNotes: input.phase.implementationNotes,
-      codeExamples: input.phase.codeExamples,
-      codeRefs: input.phase.codeRefs,
       priority: input.phase.priority ?? 'medium',
     };
 
@@ -318,6 +465,21 @@ export class PhaseService {
     const phase = phases[index];
     const now = new Date().toISOString();
 
+    // Sprint 7: Save current version to history BEFORE updating
+    if (this.versionHistoryService) {
+      const currentSnapshot = JSON.parse(JSON.stringify(phase));
+      await this.versionHistoryService.saveVersion(
+        input.planId,
+        input.phaseId,
+        'phase',
+        currentSnapshot,
+        phase.version,
+        'claude-code',
+        'Auto-saved before update'
+      );
+    }
+
+
     if (input.updates.title !== undefined) phase.title = input.updates.title;
     if (input.updates.description !== undefined) phase.description = input.updates.description;
     if (input.updates.objectives !== undefined) phase.objectives = input.updates.objectives;
@@ -336,14 +498,6 @@ export class PhaseService {
     }
     if (input.updates.implementationNotes !== undefined) {
       phase.implementationNotes = input.updates.implementationNotes;
-    }
-    if (input.updates.codeExamples !== undefined) {
-      validateCodeExamples(input.updates.codeExamples);
-      phase.codeExamples = input.updates.codeExamples;
-    }
-    if (input.updates.codeRefs !== undefined) {
-      validateCodeRefs(input.updates.codeRefs);
-      phase.codeRefs = input.updates.codeRefs;
     }
     if (input.updates.priority !== undefined) {
       validatePriority(input.updates.priority);
@@ -443,32 +597,21 @@ export class PhaseService {
 
     // Build phase data based on fields parameter
     const buildPhaseData = (phase: Phase): Phase | PhaseSummary => {
-      if (isFullMode) {
-        // Return full phase with childCount added
-        return {
-          ...phase,
-          childCount: childCounts.get(phase.id) || 0,
-        } as Phase & { childCount: number };
-      }
-
-      // Summary mode: only essential fields + requested additional fields
-      const summary: PhaseSummary = {
-        id: phase.id,
-        title: phase.title,
-        status: phase.status,
-        progress: phase.progress,
-        path: phase.path,
+      // Add childCount to phase (computed field)
+      const phaseWithChildCount = {
+        ...phase,
         childCount: childCounts.get(phase.id) || 0,
       };
 
-      // Add requested additional fields (ignore unknown fields)
-      for (const field of requestedFields) {
-        if (field in phase) {
-          summary[field] = (phase as unknown as Record<string, unknown>)[field];
-        }
-      }
+      // Apply field filtering with Lazy-Load support
+      const filtered = filterPhase(
+        phaseWithChildCount,
+        input.fields,
+        input.excludeMetadata,
+        input.excludeComputed
+      ) as Phase | PhaseSummary;
 
-      return summary;
+      return filtered;
     };
 
     const buildTree = (parentId: string | null, currentDepth: number): PhaseTreeNode[] => {
@@ -800,6 +943,215 @@ export class PhaseService {
     // 4. No next phase found
     return null;
   }
+
+  /**
+   * Sprint 5: Array Field Operations
+   * Validate that field is a valid array field for Phase
+   */
+  private validateArrayField(field: string): asserts field is PhaseArrayField {
+    const validFields: PhaseArrayField[] = ['objectives', 'deliverables', 'successCriteria'];
+    if (!validFields.includes(field as PhaseArrayField)) {
+      throw new Error(`Field ${field} is not a valid array field. Valid fields: ${validFields.join(', ')}`);
+    }
+  }
+
+  /**
+   * Execute an array operation with common load/save logic
+   * @param planId - Plan identifier
+   * @param phaseId - Phase identifier
+   * @param field - Array field to modify
+   * @param operation - Function that transforms the current array to new array
+   * @returns Operation result with success status and new array length
+   */
+  private async executeArrayOperation(
+    planId: string,
+    phaseId: string,
+    field: PhaseArrayField,
+    operation: (currentArray: string[]) => string[]
+  ): Promise<ArrayOperationResult> {
+    await this.ensurePlanExists(planId);
+
+    const phases = await this.storage.loadEntities<Phase>(planId, 'phases');
+    const phase = phases.find((p) => p.id === phaseId);
+    if (!phase) {
+      throw new Error('Phase not found');
+    }
+
+    const currentArray = phase[field] || [];
+    const newArray = operation(currentArray);
+
+    phase[field] = newArray;
+    phase.updatedAt = new Date().toISOString();
+    phase.version += 1;
+
+    await this.storage.saveEntities(planId, 'phases', phases);
+
+    return {
+      success: true,
+      field,
+      newLength: newArray.length,
+    };
+  }
+
+  /**
+   * Append item to end of array field
+   */
+  async arrayAppend(input: ArrayAppendInput): Promise<ArrayOperationResult> {
+    this.validateArrayField(input.field);
+    return this.executeArrayOperation(
+      input.planId,
+      input.phaseId,
+      input.field,
+      (currentArray) => [...currentArray, input.value]
+    );
+  }
+
+  /**
+   * Prepend item to beginning of array field
+   */
+  async arrayPrepend(input: ArrayPrependInput): Promise<ArrayOperationResult> {
+    this.validateArrayField(input.field);
+    return this.executeArrayOperation(
+      input.planId,
+      input.phaseId,
+      input.field,
+      (currentArray) => [input.value, ...currentArray]
+    );
+  }
+
+  /**
+   * Insert item at specific index in array field
+   */
+  async arrayInsertAt(input: ArrayInsertAtInput): Promise<ArrayOperationResult> {
+    this.validateArrayField(input.field);
+    return this.executeArrayOperation(
+      input.planId,
+      input.phaseId,
+      input.field,
+      (currentArray) => {
+        if (input.index < 0 || input.index > currentArray.length) {
+          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+        }
+        const newArray = [...currentArray];
+        newArray.splice(input.index, 0, input.value);
+        return newArray;
+      }
+    );
+  }
+
+  /**
+   * Update item at specific index in array field
+   */
+  async arrayUpdateAt(input: ArrayUpdateAtInput): Promise<ArrayOperationResult> {
+    this.validateArrayField(input.field);
+    return this.executeArrayOperation(
+      input.planId,
+      input.phaseId,
+      input.field,
+      (currentArray) => {
+        if (input.index < 0 || input.index >= currentArray.length) {
+          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+        }
+        const newArray = [...currentArray];
+        newArray[input.index] = input.value;
+        return newArray;
+      }
+    );
+  }
+
+  /**
+   * Remove item at specific index in array field
+   */
+  async arrayRemoveAt(input: ArrayRemoveAtInput): Promise<ArrayOperationResult> {
+    this.validateArrayField(input.field);
+    return this.executeArrayOperation(
+      input.planId,
+      input.phaseId,
+      input.field,
+      (currentArray) => {
+        if (input.index < 0 || input.index >= currentArray.length) {
+          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+        }
+        const newArray = [...currentArray];
+        newArray.splice(input.index, 1);
+        return newArray;
+      }
+    );
+  }
+
+  /**
+   * Sprint 7: Get version history
+   */
+  async getHistory(input: { planId: string; phaseId: string; limit?: number; offset?: number }): Promise<VersionHistory<Phase>> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    return this.versionHistoryService.getHistory({
+      planId: input.planId,
+      entityId: input.phaseId,
+      entityType: 'phase',
+      limit: input.limit,
+      offset: input.offset,
+    });
+  }
+
+  /**
+   * Sprint 7: Compare two versions
+   */
+  async diff(input: { planId: string; phaseId: string; version1: number; version2: number }): Promise<VersionDiff> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    const entities = await this.storage.loadEntities<Phase>(
+      input.planId,
+      'phases'
+    );
+    const current = entities.find((e) => e.id === input.phaseId);
+
+    if (!current) {
+      throw new Error('Phase not found');
+    }
+
+    return this.versionHistoryService.diff({
+      planId: input.planId,
+      entityId: input.phaseId,
+      entityType: 'phase',
+      version1: input.version1,
+      version2: input.version2,
+      currentEntityData: current,
+      currentVersion: current.version,
+    });
+  }
+
+  /**
+   * Sprint 9: Bulk update multiple phases in one call
+   * REFACTOR: Uses common bulkUpdateEntities utility
+   */
+  async bulkUpdatePhases(input: BulkUpdatePhasesInput): Promise<BulkUpdatePhasesResult> {
+    return bulkUpdateEntities<'phaseId'>({
+      entityType: 'phases',
+      entityIdField: 'phaseId',
+      updateFn: (phaseId, updates) =>
+        this.updatePhase({ planId: input.planId, phaseId, updates }).then(() => {}),
+      planId: input.planId,
+      updates: input.updates,
+      atomic: input.atomic,
+      storage: this.storage,
+    });
+  }
+
 }
 
 export default PhaseService;

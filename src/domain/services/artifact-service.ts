@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
+import type { VersionHistoryService } from './version-history-service.js';
 import type {
   Artifact,
   ArtifactType,
@@ -8,8 +9,11 @@ import type {
   FileEntry,
   ArtifactTarget,
   Tag,
+  VersionHistory,
+  VersionDiff,
 } from '../entities/types.js';
 import { validateTags, validateArtifactType, validateFileTable, validateTargets, validateCodeRefs } from './validators.js';
+import { filterArtifact } from '../utils/field-filter.js';
 
 /**
  * Converts a title string into a URL-friendly slug
@@ -63,6 +67,9 @@ export interface AddArtifactInput {
 export interface GetArtifactInput {
   planId: string;
   artifactId: string;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
+  includeContent?: boolean; // Include heavy sourceCode field (default: false for Lazy-Load)
 }
 
 export interface UpdateArtifactInput {
@@ -97,6 +104,9 @@ export interface ListArtifactsInput {
   };
   limit?: number;
   offset?: number;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
+  includeContent?: boolean; // IGNORED in list operations (sourceCode never returned in lists for security)
 }
 
 export interface DeleteArtifactInput {
@@ -132,7 +142,8 @@ export interface DeleteArtifactResult {
 export class ArtifactService {
   constructor(
     private storage: FileStorage,
-    private planService: PlanService
+    private planService: PlanService,
+    private versionHistoryService?: VersionHistoryService
   ) {}
 
   private async ensurePlanExists(planId: string): Promise<void> {
@@ -245,7 +256,16 @@ export class ArtifactService {
       }));
     }
 
-    return { artifact };
+    // Apply field filtering with Lazy-Load support
+    const filtered = filterArtifact(
+      artifact,
+      input.fields,
+      false, // isListOperation
+      input.excludeMetadata,
+      input.includeContent ?? false // default: false (Lazy-Load)
+    ) as Artifact;
+
+    return { artifact: filtered };
   }
 
   async updateArtifact(input: UpdateArtifactInput): Promise<UpdateArtifactResult> {
@@ -274,6 +294,20 @@ export class ArtifactService {
 
     const artifact = artifacts[index];
     const now = new Date().toISOString();
+
+    // Sprint 7: Save current version to history BEFORE updating
+    if (this.versionHistoryService) {
+      const currentSnapshot = JSON.parse(JSON.stringify(artifact));
+      await this.versionHistoryService.saveVersion(
+        input.planId,
+        input.artifactId,
+        'artifact',
+        currentSnapshot,
+        artifact.version,
+        'claude-code',
+        'Auto-saved before update'
+      );
+    }
 
     if (input.updates.title !== undefined) artifact.title = input.updates.title;
     if (input.updates.description !== undefined) artifact.description = input.updates.description;
@@ -327,8 +361,19 @@ export class ArtifactService {
 
     artifacts = artifacts.slice(offset, offset + limit);
 
+    // Apply field filtering with Lazy-Load (list operations NEVER return sourceCode)
+    const filtered = artifacts.map((artifact) =>
+      filterArtifact(
+        artifact,
+        input.fields,
+        true, // isListOperation
+        input.excludeMetadata,
+        false // includeContent IGNORED for list operations (security)
+      )
+    ) as Artifact[];
+
     return {
-      artifacts,
+      artifacts: filtered,
       total,
       hasMore: offset + artifacts.length < total,
     };
@@ -352,6 +397,64 @@ export class ArtifactService {
       success: true,
       message: 'Artifact deleted successfully',
     };
+  }
+
+  /**
+   * Sprint 7: Get version history for an artifact
+   * Note: Can retrieve history even for deleted artifacts
+   */
+  async getHistory(input: { planId: string; artifactId: string; limit?: number; offset?: number }): Promise<VersionHistory<Artifact>> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    return this.versionHistoryService.getHistory({
+      planId: input.planId,
+      entityId: input.artifactId,
+      entityType: 'artifact',
+      limit: input.limit,
+      offset: input.offset,
+    });
+  }
+
+  /**
+   * Sprint 7: Compare two versions of an artifact
+   */
+  async diff(input: { planId: string; artifactId: string; version1: number; version2: number }): Promise<VersionDiff> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    // Load current artifact to support diffing with current version
+    const artifacts = await this.storage.loadEntities<Artifact>(
+      input.planId,
+      'artifacts'
+    );
+    const currentArtifact = artifacts.find((a) => a.id === input.artifactId);
+
+    if (!currentArtifact) {
+      throw new Error('Artifact not found');
+    }
+
+    return this.versionHistoryService.diff({
+      planId: input.planId,
+      entityId: input.artifactId,
+      entityType: 'artifact',
+      version1: input.version1,
+      version2: input.version2,
+      currentEntityData: currentArtifact,
+      currentVersion: currentArtifact.version,
+    });
   }
 }
 

@@ -8,6 +8,7 @@ import { ArtifactService } from '../domain/services/artifact-service.js';
 import { LinkingService } from '../domain/services/linking-service.js';
 import { QueryService } from '../domain/services/query-service.js';
 import { BatchService } from '../domain/services/batch-service.js';
+import { VersionHistoryService } from '../domain/services/version-history-service.js';
 
 export interface Services {
   storage: FileStorage;
@@ -28,11 +29,13 @@ export async function createServices(storagePath: string): Promise<Services> {
   await storage.initialize();
 
   const planService = new PlanService(storage);
-  const requirementService = new RequirementService(storage, planService);
-  const solutionService = new SolutionService(storage, planService);
-  const decisionService = new DecisionService(storage, planService);
-  const phaseService = new PhaseService(storage, planService);
-  const artifactService = new ArtifactService(storage, planService);
+  const versionHistoryService = new VersionHistoryService(storage);
+
+  const requirementService = new RequirementService(storage, planService, versionHistoryService);
+  const solutionService = new SolutionService(storage, planService, versionHistoryService);
+  const decisionService = new DecisionService(storage, planService, versionHistoryService);
+  const phaseService = new PhaseService(storage, planService, versionHistoryService);
+  const artifactService = new ArtifactService(storage, planService, versionHistoryService);
   const linkingService = new LinkingService(storage);
   const queryService = new QueryService(storage, planService, linkingService);
   const batchService = new BatchService(

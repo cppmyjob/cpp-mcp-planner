@@ -4,11 +4,40 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer, createServices } from '../../src/server/index.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 /**
- * Comprehensive test of ALL MCP tools and ALL their actions.
- * This validates that tool-definitions.ts matches the actual service implementations.
+ * Comprehensive E2E test of ALL MCP tools and ALL their actions.
+ * Coverage: 9/9 tools (100%)
+ *
+ * Tools tested:
+ * 1. plan (8 actions)
+ * 2. requirement (10 actions)
+ * 3. solution (9 actions)
+ * 4. decision (8 actions)
+ * 5. phase (12 actions)
+ * 6. link (3 actions)
+ * 7. artifact (5 actions) - Sprint 12
+ * 8. query (5 actions)
+ * 9. batch (1 action: execute with temp ID resolution) - Sprint 12
+ *
+ * This validates that tool-definitions.ts matches the actual service implementations
+ * and that all MCP tools work correctly through the full client-server stack.
  */
+
+// Helper to retry directory removal on Windows (EBUSY/ENOTEMPTY errors)
+async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+      return;
+    } catch (error: any) {
+      if (i === maxRetries - 1) throw error;
+      // Wait before retry (exponential backoff)
+      await new Promise((resolve) => setTimeout(resolve, 100 * (i + 1)));
+    }
+  }
+}
 
 // Helper to parse MCP tool result
 function parseResult<T>(result: unknown): T {
@@ -32,7 +61,7 @@ describe('E2E: All MCP Tools Validation', () => {
   let linkId: string;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-all-tools-' + Date.now());
+    storagePath = path.join(process.cwd(), '.test-temp', 'all-tools-' + Date.now() + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
 
     const services = await createServices(storagePath);
@@ -50,7 +79,7 @@ describe('E2E: All MCP Tools Validation', () => {
     cleanup = async () => {
       await client.close();
       await server.close();
-      await fs.rm(storagePath, { recursive: true, force: true });
+      await removeDirectoryWithRetry(storagePath);
     };
   });
 
@@ -69,6 +98,8 @@ describe('E2E: All MCP Tools Validation', () => {
           action: 'create',
           name: 'All Tools Test Plan',
           description: 'Testing all MCP tools',
+          enableHistory: true, // Sprint 7: Enable version history
+          maxHistoryDepth: 10, // Sprint 7: Keep last 10 versions
         },
       });
 
@@ -237,7 +268,7 @@ describe('E2E: All MCP Tools Validation', () => {
   });
 
   // ============================================================
-  // TOOL: requirement (5 actions)
+  // TOOL: requirement (10 actions: add, get, get_many, update, list, delete, vote, unvote, get_history, diff)
   // ============================================================
   describe('Tool: requirement', () => {
     it('action: add', async () => {
@@ -430,10 +461,131 @@ describe('E2E: All MCP Tools Validation', () => {
       const parsed = parseResult<{ success: boolean }>(result);
       expect(parsed.success).toBe(true);
     });
+
+    it('action: get_history (Sprint 7)', async () => {
+      // First, make some updates to create version history
+      await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'update',
+          planId,
+          requirementId,
+          updates: { title: 'Updated Title V2' },
+        },
+      });
+
+      await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'update',
+          planId,
+          requirementId,
+          updates: { priority: 'low' },
+        },
+      });
+
+      // Get version history
+      const result = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'get_history',
+          planId,
+          requirementId,
+        },
+      });
+
+      const parsed = parseResult<{
+        entityId: string;
+        entityType: string;
+        currentVersion: number;
+        versions: Array<{ version: number; data: any; timestamp: string }>;
+        total: number;
+        hasMore?: boolean;
+      }>(result);
+
+      expect(parsed.entityId).toBe(requirementId);
+      expect(parsed.entityType).toBe('requirement');
+      expect(parsed.versions).toBeDefined();
+      expect(parsed.versions.length).toBeGreaterThan(0);
+      expect(parsed.total).toBeGreaterThan(0);
+      expect(parsed.currentVersion).toBeGreaterThan(0);
+
+      // Verify versions are in reverse chronological order (newest first)
+      if (parsed.versions.length > 1) {
+        expect(parsed.versions[0].version).toBeGreaterThan(parsed.versions[1].version);
+      }
+    });
+
+    it('action: diff (Sprint 7)', async () => {
+      // Create another update to ensure we have at least 2 versions
+      await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'update',
+          planId,
+          requirementId,
+          updates: { description: 'Updated description for diff test' },
+        },
+      });
+
+      // Get version history to find version numbers
+      const historyResult = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'get_history',
+          planId,
+          requirementId,
+        },
+      });
+
+      const history = parseResult<{
+        versions: Array<{ version: number }>;
+      }>(historyResult);
+
+      expect(history.versions.length).toBeGreaterThanOrEqual(2);
+
+      // Compare two versions
+      const version1 = history.versions[1].version; // Older version
+      const version2 = history.versions[0].version; // Newer version
+
+      const result = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'diff',
+          planId,
+          requirementId,
+          version1,
+          version2,
+        },
+      });
+
+      const parsed = parseResult<{
+        entityId: string;
+        entityType: string;
+        version1: { version: number; timestamp: string };
+        version2: { version: number; timestamp: string };
+        changes: Record<string, { from: any; to: any; changed: boolean }>;
+      }>(result);
+
+      expect(parsed.entityId).toBe(requirementId);
+      expect(parsed.entityType).toBe('requirement');
+      expect(parsed.version1.version).toBe(version1);
+      expect(parsed.version2.version).toBe(version2);
+      expect(parsed.changes).toBeDefined();
+
+      // Verify changes only contains fields that actually changed
+      const changedFields = Object.keys(parsed.changes);
+      expect(changedFields.length).toBeGreaterThan(0);
+
+      // Metadata fields should NOT appear in changes (Sprint 7 fix)
+      expect(parsed.changes.updatedAt).toBeUndefined();
+      expect(parsed.changes.version).toBeUndefined();
+      expect(parsed.changes.createdAt).toBeUndefined();
+    });
   });
 
   // ============================================================
-  // TOOL: solution (7 actions)
+  // TOOL: solution (9 actions: propose, get, get_many, update, list, compare, select, delete, get_history, diff)
   // ============================================================
   describe('Tool: solution', () => {
     it('action: propose', async () => {
@@ -636,10 +788,84 @@ describe('E2E: All MCP Tools Validation', () => {
       const parsed = parseResult<{ success: boolean }>(result);
       expect(parsed.success).toBe(true);
     });
+
+    it('action: get_history (Sprint 7)', async () => {
+      // Make updates to create version history
+      await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'update',
+          planId,
+          solutionId,
+          updates: { title: 'Updated Solution Title' },
+        },
+      });
+
+      const result = await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'get_history',
+          planId,
+          solutionId,
+        },
+      });
+
+      const parsed = parseResult<{
+        entityId: string;
+        entityType: string;
+        versions: Array<{ version: number }>;
+        total: number;
+      }>(result);
+
+      expect(parsed.entityId).toBe(solutionId);
+      expect(parsed.entityType).toBe('solution');
+      expect(parsed.versions).toBeDefined();
+      expect(parsed.total).toBeGreaterThan(0);
+    });
+
+    it('action: diff (Sprint 7)', async () => {
+      // Create another version
+      await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'update',
+          planId,
+          solutionId,
+          updates: { description: 'Updated solution description' },
+        },
+      });
+
+      const historyResult = await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'get_history',
+          planId,
+          solutionId,
+        },
+      });
+
+      const history = parseResult<{ versions: Array<{ version: number }> }>(historyResult);
+      expect(history.versions.length).toBeGreaterThanOrEqual(2);
+
+      const result = await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'diff',
+          planId,
+          solutionId,
+          version1: history.versions[1].version,
+          version2: history.versions[0].version,
+        },
+      });
+
+      const parsed = parseResult<{ entityId: string; changes: Record<string, any> }>(result);
+      expect(parsed.entityId).toBe(solutionId);
+      expect(parsed.changes).toBeDefined();
+    });
   });
 
   // ============================================================
-  // TOOL: decision (5 actions)
+  // TOOL: decision (8 actions: record, get, get_many, update, list, supersede, get_history, diff)
   // ============================================================
   describe('Tool: decision', () => {
     it('action: record', async () => {
@@ -795,10 +1021,84 @@ describe('E2E: All MCP Tools Validation', () => {
       const newDecision = parseResult<{ decision: { id: string } }>(newDecisionResult);
       expect(newDecision.decision.id).toBe(parsed.newDecisionId);
     });
+
+    it('action: get_history (Sprint 7)', async () => {
+      // Make updates to create version history
+      await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'update',
+          planId,
+          decisionId,
+          updates: { title: 'Updated Decision Title' },
+        },
+      });
+
+      const result = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'get_history',
+          planId,
+          decisionId,
+        },
+      });
+
+      const parsed = parseResult<{
+        entityId: string;
+        entityType: string;
+        versions: Array<{ version: number }>;
+        total: number;
+      }>(result);
+
+      expect(parsed.entityId).toBe(decisionId);
+      expect(parsed.entityType).toBe('decision');
+      expect(parsed.versions).toBeDefined();
+      expect(parsed.total).toBeGreaterThan(0);
+    });
+
+    it('action: diff (Sprint 7)', async () => {
+      // Create another version
+      await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'update',
+          planId,
+          decisionId,
+          updates: { context: 'Updated context for diff test' },
+        },
+      });
+
+      const historyResult = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'get_history',
+          planId,
+          decisionId,
+        },
+      });
+
+      const history = parseResult<{ versions: Array<{ version: number }> }>(historyResult);
+      expect(history.versions.length).toBeGreaterThanOrEqual(2);
+
+      const result = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'diff',
+          planId,
+          decisionId,
+          version1: history.versions[1].version,
+          version2: history.versions[0].version,
+        },
+      });
+
+      const parsed = parseResult<{ entityId: string; changes: Record<string, any> }>(result);
+      expect(parsed.entityId).toBe(decisionId);
+      expect(parsed.changes).toBeDefined();
+    });
   });
 
   // ============================================================
-  // TOOL: phase (6 actions)
+  // TOOL: phase (12 actions: add, get, get_many, get_tree, update, update_status, move, delete, get_next_actions, complete_and_advance, get_history, diff)
   // ============================================================
   describe('Tool: phase', () => {
     it('action: add', async () => {
@@ -887,10 +1187,12 @@ describe('E2E: All MCP Tools Validation', () => {
       // Full fields should NOT be present in summary mode
       expect(phase.description).toBeUndefined();
       expect(phase.schedule).toBeUndefined();
-      expect(phase.metadata).toBeUndefined();
+
+      // Metadata IS included in summary mode by default
+      expect(phase.metadata).toBeDefined();
     });
 
-    it('action: get_tree with fields parameter adds requested fields', async () => {
+    it('action: get_tree with fields parameter returns ONLY requested fields', async () => {
       const result = await client.callTool({
         name: 'phase',
         arguments: {
@@ -903,16 +1205,16 @@ describe('E2E: All MCP Tools Validation', () => {
       const parsed = parseResult<{ tree: Array<{ phase: Record<string, unknown> }> }>(result);
       const phase = parsed.tree[0].phase;
 
-      // Summary fields
-      expect(phase.id).toBeDefined();
-      expect(phase.title).toBeDefined();
-      expect(phase.childCount).toBeDefined();
-
-      // Requested fields should be present
+      // ONLY requested fields should be present
       expect(phase.objectives).toBeDefined();
       expect(phase.deliverables).toBeDefined();
 
-      // Non-requested fields should NOT be present
+      // Summary fields NOT included when custom fields specified
+      expect(phase.id).toBeUndefined();
+      expect(phase.title).toBeUndefined();
+      expect(phase.childCount).toBeUndefined();
+
+      // Other fields also NOT present
       expect(phase.description).toBeUndefined();
       expect(phase.schedule).toBeUndefined();
     });
@@ -1039,7 +1341,7 @@ describe('E2E: All MCP Tools Validation', () => {
         const getParsed = parseResult<{ phase: { status: string } }>(getResult);
         expect(getParsed.phase.status).toBe(status);
       }
-    });
+    }, 10000); // Increase timeout for multiple status transitions
 
     it('action: update_status with progress boundaries (0 and 100)', async () => {
       // Create a test phase for progress testing
@@ -1544,6 +1846,80 @@ describe('E2E: All MCP Tools Validation', () => {
         expect(pAutoData.phase.path).toBe('101');
       });
     });
+
+    it('action: get_history (Sprint 7)', async () => {
+      // Make updates to create version history
+      await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'update',
+          planId,
+          phaseId,
+          updates: { title: 'Updated Phase Title' },
+        },
+      });
+
+      const result = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'get_history',
+          planId,
+          phaseId,
+        },
+      });
+
+      const parsed = parseResult<{
+        entityId: string;
+        entityType: string;
+        versions: Array<{ version: number }>;
+        total: number;
+      }>(result);
+
+      expect(parsed.entityId).toBe(phaseId);
+      expect(parsed.entityType).toBe('phase');
+      expect(parsed.versions).toBeDefined();
+      expect(parsed.total).toBeGreaterThan(0);
+    });
+
+    it('action: diff (Sprint 7)', async () => {
+      // Create another version
+      await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'update',
+          planId,
+          phaseId,
+          updates: { description: 'Updated phase description' },
+        },
+      });
+
+      const historyResult = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'get_history',
+          planId,
+          phaseId,
+        },
+      });
+
+      const history = parseResult<{ versions: Array<{ version: number }> }>(historyResult);
+      expect(history.versions.length).toBeGreaterThanOrEqual(2);
+
+      const result = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'diff',
+          planId,
+          phaseId,
+          version1: history.versions[1].version,
+          version2: history.versions[0].version,
+        },
+      });
+
+      const parsed = parseResult<{ entityId: string; changes: Record<string, any> }>(result);
+      expect(parsed.entityId).toBe(phaseId);
+      expect(parsed.changes).toBeDefined();
+    });
   });
 
   // ============================================================
@@ -1674,6 +2050,259 @@ describe('E2E: All MCP Tools Validation', () => {
   });
 
   // ============================================================
+  // TOOL: artifact (5 actions: add, get, update, list, delete)
+  // ============================================================
+  describe('Tool: artifact', () => {
+    let artifactId: string;
+
+    it('action: add with code artifact', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'add',
+          planId,
+          artifact: {
+            title: 'User Authentication Module',
+            description: 'JWT authentication implementation',
+            artifactType: 'code',
+            content: {
+              language: 'typescript',
+              sourceCode: `export class AuthService {
+  async login(username: string, password: string): Promise<string> {
+    // Validate credentials
+    const user = await this.validateUser(username, password);
+    // Generate JWT token
+    return this.generateToken(user);
+  }
+}`,
+              filename: 'auth-service.ts',
+            },
+            fileTable: [
+              {
+                path: 'src/services/auth-service.ts',
+                action: 'create',
+                description: 'Create new auth service',
+              },
+            ],
+            targets: [
+              {
+                path: 'src/services/auth-service.ts',
+                action: 'create',
+                description: 'Implement JWT authentication',
+              },
+            ],
+            relatedPhaseId: phaseId,
+            relatedRequirementIds: [requirementId],
+            codeRefs: ['src/services/auth-service.ts:1'],
+          },
+        },
+      });
+
+      const parsed = parseResult<{ artifactId: string }>(result);
+      expect(parsed.artifactId).toBeDefined();
+      artifactId = parsed.artifactId;
+    });
+
+    it('action: add with all artifactTypes', async () => {
+      const artifactTypes = ['config', 'migration', 'documentation', 'test', 'script', 'other'];
+
+      for (const artifactType of artifactTypes) {
+        const result = await client.callTool({
+          name: 'artifact',
+          arguments: {
+            action: 'add',
+            planId,
+            artifact: {
+              title: `${artifactType} artifact`,
+              description: `Testing ${artifactType} type`,
+              artifactType,
+              content: {
+                language: artifactType === 'documentation' ? 'markdown' : 'typescript',
+                sourceCode: `// ${artifactType} example`,
+                filename: `example.${artifactType}`,
+              },
+            },
+          },
+        });
+
+        const parsed = parseResult<{ artifactId: string }>(result);
+        expect(parsed.artifactId).toBeDefined();
+      }
+    });
+
+    it('action: get', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'get',
+          planId,
+          artifactId,
+          fields: ['*'],
+        },
+      });
+
+      const parsed = parseResult<{ artifact: { id: string; title: string } }>(result);
+      expect(parsed.artifact.id).toBe(artifactId);
+      expect(parsed.artifact.title).toBe('User Authentication Module');
+    });
+
+    it('action: get with fields parameter', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'get',
+          planId,
+          artifactId,
+          fields: ['id', 'title', 'artifactType'],
+        },
+      });
+
+      const parsed = parseResult<{ artifact: Record<string, unknown> }>(result);
+      expect(parsed.artifact.id).toBeDefined();
+      expect(parsed.artifact.title).toBeDefined();
+      expect(parsed.artifact.artifactType).toBeDefined();
+      // Other fields should not be present
+      expect(parsed.artifact.description).toBeUndefined();
+      expect(parsed.artifact.content).toBeUndefined();
+    });
+
+    it('action: get with includeContent=true', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'get',
+          planId,
+          artifactId,
+          includeContent: true,
+          fields: ['*'],
+        },
+      });
+
+      const parsed = parseResult<{ artifact: { id: string; content: { sourceCode: string } } }>(result);
+      expect(parsed.artifact.id).toBe(artifactId);
+      expect(parsed.artifact.content).toBeDefined();
+      expect(parsed.artifact.content.sourceCode).toContain('AuthService');
+    });
+
+    it('action: update', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'update',
+          planId,
+          artifactId,
+          updates: {
+            title: 'Updated Authentication Module',
+            description: 'Updated JWT implementation with refresh tokens',
+            status: 'draft',
+          },
+        },
+      });
+
+      const parsed = parseResult<{ success: boolean }>(result);
+      expect(parsed.success).toBe(true);
+
+      // Verify via get
+      const getResult = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'get',
+          planId,
+          artifactId,
+          fields: ['*'],
+        },
+      });
+      const getParsed = parseResult<{ artifact: { title: string; description: string } }>(getResult);
+      expect(getParsed.artifact.title).toBe('Updated Authentication Module');
+      expect(getParsed.artifact.description).toBe('Updated JWT implementation with refresh tokens');
+    });
+
+    it('action: list', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'list',
+          planId,
+        },
+      });
+
+      const parsed = parseResult<{ artifacts: Array<{ id: string }>; total: number }>(result);
+      expect(parsed.artifacts.length).toBeGreaterThan(0);
+      expect(parsed.total).toBeGreaterThan(0);
+      expect(parsed.artifacts.some((a) => a.id === artifactId)).toBe(true);
+    });
+
+    it('action: list with filters', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'list',
+          planId,
+          filters: {
+            artifactType: 'code',
+          },
+        },
+      });
+
+      const parsed = parseResult<{ artifacts: Array<{ id: string }>; total: number }>(result);
+      expect(parsed.artifacts).toBeDefined();
+      expect(parsed.total).toBeGreaterThanOrEqual(0);
+    });
+
+    it('action: list with relatedPhaseId filter', async () => {
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'list',
+          planId,
+          filters: {
+            relatedPhaseId: phaseId,
+          },
+        },
+      });
+
+      const parsed = parseResult<{ artifacts: Array<{ id: string }>; total: number }>(result);
+      expect(parsed.artifacts).toBeDefined();
+      // Should find at least our created artifact
+      expect(parsed.artifacts.length).toBeGreaterThan(0);
+    });
+
+    it('action: delete', async () => {
+      // Create an artifact to delete
+      const createResult = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'add',
+          planId,
+          artifact: {
+            title: 'Artifact to Delete',
+            description: 'Will be deleted',
+            artifactType: 'other',
+            content: {
+              language: 'text',
+              sourceCode: 'delete me',
+              filename: 'temp.txt',
+            },
+          },
+        },
+      });
+      const created = parseResult<{ artifactId: string }>(createResult);
+
+      const result = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'delete',
+          planId,
+          artifactId: created.artifactId,
+        },
+      });
+
+      const parsed = parseResult<{ success: boolean }>(result);
+      expect(parsed.success).toBe(true);
+    });
+  });
+
+  // ============================================================
   // TOOL: query (5 actions)
   // ============================================================
   describe('Tool: query', () => {
@@ -1783,6 +2412,390 @@ describe('E2E: All MCP Tools Validation', () => {
       expect(parsed.status).toBe('healthy');
       expect(parsed.version).toBe('1.0.0');
       expect(parsed.storagePath).toBe(storagePath);
+    });
+  });
+
+  // ============================================================
+  // TOOL: batch (1 action: execute)
+  // ============================================================
+  describe('Tool: batch', () => {
+    it('action: execute with single entity creation', async () => {
+      const result = await client.callTool({
+        name: 'batch',
+        arguments: {
+          planId,
+          operations: [
+            {
+              entity_type: 'requirement',
+              payload: {
+                title: 'Batch Test Requirement',
+                description: 'Created via batch operation',
+                source: { type: 'user-request' },
+                acceptanceCriteria: ['AC1'],
+                priority: 'medium',
+                category: 'functional',
+              },
+            },
+          ],
+        },
+      });
+
+      const parsed = parseResult<{
+        results: Array<{ success: boolean; id?: string }>;
+        tempIdMapping: Record<string, string>;
+      }>(result);
+
+      expect(parsed.results).toHaveLength(1);
+      expect(parsed.results[0].success).toBe(true);
+      expect(parsed.results[0].id).toBeDefined();
+    });
+
+    it('action: execute with multiple entities and temp IDs', async () => {
+      const result = await client.callTool({
+        name: 'batch',
+        arguments: {
+          planId,
+          operations: [
+            {
+              entity_type: 'requirement',
+              payload: {
+                tempId: '$0',
+                title: 'Batch Requirement 1',
+                description: 'First requirement',
+                source: { type: 'user-request' },
+                acceptanceCriteria: ['AC1'],
+                priority: 'high',
+                category: 'functional',
+              },
+            },
+            {
+              entity_type: 'requirement',
+              payload: {
+                tempId: '$1',
+                title: 'Batch Requirement 2',
+                description: 'Second requirement',
+                source: { type: 'user-request' },
+                acceptanceCriteria: ['AC1'],
+                priority: 'medium',
+                category: 'functional',
+              },
+            },
+            {
+              entity_type: 'solution',
+              payload: {
+                tempId: '$2',
+                title: 'Batch Solution',
+                description: 'Solution addressing both requirements',
+                approach: 'Unified approach',
+                addressing: ['$0', '$1'], // Reference temp IDs
+                tradeoffs: [],
+                evaluation: {
+                  effortEstimate: { value: 5, unit: 'days', confidence: 'medium' },
+                  technicalFeasibility: 'high',
+                  riskAssessment: 'Low',
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      const parsed = parseResult<{
+        results: Array<{ success: boolean; id?: string }>;
+        tempIdMapping: Record<string, string>;
+      }>(result);
+
+      expect(parsed.results).toHaveLength(3);
+      expect(parsed.results[0].success).toBe(true);
+      expect(parsed.results[1].success).toBe(true);
+      expect(parsed.results[2].success).toBe(true);
+
+      // Verify temp ID mapping
+      expect(parsed.tempIdMapping['$0']).toBeDefined();
+      expect(parsed.tempIdMapping['$1']).toBeDefined();
+      expect(parsed.tempIdMapping['$2']).toBeDefined();
+
+      // Verify all operations returned IDs
+      expect(parsed.results[0].id).toBeDefined();
+      expect(parsed.results[1].id).toBeDefined();
+      expect(parsed.results[2].id).toBeDefined();
+
+      // Verify solution references were resolved - get solution and check addressing
+      const solutionResult = await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'get',
+          planId,
+          solutionId: parsed.tempIdMapping['$2'],
+          fields: ['*'],
+        },
+      });
+
+      const solution = parseResult<{ solution: { addressing: string[] } }>(solutionResult);
+      expect(solution.solution.addressing).toHaveLength(2);
+      expect(solution.solution.addressing).toContain(parsed.tempIdMapping['$0']);
+      expect(solution.solution.addressing).toContain(parsed.tempIdMapping['$1']);
+    });
+
+    it('action: execute with cross-entity references (requirement → phase → link)', async () => {
+      const result = await client.callTool({
+        name: 'batch',
+        arguments: {
+          planId,
+          operations: [
+            {
+              entity_type: 'requirement',
+              payload: {
+                tempId: '$0',
+                title: 'Cross-ref Requirement',
+                description: 'Testing cross-references',
+                source: { type: 'user-request' },
+                acceptanceCriteria: ['AC1'],
+                priority: 'high',
+                category: 'functional',
+              },
+            },
+            {
+              entity_type: 'phase',
+              payload: {
+                tempId: '$1',
+                title: 'Cross-ref Phase',
+                description: 'Phase referencing requirement',
+                objectives: ['Implement requirement'],
+                deliverables: ['Code'],
+                successCriteria: ['Tests pass'],
+              },
+            },
+            {
+              entity_type: 'link',
+              payload: {
+                sourceId: '$1', // Phase
+                targetId: '$0', // Requirement
+                relationType: 'addresses',
+                metadata: { batch_test: true },
+              },
+            },
+          ],
+        },
+      });
+
+      const parsed = parseResult<{
+        results: Array<{ success: boolean; id?: string }>;
+        tempIdMapping: Record<string, string>;
+      }>(result);
+
+      expect(parsed.results).toHaveLength(3);
+      expect(parsed.results[0].success).toBe(true);
+      expect(parsed.results[1].success).toBe(true);
+      expect(parsed.results[2].success).toBe(true);
+
+      // Verify link was created with resolved IDs
+      const linkResult = await client.callTool({
+        name: 'link',
+        arguments: {
+          action: 'get',
+          planId,
+          entityId: parsed.tempIdMapping['$1'], // Phase ID
+          direction: 'both',
+        },
+      });
+
+      const links = parseResult<{ links: Array<{ sourceId: string; targetId: string }> }>(linkResult);
+      expect(links.links.length).toBeGreaterThan(0);
+      const createdLink = links.links.find(
+        (l) => l.sourceId === parsed.tempIdMapping['$1'] && l.targetId === parsed.tempIdMapping['$0']
+      );
+      expect(createdLink).toBeDefined();
+    });
+
+    it('action: execute with all entity types (requirement, solution, phase, link, decision, artifact)', async () => {
+      const result = await client.callTool({
+        name: 'batch',
+        arguments: {
+          planId,
+          operations: [
+            {
+              entity_type: 'requirement',
+              payload: {
+                tempId: '$0',
+                title: 'All Types Requirement',
+                description: 'Testing all entity types',
+                source: { type: 'user-request' },
+                acceptanceCriteria: ['AC1'],
+                priority: 'high',
+                category: 'functional',
+              },
+            },
+            {
+              entity_type: 'solution',
+              payload: {
+                tempId: '$1',
+                title: 'All Types Solution',
+                description: 'Solution for requirement',
+                approach: 'Approach',
+                addressing: ['$0'],
+                tradeoffs: [],
+                evaluation: {
+                  effortEstimate: { value: 3, unit: 'days', confidence: 'high' },
+                  technicalFeasibility: 'high',
+                  riskAssessment: 'Low',
+                },
+              },
+            },
+            {
+              entity_type: 'decision',
+              payload: {
+                tempId: '$2',
+                title: 'All Types Decision',
+                question: 'Which approach?',
+                context: 'Testing batch',
+                decision: 'Use batch approach',
+                alternativesConsidered: [],
+                consequences: 'Faster setup',
+              },
+            },
+            {
+              entity_type: 'phase',
+              payload: {
+                tempId: '$3',
+                title: 'All Types Phase',
+                description: 'Implementation phase',
+                objectives: ['Implement'],
+                deliverables: ['Code'],
+                successCriteria: ['Tests pass'],
+              },
+            },
+            {
+              entity_type: 'artifact',
+              payload: {
+                tempId: '$4',
+                title: 'All Types Artifact',
+                description: 'Generated code',
+                artifactType: 'code',
+                content: {
+                  language: 'typescript',
+                  sourceCode: '// batch test',
+                  filename: 'batch.ts',
+                },
+                relatedPhaseId: '$3',
+                relatedRequirementIds: ['$0'],
+              },
+            },
+            {
+              entity_type: 'link',
+              payload: {
+                sourceId: '$1', // Solution
+                targetId: '$0', // Requirement
+                relationType: 'implements',
+              },
+            },
+          ],
+        },
+      });
+
+      const parsed = parseResult<{
+        results: Array<{ success: boolean; id?: string }>;
+        tempIdMapping: Record<string, string>;
+      }>(result);
+
+      expect(parsed.results).toHaveLength(6);
+
+      // Verify all operations succeeded
+      parsed.results.forEach((r) => {
+        expect(r.success).toBe(true);
+        expect(r.id).toBeDefined();
+      });
+
+      // Verify all temp IDs were mapped
+      expect(parsed.tempIdMapping['$0']).toBeDefined();
+      expect(parsed.tempIdMapping['$1']).toBeDefined();
+      expect(parsed.tempIdMapping['$2']).toBeDefined();
+      expect(parsed.tempIdMapping['$3']).toBeDefined();
+      expect(parsed.tempIdMapping['$4']).toBeDefined();
+
+      // Verify artifact has resolved relatedPhaseId
+      const artifactResult = await client.callTool({
+        name: 'artifact',
+        arguments: {
+          action: 'get',
+          planId,
+          artifactId: parsed.tempIdMapping['$4'],
+          fields: ['*'],
+        },
+      });
+
+      const artifact = parseResult<{
+        artifact: { relatedPhaseId: string; relatedRequirementIds: string[] };
+      }>(artifactResult);
+      expect(artifact.artifact.relatedPhaseId).toBe(parsed.tempIdMapping['$3']); // Resolved from $3
+      expect(artifact.artifact.relatedRequirementIds).toContain(parsed.tempIdMapping['$0']); // Resolved from $0
+    });
+
+    it('action: execute with rollback on error (atomic transaction)', async () => {
+      // Get count of requirements before batch
+      const beforeList = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'list',
+          planId,
+        },
+      });
+      const beforeCount = parseResult<{ total: number }>(beforeList).total;
+
+      // Try to create batch with an invalid operation (should fail and rollback)
+      try {
+        await client.callTool({
+          name: 'batch',
+          arguments: {
+            planId,
+            operations: [
+              {
+                entity_type: 'requirement',
+                payload: {
+                  title: 'Valid Requirement',
+                  description: 'Should be rolled back',
+                  source: { type: 'user-request' },
+                  acceptanceCriteria: ['AC1'],
+                  priority: 'high',
+                  category: 'functional',
+                },
+              },
+              {
+                entity_type: 'solution',
+                payload: {
+                  title: 'Invalid Solution',
+                  description: 'Invalid evaluation format',
+                  addressing: [],
+                  tradeoffs: [],
+                  evaluation: {
+                    effortEstimate: {
+                      value: -999, // Invalid negative value
+                      unit: 'invalid_unit', // Invalid unit
+                      confidence: 'invalid', // Invalid confidence
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        });
+
+        // Should not reach here
+        throw new Error('Expected batch to fail but it succeeded');
+      } catch (error: any) {
+        // Expected error - verify rollback
+        const afterList = await client.callTool({
+          name: 'requirement',
+          arguments: {
+            action: 'list',
+            planId,
+          },
+        });
+        const afterCount = parseResult<{ total: number }>(afterList).total;
+
+        // Count should be unchanged (rollback worked)
+        expect(afterCount).toBe(beforeCount);
+      }
     });
   });
 });

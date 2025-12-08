@@ -110,7 +110,7 @@ describe('RequirementService', () => {
       });
 
       // Verify via getRequirement
-      const { requirement } = await service.getRequirement({ planId, requirementId: result.requirementId });
+      const { requirement } = await service.getRequirement({ planId, requirementId: result.requirementId, fields: ['*'] });
       expect(requirement.rationale).toBe('User experience');
       expect(requirement.impact?.riskLevel).toBe('low');
     });
@@ -199,6 +199,7 @@ describe('RequirementService', () => {
       const result = await service.getRequirement({
         planId,
         requirementId: added.requirementId,
+        fields: ['*'],
       });
 
       expect(result.requirement.version).toBe(2);
@@ -752,6 +753,703 @@ describe('RequirementService', () => {
 
       const after = await service.getRequirement({ planId, requirementId: req.requirementId });
       expect(after.requirement.updatedAt).not.toBe(updatedAtBefore);
+    });
+  });
+
+  describe('fields parameter support', () => {
+    let requirementId: string;
+
+    beforeEach(async () => {
+      const result = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Complete Requirement',
+          description: 'Full description with all fields',
+          rationale: 'Important business need',
+          source: { type: 'user-request', context: 'User feedback' },
+          acceptanceCriteria: ['Criterion 1', 'Criterion 2', 'Criterion 3'],
+          priority: 'high',
+          category: 'functional',
+          impact: {
+            scope: ['auth', 'api'],
+            complexityEstimate: 7,
+            riskLevel: 'medium',
+          },
+        },
+      });
+      requirementId = result.requirementId;
+    });
+
+    describe('getRequirement with fields', () => {
+      it('should return only minimal fields when fields=["id","title"]', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          fields: ['id', 'title'],
+        });
+
+        const req = result.requirement as unknown as Record<string, unknown>;
+        expect(req.id).toBe(requirementId);
+        expect(req.title).toBe('Complete Requirement');
+
+        // Should NOT include other fields
+        expect(req.description).toBeUndefined();
+        expect(req.rationale).toBeUndefined();
+        expect(req.acceptanceCriteria).toBeUndefined();
+      });
+
+      it('should return ALL fields by default (no fields parameter)', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+        });
+
+        const req = result.requirement;
+        // GET operations should return all fields by default
+        expect(req.id).toBeDefined();
+        expect(req.title).toBeDefined();
+        expect(req.description).toBeDefined();
+        expect(req.priority).toBeDefined();
+        expect(req.category).toBeDefined();
+        expect(req.status).toBeDefined();
+        expect(req.votes).toBeDefined();
+
+        // All fields should be included in GET by default
+        expect(req.rationale).toBeDefined();
+        expect(req.acceptanceCriteria).toBeDefined();
+        expect(req.impact).toBeDefined();
+      });
+
+      it('should return all fields when fields=["*"]', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          fields: ['*'],
+        });
+
+        const req = result.requirement;
+        expect(req.id).toBeDefined();
+        expect(req.title).toBe('Complete Requirement');
+        expect(req.description).toBe('Full description with all fields');
+        expect(req.rationale).toBe('Important business need');
+        expect(req.acceptanceCriteria).toEqual(['Criterion 1', 'Criterion 2', 'Criterion 3']);
+        expect(req.impact).toEqual({
+          scope: ['auth', 'api'],
+          complexityEstimate: 7,
+          riskLevel: 'medium',
+        });
+      });
+
+      it('should return ONLY requested fields (no summary addition)', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          fields: ['id', 'title', 'rationale', 'impact'],
+        });
+
+        const req = result.requirement as unknown as Record<string, unknown>;
+        // ONLY requested fields
+        expect(req.id).toBe(requirementId);
+        expect(req.title).toBe('Complete Requirement');
+        expect(req.rationale).toBe('Important business need');
+        expect(req.impact).toBeDefined();
+
+        // Should NOT include non-requested fields (even summary ones)
+        expect(req.description).toBeUndefined();
+        expect(req.acceptanceCriteria).toBeUndefined();
+      });
+    });
+
+    describe('listRequirements with fields', () => {
+      beforeEach(async () => {
+        // Add more requirements
+        await service.addRequirement({
+          planId,
+          requirement: {
+            title: 'Req 2',
+            description: 'Second requirement',
+            source: { type: 'discovered' },
+            acceptanceCriteria: ['AC1'],
+            priority: 'medium',
+            category: 'technical',
+          },
+        });
+      });
+
+      it('should return only minimal fields for all items when fields=["id","title"]', async () => {
+        const result = await service.listRequirements({
+          planId,
+          fields: ['id', 'title'],
+        });
+
+        expect(result.requirements.length).toBeGreaterThan(0);
+        const req = result.requirements[0] as unknown as Record<string, unknown>;
+        expect(req.id).toBeDefined();
+        expect(req.title).toBeDefined();
+        expect(req.description).toBeUndefined();
+      });
+
+      it('should return summary fields by default for list', async () => {
+        const result = await service.listRequirements({
+          planId,
+        });
+
+        expect(result.requirements.length).toBeGreaterThan(0);
+        const req = result.requirements[0];
+
+        // Summary fields present
+        expect(req.id).toBeDefined();
+        expect(req.title).toBeDefined();
+        expect(req.description).toBeDefined();
+        expect(req.priority).toBeDefined();
+
+        // Heavy fields NOT present
+        expect(req.acceptanceCriteria).toBeUndefined();
+        expect(req.impact).toBeUndefined();
+      });
+
+      it('should return all fields when fields=["*"]', async () => {
+        const result = await service.listRequirements({
+          planId,
+          fields: ['*'],
+        });
+
+        const fullReq = result.requirements.find((r) => r.title === 'Complete Requirement');
+        expect(fullReq).toBeDefined();
+        expect(fullReq!.acceptanceCriteria).toBeDefined();
+        expect(fullReq!.impact).toBeDefined();
+      });
+
+      it('should combine fields with filters', async () => {
+        const result = await service.listRequirements({
+          planId,
+          filters: { priority: 'high' },
+          fields: ['id', 'title', 'priority'],
+        });
+
+        expect(result.requirements.length).toBe(1);
+        const req = result.requirements[0] as unknown as Record<string, unknown>;
+        expect(req.title).toBe('Complete Requirement');
+        expect(req.priority).toBe('high');
+        expect(req.description).toBeUndefined();
+      });
+    });
+  });
+
+  describe('excludeMetadata parameter support (Sprint 2)', () => {
+    let requirementId: string;
+
+    beforeEach(async () => {
+      const result = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement with Metadata',
+          description: 'Testing metadata exclusion',
+          source: { type: 'user-request' },
+          acceptanceCriteria: ['Test criterion'],
+          priority: 'medium',
+          category: 'functional',
+        },
+      });
+      requirementId = result.requirementId;
+    });
+
+    describe('getRequirement with excludeMetadata', () => {
+      it('should exclude metadata fields when excludeMetadata=true', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          excludeMetadata: true,
+        });
+
+        const req = result.requirement as unknown as Record<string, unknown>;
+
+        // Business fields should be present
+        expect(req.id).toBeDefined();
+        expect(req.title).toBe('Test Requirement with Metadata');
+        expect(req.description).toBe('Testing metadata exclusion');
+
+        // Metadata fields should NOT be present
+        expect(req.createdAt).toBeUndefined();
+        expect(req.updatedAt).toBeUndefined();
+        expect(req.version).toBeUndefined();
+        expect(req.metadata).toBeUndefined();
+      });
+
+      it('should include metadata fields by default (excludeMetadata=false)', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          fields: ['*'],
+        });
+
+        const req = result.requirement;
+
+        // Metadata fields should be present by default
+        expect(req.createdAt).toBeDefined();
+        expect(req.updatedAt).toBeDefined();
+        expect(req.version).toBeDefined();
+        expect(req.metadata).toBeDefined();
+      });
+
+      it('should work together with fields parameter', async () => {
+        const result = await service.getRequirement({
+          planId,
+          requirementId,
+          fields: ['id', 'title', 'description', 'createdAt', 'version'],
+          excludeMetadata: true,
+        });
+
+        const req = result.requirement as unknown as Record<string, unknown>;
+
+        // Requested non-metadata fields should be present
+        expect(req.id).toBeDefined();
+        expect(req.title).toBeDefined();
+        expect(req.description).toBeDefined();
+
+        // Metadata fields should be excluded even though requested in fields
+        expect(req.createdAt).toBeUndefined();
+        expect(req.version).toBeUndefined();
+        expect(req.metadata).toBeUndefined();
+      });
+    });
+
+    describe('listRequirements with excludeMetadata', () => {
+      beforeEach(async () => {
+        // Add another requirement
+        await service.addRequirement({
+          planId,
+          requirement: {
+            title: 'Second Requirement',
+            description: 'Another test',
+            source: { type: 'discovered' },
+            acceptanceCriteria: [],
+            priority: 'low',
+            category: 'technical',
+          },
+        });
+      });
+
+      it('should exclude metadata from all items when excludeMetadata=true', async () => {
+        const result = await service.listRequirements({
+          planId,
+          excludeMetadata: true,
+        });
+
+        expect(result.requirements.length).toBeGreaterThan(0);
+
+        for (const req of result.requirements) {
+          const r = req as unknown as Record<string, unknown>;
+          expect(r.createdAt).toBeUndefined();
+          expect(r.updatedAt).toBeUndefined();
+          expect(r.version).toBeUndefined();
+          expect(r.metadata).toBeUndefined();
+
+          // Business fields should still be present
+          expect(r.id).toBeDefined();
+          expect(r.title).toBeDefined();
+        }
+      });
+
+      it('should combine excludeMetadata with fields and filters', async () => {
+        const result = await service.listRequirements({
+          planId,
+          fields: ['id', 'title', 'priority', 'version'],
+          filters: { priority: 'medium' },
+          excludeMetadata: true,
+        });
+
+        expect(result.requirements.length).toBe(1);
+        const req = result.requirements[0] as unknown as Record<string, unknown>;
+
+        // Only requested non-metadata fields
+        expect(req.id).toBeDefined();
+        expect(req.title).toBe('Test Requirement with Metadata');
+        expect(req.priority).toBe('medium');
+
+        // Metadata excluded despite being in fields
+        expect(req.version).toBeUndefined();
+        expect(req.createdAt).toBeUndefined();
+      });
+    });
+  });
+
+  describe('Sprint 5: Array Field Operations', () => {
+    it('should append item to acceptanceCriteria array', async () => {
+      const { requirementId } = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: ['Criteria 1', 'Criteria 2'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      await service.arrayAppend({
+        planId,
+        requirementId,
+        field: 'acceptanceCriteria',
+        value: 'Criteria 3',
+      });
+
+      const result = await service.getRequirement({ planId, requirementId, fields: ['*'] });
+      expect(result.requirement.acceptanceCriteria).toEqual(['Criteria 1', 'Criteria 2', 'Criteria 3']);
+    });
+
+    it('should prepend item to acceptanceCriteria array', async () => {
+      const { requirementId } = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: ['Criteria 2', 'Criteria 3'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      await service.arrayPrepend({
+        planId,
+        requirementId,
+        field: 'acceptanceCriteria',
+        value: 'Criteria 1',
+      });
+
+      const result = await service.getRequirement({ planId, requirementId, fields: ['*'] });
+      expect(result.requirement.acceptanceCriteria).toEqual(['Criteria 1', 'Criteria 2', 'Criteria 3']);
+    });
+
+    it('should insert item at specific index', async () => {
+      const { requirementId } = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: ['Criteria 1', 'Criteria 3'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      await service.arrayInsertAt({
+        planId,
+        requirementId,
+        field: 'acceptanceCriteria',
+        index: 1,
+        value: 'Criteria 2',
+      });
+
+      const result = await service.getRequirement({ planId, requirementId, fields: ['*'] });
+      expect(result.requirement.acceptanceCriteria).toEqual(['Criteria 1', 'Criteria 2', 'Criteria 3']);
+    });
+
+    it('should update item at specific index', async () => {
+      const { requirementId } = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: ['Criteria 1', 'Old Criteria', 'Criteria 3'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      await service.arrayUpdateAt({
+        planId,
+        requirementId,
+        field: 'acceptanceCriteria',
+        index: 1,
+        value: 'Criteria 2',
+      });
+
+      const result = await service.getRequirement({ planId, requirementId, fields: ['*'] });
+      expect(result.requirement.acceptanceCriteria).toEqual(['Criteria 1', 'Criteria 2', 'Criteria 3']);
+    });
+
+    it('should remove item at specific index', async () => {
+      const { requirementId } = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: ['Criteria 1', 'Extra Criteria', 'Criteria 2'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      await service.arrayRemoveAt({
+        planId,
+        requirementId,
+        field: 'acceptanceCriteria',
+        index: 1,
+      });
+
+      const result = await service.getRequirement({ planId, requirementId, fields: ['*'] });
+      expect(result.requirement.acceptanceCriteria).toEqual(['Criteria 1', 'Criteria 2']);
+    });
+  });
+
+  describe('bulk_update (Sprint 9 - RED Phase)', () => {
+    it('RED 9.1: should update multiple requirements in one call', async () => {
+      // Create 3 requirements
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Requirement 1',
+          description: 'First requirement',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: ['AC1'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const req2 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Requirement 2',
+          description: 'Second requirement',
+          category: 'technical',
+          priority: 'medium',
+          acceptanceCriteria: ['AC2'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const req3 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Requirement 3',
+          description: 'Third requirement',
+          category: 'functional',
+          priority: 'low',
+          acceptanceCriteria: ['AC3'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      // Bulk update all 3 requirements
+      const result = await service.bulkUpdateRequirements({
+        planId,
+        updates: [
+          { requirementId: req1.requirementId, updates: { priority: 'critical' } },
+          { requirementId: req2.requirementId, updates: { status: 'approved' } },
+          { requirementId: req3.requirementId, updates: { category: 'technical' } },
+        ],
+      });
+
+      // Verify results
+      expect(result.updated).toBe(3);
+      expect(result.failed).toBe(0);
+      expect(result.results).toHaveLength(3);
+
+      // Verify actual updates
+      const updated1 = await service.getRequirement({ planId, requirementId: req1.requirementId });
+      expect(updated1.requirement.priority).toBe('critical');
+
+      const updated2 = await service.getRequirement({ planId, requirementId: req2.requirementId });
+      expect(updated2.requirement.status).toBe('approved');
+
+      const updated3 = await service.getRequirement({ planId, requirementId: req3.requirementId });
+      expect(updated3.requirement.category).toBe('technical');
+    });
+
+    it('RED 9.2: should return success/error for each update', async () => {
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Valid Requirement',
+          description: 'Valid',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const result = await service.bulkUpdateRequirements({
+        planId,
+        updates: [
+          { requirementId: req1.requirementId, updates: { priority: 'low' } },
+          { requirementId: 'non-existent-id', updates: { priority: 'high' } },
+        ],
+      });
+
+      expect(result.updated).toBe(1);
+      expect(result.failed).toBe(1);
+      expect(result.results).toHaveLength(2);
+
+      expect(result.results[0].success).toBe(true);
+      expect(result.results[0].requirementId).toBe(req1.requirementId);
+
+      expect(result.results[1].success).toBe(false);
+      expect(result.results[1].error).toBeDefined();
+    });
+
+    it('RED 9.3: should support atomic mode (all-or-nothing)', async () => {
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 1',
+          description: 'Test',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const req2 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 2',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      // Attempt bulk update with one invalid ID (atomic mode)
+      await expect(
+        service.bulkUpdateRequirements({
+          planId,
+          updates: [
+            { requirementId: req1.requirementId, updates: { priority: 'critical' } },
+            { requirementId: 'invalid-id', updates: { priority: 'low' } },
+          ],
+          atomic: true,
+        })
+      ).rejects.toThrow();
+
+      // Verify no changes were applied (rollback)
+      const check1 = await service.getRequirement({ planId, requirementId: req1.requirementId });
+      expect(check1.requirement.priority).toBe('high'); // unchanged
+
+      const check2 = await service.getRequirement({ planId, requirementId: req2.requirementId });
+      expect(check2.requirement.priority).toBe('medium'); // unchanged
+    });
+
+    it('RED 9.3b (BUGFIX): atomic mode should rollback partial updates when validation fails mid-execution', async () => {
+      /**
+       * CRITICAL BUG: Current atomic implementation validates entity existence upfront,
+       * but each updateFn() call immediately persists changes to disk via storage.saveEntities().
+       * If update #1 succeeds but update #2 fails validation, update #1 remains persisted.
+       *
+       * Example scenario:
+       * - req1.priority = 'high'
+       * - Bulk update with atomic=true:
+       *   1. Update req1.priority to 'critical' → succeeds, saves to disk
+       *   2. Update req2.tags to invalid format → fails validation
+       * - Expected: Both updates rolled back (req1.priority still 'high')
+       * - Actual BUG: req1.priority changed to 'critical' (partial modification persisted)
+       *
+       * Fix requires: Collect all changes in memory, validate all, then single atomic write.
+       */
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 1',
+          description: 'Test',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const req2 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Req 2',
+          description: 'Test',
+          category: 'functional',
+          priority: 'medium',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+          tags: [{ key: 'env', value: 'prod' }],
+        },
+      });
+
+      // Attempt bulk update where:
+      // - First update is valid (req1: priority change)
+      // - Second update has invalid data (req2: malformed tags - missing 'key' field)
+      await expect(
+        service.bulkUpdateRequirements({
+          planId,
+          updates: [
+            { requirementId: req1.requirementId, updates: { priority: 'critical' } },
+            { requirementId: req2.requirementId, updates: { tags: [{ invalidField: 'test' }] as any } },
+          ],
+          atomic: true,
+        })
+      ).rejects.toThrow();
+
+      // BUGFIX TEST: Verify req1 was NOT modified (true atomicity)
+      const check1 = await service.getRequirement({ planId, requirementId: req1.requirementId });
+      expect(check1.requirement.priority).toBe('high'); // Should remain unchanged due to atomic rollback
+
+      // req2 should also be unchanged
+      const check2 = await service.getRequirement({ planId, requirementId: req2.requirementId });
+      expect(check2.requirement.metadata.tags).toEqual([{ key: 'env', value: 'prod' }]); // unchanged
+    });
+
+    it('RED 9.4: should handle empty updates array', async () => {
+      const result = await service.bulkUpdateRequirements({
+        planId,
+        updates: [],
+      });
+
+      expect(result.updated).toBe(0);
+      expect(result.failed).toBe(0);
+      expect(result.results).toHaveLength(0);
+    });
+
+    it('RED 9.5: should update requirements with different field combinations', async () => {
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test',
+          description: 'Test',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: ['AC1'],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const result = await service.bulkUpdateRequirements({
+        planId,
+        updates: [
+          {
+            requirementId: req1.requirementId,
+            updates: {
+              title: 'Updated Title',
+              description: 'Updated Description',
+              priority: 'critical',
+              acceptanceCriteria: ['Updated AC1', 'Updated AC2'],
+            },
+          },
+        ],
+      });
+
+      expect(result.updated).toBe(1);
+
+      const updated = await service.getRequirement({ planId, requirementId: req1.requirementId });
+      expect(updated.requirement.title).toBe('Updated Title');
+      expect(updated.requirement.description).toBe('Updated Description');
+      expect(updated.requirement.priority).toBe('critical');
+      expect(updated.requirement.acceptanceCriteria).toEqual(['Updated AC1', 'Updated AC2']);
     });
   });
 });

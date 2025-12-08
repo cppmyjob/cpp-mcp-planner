@@ -1,8 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
-import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag } from '../entities/types.js';
+import type { VersionHistoryService } from './version-history-service.js';
+import type { DecisionService } from './decision-service.js';
+import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
 import { validateEffortEstimate, validateTags } from './validators.js';
+import { filterEntity, filterEntities } from '../utils/field-filter.js';
+import { bulkUpdateEntities } from '../utils/bulk-operations.js';
 
 // Input types
 export interface ProposeSolutionInput {
@@ -31,10 +35,27 @@ export interface CompareSolutionsInput {
   aspects?: string[];
 }
 
+/**
+ * Input for selecting a solution
+ */
 export interface SelectSolutionInput {
   planId: string;
   solutionId: string;
+  /** Reason for selecting this solution (stored in solution.selectionReason) */
   reason?: string;
+  /**
+   * Automatically create an ADR Decision record documenting this solution selection.
+   * The Decision will include:
+   * - title: "Solution Selection: {solution.title}"
+   * - context: solution description and approach
+   * - decision: selected solution with reason
+   * - alternativesConsidered: other solutions addressing same requirements
+   * - consequences: from solution.evaluation.riskAssessment
+   * - impactScope: solution.addressing (requirement IDs)
+   *
+   * @default false
+   */
+  createDecisionRecord?: boolean;
 }
 
 export interface UpdateSolutionInput {
@@ -52,6 +73,8 @@ export interface ListSolutionsInput {
   };
   limit?: number;
   offset?: number;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface DeleteSolutionInput {
@@ -63,10 +86,65 @@ export interface DeleteSolutionInput {
 export interface GetSolutionInput {
   planId: string;
   solutionId: string;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface GetSolutionResult {
   solution: Solution;
+}
+
+export interface GetSolutionsInput {
+  planId: string;
+  solutionIds: string[];
+  fields?: string[];
+  excludeMetadata?: boolean;
+}
+
+export interface BulkUpdateSolutionsInput {
+  planId: string;
+  updates: Array<{
+    solutionId: string;
+    updates: Partial<{
+      title: string;
+      description: string;
+      approach: string;
+      addressing: string[];
+      implementationNotes: string;
+      tradeoffs: Array<{
+        aspect: string;
+        pros: string[];
+        cons: string[];
+        score?: number;
+      }>;
+      evaluation: {
+        technicalFeasibility: 'high' | 'medium' | 'low';
+        effortEstimate: {
+          value: number;
+          unit: 'hours' | 'days' | 'weeks' | 'story-points' | 'minutes';
+          confidence: 'low' | 'medium' | 'high';
+        };
+        riskAssessment: string;
+      };
+      status: 'proposed' | 'selected' | 'rejected';
+    }>;
+  }>;
+  atomic?: boolean;
+}
+
+export interface BulkUpdateSolutionsResult {
+  updated: number;
+  failed: number;
+  results: Array<{
+    solutionId: string;
+    success: boolean;
+    error?: string;
+  }>;
+}
+
+export interface GetSolutionsResult {
+  solutions: Solution[];
+  notFound: string[];
 }
 
 // Output types
@@ -95,10 +173,19 @@ export interface CompareSolutionsResult {
   };
 }
 
+/**
+ * Result of solution selection
+ */
 export interface SelectSolutionResult {
   success: boolean;
   solutionId: string;
+  /** IDs of solutions that were deselected (rejected) because they addressed same requirements */
   deselectedIds?: string[];
+  /**
+   * ID of automatically created Decision record (only present when createDecisionRecord=true)
+   * Use this ID to retrieve the full Decision record via DecisionService.getDecision()
+   */
+  decisionId?: string;
 }
 
 export interface UpdateSolutionResult {
@@ -120,7 +207,9 @@ export interface DeleteSolutionResult {
 export class SolutionService {
   constructor(
     private storage: FileStorage,
-    private planService: PlanService
+    private planService: PlanService,
+    private versionHistoryService?: VersionHistoryService,
+    private decisionService?: DecisionService // TDD Sprint: Optional DecisionService for auto-creating Decision records
   ) {}
 
   async getSolution(input: GetSolutionInput): Promise<GetSolutionResult> {
@@ -131,7 +220,52 @@ export class SolutionService {
       throw new Error('Solution not found');
     }
 
-    return { solution };
+    // Apply field filtering - GET operations default to all fields
+    const filtered = filterEntity(
+      solution,
+      input.fields ?? ['*'],
+      'solution',
+      input.excludeMetadata,
+      false
+    ) as Solution;
+
+    return { solution: filtered };
+  }
+
+  async getSolutions(input: GetSolutionsInput): Promise<GetSolutionsResult> {
+    // Enforce max limit
+    if (input.solutionIds.length > 100) {
+      throw new Error('Cannot fetch more than 100 solutions at once');
+    }
+
+    // Handle empty array
+    if (input.solutionIds.length === 0) {
+      return { solutions: [], notFound: [] };
+    }
+
+    const allSolutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
+    const foundSolutions: Solution[] = [];
+    const notFound: string[] = [];
+
+    // Collect found and not found IDs
+    for (const id of input.solutionIds) {
+      const solution = allSolutions.find((s) => s.id === id);
+      if (solution) {
+        // Apply field filtering - solutions default to all fields
+        const filtered = filterEntity(
+          solution,
+          input.fields ?? ['*'],
+          'solution',
+          input.excludeMetadata,
+          false
+        ) as Solution;
+        foundSolutions.push(filtered);
+      } else {
+        notFound.push(id);
+      }
+    }
+
+    return { solutions: foundSolutions, notFound };
   }
 
   async proposeSolution(input: ProposeSolutionInput): Promise<ProposeSolutionResult> {
@@ -250,6 +384,27 @@ export class SolutionService {
     };
   }
 
+  /**
+   * Select a solution and optionally create an ADR Decision record
+   *
+   * This method:
+   * 1. Marks the specified solution as 'selected'
+   * 2. Deselects (rejects) other solutions addressing the same requirements
+   * 3. Optionally creates a Decision record documenting the selection (when createDecisionRecord=true)
+   *
+   * @param input - Selection parameters including optional createDecisionRecord flag
+   * @returns Selection result with optional decisionId
+   *
+   * @example
+   * // Select solution and create Decision record
+   * const result = await service.selectSolution({
+   *   planId: 'plan-123',
+   *   solutionId: 'sol-456',
+   *   reason: 'Best balance of performance and maintainability',
+   *   createDecisionRecord: true
+   * });
+   * console.log(result.decisionId); // ID of created Decision record
+   */
   async selectSolution(input: SelectSolutionInput): Promise<SelectSolutionResult> {
     const solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
     const index = solutions.findIndex((s) => s.id === input.solutionId);
@@ -285,10 +440,18 @@ export class SolutionService {
     solutions[index] = solution;
     await this.storage.saveEntities(input.planId, 'solutions', solutions);
 
+    // TDD Sprint: Auto-create Decision record if requested
+    const decisionId = await this.createDecisionRecordIfRequested(
+      input,
+      solution,
+      solutions
+    );
+
     return {
       success: true,
       solutionId: input.solutionId,
       deselectedIds: deselected.length > 0 ? deselected.map((s) => s.id) : undefined,
+      decisionId,
     };
   }
 
@@ -302,6 +465,21 @@ export class SolutionService {
 
     const solution = solutions[index];
     const now = new Date().toISOString();
+
+    // Sprint 7: Save current version to history BEFORE updating
+    if (this.versionHistoryService) {
+      const currentSnapshot = JSON.parse(JSON.stringify(solution));
+      await this.versionHistoryService.saveVersion(
+        input.planId,
+        input.solutionId,
+        'solution',
+        currentSnapshot,
+        solution.version,
+        'claude-code',
+        'Auto-saved before update'
+      );
+    }
+
 
     // Apply updates
     if (input.updates.title !== undefined) solution.title = input.updates.title;
@@ -351,8 +529,17 @@ export class SolutionService {
     const limit = input.limit || 50;
     const paginated = solutions.slice(offset, offset + limit);
 
+    // Apply field filtering
+    const filtered = filterEntities(
+      paginated,
+      input.fields,
+      'solution',
+      input.excludeMetadata,
+      false
+    ) as Solution[];
+
     return {
-      solutions: paginated,
+      solutions: filtered,
       total,
       hasMore: offset + limit < total,
     };
@@ -409,6 +596,139 @@ export class SolutionService {
       }
     }
   }
+
+  /**
+   * Sprint 7: Get version history
+   */
+  async getHistory(input: { planId: string; solutionId: string; limit?: number; offset?: number }): Promise<VersionHistory<Solution>> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    return this.versionHistoryService.getHistory({
+      planId: input.planId,
+      entityId: input.solutionId,
+      entityType: 'solution',
+      limit: input.limit,
+      offset: input.offset,
+    });
+  }
+
+  /**
+   * Sprint 7: Compare two versions
+   */
+  async diff(input: { planId: string; solutionId: string; version1: number; version2: number }): Promise<VersionDiff> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    const entities = await this.storage.loadEntities<Solution>(
+      input.planId,
+      'solutions'
+    );
+    const current = entities.find((e) => e.id === input.solutionId);
+
+    if (!current) {
+      throw new Error('Solution not found');
+    }
+
+    return this.versionHistoryService.diff({
+      planId: input.planId,
+      entityId: input.solutionId,
+      entityType: 'solution',
+      version1: input.version1,
+      version2: input.version2,
+      currentEntityData: current,
+      currentVersion: current.version,
+    });
+  }
+
+  /**
+   * Sprint 9: Bulk update multiple solutions in one call
+   * REFACTOR: Uses common bulkUpdateEntities utility
+   */
+  async bulkUpdateSolutions(input: BulkUpdateSolutionsInput): Promise<BulkUpdateSolutionsResult> {
+    return bulkUpdateEntities<'solutionId'>({
+      entityType: 'solutions',
+      entityIdField: 'solutionId',
+      updateFn: (solutionId, updates) =>
+        this.updateSolution({ planId: input.planId, solutionId, updates }).then(() => {}),
+      planId: input.planId,
+      updates: input.updates,
+      atomic: input.atomic,
+      storage: this.storage,
+    });
+  }
+
+  /**
+   * TDD Sprint: Create Decision record from Solution selection (private helper)
+   *
+   * This method automatically creates an ADR Decision record documenting the solution selection.
+   * It extracts relevant information from the selected solution and related alternatives.
+   *
+   * @param input - Original selectSolution input
+   * @param selectedSolution - The solution that was selected
+   * @param allSolutions - All solutions in the plan (for finding alternatives)
+   * @returns Decision ID if created, undefined otherwise
+   */
+  private async createDecisionRecordIfRequested(
+    input: SelectSolutionInput,
+    selectedSolution: Solution,
+    allSolutions: Solution[]
+  ): Promise<string | undefined> {
+    if (!input.createDecisionRecord || !this.decisionService) {
+      return undefined;
+    }
+
+    // Collect all solutions addressing the same requirements for alternativesConsidered
+    const allSolutionsForRequirements = allSolutions.filter((s) =>
+      s.addressing.some((req) => selectedSolution.addressing.includes(req))
+    );
+
+    // Build alternativesConsidered from other solutions (excluding the selected one)
+    const alternativesConsidered = allSolutionsForRequirements
+      .filter((s) => s.id !== input.solutionId)
+      .map((altSolution) => ({
+        option: altSolution.title,
+        reasoning: altSolution.description || altSolution.approach,
+        whyNotChosen:
+          altSolution.status === 'rejected'
+            ? `Rejected in favor of ${selectedSolution.title}`
+            : 'Not selected',
+      }));
+
+    // Create Decision record
+    const decisionInput = {
+      planId: input.planId,
+      decision: {
+        title: `Solution Selection: ${selectedSolution.title}`,
+        question: `Which solution should be selected for requirements ${selectedSolution.addressing.join(', ')}?`,
+        context: `${selectedSolution.description}\n\nApproach: ${selectedSolution.approach}${
+          selectedSolution.implementationNotes
+            ? `\n\nImplementation Notes: ${selectedSolution.implementationNotes}`
+            : ''
+        }`,
+        decision: `Selected: ${selectedSolution.title}${input.reason ? ` - ${input.reason}` : ''}`,
+        alternativesConsidered,
+        consequences: selectedSolution.evaluation?.riskAssessment || 'To be determined',
+        impactScope: selectedSolution.addressing,
+      },
+    };
+
+    const decisionResult = await this.decisionService.recordDecision(decisionInput);
+    return decisionResult.decisionId;
+  }
+
 }
 
 export default SolutionService;

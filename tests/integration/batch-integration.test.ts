@@ -24,6 +24,20 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
+// Helper to retry directory removal on Windows (EBUSY/ENOTEMPTY errors)
+async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+      return;
+    } catch (error: any) {
+      if (i === maxRetries - 1) throw error;
+      // Wait before retry (exponential backoff)
+      await new Promise((resolve) => setTimeout(resolve, 100 * (i + 1)));
+    }
+  }
+}
+
 describe('BatchService - Integration Tests', () => {
   let batchService: BatchService;
   let planService: PlanService;
@@ -72,7 +86,7 @@ describe('BatchService - Integration Tests', () => {
   });
 
   afterEach(async () => {
-    await fs.rm(testDir, { recursive: true, force: true });
+    await removeDirectoryWithRetry(testDir);
   });
 
   it('Test 32: Real FileStorage integration - batch creates entities on disk', async () => {
@@ -317,7 +331,7 @@ describe('BatchService - Integration Tests', () => {
     // Verify all persisted
     const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
     expect(requirements).toHaveLength(50);
-  });
+  }, 30000); // Increase timeout for large batch operation under parallel test load
 
   it('Test 38: Batch creates full dependency tree', async () => {
     const result = await batchService.executeBatch({

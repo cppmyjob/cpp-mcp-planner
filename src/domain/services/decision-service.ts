@@ -1,8 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
 import type { PlanService } from './plan-service.js';
-import type { Decision, DecisionStatus, AlternativeConsidered, Tag } from '../entities/types.js';
+import type { VersionHistoryService } from './version-history-service.js';
+import type { Decision, DecisionStatus, AlternativeConsidered, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
 import { validateAlternativesConsidered, validateTags } from './validators.js';
+import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
 // Input types
 export interface RecordDecisionInput {
@@ -47,15 +49,31 @@ export interface ListDecisionsInput {
   };
   limit?: number;
   offset?: number;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface GetDecisionInput {
   planId: string;
   decisionId: string;
+  fields?: string[]; // Fields to include: summary (default), ['*'] (all), or custom list
+  excludeMetadata?: boolean; // Exclude metadata fields (createdAt, updatedAt, version, metadata)
 }
 
 export interface GetDecisionResult {
   decision: Decision;
+}
+
+export interface GetDecisionsInput {
+  planId: string;
+  decisionIds: string[];
+  fields?: string[];
+  excludeMetadata?: boolean;
+}
+
+export interface GetDecisionsResult {
+  decisions: Decision[];
+  notFound: string[];
 }
 
 export interface SupersedeDecisionInput {
@@ -100,7 +118,8 @@ export interface ListDecisionsResult {
 export class DecisionService {
   constructor(
     private storage: FileStorage,
-    private planService: PlanService
+    private planService: PlanService,
+    private versionHistoryService?: VersionHistoryService
   ) {}
 
   async getDecision(input: GetDecisionInput): Promise<GetDecisionResult> {
@@ -111,7 +130,52 @@ export class DecisionService {
       throw new Error('Decision not found');
     }
 
-    return { decision };
+    // Apply field filtering - GET operations default to all fields
+    const filtered = filterEntity(
+      decision,
+      input.fields ?? ['*'],
+      'decision',
+      input.excludeMetadata,
+      false
+    ) as Decision;
+
+    return { decision: filtered };
+  }
+
+  async getDecisions(input: GetDecisionsInput): Promise<GetDecisionsResult> {
+    // Enforce max limit
+    if (input.decisionIds.length > 100) {
+      throw new Error('Cannot fetch more than 100 decisions at once');
+    }
+
+    // Handle empty array
+    if (input.decisionIds.length === 0) {
+      return { decisions: [], notFound: [] };
+    }
+
+    const allDecisions = await this.storage.loadEntities<Decision>(input.planId, 'decisions');
+    const foundDecisions: Decision[] = [];
+    const notFound: string[] = [];
+
+    // Collect found and not found IDs
+    for (const id of input.decisionIds) {
+      const decision = allDecisions.find((d) => d.id === id);
+      if (decision) {
+        // Apply field filtering - decisions default to all fields
+        const filtered = filterEntity(
+          decision,
+          input.fields ?? ['*'],
+          'decision',
+          input.excludeMetadata,
+          false
+        ) as Decision;
+        foundDecisions.push(filtered);
+      } else {
+        notFound.push(id);
+      }
+    }
+
+    return { decisions: foundDecisions, notFound };
   }
 
   async supersedeDecision(input: SupersedeDecisionInput): Promise<SupersedeDecisionResult> {
@@ -260,6 +324,21 @@ export class DecisionService {
     const decision = decisions[index];
     const now = new Date().toISOString();
 
+    // Sprint 7: Save current version to history BEFORE updating
+    if (this.versionHistoryService) {
+      const currentSnapshot = JSON.parse(JSON.stringify(decision));
+      await this.versionHistoryService.saveVersion(
+        input.planId,
+        input.decisionId,
+        'decision',
+        currentSnapshot,
+        decision.version,
+        'claude-code',
+        'Auto-saved before update'
+      );
+    }
+
+
     // Handle supersede
     if (input.supersede) {
       // Mark old decision as superseded
@@ -357,12 +436,78 @@ export class DecisionService {
     const limit = input.limit || 50;
     const paginated = decisions.slice(offset, offset + limit);
 
+    // Apply field filtering
+    const filtered = filterEntities(
+      paginated,
+      input.fields,
+      'decision',
+      input.excludeMetadata,
+      false
+    ) as Decision[];
+
     return {
-      decisions: paginated,
+      decisions: filtered,
       total,
       hasMore: offset + limit < total,
     };
   }
+
+  /**
+   * Sprint 7: Get version history
+   */
+  async getHistory(input: { planId: string; decisionId: string; limit?: number; offset?: number }): Promise<VersionHistory<Decision>> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    return this.versionHistoryService.getHistory({
+      planId: input.planId,
+      entityId: input.decisionId,
+      entityType: 'decision',
+      limit: input.limit,
+      offset: input.offset,
+    });
+  }
+
+  /**
+   * Sprint 7: Compare two versions
+   */
+  async diff(input: { planId: string; decisionId: string; version1: number; version2: number }): Promise<VersionDiff> {
+    if (!this.versionHistoryService) {
+      throw new Error('Version history service not available');
+    }
+
+    const exists = await this.storage.planExists(input.planId);
+    if (!exists) {
+      throw new Error('Plan not found');
+    }
+
+    const entities = await this.storage.loadEntities<Decision>(
+      input.planId,
+      'decisions'
+    );
+    const current = entities.find((e) => e.id === input.decisionId);
+
+    if (!current) {
+      throw new Error('Decision not found');
+    }
+
+    return this.versionHistoryService.diff({
+      planId: input.planId,
+      entityId: input.decisionId,
+      entityType: 'decision',
+      version1: input.version1,
+      version2: input.version2,
+      currentEntityData: current,
+      currentVersion: current.version,
+    });
+  }
+
 }
 
 export default DecisionService;

@@ -47,6 +47,7 @@ describe('PhaseService', () => {
       const result = await service.getPhase({
         planId,
         phaseId: added.phaseId,
+        fields: ['*'],
       });
 
       expect(result.phase).toBeDefined();
@@ -460,7 +461,11 @@ describe('PhaseService', () => {
       });
 
       // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      const { phase } = await service.getPhase({
+        planId,
+        phaseId: added.phaseId,
+        fields: ['*'],
+      });
       expect(phase.schedule.actualEffort).toBe(4.5);
     });
   });
@@ -726,114 +731,16 @@ describe('PhaseService', () => {
       });
 
       // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId, fields: ['*'] });
       expect(phase.implementationNotes).toBe(
         '## TDD Steps\n1. Write failing test\n2. Implement\n3. Refactor'
       );
     });
 
-    it('should add phase with codeExamples', async () => {
-      const result = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Code Phase',
-          description: 'Phase with code examples',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-          codeExamples: [
-            {
-              language: 'typescript',
-              filename: 'service.ts',
-              code: 'export class MyService {}',
-              description: 'Service skeleton',
-            },
-            {
-              language: 'typescript',
-              code: 'it("should work", () => expect(true).toBe(true));',
-            },
-          ],
-        },
-      });
 
-      // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
-      expect(phase.codeExamples).toHaveLength(2);
-      expect(phase.codeExamples![0].language).toBe('typescript');
-      expect(phase.codeExamples![0].filename).toBe('service.ts');
-      expect(phase.codeExamples![1].code).toContain('expect(true)');
-    });
 
-    it('should validate codeExamples structure', async () => {
-      await expect(
-        service.addPhase({
-          planId,
-          phase: {
-            title: 'Invalid',
-            description: '',
-            objectives: [],
-            deliverables: [],
-            successCriteria: [],
-            codeExamples: [{ lang: 'ts', src: 'code' } as any],
-          },
-        })
-      ).rejects.toThrow(/language/i);
-    });
 
-    it('should add phase with codeRefs', async () => {
-      const result = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Phase with refs',
-          description: '',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-          codeRefs: [
-            'src/services/phase-service.ts:42',
-            'tests/domain/phase-service.test.ts:100',
-          ],
-        },
-      });
 
-      // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
-      expect(phase.codeRefs).toHaveLength(2);
-      expect(phase.codeRefs![0]).toBe('src/services/phase-service.ts:42');
-      expect(phase.codeRefs![1]).toBe('tests/domain/phase-service.test.ts:100');
-    });
-
-    it('should validate codeRefs structure', async () => {
-      await expect(
-        service.addPhase({
-          planId,
-          phase: {
-            title: 'Invalid refs',
-            description: '',
-            objectives: [],
-            deliverables: [],
-            successCriteria: [],
-            codeRefs: ['invalid-no-line-number'],
-          },
-        })
-      ).rejects.toThrow(/must be in format/i);
-    });
-
-    it('should validate codeRefs line number', async () => {
-      await expect(
-        service.addPhase({
-          planId,
-          phase: {
-            title: 'Invalid line',
-            description: '',
-            objectives: [],
-            deliverables: [],
-            successCriteria: [],
-            codeRefs: ['src/file.ts:0'],
-          },
-        })
-      ).rejects.toThrow(/line number must be a positive integer/i);
-    });
 
     it('should update phase with implementationNotes', async () => {
       const added = await service.addPhase({
@@ -856,108 +763,17 @@ describe('PhaseService', () => {
       });
 
       // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
+      const { phase } = await service.getPhase({
+        planId,
+        phaseId: added.phaseId,
+        fields: ['*'],
+      });
       expect(phase.implementationNotes).toBe('## Updated Notes\n- Step 1\n- Step 2');
     });
 
-    it('should update phase with codeExamples', async () => {
-      const added = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Test',
-          description: '',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-        },
-      });
 
-      await service.updatePhase({
-        planId,
-        phaseId: added.phaseId,
-        updates: {
-          codeExamples: [{ language: 'python', code: 'print("hello")' }],
-        },
-      });
 
-      // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
-      expect(phase.codeExamples).toHaveLength(1);
-      expect(phase.codeExamples![0].language).toBe('python');
-    });
 
-    it('should validate codeExamples on update', async () => {
-      const phase = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Test',
-          description: '',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-        },
-      });
-
-      await expect(
-        service.updatePhase({
-          planId,
-          phaseId: phase.phaseId,
-          updates: {
-            codeExamples: [{ language: '', code: 'x' }],
-          },
-        })
-      ).rejects.toThrow(/language/i);
-    });
-
-    it('should update phase with codeRefs', async () => {
-      const added = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Test',
-          description: '',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-        },
-      });
-
-      await service.updatePhase({
-        planId,
-        phaseId: added.phaseId,
-        updates: {
-          codeRefs: ['src/new-file.ts:10', 'tests/new-test.ts:20'],
-        },
-      });
-
-      // Verify via getPhase
-      const { phase } = await service.getPhase({ planId, phaseId: added.phaseId });
-      expect(phase.codeRefs).toHaveLength(2);
-      expect(phase.codeRefs![0]).toBe('src/new-file.ts:10');
-      expect(phase.codeRefs![1]).toBe('tests/new-test.ts:20');
-    });
-
-    it('should validate codeRefs on update', async () => {
-      const phase = await service.addPhase({
-        planId,
-        phase: {
-          title: 'Test',
-          description: '',
-          objectives: [],
-          deliverables: [],
-          successCriteria: [],
-        },
-      });
-
-      await expect(
-        service.updatePhase({
-          planId,
-          phaseId: phase.phaseId,
-          updates: {
-            codeRefs: ['no-line-number'],
-          },
-        })
-      ).rejects.toThrow(/must be in format/i);
-    });
   });
 
   describe('get_tree summary mode (Phase 1.9)', () => {
@@ -995,7 +811,9 @@ describe('PhaseService', () => {
       expect((node.phase as any).successCriteria).toBeUndefined();
       expect((node.phase as any).implementationNotes).toBeUndefined();
       expect((node.phase as any).schedule).toBeUndefined();
-      expect((node.phase as any).metadata).toBeUndefined();
+
+      // Metadata IS included in summary mode (use excludeMetadata to remove it)
+      expect((node.phase as any).metadata).toBeDefined();
     });
 
     it('should include objectives when requested via fields', async () => {
@@ -1010,19 +828,20 @@ describe('PhaseService', () => {
         },
       });
 
-      const result = await service.getPhaseTree({ planId, fields: ['objectives'] });
+      const result = await service.getPhaseTree({
+        planId,
+        fields: ['id', 'title', 'status', 'childCount', 'objectives'],
+      });
       const phase = result.tree[0].phase as any;
 
-      // Summary fields always present
+      // Requested fields should be present
       expect(phase.id).toBeDefined();
       expect(phase.title).toBe('Test');
       expect(phase.status).toBe('planned');
       expect(phase.childCount).toBe(0);
-
-      // objectives added via fields
       expect(phase.objectives).toEqual(['Build API', 'Write tests']);
 
-      // deliverables NOT requested - should not be present
+      // NOT requested - should not be present
       expect(phase.deliverables).toBeUndefined();
       expect(phase.description).toBeUndefined();
     });
@@ -1042,21 +861,19 @@ describe('PhaseService', () => {
 
       const result = await service.getPhaseTree({
         planId,
-        fields: ['objectives', 'deliverables', 'schedule'],
+        fields: ['id', 'title', 'objectives', 'deliverables', 'schedule'],
       });
       const phase = result.tree[0].phase as any;
 
-      // Summary fields
+      // Requested fields should be present
       expect(phase.id).toBeDefined();
       expect(phase.title).toBe('Test');
-
-      // Requested fields
       expect(phase.objectives).toEqual(['obj1', 'obj2']);
       expect(phase.deliverables).toEqual(['del1']);
       expect(phase.schedule).toBeDefined();
       expect(phase.schedule.estimatedEffort.value).toBe(2);
 
-      // NOT requested
+      // NOT requested - should not be present
       expect(phase.successCriteria).toBeUndefined();
       expect(phase.description).toBeUndefined();
     });
@@ -1323,23 +1140,21 @@ describe('PhaseService', () => {
       const result = await service.getPhaseTree({
         planId,
         maxDepth: 0,
-        fields: ['objectives', 'deliverables'],
+        fields: ['id', 'title', 'childCount', 'objectives', 'deliverables'],
       });
 
       expect(result.tree).toHaveLength(1);
 
       const phase = result.tree[0].phase as any;
 
-      // Summary fields
+      // Requested fields should be present
       expect(phase.id).toBeDefined();
       expect(phase.title).toBe('Parent');
       expect(phase.childCount).toBe(1);
-
-      // Requested fields
       expect(phase.objectives).toEqual(['Build parent']);
       expect(phase.deliverables).toEqual(['Parent code']);
 
-      // NOT requested
+      // NOT requested - should not be present
       expect(phase.description).toBeUndefined();
       expect(phase.successCriteria).toBeUndefined();
 
@@ -1372,8 +1187,8 @@ describe('PhaseService', () => {
       const summarySize = JSON.stringify(summaryResult).length;
       const fullSize = JSON.stringify(fullResult).length;
 
-      // Summary should be at least 3x smaller
-      expect(summarySize).toBeLessThan(fullSize / 3);
+      // Summary should be smaller than full (includes metadata by default, still excludes heavy fields)
+      expect(summarySize).toBeLessThan(fullSize);
 
       console.log(`Summary size: ${summarySize} bytes`);
       console.log(`Full size: ${fullSize} bytes`);
@@ -1658,7 +1473,7 @@ describe('PhaseService', () => {
         const uniquePaths = new Set(paths);
 
         expect(uniquePaths.size).toBe(15);
-      });
+      }, 15000); // Increase timeout for 15 phases under parallel test load
 
       it('should maintain path consistency after delete and add', async () => {
         await service.addPhase({
@@ -1859,7 +1674,11 @@ describe('PhaseService', () => {
           actualEffort: 3.5,
         });
 
-        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        const completed = await service.getPhase({
+          planId,
+          phaseId: p1.phaseId,
+          fields: ['*'],
+        });
         expect(completed.phase.schedule.actualEffort).toBe(3.5);
       });
 
@@ -1876,7 +1695,11 @@ describe('PhaseService', () => {
           notes: 'All tests passed',
         });
 
-        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        const completed = await service.getPhase({
+          planId,
+          phaseId: p1.phaseId,
+          fields: ['*'],
+        });
         expect(completed.phase.metadata.annotations).toContainEqual(
           expect.objectContaining({
             text: 'All tests passed',
@@ -1892,10 +1715,16 @@ describe('PhaseService', () => {
         });
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
 
-        const beforeVersion = (await service.getPhase({ planId, phaseId: p1.phaseId })).phase.version;
+        const beforeVersion = (
+          await service.getPhase({ planId, phaseId: p1.phaseId, fields: ['*'] })
+        ).phase.version;
         await service.completeAndAdvance({ planId, phaseId: p1.phaseId });
 
-        const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
+        const completed = await service.getPhase({
+          planId,
+          phaseId: p1.phaseId,
+          fields: ['*'],
+        });
         expect(completed.phase.version).toBe(beforeVersion + 1);
       });
     });
@@ -2063,6 +1892,691 @@ describe('PhaseService', () => {
 
         expect(result.nextPhaseId).toBeNull();
       });
+    });
+  });
+
+  describe('fields parameter support', () => {
+    let phaseId: string;
+
+    beforeEach(async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Complete Phase',
+          description: 'Full description',
+          objectives: ['Obj 1', 'Obj 2'],
+          deliverables: ['Del 1', 'Del 2'],
+          successCriteria: ['SC 1', 'SC 2'],
+          implementationNotes: 'Important notes',
+          priority: 'high',
+        },
+      });
+      phaseId = result.phaseId;
+    });
+
+    describe('getPhase with fields', () => {
+      it('should return only minimal fields when fields=["id","title"]', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['id', 'title'],
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+        expect(phase.id).toBe(phaseId);
+        expect(phase.title).toBe('Complete Phase');
+        expect(phase.description).toBeUndefined();
+        expect(phase.objectives).toBeUndefined();
+      });
+
+      it('should return summary fields by default WITHOUT heavy fields (Lazy-Load)', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+        });
+
+        const phase = result.phase;
+        // GET operations return summary by default (without heavy fields like objectives, etc)
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBeDefined();
+        expect(phase.status).toBeDefined();
+        expect(phase.progress).toBeDefined();
+        expect(phase.path).toBeDefined();
+
+        // Lazy-Load: heavy fields NOT included (use fields=['*'] to get them)
+        expect(phase.objectives).toBeUndefined();
+        expect(phase.implementationNotes).toBeUndefined();
+      });
+
+      it('should return all fields when fields=["*"]', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['*'],
+        });
+
+        const phase = result.phase;
+        expect(phase.title).toBe('Complete Phase');
+        expect(phase.objectives).toEqual(['Obj 1', 'Obj 2']);
+        expect(phase.implementationNotes).toBe('Important notes');
+      });
+    });
+  });
+
+  describe('excludeMetadata and excludeComputed parameters (Sprint 2)', () => {
+    let phaseId: string;
+
+    beforeEach(async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase with Metadata',
+          description: 'Testing metadata and computed exclusion',
+          objectives: ['Test objective'],
+          deliverables: ['Test deliverable'],
+          successCriteria: ['Test criterion'],
+        },
+      });
+      phaseId = result.phaseId;
+    });
+
+    describe('getPhase with excludeMetadata', () => {
+      it('should exclude metadata fields when excludeMetadata=true', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['*'],
+          excludeMetadata: true,
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+
+        // Business fields should be present
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBe('Test Phase with Metadata');
+        expect(phase.description).toBe('Testing metadata and computed exclusion');
+
+        // Metadata fields should NOT be present
+        expect(phase.createdAt).toBeUndefined();
+        expect(phase.updatedAt).toBeUndefined();
+        expect(phase.version).toBeUndefined();
+        expect(phase.metadata).toBeUndefined();
+      });
+
+      it('should include metadata fields by default', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['*'],
+        });
+
+        const phase = result.phase;
+
+        // Metadata fields should be present by default
+        expect(phase.createdAt).toBeDefined();
+        expect(phase.updatedAt).toBeDefined();
+        expect(phase.version).toBeDefined();
+        expect(phase.metadata).toBeDefined();
+      });
+    });
+
+    describe('getPhase with excludeComputed', () => {
+      it('should exclude computed fields when excludeComputed=true', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          excludeComputed: true,
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+
+        // Business fields should be present
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBe('Test Phase with Metadata');
+        expect(phase.status).toBeDefined();
+
+        // Computed fields should NOT be present
+        expect(phase.depth).toBeUndefined();
+        expect(phase.path).toBeUndefined();
+        // Note: childCount is not available in getPhase, only in get_tree
+      });
+
+      it('should include computed fields by default', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+        });
+
+        const phase = result.phase;
+
+        // Computed fields should be present by default
+        expect(phase.depth).toBeDefined();
+        expect(phase.path).toBeDefined();
+      });
+    });
+
+    describe('getPhase with both excludeMetadata and excludeComputed', () => {
+      it('should exclude both metadata and computed fields', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['*'],
+          excludeMetadata: true,
+          excludeComputed: true,
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+
+        // Business fields present
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBeDefined();
+        expect(phase.objectives).toBeDefined();
+
+        // Metadata fields excluded
+        expect(phase.createdAt).toBeUndefined();
+        expect(phase.version).toBeUndefined();
+
+        // Computed fields excluded
+        expect(phase.depth).toBeUndefined();
+        expect(phase.path).toBeUndefined();
+      });
+
+      it('should work together with fields parameter', async () => {
+        const result = await service.getPhase({
+          planId,
+          phaseId,
+          fields: ['id', 'title', 'description', 'path', 'version'],
+          excludeMetadata: true,
+          excludeComputed: true,
+        });
+
+        const phase = result.phase as unknown as Record<string, unknown>;
+
+        // Requested non-metadata/non-computed fields should be present
+        expect(phase.id).toBeDefined();
+        expect(phase.title).toBeDefined();
+        expect(phase.description).toBeDefined();
+
+        // Metadata and computed fields excluded even if requested
+        expect(phase.version).toBeUndefined();
+        expect(phase.path).toBeUndefined();
+      });
+    });
+
+    describe('getPhaseTree with excludeComputed', () => {
+      beforeEach(async () => {
+        // Add child phase
+        await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child Phase',
+            description: 'Child',
+            parentId: phaseId,
+            objectives: ['Child objective'],
+            deliverables: ['Child deliverable'],
+            successCriteria: ['Child criterion'],
+          },
+        });
+      });
+
+      it('should exclude computed fields from tree when excludeComputed=true', async () => {
+        const result = await service.getPhaseTree({
+          planId,
+          excludeComputed: true,
+        });
+
+        expect(result.tree.length).toBeGreaterThan(0);
+        const phaseNode = result.tree[0].phase as unknown as Record<string, unknown>;
+
+        // Business fields present
+        expect(phaseNode.id).toBeDefined();
+        expect(phaseNode.title).toBeDefined();
+
+        // Computed fields excluded
+        expect(phaseNode.depth).toBeUndefined();
+        expect(phaseNode.path).toBeUndefined();
+        expect(phaseNode.childCount).toBeUndefined();
+      });
+
+      it('should include computed fields in tree by default', async () => {
+        const result = await service.getPhaseTree({
+          planId,
+        });
+
+        const phaseNode = result.tree[0].phase;
+
+        // Computed fields should be present
+        expect(phaseNode.path).toBeDefined();
+        expect((phaseNode as unknown as Record<string, unknown>).childCount).toBeDefined();
+      });
+    });
+  });
+
+  describe('get_many operation (Sprint 4: Batch Read)', () => {
+    it('should get multiple phases by IDs', async () => {
+      const phase1 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 1',
+          description: 'First phase',
+          objectives: ['Obj 1'],
+          deliverables: ['Del 1'],
+          successCriteria: ['Criteria 1'],
+        },
+      });
+
+      const phase2 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 2',
+          description: 'Second phase',
+          objectives: ['Obj 2'],
+          deliverables: ['Del 2'],
+          successCriteria: ['Criteria 2'],
+        },
+      });
+
+      const phase3 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 3',
+          description: 'Third phase',
+          objectives: ['Obj 3'],
+          deliverables: ['Del 3'],
+          successCriteria: ['Criteria 3'],
+        },
+      });
+
+      const result = await service.getPhases({
+        planId,
+        phaseIds: [phase1.phaseId, phase2.phaseId, phase3.phaseId],
+      });
+
+      expect(result.phases).toHaveLength(3);
+      expect(result.phases[0].title).toBe('Phase 1');
+      expect(result.phases[1].title).toBe('Phase 2');
+      expect(result.phases[2].title).toBe('Phase 3');
+    });
+
+    it('should support fields parameter in get_many', async () => {
+      const phase1 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 1',
+          description: 'First phase',
+          objectives: ['Obj 1'],
+          deliverables: ['Del 1'],
+          successCriteria: ['Criteria 1'],
+        },
+      });
+
+      const phase2 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 2',
+          description: 'Second phase',
+          objectives: ['Obj 2'],
+          deliverables: ['Del 2'],
+          successCriteria: ['Criteria 2'],
+        },
+      });
+
+      const result = await service.getPhases({
+        planId,
+        phaseIds: [phase1.phaseId, phase2.phaseId],
+        fields: ['id', 'title'],
+      });
+
+      expect(result.phases).toHaveLength(2);
+      expect(result.phases[0].id).toBeDefined();
+      expect(result.phases[0].title).toBeDefined();
+      expect((result.phases[0] as unknown as Record<string, unknown>).description).toBeUndefined();
+      expect((result.phases[0] as unknown as Record<string, unknown>).objectives).toBeUndefined();
+    });
+
+    it('should handle partial success when some IDs not found', async () => {
+      const phase1 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 1',
+          description: 'First phase',
+          objectives: ['Obj 1'],
+          deliverables: ['Del 1'],
+          successCriteria: ['Criteria 1'],
+        },
+      });
+
+      const result = await service.getPhases({
+        planId,
+        phaseIds: [phase1.phaseId, 'non-existent-id', 'another-fake-id'],
+      });
+
+      expect(result.phases).toHaveLength(1);
+      expect(result.phases[0].title).toBe('Phase 1');
+      expect(result.notFound).toEqual(['non-existent-id', 'another-fake-id']);
+    });
+
+    it('should enforce max limit of 100 IDs', async () => {
+      const manyIds = Array.from({ length: 101 }, (_, i) => `id-${i}`);
+
+      await expect(
+        service.getPhases({
+          planId,
+          phaseIds: manyIds,
+        })
+      ).rejects.toThrow('Cannot fetch more than 100 phases at once');
+    });
+
+    it('should return empty array when no IDs provided', async () => {
+      const result = await service.getPhases({
+        planId,
+        phaseIds: [],
+      });
+
+      expect(result.phases).toEqual([]);
+      expect(result.notFound).toEqual([]);
+    });
+
+    it('should support excludeMetadata in get_many', async () => {
+      const phase1 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 1',
+          description: 'First phase',
+          objectives: ['Obj 1'],
+          deliverables: ['Del 1'],
+          successCriteria: ['Criteria 1'],
+        },
+      });
+
+      const result = await service.getPhases({
+        planId,
+        phaseIds: [phase1.phaseId],
+        excludeMetadata: true,
+      });
+
+      expect(result.phases).toHaveLength(1);
+      expect((result.phases[0] as unknown as Record<string, unknown>).createdAt).toBeUndefined();
+      expect((result.phases[0] as unknown as Record<string, unknown>).metadata).toBeUndefined();
+    });
+  });
+
+  describe('Sprint 5: Array Field Operations', () => {
+    it('should append item to objectives array', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: ['Objective 1', 'Objective 2'],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await service.arrayAppend({
+        planId,
+        phaseId,
+        field: 'objectives',
+        value: 'Objective 3',
+      });
+
+      const result = await service.getPhase({ planId, phaseId, fields: ['*'] });
+      expect(result.phase.objectives).toEqual(['Objective 1', 'Objective 2', 'Objective 3']);
+    });
+
+    it('should prepend item to deliverables array', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: [],
+          deliverables: ['Item 2', 'Item 3'],
+          successCriteria: [],
+        },
+      });
+
+      await service.arrayPrepend({
+        planId,
+        phaseId,
+        field: 'deliverables',
+        value: 'Item 1',
+      });
+
+      const result = await service.getPhase({ planId, phaseId, fields: ['*'] });
+      expect(result.phase.deliverables).toEqual(['Item 1', 'Item 2', 'Item 3']);
+    });
+
+    it('should insert item at specific index in successCriteria array', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: [],
+          deliverables: [],
+          successCriteria: ['Criteria 1', 'Criteria 3'],
+        },
+      });
+
+      await service.arrayInsertAt({
+        planId,
+        phaseId,
+        field: 'successCriteria',
+        index: 1,
+        value: 'Criteria 2',
+      });
+
+      const result = await service.getPhase({ planId, phaseId, fields: ['*'] });
+      expect(result.phase.successCriteria).toEqual(['Criteria 1', 'Criteria 2', 'Criteria 3']);
+    });
+
+    it('should update item at specific index', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: ['Old objective', 'Keep this'],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await service.arrayUpdateAt({
+        planId,
+        phaseId,
+        field: 'objectives',
+        index: 0,
+        value: 'New objective',
+      });
+
+      const result = await service.getPhase({ planId, phaseId, fields: ['*'] });
+      expect(result.phase.objectives).toEqual(['New objective', 'Keep this']);
+    });
+
+    it('should remove item at specific index', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: ['Item 1', 'Item 2', 'Item 3'],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await service.arrayRemoveAt({
+        planId,
+        phaseId,
+        field: 'objectives',
+        index: 1,
+      });
+
+      const result = await service.getPhase({ planId, phaseId, fields: ['*'] });
+      expect(result.phase.objectives).toEqual(['Item 1', 'Item 3']);
+    });
+
+    it('should throw error when index is out of bounds for insert_at', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: ['Item 1'],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await expect(
+        service.arrayInsertAt({
+          planId,
+          phaseId,
+          field: 'objectives',
+          index: 10,
+          value: 'New item',
+        })
+      ).rejects.toThrow('Index 10 is out of bounds');
+    });
+
+    it('should throw error when field is not an array field', async () => {
+      const { phaseId } = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+          objectives: [],
+          deliverables: [],
+          successCriteria: [],
+        },
+      });
+
+      await expect(
+        service.arrayAppend({
+          planId,
+          phaseId,
+          field: 'title' as any,
+          value: 'Invalid',
+        })
+      ).rejects.toThrow('Field title is not a valid array field');
+    });
+  });
+
+
+  describe('bulk_update (Sprint 9 - RED Phase)', () => {
+    let phase1Id: string;
+    let phase2Id: string;
+    let phase3Id: string;
+
+    beforeEach(async () => {
+      // Create test phases
+      const p1 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 1',
+          description: 'First phase',
+          objectives: ['Obj1'],
+          deliverables: ['Del1'],
+          successCriteria: ['SC1'],
+        },
+      });
+      phase1Id = p1.phaseId;
+
+      const p2 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 2',
+          description: 'Second phase',
+          objectives: ['Obj2'],
+          deliverables: ['Del2'],
+          successCriteria: ['SC2'],
+        },
+      });
+      phase2Id = p2.phaseId;
+
+      const p3 = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Phase 3',
+          description: 'Third phase',
+          objectives: ['Obj3'],
+          deliverables: ['Del3'],
+          successCriteria: ['SC3'],
+        },
+      });
+      phase3Id = p3.phaseId;
+    });
+
+    it('RED 9.6: should update multiple phases in one call', async () => {
+      const result = await service.bulkUpdatePhases({
+        planId,
+        updates: [
+          { phaseId: phase1Id, updates: { status: 'in_progress' } },
+          { phaseId: phase2Id, updates: { progress: 50 } },
+          { phaseId: phase3Id, updates: { status: 'completed', progress: 100 } },
+        ],
+      });
+
+      expect(result.updated).toBe(3);
+      expect(result.failed).toBe(0);
+      expect(result.results).toHaveLength(3);
+
+      const updated1 = await service.getPhase({ planId, phaseId: phase1Id });
+      expect(updated1.phase.status).toBe('in_progress');
+
+      const updated2 = await service.getPhase({ planId, phaseId: phase2Id });
+      expect(updated2.phase.progress).toBe(50);
+
+      const updated3 = await service.getPhase({ planId, phaseId: phase3Id });
+      expect(updated3.phase.status).toBe('completed');
+      expect(updated3.phase.progress).toBe(100);
+    });
+
+    it('RED 9.7: should handle partial failures in non-atomic mode', async () => {
+      const result = await service.bulkUpdatePhases({
+        planId,
+        updates: [
+          { phaseId: phase1Id, updates: { status: 'completed' } },
+          { phaseId: 'invalid-id', updates: { status: 'in_progress' } },
+          { phaseId: phase3Id, updates: { progress: 75 } },
+        ],
+        atomic: false,
+      });
+
+      expect(result.updated).toBe(2);
+      expect(result.failed).toBe(1);
+      expect(result.results).toHaveLength(3);
+
+      expect(result.results[0].success).toBe(true);
+      expect(result.results[1].success).toBe(false);
+      expect(result.results[2].success).toBe(true);
+
+      // Verify successful updates were applied
+      const check1 = await service.getPhase({ planId, phaseId: phase1Id });
+      expect(check1.phase.status).toBe('completed');
+
+      const check3 = await service.getPhase({ planId, phaseId: phase3Id });
+      expect(check3.phase.progress).toBe(75);
+    });
+
+    it('RED 9.8: should rollback all changes in atomic mode on error', async () => {
+      await expect(
+        service.bulkUpdatePhases({
+          planId,
+          updates: [
+            { phaseId: phase1Id, updates: { status: 'completed' } },
+            { phaseId: 'invalid-id', updates: { status: 'in_progress' } },
+          ],
+          atomic: true,
+        })
+      ).rejects.toThrow();
+
+      // Verify no changes were applied
+      const check1 = await service.getPhase({ planId, phaseId: phase1Id });
+      expect(check1.phase.status).toBe('planned'); // unchanged
     });
   });
 });

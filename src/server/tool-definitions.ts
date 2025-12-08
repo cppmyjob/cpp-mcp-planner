@@ -36,7 +36,7 @@ export const tools = [
         workspacePath: { type: 'string' },
         includeGuide: {
           type: 'boolean',
-          description: 'Include usage guide in get_active response. Default: true (omit this parameter to get guide). The guide provides essential commands, formatting instructions, and best practices for working with the planner. Only set to false if you have already seen the guide in this session.',
+          description: 'Include usage guide in get_active response. Default: false (omit this parameter to exclude guide, saving ~2.5KB). The guide provides essential commands, formatting instructions, and best practices for working with the planner. Set to true on first call to see the guide, then omit or use false for subsequent calls.',
         },
         includeEntities: { type: 'boolean' },
         includeLinks: { type: 'boolean' },
@@ -48,16 +48,21 @@ export const tools = [
   },
   {
     name: 'requirement',
-    description: 'Manage project requirements - the foundation of planning workflow. Add requirements first, then propose solutions with `solution` tool to address them. Link requirements to phases for implementation tracking. Use `query` tool to trace requirement coverage. Use vote/unvote to prioritize requirements based on user feedback - each requirement has a votes field (default: 0) that can be incremented/decremented. Use reset_all_votes to reset all requirement votes to 0 in a plan. Actions: add, get, update, list, delete, vote, unvote, reset_all_votes.',
+    description: 'Manage project requirements - the foundation of planning workflow. Add requirements first, then propose solutions with `solution` tool to address them. Link requirements to phases for implementation tracking. Use `query` tool to trace requirement coverage. Use vote/unvote to prioritize requirements based on user feedback - each requirement has a votes field (default: 0) that can be incremented/decremented. . Use reset_all_votes to reset all requirement votes to 0 in a plan. Actions: add, get, get_many, update, list, delete, vote, unvote, get_history, diff, reset_all_votes',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['add', 'get', 'update', 'list', 'delete', 'vote', 'unvote', 'reset_all_votes'],
+          enum: ['add', 'get', 'get_many', 'update', 'list', 'delete', 'vote', 'unvote', 'get_history', 'diff', 'reset_all_votes'],
         },
         planId: { type: 'string' },
         requirementId: { type: 'string' },
+        requirementIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of requirement IDs for get_many action. Max 100 IDs.',
+        },
         requirement: {
           type: 'object',
           properties: {
@@ -100,23 +105,36 @@ export const tools = [
         },
         includeTraceability: { type: 'boolean' },
         force: { type: 'boolean' },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Fields to include. Default returns summary (id, title, description, priority, category, status, votes). Available fields: "rationale", "source", "acceptanceCriteria", "impact", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
+        },
+        excludeMetadata: {
+          type: 'boolean',
+          description: 'Exclude metadata fields (createdAt, updatedAt, version, metadata, type) from response. Saves ~162 bytes per entity.',
+        },
       },
       required: ['action', 'planId'],
     },
   },
   {
     name: 'solution',
-    description: 'Manage solution proposals for requirements. Propose multiple solutions with tradeoff analysis, compare them to evaluate options, then select the best one. Use `decision` tool to record selection rationale. Selected solutions guide phase implementation. Actions: propose, get, update, list, compare, select, delete.',
+    description: 'Manage solution proposals for requirements. Propose multiple solutions with tradeoff analysis, compare them to evaluate options, then select the best one. Use `decision` tool to record selection rationale. Selected solutions guide phase implementation. Actions: propose, get, get_many, update, list, compare, select, delete, get_history, diff.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['propose', 'get', 'update', 'list', 'compare', 'select', 'delete'],
+          enum: ['propose', 'get', 'get_many', 'update', 'list', 'compare', 'select', 'delete', 'get_history', 'diff'],
         },
         planId: { type: 'string' },
         solutionId: { type: 'string' },
-        solutionIds: { type: 'array', items: { type: 'string' } },
+        solutionIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of solution IDs for get_many or compare actions. Max 100 IDs for get_many.',
+        },
         solution: {
           type: 'object',
           properties: {
@@ -160,22 +178,36 @@ export const tools = [
         aspects: { type: 'array', items: { type: 'string' } },
         reason: { type: 'string' },
         createDecisionRecord: { type: 'boolean' },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Fields to include. Default returns summary (id, title, description, status, addressing). Available fields: "approach", "implementationNotes", "tradeoffs", "evaluation", "selectedAt", "selectedBy", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
+        },
+        excludeMetadata: {
+          type: 'boolean',
+          description: 'Exclude metadata fields (createdAt, updatedAt, version, metadata, type) from response. Saves ~162 bytes per entity.',
+        },
       },
       required: ['action', 'planId'],
     },
   },
   {
     name: 'decision',
-    description: 'Record architectural decisions (ADR pattern) with context and alternatives considered. Use after solution selection or for any significant technical choice. Decisions can be superseded when context changes, maintaining decision history. Link decisions to requirements/solutions for traceability. Actions: record, get, update, list, supersede.',
+    description: 'Record architectural decisions (ADR pattern) with context and alternatives considered. Use after solution selection or for any significant technical choice. Decisions can be superseded when context changes, maintaining decision history. Link decisions to requirements/solutions for traceability. Actions: record, get, get_many, update, list, supersede, get_history, diff.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['record', 'get', 'update', 'list', 'supersede'],
+          enum: ['record', 'get', 'get_many', 'update', 'list', 'supersede', 'get_history', 'diff'],
         },
         planId: { type: 'string' },
         decisionId: { type: 'string' },
+        decisionIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of decision IDs for get_many action. Max 100 IDs.',
+        },
         decision: {
           type: 'object',
           properties: {
@@ -211,22 +243,36 @@ export const tools = [
         newDecision: { type: 'object' },
         reason: { type: 'string' },
         status: { type: 'string', enum: ['active', 'superseded', 'reversed'] },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Fields to include. Default returns summary (id, title, question, decision, status). Available fields: "context", "consequences", "alternativesConsidered", "supersededBy", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
+        },
+        excludeMetadata: {
+          type: 'boolean',
+          description: 'Exclude metadata fields (createdAt, updatedAt, version, metadata, type) from response. Saves ~162 bytes per entity.',
+        },
       },
       required: ['action', 'planId'],
     },
   },
   {
     name: 'phase',
-    description: 'Manage implementation phases/tasks in hierarchical structure. Break selected solutions into phases with objectives, deliverables, and estimates. Track progress, update status (planned/in_progress/completed/blocked), and get next actionable items. For plan overview/summary, use get_tree with fields parameter to get compact tree. Use link tool with depends_on relation to create phase dependencies with cycle detection. Use after solution selection. Actions: add, get, get_tree, update, update_status, move, delete, get_next_actions, complete_and_advance.',
+    description: 'Manage implementation phases/tasks in hierarchical structure. Break selected solutions into phases with objectives, deliverables, and estimates. Track progress, update status (planned/in_progress/completed/blocked), and get next actionable items. For plan overview/summary, use get_tree with fields parameter to get compact tree. Use link tool with depends_on relation to create phase dependencies with cycle detection. Use after solution selection. Actions: add, get, get_many, get_tree, update, update_status, move, delete, get_next_actions, complete_and_advance, get_history, diff.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['add', 'get', 'get_tree', 'update', 'update_status', 'move', 'delete', 'get_next_actions', 'complete_and_advance'],
+          enum: ['add', 'get', 'get_many', 'get_tree', 'update', 'update_status', 'move', 'delete', 'get_next_actions', 'complete_and_advance', 'get_history', 'diff'],
         },
         planId: { type: 'string' },
         phaseId: { type: 'string' },
+        phaseIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of phase IDs for get_many action. Max 100 IDs.',
+        },
         phase: {
           type: 'object',
           properties: {
@@ -246,24 +292,6 @@ export const tools = [
               required: ['value', 'unit', 'confidence'],
             },
             implementationNotes: { type: 'string' },
-            codeExamples: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  language: { type: 'string' },
-                  filename: { type: 'string' },
-                  code: { type: 'string' },
-                  description: { type: 'string' },
-                },
-                required: ['language', 'code'],
-              },
-            },
-            codeRefs: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Code references in format "file_path:line_number" (e.g., "src/services/phase-service.ts:42")',
-            },
             priority: {
               type: 'string',
               enum: ['critical', 'high', 'medium', 'low'],
@@ -284,24 +312,6 @@ export const tools = [
             blockingReason: { type: 'string' },
             progress: { type: 'number', minimum: 0, maximum: 100 },
             implementationNotes: { type: 'string' },
-            codeExamples: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  language: { type: 'string' },
-                  filename: { type: 'string' },
-                  code: { type: 'string' },
-                  description: { type: 'string' },
-                },
-                required: ['language', 'code'],
-              },
-            },
-            codeRefs: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Code references in format "file_path:line_number" (e.g., "src/services/phase-service.ts:42")',
-            },
             priority: {
               type: 'string',
               enum: ['critical', 'high', 'medium', 'low'],
@@ -321,7 +331,15 @@ export const tools = [
         fields: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Fields to include. Default returns summary (id, title, status, progress, path, childCount). Available fields: "description", "parentId", "order", "depth", "objectives", "deliverables", "successCriteria", "schedule", "startedAt", "completedAt", "milestones", "blockers", "implementationNotes", "codeExamples", "codeRefs", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
+          description: 'Fields to include. Default returns summary (id, title, status, progress, path, childCount). Available fields: "description", "parentId", "order", "depth", "objectives", "deliverables", "successCriteria", "schedule", "startedAt", "completedAt", "milestones", "blockers", "implementationNotes", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields (WARNING: returns large output, may pollute context).',
+        },
+        excludeMetadata: {
+          type: 'boolean',
+          description: 'Exclude metadata fields (createdAt, updatedAt, version, metadata, type) from response. Saves ~162 bytes per entity.',
+        },
+        excludeComputed: {
+          type: 'boolean',
+          description: 'Exclude computed fields (depth, path, childCount) from response. Saves ~50 bytes per entity. Only applies to phase entities.',
         },
         limit: { type: 'number' },
       },
@@ -330,13 +348,13 @@ export const tools = [
   },
   {
     name: 'artifact',
-    description: 'Store generated artifacts (code, configs, migrations, docs, tests, scripts) related to phases and solutions. Track file targets with precision (lineNumber, lineEnd, searchPattern), store source code with syntax highlighting. Link artifacts to phases/solutions/requirements for traceability. Use during phase implementation. Actions: add, get, update, list, delete.',
+    description: 'Store generated artifacts (code, configs, migrations, docs, tests, scripts) related to phases and solutions. Track file targets with precision (lineNumber, lineEnd, searchPattern), store source code with syntax highlighting. Link artifacts to phases/solutions/requirements for traceability. Use during phase implementation. Actions: add, get, update, list, delete, get_history, diff.',
     inputSchema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['add', 'get', 'update', 'list', 'delete'],
+          enum: ['add', 'get', 'update', 'list', 'delete', 'get_history', 'diff'],
         },
         planId: { type: 'string' },
         artifactId: { type: 'string' },
@@ -425,6 +443,19 @@ export const tools = [
             status: { type: 'string' },
             relatedPhaseId: { type: 'string' },
           },
+        },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Fields to include. Default returns summary (id, title, slug, artifactType, status). Available fields: "description", "content" (excluding sourceCode unless fields=["*"]), "fileTable", "targets", "relatedPhaseId", "relatedSolutionId", "relatedRequirementIds", "codeRefs", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields including sourceCode (WARNING: sourceCode can be 5-50KB, returns large output, may pollute context).',
+        },
+        excludeMetadata: {
+          type: 'boolean',
+          description: 'Exclude metadata fields (createdAt, updatedAt, version, metadata, type) from response. Saves ~162 bytes per entity.',
+        },
+        includeContent: {
+          type: 'boolean',
+          description: 'Include heavy sourceCode field (default: false for Lazy-Load). sourceCode can be 5-50KB and is excluded by default to minimize payload. Use includeContent=true ONLY when you need to read the actual source code. IMPORTANT: list operations NEVER return sourceCode even with includeContent=true (security measure).',
         },
       },
       required: ['action', 'planId'],

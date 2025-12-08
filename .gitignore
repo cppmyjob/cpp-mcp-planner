@@ -31,6 +31,9 @@ coverage/
 *.temp
 .mcp-plans/
 
+# Test temporary directories
+.test-*/
+
 # Plan file
 PLAN.md
 

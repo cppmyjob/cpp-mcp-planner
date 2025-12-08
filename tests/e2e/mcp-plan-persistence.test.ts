@@ -4,6 +4,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer, createServices } from '../../src/server/index.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 // Helper to parse MCP tool result
 function parseResult<T>(result: unknown): T {
@@ -20,7 +21,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
   let storagePath: string;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-mcp-plan-persistence-' + Date.now());
+    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-plan-persistence-' + Date.now() + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
   });
 
@@ -109,7 +110,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
 
   it('should return null when no active plan is set', async () => {
     // Create fresh storage to ensure no active plan exists
-    const freshStoragePath = path.join(process.cwd(), '.test-mcp-plan-persistence-null-' + Date.now());
+    const freshStoragePath = path.join(process.cwd(), '.test-temp', 'mcp-plan-persistence-null-' + Date.now());
     await fs.mkdir(freshStoragePath, { recursive: true });
 
     const services = await createServices(freshStoragePath);
@@ -140,7 +141,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
   });
 
   it('should throw error when setting non-existent plan as active', async () => {
-    const errorStoragePath = path.join(process.cwd(), '.test-mcp-plan-persistence-error-' + Date.now());
+    const errorStoragePath = path.join(process.cwd(), '.test-temp', 'mcp-plan-persistence-error-' + Date.now());
     await fs.mkdir(errorStoragePath, { recursive: true });
 
     const services = await createServices(errorStoragePath);
@@ -171,7 +172,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
   });
 
   it('should overwrite previous active plan when setting new one', async () => {
-    const overwriteStoragePath = path.join(process.cwd(), '.test-mcp-plan-persistence-overwrite-' + Date.now());
+    const overwriteStoragePath = path.join(process.cwd(), '.test-temp', 'mcp-plan-persistence-overwrite-' + Date.now());
     await fs.mkdir(overwriteStoragePath, { recursive: true });
 
     const services = await createServices(overwriteStoragePath);

@@ -19,9 +19,11 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.24.2",
+    "graceful-fs": "^4.2.11",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
+    "@types/graceful-fs": "^4.1.9",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
     "@types/uuid": "^9.0.0",
