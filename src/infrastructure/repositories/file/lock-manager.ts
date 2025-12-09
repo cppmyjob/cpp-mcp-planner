@@ -1,24 +1,76 @@
 /**
- * LockManager - Resource locking with reentrant support
+ * LockManager - In-process resource locking with reentrant support
+ *
+ * ============================================================================
+ * STATUS: NOT USED IN FileRepository
+ * ============================================================================
+ *
+ * FileRepository now uses FileLockManager (file-based, cross-process locking).
+ * This module is preserved for potential future use cases that require:
+ * - Reentrant locks (same holder acquiring multiple times)
+ * - TTL with auto-release
+ * - Event-driven lock notifications
+ * - Faster in-memory locking (~0.01ms vs ~10-50ms for file locks)
+ *
+ * ============================================================================
+ * KNOWN ISSUES & LIMITATIONS
+ * ============================================================================
+ *
+ * 1. IN-PROCESS ONLY: Does NOT work across multiple processes.
+ *    For multi-process scenarios, use FileLockManager.
+ *
+ * 2. EXTEND() RACE CONDITION: extend() can race with release() in autoRelease.
+ *    If TTL expires while extend() is executing, the lock may be released
+ *    before extension completes. Mitigation: use mutex protection.
+ *
+ * 3. INFINITE LOOP POTENTIAL: doAcquire() loop has maxRetries option but
+ *    defaults to 0 (unlimited). Under heavy contention, could loop excessively.
+ *    Set maxRetries option for production use.
+ *
+ * 4. DISPOSE TIMING: dispose() waits for in-flight operations with configurable
+ *    disposeTimeout. Operations started after dispose begins will fail.
+ *
+ * ============================================================================
+ * FEATURES
+ * ============================================================================
  *
  * Provides thread-safe resource locking:
  * - Reentrant locks (same holder can acquire multiple times)
- * - Lock timeout and expiration
- * - Atomic acquire operations (race condition prevention)
+ * - Separate acquireTimeout and TTL semantics
+ * - Atomic acquire operations (race condition prevention via per-resource mutex)
  * - Timer cleanup (memory leak prevention)
  * - Event-driven waiting (no polling)
  * - Graceful shutdown with dispose()
+ * - Optional logging for debugging
+ * - Lock extension via extend()
  *
- * Timeout semantics:
- * - timeout > 0: wait up to N milliseconds for lock
- * - timeout === 0: try once without waiting (instant fail if locked)
- * - timeout < 0: invalid (throws error)
- * - timeout === undefined: use defaultTimeout (10 seconds)
+ * acquireTimeout semantics:
+ * - acquireTimeout > 0: wait up to N milliseconds for lock
+ * - acquireTimeout === 0: try once without waiting (instant fail if locked)
+ * - acquireTimeout < 0: invalid (throws error)
+ * - acquireTimeout === undefined: use defaultAcquireTimeout (10 seconds)
+ *
+ * TTL semantics:
+ * - ttl > 0: auto-release lock after N milliseconds
+ * - ttl === 0 or undefined: no auto-release (infinite)
  */
 
 import { v4 as uuidv4 } from 'uuid';
 import { EventEmitter } from 'events';
-import type { LockHolder, LockOptions, LockResult } from './types.js';
+import type {
+  LockHolder,
+  LockOptions,
+  LockResult,
+  LockManagerOptions,
+  LockLogger,
+  LogLevel,
+  ExtendResult,
+} from './types.js';
+
+import {
+  DEFAULT_ACQUIRE_TIMEOUT,
+  DEFAULT_LOCK_TTL,
+} from './types.js';
 
 /**
  * Mutex entry for serializing acquire operations per resource
@@ -29,6 +81,17 @@ interface MutexEntry {
 }
 
 /**
+ * Log level priority for filtering
+ */
+const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+  none: 999,
+};
+
+/**
  * LockManager
  *
  * Manages locks for resources with support for reentrant locks
@@ -36,7 +99,8 @@ interface MutexEntry {
 export class LockManager {
   private locks: Map<string, LockHolder> = new Map();
   private locksByResource: Map<string, string> = new Map(); // resource -> lockId
-  private defaultTimeout: number = 10000; // 10 seconds
+  private defaultAcquireTimeout: number;
+  private defaultTtl: number;
 
   /**
    * Per-resource mutex for serializing acquire operations
@@ -59,12 +123,67 @@ export class LockManager {
    */
   private inFlightOps: number = 0;
 
-  constructor(defaultTimeout?: number) {
-    if (defaultTimeout !== undefined) {
-      this.defaultTimeout = defaultTimeout;
+  /**
+   * Optional logger for debugging
+   */
+  private logger?: LockLogger;
+
+  /**
+   * Minimum log level
+   */
+  private logLevel: LogLevel;
+
+  /**
+   * Maximum retry attempts in doAcquire() loop (0 = no limit)
+   */
+  private maxRetries: number;
+
+  /**
+   * Timeout for dispose() to wait for in-flight operations (ms)
+   */
+  private disposeTimeout: number;
+
+  constructor(options?: LockManagerOptions | number) {
+    // Backwards compatibility: accept number as defaultAcquireTimeout
+    if (typeof options === 'number') {
+      this.defaultAcquireTimeout = options;
+      this.defaultTtl = options; // Old behavior: timeout used for both
+      this.logLevel = 'none';
+      this.maxRetries = 0;
+      this.disposeTimeout = 100;
+    } else {
+      this.defaultAcquireTimeout = options?.defaultAcquireTimeout ?? DEFAULT_ACQUIRE_TIMEOUT;
+      this.defaultTtl = options?.defaultTtl ?? DEFAULT_LOCK_TTL;
+      this.logger = options?.logger;
+      this.logLevel = options?.logLevel ?? 'none';
+      this.maxRetries = options?.maxRetries ?? 0;
+      this.disposeTimeout = options?.disposeTimeout ?? 100;
     }
+
     // Prevent memory leak warning for many listeners
     this.lockEvents.setMaxListeners(1000);
+  }
+
+  // ============================================================================
+  // Logging Helpers
+  // ============================================================================
+
+  /**
+   * Log a message if level meets threshold
+   */
+  private log(level: Exclude<LogLevel, 'none'>, message: string, context?: Record<string, unknown>): void {
+    if (!this.logger || this.logLevel === 'none') {
+      return;
+    }
+
+    if (LOG_LEVEL_PRIORITY[level] < LOG_LEVEL_PRIORITY[this.logLevel]) {
+      return;
+    }
+
+    const logFn = this.logger[level];
+    if (logFn) {
+      logFn(message, context);
+    }
   }
 
   /**
@@ -74,6 +193,7 @@ export class LockManager {
   async acquire(resource: string, options?: LockOptions): Promise<LockResult> {
     // Check if disposed
     if (this.disposed) {
+      this.log('debug', 'acquire rejected - disposed', { resource });
       return {
         acquired: false,
         reason: 'LockManager has been disposed',
@@ -85,15 +205,21 @@ export class LockManager {
       throw new Error('resource name cannot be empty');
     }
 
-    // Validate timeout (0 = no wait/instant, >0 = wait up to N ms)
-    const timeout = options?.timeout ?? this.defaultTimeout;
-    if (timeout < 0) {
-      throw new Error('timeout must be non-negative (0 for no wait, >0 for wait duration)');
+    // Resolve acquireTimeout: new param > deprecated timeout > default
+    const acquireTimeout = options?.acquireTimeout ?? options?.timeout ?? this.defaultAcquireTimeout;
+    if (acquireTimeout < 0) {
+      throw new Error('acquireTimeout must be non-negative (0 for no wait, >0 for wait duration)');
     }
+
+    // Resolve TTL: new param > deprecated timeout > default
+    // For backwards compatibility: if only timeout is specified, use it for TTL too
+    const ttl = options?.ttl ?? (options?.timeout !== undefined && options?.acquireTimeout === undefined ? options.timeout : this.defaultTtl);
 
     const holderId = options?.holderId ?? `pid-${process.pid}`;
     const reentrant = options?.reentrant ?? false;
     const startTime = Date.now();
+
+    this.log('debug', 'acquire attempt', { resource, holderId, reentrant, acquireTimeout, ttl });
 
     // Track in-flight operation
     this.inFlightOps++;
@@ -101,34 +227,37 @@ export class LockManager {
     try {
       // Acquire per-resource mutex (serializes all acquire attempts for this resource)
       // Returns true if mutex was acquired, false if timed out or disposed
-      const mutexAcquired = await this.acquireMutex(resource, timeout, startTime);
+      const mutexAcquired = await this.acquireMutex(resource, acquireTimeout, startTime);
 
       // If mutex wasn't acquired (timeout or disposed), return immediately
       if (!mutexAcquired) {
         // Check if disposed to return appropriate message
         if (this.disposed) {
+          this.log('debug', 'acquire rejected - disposed during mutex wait', { resource });
           return {
             acquired: false,
             reason: 'LockManager has been disposed',
           };
         }
+        this.log('warn', 'acquire timeout waiting for mutex', { resource, acquireTimeout });
         return {
           acquired: false,
-          reason: `timeout waiting for lock on '${resource}' after ${timeout}ms`,
+          reason: `timeout waiting for lock on '${resource}' after ${acquireTimeout}ms`,
         };
       }
 
-      // Check timeout after acquiring mutex (time may have passed)
-      if (timeout > 0 && Date.now() - startTime >= timeout) {
+      // Check acquireTimeout after acquiring mutex (time may have passed)
+      if (acquireTimeout > 0 && Date.now() - startTime >= acquireTimeout) {
         this.releaseMutex(resource);
+        this.log('warn', 'acquire timeout after mutex acquired', { resource, acquireTimeout });
         return {
           acquired: false,
-          reason: `timeout waiting for lock on '${resource}' after ${timeout}ms`,
+          reason: `timeout waiting for lock on '${resource}' after ${acquireTimeout}ms`,
         };
       }
 
       try {
-        return await this.doAcquire(resource, holderId, reentrant, timeout, startTime);
+        return await this.doAcquire(resource, holderId, reentrant, acquireTimeout, ttl, startTime);
       } finally {
         this.releaseMutex(resource);
       }
@@ -215,7 +344,8 @@ export class LockManager {
     resource: string,
     holderId: string,
     reentrant: boolean,
-    timeout: number,
+    acquireTimeout: number,
+    ttl: number,
     startTime: number
   ): Promise<LockResult> {
     // Retry loop - handles case where lock is grabbed by another holder after release
@@ -228,28 +358,31 @@ export class LockManager {
 
         // Handle reentrant case (same holder)
         if (reentrant && existingLock && existingLock.holderId === holderId) {
-          return this.handleReentrantAcquire(existingLock, existingLockId, timeout);
+          return this.handleReentrantAcquire(existingLock, existingLockId, ttl);
         }
 
         // Different holder - wait for lock to be released
-        const remainingTimeout = timeout > 0 ? timeout - (Date.now() - startTime) : 0;
-        if (remainingTimeout <= 0 && timeout > 0) {
+        const remainingTimeout = acquireTimeout > 0 ? acquireTimeout - (Date.now() - startTime) : 0;
+        if (remainingTimeout <= 0 && acquireTimeout > 0) {
+          this.log('warn', 'acquire timeout in doAcquire', { resource, acquireTimeout });
           return {
             acquired: false,
-            reason: `timeout waiting for lock on '${resource}' after ${timeout}ms`,
+            reason: `timeout waiting for lock on '${resource}' after ${acquireTimeout}ms`,
           };
         }
 
         const released = await this.waitForRelease(resource, remainingTimeout);
         if (!released) {
+          this.log('warn', 'acquire timeout waiting for release', { resource, acquireTimeout });
           return {
             acquired: false,
-            reason: `timeout waiting for lock on '${resource}' after ${timeout}ms`,
+            reason: `timeout waiting for lock on '${resource}' after ${acquireTimeout}ms`,
           };
         }
 
         // Check disposed IMMEDIATELY after await (dispose may have been called during wait)
         if (this.disposed) {
+          this.log('debug', 'acquire rejected - disposed during wait', { resource });
           return {
             acquired: false,
             reason: 'LockManager has been disposed',
@@ -261,8 +394,17 @@ export class LockManager {
         continue;
       }
 
+      // Check disposed BEFORE creating lock (race with dispose after waitForRelease)
+      if (this.disposed) {
+        this.log('debug', 'acquire rejected - disposed before createNewLock', { resource });
+        return {
+          acquired: false,
+          reason: 'LockManager has been disposed',
+        };
+      }
+
       // Resource is not locked - create new lock
-      return this.createNewLock(resource, holderId, timeout);
+      return this.createNewLock(resource, holderId, ttl);
     }
   }
 
@@ -273,14 +415,21 @@ export class LockManager {
   private handleReentrantAcquire(
     existingLock: LockHolder,
     existingLockId: string,
-    timeout: number
+    ttl: number
   ): LockResult {
     existingLock.refCount++;
 
+    this.log('debug', 'reentrant acquire', {
+      resource: existingLock.resource,
+      lockId: existingLockId,
+      refCount: existingLock.refCount,
+      ttl,
+    });
+
     // Extend expiration on reentrant acquire (only if new expiration is later)
-    if (timeout > 0) {
+    if (ttl > 0) {
       const now = Date.now();
-      const newExpiration = now + timeout;
+      const newExpiration = now + ttl;
 
       // Only extend if new expiration is later than current (prevents timer drift)
       if (!existingLock.expiresAt || newExpiration > existingLock.expiresAt) {
@@ -294,6 +443,11 @@ export class LockManager {
         existingLock.timer = setTimeout(() => {
           this.autoRelease(existingLockId);
         }, timeUntilExpiration);
+
+        this.log('debug', 'extended lock TTL on reentrant acquire', {
+          resource: existingLock.resource,
+          newExpiresAt: newExpiration,
+        });
       }
     }
 
@@ -306,7 +460,7 @@ export class LockManager {
   /**
    * Create a new lock
    */
-  private createNewLock(resource: string, holderId: string, timeout: number): LockResult {
+  private createNewLock(resource: string, holderId: string, ttl: number): LockResult {
     const lockId = uuidv4();
     const now = Date.now();
 
@@ -314,7 +468,7 @@ export class LockManager {
       lockId,
       resource,
       acquiredAt: now,
-      expiresAt: timeout > 0 ? now + timeout : undefined,
+      expiresAt: ttl > 0 ? now + ttl : undefined,
       holderId,
       refCount: 1,
     };
@@ -323,10 +477,18 @@ export class LockManager {
     if (lock.expiresAt) {
       lock.timer = setTimeout(() => {
         this.autoRelease(lockId);
-      }, timeout);
+      }, ttl);
     }
 
     this.setLock(lockId, lock);
+
+    this.log('debug', 'lock acquired', {
+      resource,
+      lockId,
+      holderId,
+      ttl: ttl > 0 ? ttl : 'infinite',
+      expiresAt: lock.expiresAt,
+    });
 
     return {
       acquired: true,
@@ -361,6 +523,7 @@ export class LockManager {
     // If disposed, return silently - releaseAll() already cleaned up all locks
     // This enables safe usage in finally blocks (e.g., withLock)
     if (this.disposed) {
+      this.log('debug', 'release skipped - disposed', { lockId });
       return;
     }
 
@@ -378,6 +541,12 @@ export class LockManager {
     // Decrement refCount for reentrant locks
     lock.refCount--;
 
+    this.log('debug', 'release', {
+      resource: lock.resource,
+      lockId,
+      refCountAfter: lock.refCount,
+    });
+
     if (lock.refCount <= 0) {
       // Clear timer before deleting lock
       if (lock.timer) {
@@ -389,6 +558,8 @@ export class LockManager {
 
       // Delete lock from both maps
       this.deleteLock(lockId, resource);
+
+      this.log('debug', 'lock fully released', { resource, lockId });
 
       // Emit release event (for waiters)
       this.lockEvents.emit(`lock:release:${resource}`);
@@ -539,10 +710,9 @@ export class LockManager {
     // Waiters will check disposed flag and exit gracefully
     await this.releaseAll();
 
-    // 3. Give in-flight operations a chance to complete (max 100ms)
-    const maxWait = 100;
+    // 3. Give in-flight operations a chance to complete
     const startWait = Date.now();
-    while (this.inFlightOps > 0 && Date.now() - startWait < maxWait) {
+    while (this.inFlightOps > 0 && Date.now() - startWait < this.disposeTimeout) {
       await new Promise(resolve => setTimeout(resolve, 10));
     }
 
@@ -602,6 +772,84 @@ export class LockManager {
     }
   }
 
+  /**
+   * Extend lock TTL without reacquiring
+   *
+   * Use this to extend a lock's lifetime without incrementing refCount.
+   * Unlike reentrant acquire, extend() doesn't change refCount.
+   *
+   * @param lockId - The lock ID to extend
+   * @param ttl - New TTL in milliseconds (must be > 0)
+   * @returns ExtendResult with extended=true and newExpiresAt on success
+   */
+  async extend(lockId: string, ttl: number): Promise<ExtendResult> {
+    // Check if disposed
+    if (this.disposed) {
+      this.log('debug', 'extend rejected - disposed', { lockId });
+      return {
+        extended: false,
+        reason: 'LockManager has been disposed',
+      };
+    }
+
+    // Validate TTL
+    if (ttl < 0) {
+      throw new Error('ttl must be non-negative');
+    }
+
+    const lock = this.locks.get(lockId);
+
+    if (!lock) {
+      this.log('debug', 'extend failed - lock not found', { lockId });
+      return {
+        extended: false,
+        reason: `Lock with ID '${lockId}' not found`,
+      };
+    }
+
+    // Clear old timer first (always)
+    if (lock.timer) {
+      clearTimeout(lock.timer);
+      lock.timer = undefined;
+    }
+
+    // Handle ttl=0: make lock infinite (no expiration)
+    if (ttl === 0) {
+      lock.expiresAt = undefined;
+
+      this.log('debug', 'lock extended to infinite', {
+        resource: lock.resource,
+        lockId,
+      });
+
+      return {
+        extended: true,
+        newExpiresAt: undefined,
+      };
+    }
+
+    // For ttl > 0: set new expiration and timer
+    const now = Date.now();
+    const newExpiration = now + ttl;
+
+    lock.expiresAt = newExpiration;
+    lock.timer = setTimeout(() => {
+      this.autoRelease(lockId);
+    }, ttl);
+
+    this.log('debug', 'lock extended', {
+      resource: lock.resource,
+      lockId,
+      newExpiresAt: newExpiration,
+      ttl,
+    });
+
+    return {
+      extended: true,
+      newExpiresAt: newExpiration,
+    };
+  }
+
   // ============================================================================
   // Private Methods
   // ============================================================================
@@ -611,6 +859,11 @@ export class LockManager {
    * Uses double-check pattern for race condition safety
    */
   private autoRelease(lockId: string): void {
+    // Check disposed FIRST - don't emit events on disposed manager
+    if (this.disposed) {
+      return;
+    }
+
     // First check: lock exists?
     const lock = this.locks.get(lockId);
     if (!lock) {

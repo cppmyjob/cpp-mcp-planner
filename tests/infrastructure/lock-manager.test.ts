@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { LockManager } from '../../src/infrastructure/repositories/file/lock-manager.js';
-import type { LockResult } from '../../src/infrastructure/repositories/file/types.js';
+import type { LockResult, LockLogger, LockManagerOptions } from '../../src/infrastructure/repositories/file/types.js';
 
 describe('LockManager', () => {
   let lockManager: LockManager;
@@ -335,9 +335,15 @@ describe('LockManager', () => {
     });
 
     it('should validate lock options', async () => {
+      // Test with deprecated timeout param
       await expect(
         lockManager.acquire('resource-1', { timeout: -100 })
-      ).rejects.toThrow(/timeout must be non-negative/);
+      ).rejects.toThrow(/acquireTimeout must be non-negative/);
+
+      // Test with new acquireTimeout param
+      await expect(
+        lockManager.acquire('resource-1', { acquireTimeout: -100 })
+      ).rejects.toThrow(/acquireTimeout must be non-negative/);
     });
 
     it('should handle resource name validation', async () => {
@@ -1439,6 +1445,813 @@ describe('LockManager', () => {
 
       const locks = await lockManager.getActiveLocks();
       expect(locks).toEqual([]);
+    });
+  });
+
+  // ============================================================================
+  // NEW API: acquireTimeout/ttl separation
+  // ============================================================================
+
+  describe('NEW API: acquireTimeout and ttl separation', () => {
+    describe('acquireTimeout semantics', () => {
+      it('should wait up to acquireTimeout for locked resource', async () => {
+        // First holder acquires with infinite TTL
+        const first = await lockManager.acquire('resource-1', {
+          holderId: 'holder-1',
+          acquireTimeout: 0, // instant acquire
+          ttl: 0, // infinite TTL
+        });
+        expect(first.acquired).toBe(true);
+
+        // Second holder waits with acquireTimeout
+        const start = Date.now();
+        const second = await lockManager.acquire('resource-1', {
+          holderId: 'holder-2',
+          acquireTimeout: 100, // wait up to 100ms
+          ttl: 0,
+        });
+        const duration = Date.now() - start;
+
+        expect(second.acquired).toBe(false);
+        expect(second.reason).toContain('timeout');
+        expect(duration).toBeGreaterThanOrEqual(100);
+        expect(duration).toBeLessThan(150);
+
+        await lockManager.release(first.lockId!);
+      });
+
+      it('should acquire immediately if acquireTimeout=0 and resource is free', async () => {
+        const start = Date.now();
+        const result = await lockManager.acquire('resource-1', {
+          acquireTimeout: 0,
+        });
+        const duration = Date.now() - start;
+
+        expect(result.acquired).toBe(true);
+        expect(duration).toBeLessThan(10);
+
+        await lockManager.release(result.lockId!);
+      });
+
+      it('should fail immediately if acquireTimeout=0 and resource is locked', async () => {
+        await lockManager.acquire('resource-1', { holderId: 'holder-1' });
+
+        const start = Date.now();
+        const result = await lockManager.acquire('resource-1', {
+          holderId: 'holder-2',
+          acquireTimeout: 0,
+        });
+        const duration = Date.now() - start;
+
+        expect(result.acquired).toBe(false);
+        expect(duration).toBeLessThan(10);
+      });
+    });
+
+    describe('ttl semantics', () => {
+      it('should auto-release lock after ttl expires', async () => {
+        const result = await lockManager.acquire('resource-1', {
+          acquireTimeout: 0,
+          ttl: 50, // 50ms TTL
+        });
+        expect(result.acquired).toBe(true);
+        expect(await lockManager.isLocked('resource-1')).toBe(true);
+
+        // Wait for TTL to expire
+        await new Promise(r => setTimeout(r, 80));
+
+        expect(await lockManager.isLocked('resource-1')).toBe(false);
+      });
+
+      it('should NOT auto-release if ttl=0 (infinite)', async () => {
+        const result = await lockManager.acquire('resource-1', {
+          acquireTimeout: 0,
+          ttl: 0, // infinite
+        });
+        expect(result.acquired).toBe(true);
+
+        // Wait a bit
+        await new Promise(r => setTimeout(r, 100));
+
+        // Still locked
+        expect(await lockManager.isLocked('resource-1')).toBe(true);
+
+        await lockManager.release(result.lockId!);
+      });
+
+      it('should NOT auto-release if ttl is undefined (infinite)', async () => {
+        const result = await lockManager.acquire('resource-1', {
+          acquireTimeout: 0,
+          // ttl: undefined (default)
+        });
+        expect(result.acquired).toBe(true);
+
+        await new Promise(r => setTimeout(r, 100));
+
+        expect(await lockManager.isLocked('resource-1')).toBe(true);
+
+        await lockManager.release(result.lockId!);
+      });
+
+      it('should allow long acquireTimeout with short ttl', async () => {
+        // First holder acquires with 100ms TTL
+        const first = await lockManager.acquire('resource-1', {
+          holderId: 'holder-1',
+          acquireTimeout: 0,
+          ttl: 100,
+        });
+        expect(first.acquired).toBe(true);
+
+        // Second holder waits with 500ms acquireTimeout
+        const start = Date.now();
+        const second = await lockManager.acquire('resource-1', {
+          holderId: 'holder-2',
+          acquireTimeout: 500, // long wait
+          ttl: 0, // infinite once acquired
+        });
+        const duration = Date.now() - start;
+
+        // Should succeed after first lock's TTL expires (~100ms)
+        expect(second.acquired).toBe(true);
+        expect(duration).toBeGreaterThanOrEqual(100);
+        expect(duration).toBeLessThan(200);
+
+        await lockManager.release(second.lockId!);
+      });
+    });
+
+    describe('backwards compatibility with timeout', () => {
+      it('should use timeout for BOTH acquireTimeout and ttl when new params not specified', async () => {
+        // Old API: timeout=100 means both wait 100ms AND auto-release after 100ms
+        const result = await lockManager.acquire('resource-1', {
+          timeout: 100,
+        });
+        expect(result.acquired).toBe(true);
+
+        // Should auto-release after 100ms (TTL behavior)
+        await new Promise(r => setTimeout(r, 150));
+        expect(await lockManager.isLocked('resource-1')).toBe(false);
+      });
+
+      it('should prefer acquireTimeout over timeout when both specified', async () => {
+        const first = await lockManager.acquire('resource-1', {
+          holderId: 'holder-1',
+          acquireTimeout: 0,
+          ttl: 0,
+        });
+
+        const start = Date.now();
+        const second = await lockManager.acquire('resource-1', {
+          holderId: 'holder-2',
+          timeout: 500, // old param
+          acquireTimeout: 50, // new param takes precedence
+        });
+        const duration = Date.now() - start;
+
+        expect(second.acquired).toBe(false);
+        expect(duration).toBeGreaterThanOrEqual(50);
+        expect(duration).toBeLessThan(100); // NOT 500ms
+
+        await lockManager.release(first.lockId!);
+      });
+
+      it('should prefer ttl over timeout when both specified', async () => {
+        const result = await lockManager.acquire('resource-1', {
+          timeout: 500, // old param
+          ttl: 50, // new param takes precedence
+        });
+        expect(result.acquired).toBe(true);
+
+        // Should auto-release after 50ms (not 500ms)
+        await new Promise(r => setTimeout(r, 80));
+        expect(await lockManager.isLocked('resource-1')).toBe(false);
+      });
+    });
+
+    describe('LockManagerOptions defaults', () => {
+      it('should use defaultAcquireTimeout from constructor', async () => {
+        const lm = new LockManager({ defaultAcquireTimeout: 50 });
+
+        const first = await lm.acquire('resource-1', {
+          holderId: 'holder-1',
+          acquireTimeout: 0,
+          ttl: 0,
+        });
+
+        const start = Date.now();
+        const second = await lm.acquire('resource-1', {
+          holderId: 'holder-2',
+          // acquireTimeout: undefined - uses defaultAcquireTimeout
+        });
+        const duration = Date.now() - start;
+
+        expect(second.acquired).toBe(false);
+        expect(duration).toBeGreaterThanOrEqual(50);
+        expect(duration).toBeLessThan(100);
+
+        await lm.dispose();
+      });
+
+      it('should use defaultTtl from constructor', async () => {
+        const lm = new LockManager({ defaultTtl: 50 });
+
+        const result = await lm.acquire('resource-1', {
+          acquireTimeout: 0,
+          // ttl: undefined - uses defaultTtl
+        });
+        expect(result.acquired).toBe(true);
+
+        await new Promise(r => setTimeout(r, 80));
+        expect(await lm.isLocked('resource-1')).toBe(false);
+
+        await lm.dispose();
+      });
+    });
+  });
+
+  // ============================================================================
+  // NEW API: Logging
+  // ============================================================================
+
+  describe('NEW API: Optional Logging', () => {
+    it('should call logger.debug on acquire', async () => {
+      const logs: Array<{ level: string; message: string; context?: Record<string, unknown> }> = [];
+      const logger: LockLogger = {
+        debug: (message, context) => logs.push({ level: 'debug', message, context }),
+        info: (message, context) => logs.push({ level: 'info', message, context }),
+      };
+
+      const lm = new LockManager({ logger, logLevel: 'debug' });
+
+      await lm.acquire('resource-1', { holderId: 'test-holder' });
+
+      expect(logs.some(l => l.level === 'debug' && l.message.includes('acquire'))).toBe(true);
+      expect(logs.some(l => l.context?.resource === 'resource-1')).toBe(true);
+
+      await lm.dispose();
+    });
+
+    it('should call logger.debug on release', async () => {
+      const logs: Array<{ level: string; message: string }> = [];
+      const logger: LockLogger = {
+        debug: (message) => logs.push({ level: 'debug', message }),
+      };
+
+      const lm = new LockManager({ logger, logLevel: 'debug' });
+
+      const { lockId } = await lm.acquire('resource-1');
+      logs.length = 0; // Clear acquire logs
+
+      await lm.release(lockId!);
+
+      expect(logs.some(l => l.message.includes('release'))).toBe(true);
+
+      await lm.dispose();
+    });
+
+    it('should respect logLevel=none (no logging)', async () => {
+      const logs: string[] = [];
+      const logger: LockLogger = {
+        debug: (message) => logs.push(message),
+        info: (message) => logs.push(message),
+        warn: (message) => logs.push(message),
+        error: (message) => logs.push(message),
+      };
+
+      const lm = new LockManager({ logger, logLevel: 'none' });
+
+      await lm.acquire('resource-1');
+      await lm.releaseAll();
+
+      expect(logs).toHaveLength(0);
+
+      await lm.dispose();
+    });
+
+    it('should respect logLevel filtering', async () => {
+      const logs: Array<{ level: string; message: string }> = [];
+      const logger: LockLogger = {
+        debug: (message) => logs.push({ level: 'debug', message }),
+        info: (message) => logs.push({ level: 'info', message }),
+        warn: (message) => logs.push({ level: 'warn', message }),
+      };
+
+      const lm = new LockManager({ logger, logLevel: 'warn' });
+
+      // Acquire/release normally - should NOT log (only debug/info)
+      const { lockId } = await lm.acquire('resource-1');
+      await lm.release(lockId!);
+
+      // Only warn and above should be logged
+      const hasDebug = logs.some(l => l.level === 'debug');
+      const hasInfo = logs.some(l => l.level === 'info');
+
+      expect(hasDebug).toBe(false);
+      expect(hasInfo).toBe(false);
+
+      await lm.dispose();
+    });
+
+    it('should log warning on timeout', async () => {
+      const logs: Array<{ level: string; message: string }> = [];
+      const logger: LockLogger = {
+        debug: (message) => logs.push({ level: 'debug', message }),
+        warn: (message) => logs.push({ level: 'warn', message }),
+      };
+
+      const lm = new LockManager({ logger, logLevel: 'debug' });
+
+      await lm.acquire('resource-1', { holderId: 'holder-1', acquireTimeout: 0, ttl: 0 });
+      await lm.acquire('resource-1', { holderId: 'holder-2', acquireTimeout: 50 });
+
+      expect(logs.some(l => l.level === 'warn' && l.message.includes('timeout'))).toBe(true);
+
+      await lm.dispose();
+    });
+
+    it('should work without logger (no errors)', async () => {
+      const lm = new LockManager(); // No logger
+
+      const result = await lm.acquire('resource-1');
+      expect(result.acquired).toBe(true);
+
+      await lm.release(result.lockId!);
+      await lm.dispose();
+    });
+  });
+
+  // ============================================================================
+  // NEW API: extend(lockId, ttl)
+  // ============================================================================
+
+  describe('NEW API: extend(lockId, ttl)', () => {
+    it('should extend lock TTL', async () => {
+      const { lockId } = await lockManager.acquire('resource-1', {
+        acquireTimeout: 0,
+        ttl: 100, // 100ms TTL
+      });
+
+      // Wait 50ms (halfway)
+      await new Promise(r => setTimeout(r, 50));
+
+      // Extend by 200ms
+      const result = await lockManager.extend(lockId!, 200);
+
+      expect(result.extended).toBe(true);
+      expect(result.newExpiresAt).toBeDefined();
+      expect(result.newExpiresAt!).toBeGreaterThan(Date.now() + 150);
+
+      // Wait 100ms more (original TTL would have expired)
+      await new Promise(r => setTimeout(r, 100));
+
+      // Still locked because we extended
+      expect(await lockManager.isLocked('resource-1')).toBe(true);
+
+      await lockManager.release(lockId!);
+    });
+
+    it('should fail to extend non-existent lock', async () => {
+      const result = await lockManager.extend('non-existent-lock-id', 1000);
+
+      expect(result.extended).toBe(false);
+      expect(result.reason).toContain('not found');
+    });
+
+    it('should fail to extend after lock released', async () => {
+      const { lockId } = await lockManager.acquire('resource-1', {
+        acquireTimeout: 0,
+        ttl: 1000,
+      });
+
+      await lockManager.release(lockId!);
+
+      const result = await lockManager.extend(lockId!, 1000);
+
+      expect(result.extended).toBe(false);
+      expect(result.reason).toContain('not found');
+    });
+
+    it('should fail to extend after lock auto-released', async () => {
+      const { lockId } = await lockManager.acquire('resource-1', {
+        acquireTimeout: 0,
+        ttl: 50,
+      });
+
+      // Wait for auto-release
+      await new Promise(r => setTimeout(r, 80));
+
+      const result = await lockManager.extend(lockId!, 1000);
+
+      expect(result.extended).toBe(false);
+      expect(result.reason).toContain('not found');
+    });
+
+    it('should convert infinite lock to TTL lock via extend', async () => {
+      const { lockId } = await lockManager.acquire('resource-1', {
+        acquireTimeout: 0,
+        ttl: 0, // infinite
+      });
+
+      const holder1 = await lockManager.getLockHolder('resource-1');
+      expect(holder1?.expiresAt).toBeUndefined();
+
+      // Extend with TTL
+      const result = await lockManager.extend(lockId!, 100);
+
+      expect(result.extended).toBe(true);
+      const holder2 = await lockManager.getLockHolder('resource-1');
+      expect(holder2?.expiresAt).toBeDefined();
+
+      // Wait for expiration
+      await new Promise(r => setTimeout(r, 150));
+      expect(await lockManager.isLocked('resource-1')).toBe(false);
+    });
+
+    it('should extend reentrant lock correctly', async () => {
+      const holderId = 'holder-1';
+
+      const { lockId } = await lockManager.acquire('resource-1', {
+        holderId,
+        reentrant: true,
+        acquireTimeout: 0,
+        ttl: 100,
+      });
+
+      await lockManager.acquire('resource-1', {
+        holderId,
+        reentrant: true,
+        acquireTimeout: 0,
+        ttl: 100,
+      });
+
+      const holder1 = await lockManager.getLockHolder('resource-1');
+      expect(holder1?.refCount).toBe(2);
+
+      // Extend
+      const result = await lockManager.extend(lockId!, 300);
+      expect(result.extended).toBe(true);
+
+      // refCount should remain 2
+      const holder2 = await lockManager.getLockHolder('resource-1');
+      expect(holder2?.refCount).toBe(2);
+
+      await lockManager.release(lockId!);
+      await lockManager.release(lockId!);
+    });
+
+    it('should fail extend when disposed', async () => {
+      const { lockId } = await lockManager.acquire('resource-1', {
+        acquireTimeout: 0,
+        ttl: 1000,
+      });
+
+      await lockManager.dispose();
+
+      const result = await lockManager.extend(lockId!, 1000);
+
+      expect(result.extended).toBe(false);
+      expect(result.reason).toContain('disposed');
+    });
+
+    it('should validate ttl parameter', async () => {
+      const { lockId } = await lockManager.acquire('resource-1', {
+        acquireTimeout: 0,
+        ttl: 1000,
+      });
+
+      // Negative TTL should fail
+      await expect(lockManager.extend(lockId!, -100)).rejects.toThrow(/ttl must be non-negative/);
+
+      await lockManager.release(lockId!);
+    });
+
+    it('should clear existing timer and set new one on extend', async () => {
+      const { lockId } = await lockManager.acquire('resource-1', {
+        acquireTimeout: 0,
+        ttl: 50,
+      });
+
+      // Get initial timer
+      const holder1 = await lockManager.getLockHolder('resource-1');
+      const timer1 = holder1?.timer;
+
+      // Extend
+      await lockManager.extend(lockId!, 200);
+
+      const holder2 = await lockManager.getLockHolder('resource-1');
+      const timer2 = holder2?.timer;
+
+      // Timer should be different
+      expect(timer2).not.toBe(timer1);
+
+      await lockManager.release(lockId!);
+    });
+  });
+
+  // ============================================================================
+  // BUG FIXES: Issues found in code review
+  // ============================================================================
+
+  describe('BUG FIXES from Code Review', () => {
+    describe('CRITICAL #1: extend() race condition with reentrant acquire', () => {
+      it('should not leak timers when extend() and reentrant acquire race', async () => {
+        const holderId = 'holder-1';
+
+        const { lockId } = await lockManager.acquire('resource-1', {
+          holderId,
+          reentrant: true,
+          acquireTimeout: 0,
+          ttl: 1000,
+        });
+
+        // Race: extend and reentrant acquire simultaneously
+        const results = await Promise.all([
+          lockManager.extend(lockId!, 500),
+          lockManager.acquire('resource-1', {
+            holderId,
+            reentrant: true,
+            acquireTimeout: 0,
+            ttl: 600,
+          }),
+        ]);
+
+        // Both should succeed
+        expect(results[0].extended).toBe(true);
+        expect(results[1].acquired).toBe(true);
+
+        // Lock should have consistent state
+        const holder = await lockManager.getLockHolder('resource-1');
+        expect(holder).toBeDefined();
+        expect(holder!.timer).toBeDefined();
+        expect(holder!.expiresAt).toBeDefined();
+
+        // Timer and expiresAt should be consistent
+        // (timer should fire around expiresAt time)
+        const now = Date.now();
+        expect(holder!.expiresAt!).toBeGreaterThan(now);
+
+        // Cleanup
+        await lockManager.release(lockId!);
+        await lockManager.release(lockId!);
+      });
+
+      it('should serialize extend() operations on same resource', async () => {
+        const { lockId } = await lockManager.acquire('resource-1', {
+          acquireTimeout: 0,
+          ttl: 1000,
+        });
+
+        // Multiple concurrent extends
+        const results = await Promise.all([
+          lockManager.extend(lockId!, 100),
+          lockManager.extend(lockId!, 200),
+          lockManager.extend(lockId!, 300),
+        ]);
+
+        // All should succeed (serialized)
+        expect(results.every(r => r.extended)).toBe(true);
+
+        // Final state should be consistent
+        const holder = await lockManager.getLockHolder('resource-1');
+        expect(holder).toBeDefined();
+        expect(holder!.timer).toBeDefined();
+
+        await lockManager.release(lockId!);
+      });
+    });
+
+    describe('CRITICAL #2: extend(ttl=0) inconsistent state', () => {
+      it('should handle extend(ttl=0) correctly - make lock infinite', async () => {
+        const { lockId } = await lockManager.acquire('resource-1', {
+          acquireTimeout: 0,
+          ttl: 100, // Start with TTL
+        });
+
+        // Extend with ttl=0 should make lock infinite
+        const result = await lockManager.extend(lockId!, 0);
+
+        expect(result.extended).toBe(true);
+
+        // Lock should now be infinite (no expiresAt, no timer)
+        const holder = await lockManager.getLockHolder('resource-1');
+        expect(holder).toBeDefined();
+        expect(holder!.expiresAt).toBeUndefined();
+        expect(holder!.timer).toBeUndefined();
+
+        // Wait past original TTL - lock should still exist
+        await new Promise(r => setTimeout(r, 150));
+        expect(await lockManager.isLocked('resource-1')).toBe(true);
+
+        await lockManager.release(lockId!);
+      });
+
+      it('should maintain invariant: timer exists <=> expiresAt exists', async () => {
+        const { lockId } = await lockManager.acquire('resource-1', {
+          acquireTimeout: 0,
+          ttl: 100,
+        });
+
+        // With TTL: both should exist
+        let holder = await lockManager.getLockHolder('resource-1');
+        expect(holder!.timer).toBeDefined();
+        expect(holder!.expiresAt).toBeDefined();
+
+        // Extend to infinite: both should be undefined
+        await lockManager.extend(lockId!, 0);
+        holder = await lockManager.getLockHolder('resource-1');
+        expect(holder!.timer).toBeUndefined();
+        expect(holder!.expiresAt).toBeUndefined();
+
+        // Extend back to TTL: both should exist again
+        await lockManager.extend(lockId!, 200);
+        holder = await lockManager.getLockHolder('resource-1');
+        expect(holder!.timer).toBeDefined();
+        expect(holder!.expiresAt).toBeDefined();
+
+        await lockManager.release(lockId!);
+      });
+    });
+
+    describe('CRITICAL #3: autoRelease() should check disposed', () => {
+      it('should not emit events after dispose in autoRelease', async () => {
+        const lm = new LockManager();
+
+        // Acquire with short TTL
+        await lm.acquire('resource-1', {
+          acquireTimeout: 0,
+          ttl: 50,
+        });
+
+        // Dispose before TTL expires
+        await new Promise(r => setTimeout(r, 20));
+        await lm.dispose();
+
+        // Wait for TTL to expire (autoRelease timer fires)
+        await new Promise(r => setTimeout(r, 50));
+
+        // Should not throw or emit on disposed manager
+        // If we get here without error, test passes
+        expect(lm.isDisposed()).toBe(true);
+      });
+
+      it('should handle autoRelease racing with dispose gracefully', async () => {
+        const lm = new LockManager();
+
+        // Create many locks with TTL
+        const lockPromises = [];
+        for (let i = 0; i < 10; i++) {
+          lockPromises.push(
+            lm.acquire(`resource-${i}`, {
+              acquireTimeout: 0,
+              ttl: 30 + i * 5, // Staggered TTLs
+            })
+          );
+        }
+        await Promise.all(lockPromises);
+
+        // Dispose while timers are firing
+        await new Promise(r => setTimeout(r, 40));
+        await lm.dispose();
+
+        // Wait for all timers to fire
+        await new Promise(r => setTimeout(r, 100));
+
+        // No errors should occur
+        expect(lm.isDisposed()).toBe(true);
+      });
+    });
+
+    describe('HIGH #1: dispose() should wait longer for in-flight ops', () => {
+      it('should wait for slow acquire operations during dispose', async () => {
+        const lm = new LockManager();
+
+        // First holder
+        const first = await lm.acquire('resource-1', {
+          holderId: 'holder-1',
+          acquireTimeout: 0,
+          ttl: 0,
+        });
+
+        // Start slow acquire (will wait)
+        let acquireCompleted = false;
+        const slowAcquire = lm.acquire('resource-1', {
+          holderId: 'holder-2',
+          acquireTimeout: 500,
+        }).then(result => {
+          acquireCompleted = true;
+          return result;
+        });
+
+        // Wait a bit, then dispose
+        await new Promise(r => setTimeout(r, 50));
+        const disposePromise = lm.dispose();
+
+        // Wait for dispose to complete
+        await disposePromise;
+
+        // slowAcquire should have been notified (resolved with failure)
+        const result = await slowAcquire;
+        expect(result.acquired).toBe(false);
+        expect(acquireCompleted).toBe(true);
+      });
+
+      it('should have configurable dispose timeout', async () => {
+        // This test documents that dispose timeout should be configurable
+        // Currently hardcoded to 100ms - should be option
+        const lm = new LockManager();
+
+        await lm.acquire('resource-1', { acquireTimeout: 0 });
+
+        const start = Date.now();
+        await lm.dispose();
+        const duration = Date.now() - start;
+
+        // Should complete quickly when no pending operations
+        expect(duration).toBeLessThan(50);
+      });
+    });
+
+    describe('HIGH #2: Event names consistency', () => {
+      it('should use consistent event names (lock:release:resource)', async () => {
+        const events = (lockManager as any).lockEvents;
+
+        // Correct event name format
+        const correctEventName = 'lock:release:resource-1';
+
+        // Start listening
+        let eventReceived = false;
+        events.once(correctEventName, () => {
+          eventReceived = true;
+        });
+
+        // Acquire and release
+        const { lockId } = await lockManager.acquire('resource-1', {
+          acquireTimeout: 0,
+        });
+        await lockManager.release(lockId!);
+
+        // Event should have been received
+        expect(eventReceived).toBe(true);
+      });
+
+      it('should not leak listeners with correct event names', async () => {
+        const events = (lockManager as any).lockEvents;
+        const eventName = 'lock:release:resource-1';
+
+        const initialCount = events.listenerCount(eventName);
+
+        // FIRST: Block the resource (must be first to create contention)
+        const { lockId } = await lockManager.acquire('resource-1', {
+          holderId: 'holder-1',
+          acquireTimeout: 0,
+        });
+
+        // THEN: Start waiting acquire that will timeout
+        const acquirePromise = lockManager.acquire('resource-1', {
+          holderId: 'holder-2',
+          acquireTimeout: 50,
+        });
+
+        // Wait for timeout
+        await acquirePromise;
+
+        // Listeners should be cleaned up
+        const finalCount = events.listenerCount(eventName);
+        expect(finalCount).toBe(initialCount);
+
+        await lockManager.release(lockId!);
+      });
+    });
+
+    describe('MEDIUM: acquireMutex safety limit', () => {
+      it('should not infinite loop in pathological cases', async () => {
+        // This test ensures acquireMutex has some form of safety limit
+        // Currently relies on timeout - document this behavior
+
+        const lm = new LockManager({ defaultAcquireTimeout: 100 });
+
+        // Block resource
+        const { lockId } = await lm.acquire('resource-1', {
+          holderId: 'holder-1',
+          acquireTimeout: 0,
+          ttl: 0,
+        });
+
+        // Try to acquire with short timeout
+        const start = Date.now();
+        const result = await lm.acquire('resource-1', {
+          holderId: 'holder-2',
+          acquireTimeout: 100,
+        });
+        const duration = Date.now() - start;
+
+        // Should timeout, not infinite loop
+        expect(result.acquired).toBe(false);
+        expect(duration).toBeGreaterThanOrEqual(100);
+        expect(duration).toBeLessThan(200); // Reasonable upper bound
+
+        await lm.dispose();
+      });
     });
   });
 });

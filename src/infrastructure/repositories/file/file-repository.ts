@@ -4,7 +4,7 @@
  * Implements Repository Pattern for file-based storage:
  * - Entity files stored as JSON in entities/ directory
  * - IndexManager for fast lookups with caching
- * - LockManager for concurrent access control
+ * - FileLockManager for cross-process concurrent access control
  * - Atomic writes with graceful-fs
  * - Validation with Zod schemas
  * - Query operations with filtering, sorting, pagination
@@ -30,7 +30,7 @@ import {
   ValidationError,
 } from '../../../domain/repositories/errors.js';
 import { IndexManager } from './index-manager.js';
-import { LockManager } from './lock-manager.js';
+import { FileLockManager } from './file-lock-manager.js';
 import type { IndexMetadata, CacheOptions } from './types.js';
 
 const gracefulRename = util.promisify(gracefulFs.rename);
@@ -45,7 +45,7 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   private planId: string;
   private entitiesDir: string;
   private indexManager: IndexManager<IndexMetadata>;
-  private lockManager: LockManager;
+  private fileLockManager: FileLockManager;
   private entityCache: Map<string, T> = new Map();
   private cacheOptions: Required<CacheOptions>;
 
@@ -67,7 +67,7 @@ export class FileRepository<T extends Entity> implements Repository<T> {
 
     // Initialize managers
     this.indexManager = new IndexManager<IndexMetadata>(indexPath, cacheOptions);
-    this.lockManager = new LockManager();
+    this.fileLockManager = new FileLockManager(planDir);
 
     // Cache options
     this.cacheOptions = {
@@ -89,8 +89,9 @@ export class FileRepository<T extends Entity> implements Repository<T> {
     await fs.mkdir(this.entitiesDir, { recursive: true });
     await fs.mkdir(indexesDir, { recursive: true });
 
-    // Initialize index
+    // Initialize managers
     await this.indexManager.initialize();
+    await this.fileLockManager.initialize();
   }
 
   // ============================================================================
@@ -211,7 +212,10 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   // ============================================================================
 
   async create(entity: T): Promise<T> {
-    return await this.lockManager.withLock(`entity:${entity.id}`, async () => {
+    const lockResource = `${this.entityType}:${entity.id}`;
+
+    // Cross-process file lock for concurrent access control
+    return await this.fileLockManager.withLock(lockResource, async () => {
       // Check if already exists
       if (await this.exists(entity.id)) {
         throw new ConflictError(
@@ -249,7 +253,10 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   async update(id: string, updates: Partial<T>): Promise<T> {
-    return await this.lockManager.withLock(`entity:${id}`, async () => {
+    const lockResource = `${this.entityType}:${id}`;
+
+    // Cross-process file lock for concurrent access control
+    return await this.fileLockManager.withLock(lockResource, async () => {
       // Load existing entity
       const existing = await this.findById(id);
 
@@ -286,7 +293,10 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   async delete(id: string): Promise<void> {
-    return await this.lockManager.withLock(`entity:${id}`, async () => {
+    const lockResource = `${this.entityType}:${id}`;
+
+    // Cross-process file lock for concurrent access control
+    return await this.fileLockManager.withLock(lockResource, async () => {
       // Check if exists
       if (!(await this.exists(id))) {
         throw new NotFoundError(this.entityType, id);
@@ -564,5 +574,20 @@ export class FileRepository<T extends Entity> implements Repository<T> {
    */
   private invalidateCache(id: string): void {
     this.entityCache.delete(id);
+  }
+
+  // ============================================================================
+  // Lifecycle
+  // ============================================================================
+
+  /**
+   * Dispose repository and release resources
+   */
+  async dispose(): Promise<void> {
+    // Dispose file lock manager
+    await this.fileLockManager.dispose();
+
+    // Clear cache
+    this.entityCache.clear();
   }
 }

@@ -81,6 +81,67 @@ export interface IndexFile<TMetadata = IndexMetadata> {
 // ============================================================================
 
 /**
+ * Log levels for LockManager logging
+ */
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'none';
+
+/**
+ * Logger interface for LockManager
+ * Allows plugging in custom logging implementations (console, winston, pino, etc.)
+ */
+export interface LockLogger {
+  debug?(message: string, context?: Record<string, unknown>): void;
+  info?(message: string, context?: Record<string, unknown>): void;
+  warn?(message: string, context?: Record<string, unknown>): void;
+  error?(message: string, context?: Record<string, unknown>): void;
+}
+
+/**
+ * LockManager constructor options
+ */
+export interface LockManagerOptions {
+  /**
+   * Default timeout for acquiring locks (ms)
+   * How long to wait for a locked resource to become available
+   * @default 10000 (10 seconds)
+   */
+  defaultAcquireTimeout?: number;
+
+  /**
+   * Default TTL for locks (ms)
+   * How long a lock lives before auto-release
+   * 0 = no auto-release (infinite)
+   * @default 0 (infinite)
+   */
+  defaultTtl?: number;
+
+  /**
+   * Optional logger for debugging
+   */
+  logger?: LockLogger;
+
+  /**
+   * Minimum log level
+   * @default 'none'
+   */
+  logLevel?: LogLevel;
+
+  /**
+   * Maximum retry attempts in doAcquire() loop
+   * Prevents infinite loop under high contention
+   * 0 = no limit (rely on acquireTimeout only)
+   * @default 0 (no limit)
+   */
+  maxRetries?: number;
+
+  /**
+   * Timeout for dispose() to wait for in-flight operations (ms)
+   * @default 100
+   */
+  disposeTimeout?: number;
+}
+
+/**
  * Lock holder information
  */
 export interface LockHolder {
@@ -93,7 +154,7 @@ export interface LockHolder {
   /** Lock acquisition timestamp */
   acquiredAt: number;
 
-  /** Lock expiration timestamp (for timeout) */
+  /** Lock expiration timestamp (TTL-based) */
   expiresAt?: number;
 
   /** Holder identifier (thread/process) */
@@ -107,10 +168,30 @@ export interface LockHolder {
 }
 
 /**
- * Lock options
+ * Lock options for acquire()
  */
 export interface LockOptions {
-  /** Lock timeout in milliseconds */
+  /**
+   * How long to wait for lock acquisition (ms)
+   * - acquireTimeout > 0: wait up to N milliseconds
+   * - acquireTimeout === 0: instant fail if locked
+   * - acquireTimeout === undefined: use defaultAcquireTimeout
+   */
+  acquireTimeout?: number;
+
+  /**
+   * How long the lock lives after acquisition (ms)
+   * - ttl > 0: auto-release after N milliseconds
+   * - ttl === 0 or undefined: no auto-release (infinite)
+   */
+  ttl?: number;
+
+  /**
+   * @deprecated Use acquireTimeout instead. Will be removed in v2.0.
+   * If both timeout and acquireTimeout are specified, acquireTimeout takes precedence.
+   * For backwards compatibility: timeout is used for BOTH acquire timeout AND ttl
+   * when acquireTimeout/ttl are not specified.
+   */
   timeout?: number;
 
   /** Whether lock is reentrant (can be acquired multiple times by same holder) */
@@ -129,6 +210,20 @@ export interface LockResult {
 
   /** Lock ID if acquired */
   lockId?: string;
+
+  /** Reason for failure */
+  reason?: string;
+}
+
+/**
+ * Result of extend() operation
+ */
+export interface ExtendResult {
+  /** Whether extension was successful */
+  extended: boolean;
+
+  /** New expiration timestamp if extended */
+  newExpiresAt?: number;
 
   /** Reason for failure */
   reason?: string;
@@ -260,9 +355,20 @@ export const DEFAULT_CACHE_OPTIONS: CacheOptions = {
 };
 
 /**
- * Default lock timeout (10 seconds)
+ * Default acquire timeout (10 seconds)
+ * How long to wait for a locked resource
  */
-export const DEFAULT_LOCK_TIMEOUT = 10000;
+export const DEFAULT_ACQUIRE_TIMEOUT = 10000;
+
+/**
+ * Default TTL (0 = infinite, no auto-release)
+ */
+export const DEFAULT_LOCK_TTL = 0;
+
+/**
+ * @deprecated Use DEFAULT_ACQUIRE_TIMEOUT instead
+ */
+export const DEFAULT_LOCK_TIMEOUT = DEFAULT_ACQUIRE_TIMEOUT;
 
 /**
  * Default index rebuild interval (1 hour)
