@@ -260,10 +260,26 @@ export class FileRepository<T extends Entity> implements Repository<T> {
       // Load existing entity
       const existing = await this.findById(id);
 
-      // Apply updates
+      // Check for version mismatch (optimistic locking)
+      // If caller provides version, it must match current version
+      if (updates.version !== undefined && updates.version !== existing.version) {
+        throw new ConflictError(
+          `Version mismatch for ${this.entityType} '${id}': expected ${updates.version}, found ${existing.version}`,
+          'version',
+          {
+            entityType: this.entityType,
+            entityId: id,
+            expectedVersion: updates.version,
+            actualVersion: existing.version,
+          }
+        );
+      }
+
+      // Apply updates (excluding version from updates, we auto-increment)
+      const { version: _ignoredVersion, ...otherUpdates } = updates;
       const updated: T = {
         ...existing,
-        ...updates,
+        ...otherUpdates,
         id, // Ensure ID cannot be changed
         version: existing.version + 1,
         updatedAt: new Date().toISOString(),
@@ -378,8 +394,9 @@ export class FileRepository<T extends Entity> implements Repository<T> {
       const exists = await this.exists(entity.id);
 
       if (exists) {
-        // Update existing
-        const updated = await this.update(entity.id, entity);
+        // Update existing - exclude version to allow upsert regardless of version
+        const { version: _ignoreVersion, ...updates } = entity as T & { version?: number };
+        const updated = await this.update(entity.id, updates as Partial<T>);
         results.push(updated);
       } else {
         // Create new
@@ -504,6 +521,23 @@ export class FileRepository<T extends Entity> implements Repository<T> {
               return Array.isArray(condition.value) && !condition.value.includes(value);
             case 'contains':
               return typeof value === 'string' && value.includes(String(condition.value));
+            case 'startsWith':
+              return typeof value === 'string' && value.startsWith(String(condition.value));
+            case 'endsWith':
+              return typeof value === 'string' && value.endsWith(String(condition.value));
+            case 'exists':
+              // Check if field exists and has a value (not undefined/null)
+              return condition.value ? value !== undefined && value !== null : value === undefined || value === null;
+            case 'regex': {
+              if (typeof value !== 'string') return false;
+              try {
+                // Support case-insensitive matching by default
+                const regex = new RegExp(String(condition.value), 'i');
+                return regex.test(value);
+              } catch {
+                return false; // Invalid regex pattern
+              }
+            }
             default:
               return false;
           }

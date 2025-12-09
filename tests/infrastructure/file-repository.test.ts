@@ -424,4 +424,136 @@ describe('FileRepository', () => {
       expect(found.version).toBeGreaterThan(1);
     });
   });
+
+  // ============================================================================
+  // BUG FIX: Version Mismatch Detection (Issue #1)
+  // ============================================================================
+  describe('RED: Version Mismatch Detection', () => {
+    it('should throw ConflictError when updating with stale version', async () => {
+      // Create entity with version 1
+      const requirement = createTestRequirement('req-1', 'Original');
+      await repository.create(requirement);
+
+      // Simulate another process updating the entity (version becomes 2)
+      await repository.update('req-1', { title: 'Updated by other' });
+
+      // Try to update with stale version (passing version: 1 when current is 2)
+      await expect(
+        repository.update('req-1', { title: 'My update', version: 1 })
+      ).rejects.toThrow(/version mismatch|conflict/i);
+    });
+
+    it('should allow update when version matches', async () => {
+      const requirement = createTestRequirement('req-1', 'Original');
+      await repository.create(requirement);
+
+      // Update with correct version
+      const updated = await repository.update('req-1', {
+        title: 'Updated',
+        version: 1,
+      });
+
+      expect(updated.title).toBe('Updated');
+      expect(updated.version).toBe(2);
+    });
+
+    it('should allow update without version (backward compatibility)', async () => {
+      const requirement = createTestRequirement('req-1', 'Original');
+      await repository.create(requirement);
+
+      // Update without version - should work (backward compatibility)
+      const updated = await repository.update('req-1', { title: 'Updated' });
+
+      expect(updated.title).toBe('Updated');
+      expect(updated.version).toBe(2);
+    });
+  });
+
+  // ============================================================================
+  // BUG FIX: Missing Filter Operators (Issue #2)
+  // ============================================================================
+  describe('RED: Missing Filter Operators', () => {
+    beforeEach(async () => {
+      // Create test data for filter tests
+      await repository.create(createTestRequirement('req-1', 'Authentication System'));
+      await repository.create(createTestRequirement('req-2', 'Authorization Module'));
+      await repository.create(createTestRequirement('req-3', 'User Management'));
+      await repository.create(createTestRequirement('req-4', 'System Settings'));
+    });
+
+    it('should support startsWith operator', async () => {
+      const results = await repository.query({
+        filter: {
+          conditions: [{ field: 'title', operator: 'startsWith', value: 'Auth' }],
+        },
+      });
+
+      expect(results.items).toHaveLength(2);
+      expect(results.items.map((r: Requirement) => r.title)).toEqual(
+        expect.arrayContaining(['Authentication System', 'Authorization Module'])
+      );
+    });
+
+    it('should support endsWith operator', async () => {
+      const results = await repository.query({
+        filter: {
+          conditions: [{ field: 'title', operator: 'endsWith', value: 'System' }],
+        },
+      });
+
+      // Only "Authentication System" ends with "System"
+      // "System Settings" ends with "Settings", not "System"
+      expect(results.items).toHaveLength(1);
+      expect(results.items[0].title).toBe('Authentication System');
+    });
+
+    it('should support exists operator (field exists)', async () => {
+      const results = await repository.query({
+        filter: {
+          conditions: [{ field: 'rationale', operator: 'exists', value: true }],
+        },
+      });
+
+      // All test requirements have rationale
+      expect(results.items).toHaveLength(4);
+    });
+
+    it('should support exists operator (field does not exist)', async () => {
+      const results = await repository.query({
+        filter: {
+          conditions: [{ field: 'nonExistentField', operator: 'exists', value: true }],
+        },
+      });
+
+      expect(results.items).toHaveLength(0);
+    });
+
+    it('should support regex operator', async () => {
+      const results = await repository.query({
+        filter: {
+          conditions: [{ field: 'title', operator: 'regex', value: '^(Auth|User)' }],
+        },
+      });
+
+      expect(results.items).toHaveLength(3);
+      expect(results.items.map((r: Requirement) => r.title)).toEqual(
+        expect.arrayContaining([
+          'Authentication System',
+          'Authorization Module',
+          'User Management',
+        ])
+      );
+    });
+
+    it('should support regex with case insensitive flag', async () => {
+      const results = await repository.query({
+        filter: {
+          conditions: [{ field: 'title', operator: 'regex', value: 'system' }],
+        },
+      });
+
+      // Should match 'System' case-insensitively
+      expect(results.items.length).toBeGreaterThan(0);
+    });
+  });
 });
