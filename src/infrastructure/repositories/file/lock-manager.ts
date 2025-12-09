@@ -353,11 +353,15 @@ export class LockManager {
   /**
    * Release lock
    * Validates refCount to prevent double-release corruption
+   *
+   * If disposed, returns silently (lock already released by releaseAll).
+   * This enables safe usage in finally blocks during graceful shutdown.
    */
   async release(lockId: string): Promise<void> {
-    // Check if disposed
+    // If disposed, return silently - releaseAll() already cleaned up all locks
+    // This enables safe usage in finally blocks (e.g., withLock)
     if (this.disposed) {
-      throw new Error('LockManager has been disposed');
+      return;
     }
 
     const lock = this.locks.get(lockId);

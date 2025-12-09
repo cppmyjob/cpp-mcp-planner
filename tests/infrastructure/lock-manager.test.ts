@@ -1364,11 +1364,56 @@ describe('LockManager', () => {
   });
 
   describe('Other dispose() related methods', () => {
-    it('release() should throw when disposed', async () => {
+    it('release() should return silently when disposed (not throw)', async () => {
       const { lockId } = await lockManager.acquire('resource-1');
       await lockManager.dispose();
 
-      await expect(lockManager.release(lockId!)).rejects.toThrow('disposed');
+      // Should NOT throw - just return silently (lock already released by releaseAll)
+      await expect(lockManager.release(lockId!)).resolves.toBeUndefined();
+    });
+
+    it('withLock() should handle dispose during callback gracefully', async () => {
+      // Test the race condition: dispose() called while withLock callback is running
+      let callbackCompleted = false;
+
+      const withLockPromise = lockManager.withLock('resource-1', async () => {
+        // Simulate long operation
+        await new Promise(r => setTimeout(r, 50));
+        callbackCompleted = true;
+        return 42;
+      });
+
+      // Dispose while callback is running
+      await new Promise(r => setTimeout(r, 10));
+      await lockManager.dispose();
+
+      // withLock should complete without throwing
+      // (release() in finally returns silently when disposed)
+      const result = await withLockPromise;
+      expect(result).toBe(42);
+      expect(callbackCompleted).toBe(true);
+    });
+
+    it('withLock() should handle dispose before callback gracefully', async () => {
+      // Edge case: dispose after acquire but immediately before callback starts
+      let callbackStarted = false;
+
+      // Create a new lock manager for this test (previous was disposed)
+      const lm = new LockManager();
+
+      const withLockPromise = lm.withLock('resource-1', async () => {
+        callbackStarted = true;
+        await new Promise(r => setTimeout(r, 30));
+        return 'success';
+      });
+
+      // Tiny delay then dispose
+      await new Promise(r => setTimeout(r, 5));
+      await lm.dispose();
+
+      // Should still complete gracefully
+      const result = await withLockPromise;
+      expect(result).toBe('success');
     });
 
     it('getLockHolder() should return undefined when disposed', async () => {
