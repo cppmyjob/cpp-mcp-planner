@@ -101,6 +101,9 @@ export interface LockHolder {
 
   /** Number of times lock acquired (for reentrant locks) */
   refCount: number;
+
+  /** Timer reference for auto-release (internal use) */
+  timer?: ReturnType<typeof setTimeout>;
 }
 
 /**
