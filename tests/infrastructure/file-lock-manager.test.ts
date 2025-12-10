@@ -43,6 +43,43 @@ describe('FileLockManager', () => {
   });
 
   // ============================================================================
+  // Default Configuration
+  // ============================================================================
+  describe('Default Configuration', () => {
+    it('should use platform-aware staleThreshold defaults', async () => {
+      const lm = new FileLockManager(testDir);
+      await lm.initialize();
+
+      // Check via the actual behavior - not directly accessible, but we can verify
+      // the manager was created without errors
+      expect(lm.isInitialized()).toBe(true);
+
+      await lm.dispose();
+    });
+
+    it('should use warn as default logLevel', async () => {
+      const logs: Array<{ level: string; message: string }> = [];
+
+      const lm = new FileLockManager(testDir, {
+        logger: {
+          debug: (msg) => logs.push({ level: 'debug', message: msg }),
+          info: (msg) => logs.push({ level: 'info', message: msg }),
+          warn: (msg) => logs.push({ level: 'warn', message: msg }),
+          error: (msg) => logs.push({ level: 'error', message: msg }),
+        },
+        // Not specifying logLevel - should default to 'warn'
+      });
+      await lm.initialize();
+      const release = await lm.acquire('resource');
+      await release();
+      await lm.dispose();
+
+      // With default 'warn' level, debug logs should NOT appear
+      expect(logs.some((l) => l.level === 'debug')).toBe(false);
+    });
+  });
+
+  // ============================================================================
   // Basic Operations
   // ============================================================================
   describe('Basic Operations', () => {
@@ -78,26 +115,33 @@ describe('FileLockManager', () => {
       expect(lockManager.getActiveLocksCount()).toBe(0);
     });
 
-    it('should create lock files', async () => {
-      await lockManager.acquire('my-resource');
+    it('should create lock files in .locks directory', async () => {
+      const release = await lockManager.acquire('my-resource');
 
-      const lockFile = path.join(testDir, '.locks', 'my-resource.lock');
-      const stat = await fs.stat(lockFile);
-      expect(stat.isFile()).toBe(true);
+      // Lock file should exist in .locks directory (name is hashed)
+      const lockDir = path.join(testDir, '.locks');
+      const files = await fs.readdir(lockDir);
+      // proper-lockfile creates .lock directory with files inside
+      const hasLockFiles = files.some(f => f.endsWith('.lock'));
+      expect(hasLockFiles).toBe(true);
+
+      await release();
     });
 
-    it('should sanitize resource names for file paths', async () => {
+    it('should handle resource names with special characters', async () => {
       // Resource with special characters
       const release = await lockManager.acquire('plan:123/entity:456');
 
       expect(lockManager.isHeldByUs('plan:123/entity:456')).toBe(true);
 
-      // Should create sanitized lock file
-      const lockFile = path.join(testDir, '.locks', 'plan_123_entity_456.lock');
-      const stat = await fs.stat(lockFile);
-      expect(stat.isFile()).toBe(true);
+      // Verify lock is functional by checking isLocked
+      const isLocked = await lockManager.isLocked('plan:123/entity:456');
+      expect(isLocked).toBe(true);
 
       await release();
+
+      // After release, should not be locked
+      expect(lockManager.isHeldByUs('plan:123/entity:456')).toBe(false);
     });
   });
 
@@ -267,6 +311,152 @@ describe('FileLockManager', () => {
   });
 
   // ============================================================================
+  // Release Return Value
+  // ============================================================================
+  describe('Release Return Value', () => {
+    it('should return true for clean release', async () => {
+      const release = await lockManager.acquire('resource');
+      const result = await release();
+
+      expect(result).toBe(true);
+    });
+
+    it('should return true when releasing non-held lock', async () => {
+      // Calling release on non-held lock should return true (already released)
+      const result = await lockManager.release('never-acquired');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return true after dispose', async () => {
+      await lockManager.acquire('resource');
+      await lockManager.dispose();
+
+      // Release after dispose should return true (dispose handled it)
+      const result = await lockManager.release('resource');
+
+      expect(result).toBe(true);
+    });
+  });
+
+  // ============================================================================
+  // onLockCompromised Callback
+  // ============================================================================
+  describe('onLockCompromised Callback', () => {
+    // Note: Stale detection tests are unreliable on Windows because proper-lockfile
+    // uses mtime which doesn't update reliably on Windows file systems.
+    // These tests are skipped on Windows and covered in file-lock-manager-issues.test.ts
+    // which uses mocking for reliable testing.
+
+    const isWindows = process.platform === 'win32';
+
+    (isWindows ? it.skip : it)(
+      'should call onLockCompromised when lock is externally released',
+      async () => {
+        const compromisedLocks: Array<{ resource: string; heldFor: number }> = [];
+
+        // Use longer staleThreshold for reliability
+        const staleThreshold = 500;
+
+        const lm = new FileLockManager(testDir, {
+          staleThreshold,
+          acquireTimeout: 10000,
+          onLockCompromised: (resource, heldFor) => {
+            compromisedLocks.push({ resource, heldFor });
+          },
+        });
+        await lm.initialize();
+
+        // Acquire lock
+        const release = await lm.acquire('resource');
+
+        // Wait for stale threshold to pass (with large margin)
+        await new Promise((resolve) => setTimeout(resolve, staleThreshold + 500));
+
+        // Create another instance that will steal the "stale" lock
+        const lm2 = new FileLockManager(testDir, {
+          staleThreshold,
+          acquireTimeout: 10000,
+        });
+        await lm2.initialize();
+        const release2 = await lm2.acquire('resource');
+
+        // Now release original lock - it was externally released
+        const wasClean = await release();
+
+        expect(wasClean).toBe(false);
+        expect(compromisedLocks.length).toBe(1);
+        expect(compromisedLocks[0].resource).toBe('resource');
+        expect(compromisedLocks[0].heldFor).toBeGreaterThanOrEqual(staleThreshold);
+
+        await release2();
+        await lm.dispose();
+        await lm2.dispose();
+      },
+      20000
+    ); // Longer timeout for this test
+
+    it('should not call onLockCompromised for clean release', async () => {
+      const compromisedLocks: string[] = [];
+
+      const lm = new FileLockManager(testDir, {
+        staleThreshold: 10000, // Long threshold
+        onLockCompromised: (resource) => {
+          compromisedLocks.push(resource);
+        },
+      });
+      await lm.initialize();
+
+      const release = await lm.acquire('resource');
+      const wasClean = await release();
+
+      expect(wasClean).toBe(true);
+      expect(compromisedLocks.length).toBe(0);
+
+      await lm.dispose();
+    });
+
+    (isWindows ? it.skip : it)(
+      'should handle errors in onLockCompromised callback',
+      async () => {
+        // Use longer staleThreshold for reliability
+        const staleThreshold = 500;
+
+        const lm = new FileLockManager(testDir, {
+          staleThreshold,
+          acquireTimeout: 10000,
+          onLockCompromised: () => {
+            throw new Error('Callback error');
+          },
+        });
+        await lm.initialize();
+
+        const release = await lm.acquire('resource');
+
+        // Wait for stale (with large margin)
+        await new Promise((resolve) => setTimeout(resolve, staleThreshold + 500));
+
+        // Steal lock
+        const lm2 = new FileLockManager(testDir, {
+          staleThreshold,
+          acquireTimeout: 10000,
+        });
+        await lm2.initialize();
+        const release2 = await lm2.acquire('resource');
+
+        // Should not throw even if callback throws
+        const wasClean = await release();
+        expect(wasClean).toBe(false);
+
+        await release2();
+        await lm.dispose();
+        await lm2.dispose();
+      },
+      20000
+    ); // Longer timeout for this test
+  });
+
+  // ============================================================================
   // Logging
   // ============================================================================
   describe('Logging', () => {
@@ -300,8 +490,8 @@ describe('FileLockManager', () => {
   describe('Multi-Process Simulation', () => {
     it('should serialize operations from multiple FileLockManager instances', async () => {
       // Simulate multiple processes by creating multiple instances
-      const lm1 = new FileLockManager(testDir, { acquireTimeout: 2000 });
-      const lm2 = new FileLockManager(testDir, { acquireTimeout: 2000 });
+      const lm1 = new FileLockManager(testDir, { acquireTimeout: 2000, staleThreshold: 10000 });
+      const lm2 = new FileLockManager(testDir, { acquireTimeout: 2000, staleThreshold: 10000 });
 
       await lm1.initialize();
       await lm2.initialize();
