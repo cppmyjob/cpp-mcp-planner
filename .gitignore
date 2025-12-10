@@ -38,5 +38,6 @@ coverage/
 PLAN.md
 
 # Claude Code local settings
-.claude/
+.claude/*
+!.claude/commands/
 .mcp.json
