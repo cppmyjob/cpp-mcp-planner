@@ -18,13 +18,10 @@
  * Recommendation: Use database backend (SQLite/PostgreSQL) for ACID guarantees.
  */
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import type {
   UnitOfWork,
   TransactionOptions,
   Repository,
-  IsolationLevel,
 } from '../../../domain/repositories/interfaces.js';
 import type { Entity, EntityType } from '../../../domain/entities/types.js';
 import { FileRepository } from './file-repository.js';

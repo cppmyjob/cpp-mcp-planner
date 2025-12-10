@@ -12,7 +12,6 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import type { LinkRepository } from '../../../domain/repositories/interfaces.js';
 import type { Link, RelationType } from '../../../domain/entities/types.js';
@@ -169,6 +168,7 @@ export class FileLinkRepository implements LinkRepository {
   }
 
   async getLinkById(id: string): Promise<Link> {
+    await this.ensureInitialized();
     const link = await this.getLinkByIdOrNull(id);
     if (!link) {
       throw new NotFoundError('link', id);
@@ -177,6 +177,7 @@ export class FileLinkRepository implements LinkRepository {
   }
 
   private async getLinkByIdOrNull(id: string): Promise<Link | null> {
+    // Note: ensureInitialized() called by public methods
     // Check cache
     if (this.cacheOptions.enabled) {
       const cached = this.linkCache.get(id);
@@ -203,6 +204,7 @@ export class FileLinkRepository implements LinkRepository {
   }
 
   async findLinksBySource(sourceId: string, relationType?: string): Promise<Link[]> {
+    await this.ensureInitialized();
     const allMetadata = await this.indexManager.getAll();
 
     // Filter by source
@@ -224,6 +226,7 @@ export class FileLinkRepository implements LinkRepository {
   }
 
   async findLinksByTarget(targetId: string, relationType?: string): Promise<Link[]> {
+    await this.ensureInitialized();
     const allMetadata = await this.indexManager.getAll();
 
     // Filter by target
@@ -248,6 +251,7 @@ export class FileLinkRepository implements LinkRepository {
     entityId: string,
     direction: 'incoming' | 'outgoing' | 'both' = 'both'
   ): Promise<Link[]> {
+    await this.ensureInitialized();
     const allMetadata = await this.indexManager.getAll();
 
     // Filter based on direction
@@ -274,6 +278,7 @@ export class FileLinkRepository implements LinkRepository {
   }
 
   async deleteLink(id: string): Promise<void> {
+    await this.ensureInitialized();
     // Check existence
     const metadata = await this.indexManager.get(id);
     if (!metadata) {
@@ -309,6 +314,7 @@ export class FileLinkRepository implements LinkRepository {
   }
 
   async linkExists(sourceId: string, targetId: string, relationType: string): Promise<boolean> {
+    await this.ensureInitialized();
     const allMetadata = await this.indexManager.getAll();
 
     // Check for exact match on composite key
@@ -362,21 +368,31 @@ export class FileLinkRepository implements LinkRepository {
       idsToDelete = links.map((l) => l.id);
     }
 
-    // Delete each link
+    // Delete each link, track actual successes
+    let successCount = 0;
     for (const id of idsToDelete) {
       try {
         await this.deleteLink(id);
-      } catch (error) {
-        // Continue on error (best effort)
+        successCount++;
+      } catch {
+        // Continue on error (best effort) - link may not exist or already deleted
       }
     }
 
-    return idsToDelete.length;
+    return successCount;
   }
 
   // ============================================================================
   // Private Helpers
   // ============================================================================
+
+  /**
+   * Valid RelationType values per CLAUDE.md
+   */
+  private static readonly VALID_RELATION_TYPES: readonly string[] = [
+    'implements', 'addresses', 'depends_on', 'blocks',
+    'alternative_to', 'supersedes', 'references', 'derived_from', 'has_artifact'
+  ];
 
   private validateLinkData(link: Partial<Link>): void {
     const errors: Array<{ field: string; message: string; value?: unknown }> = [];
@@ -393,6 +409,12 @@ export class FileLinkRepository implements LinkRepository {
       errors.push({
         field: 'relationType',
         message: 'relationType is required',
+        value: link.relationType,
+      });
+    } else if (!FileLinkRepository.VALID_RELATION_TYPES.includes(link.relationType)) {
+      errors.push({
+        field: 'relationType',
+        message: `relationType must be one of: ${FileLinkRepository.VALID_RELATION_TYPES.join(', ')}`,
         value: link.relationType,
       });
     }

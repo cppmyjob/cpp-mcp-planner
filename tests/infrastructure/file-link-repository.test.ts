@@ -418,7 +418,7 @@ describe('FileLinkRepository', () => {
     it('should maintain source index consistency after multiple operations', async () => {
       const link1 = await repository.createLink(createTestLink('req-1', 'sol-1', 'implements'));
       await repository.createLink(createTestLink('req-1', 'sol-2', 'implements'));
-      const link3 = await repository.createLink(createTestLink('req-1', 'sol-3', 'implements'));
+      await repository.createLink(createTestLink('req-1', 'sol-3', 'implements'));
 
       await repository.deleteLink(link1.id);
 
@@ -430,7 +430,7 @@ describe('FileLinkRepository', () => {
     it('should maintain target index consistency after multiple operations', async () => {
       const link1 = await repository.createLink(createTestLink('req-1', 'sol-1', 'implements'));
       await repository.createLink(createTestLink('req-2', 'sol-1', 'implements'));
-      const link3 = await repository.createLink(createTestLink('req-3', 'sol-1', 'implements'));
+      await repository.createLink(createTestLink('req-3', 'sol-1', 'implements'));
 
       await repository.deleteLink(link1.id);
 
@@ -480,6 +480,38 @@ describe('FileLinkRepository', () => {
 
       const addressesLinks = await repository.findLinksByTarget('sol-1', 'addresses');
       expect(addressesLinks).toHaveLength(1);
+    });
+  });
+
+  // ============================================================================
+  // RED: RelationType Enum Validation (Code Review Issue H-2)
+  // ============================================================================
+  describe('RED: RelationType Enum Validation', () => {
+    it('should reject invalid relationType values', async () => {
+      const invalidLink = {
+        sourceId: 'req-1',
+        targetId: 'sol-1',
+        relationType: 'invalid_type' as any, // Not a valid RelationType
+      };
+
+      await expect(repository.createLink(invalidLink)).rejects.toThrow(/validation|relationType/i);
+    });
+
+    it('should accept all valid RelationType values', async () => {
+      const validTypes = [
+        'implements', 'addresses', 'depends_on', 'blocks',
+        'alternative_to', 'supersedes', 'references', 'derived_from', 'has_artifact'
+      ];
+
+      for (let i = 0; i < validTypes.length; i++) {
+        const link = {
+          sourceId: `src-${i}`,
+          targetId: `tgt-${i}`,
+          relationType: validTypes[i] as any,
+        };
+        const created = await repository.createLink(link);
+        expect(created.relationType).toBe(validTypes[i]);
+      }
     });
   });
 });
