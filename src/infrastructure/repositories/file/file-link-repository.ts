@@ -12,6 +12,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import type { LinkRepository } from '../../../domain/repositories/interfaces.js';
 import type { Link, RelationType } from '../../../domain/entities/types.js';
@@ -129,17 +130,16 @@ export class FileLinkRepository implements LinkRepository {
       ...link,
       id,
       createdAt: now,
-      createdBy: 'system', // TODO: Get from context
+      createdBy: 'system', // Default system user; context-based user tracking not yet implemented
     };
 
     // Get file path
     const filePath = this.getLinkFilePath(id);
 
-    // Use FileLockManager for atomic create
-    const release = await this.fileLockManager.acquire(`link:${id}`);
-    try {
-      // Write link file
-      await fs.writeFile(filePath, JSON.stringify(fullLink, null, 2), 'utf-8');
+    // Use FileLockManager with withLock for atomic create (FIX M-2)
+    return await this.fileLockManager.withLock(`link:${id}`, async () => {
+      // Atomic write link file (FIX H-1)
+      await this.saveLinkFile(filePath, fullLink);
 
       // Update index
       const metadata: LinkIndexMetadata = {
@@ -162,9 +162,7 @@ export class FileLinkRepository implements LinkRepository {
       }
 
       return fullLink;
-    } finally {
-      await release();
-    }
+    });
   }
 
   async getLinkById(id: string): Promise<Link> {
@@ -285,9 +283,8 @@ export class FileLinkRepository implements LinkRepository {
       throw new NotFoundError('link', id);
     }
 
-    // Use FileLockManager for atomic delete
-    const release = await this.fileLockManager.acquire(`link:${id}`);
-    try {
+    // Use FileLockManager with withLock for atomic delete (FIX M-2)
+    await this.fileLockManager.withLock(`link:${id}`, async () => {
       // Delete file
       await fs.unlink(metadata.filePath);
 
@@ -296,9 +293,7 @@ export class FileLinkRepository implements LinkRepository {
 
       // Invalidate cache
       this.linkCache.delete(id);
-    } finally {
-      await release();
-    }
+    });
   }
 
   async deleteLinksForEntity(entityId: string): Promise<number> {
@@ -431,6 +426,41 @@ export class FileLinkRepository implements LinkRepository {
   private async loadLinkFile(filePath: string): Promise<Link> {
     const content = await fs.readFile(filePath, 'utf-8');
     return JSON.parse(content) as Link;
+  }
+
+  /**
+   * Save link to file atomically (FIX H-1)
+   * Uses temp file + rename pattern for crash safety
+   */
+  private async saveLinkFile(filePath: string, link: Link): Promise<void> {
+    const tmpPath = `${filePath}.tmp.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`;
+
+    try {
+      // Write to temp file
+      await fs.writeFile(tmpPath, JSON.stringify(link, null, 2), 'utf-8');
+
+      // Verify JSON is valid
+      const written = await fs.readFile(tmpPath, 'utf-8');
+      JSON.parse(written);
+
+      // Atomic rename
+      await fs.rename(tmpPath, filePath);
+    } catch (error) {
+      // Cleanup temp file on error
+      await fs.unlink(tmpPath).catch(() => {});
+      throw error;
+    }
+  }
+
+  /**
+   * Dispose repository and release resources (FIX H-3)
+   */
+  async dispose(): Promise<void> {
+    // Clear cache
+    this.linkCache.clear();
+
+    // Note: FileLockManager is shared and should be disposed by caller
+    // We don't dispose it here as we don't own it
   }
 
   private async findLinksByFilter(filter: LinkFilter): Promise<Link[]> {

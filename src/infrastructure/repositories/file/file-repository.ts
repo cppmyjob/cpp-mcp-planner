@@ -124,6 +124,7 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   // ============================================================================
 
   async findById(id: string): Promise<T> {
+    await this.ensureInitialized(); // FIX H-2
     const entity = await this.findByIdOrNull(id);
     if (!entity) {
       throw new NotFoundError(this.entityType, id);
@@ -132,6 +133,7 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   async findByIdOrNull(id: string): Promise<T | null> {
+    await this.ensureInitialized(); // FIX H-2
     // Check cache first
     if (this.cacheOptions.enabled) {
       const cached = this.entityCache.get(id);
@@ -158,10 +160,12 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   async exists(id: string): Promise<boolean> {
+    await this.ensureInitialized(); // FIX H-2
     return await this.indexManager.has(id);
   }
 
   async findByIds(ids: string[]): Promise<T[]> {
+    await this.ensureInitialized(); // FIX H-2
     const results: T[] = [];
     for (const id of ids) {
       const entity = await this.findByIdOrNull(id);
@@ -173,6 +177,7 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   async findAll(): Promise<T[]> {
+    await this.ensureInitialized(); // FIX H-2
     const allMetadata = await this.indexManager.getAll();
     const entities: T[] = [];
 
@@ -185,6 +190,7 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   async query(options: QueryOptions<T>): Promise<QueryResult<T>> {
+    await this.ensureInitialized(); // FIX H-2
     // Load all entities
     let entities = await this.findAll();
 
@@ -217,6 +223,7 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   async count(filter?: Filter<T>): Promise<number> {
+    await this.ensureInitialized(); // FIX H-2
     if (!filter) {
       return await this.indexManager.size();
     }
@@ -227,6 +234,7 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   async findOne(filter: Filter<T>): Promise<T | null> {
+    await this.ensureInitialized(); // FIX H-2
     const entities = await this.findAll();
     const filtered = this.applyFilter(entities, filter);
     return filtered[0] ?? null;

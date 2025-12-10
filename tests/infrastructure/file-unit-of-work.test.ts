@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import { FileUnitOfWork } from '../../src/infrastructure/repositories/file/file-unit-of-work.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import type { Requirement, EntityType } from '../../src/domain/entities/types.js';
 
 describe('FileUnitOfWork', () => {
-  const testDir = path.join(process.cwd(), '.test-data', 'file-unit-of-work');
+  // FIX M-4: Use os.tmpdir() instead of process.cwd()
+  const testDir = path.join(os.tmpdir(), `test-${Date.now()}-file-unit-of-work`);
   const planId = 'test-plan-1';
 
   let uow: FileUnitOfWork;
@@ -48,7 +50,7 @@ describe('FileUnitOfWork', () => {
     },
   });
 
-  describe('RED: Initialization', () => {
+  describe('REVIEW: Initialization', () => {
     it('should create FileUnitOfWork instance', () => {
       expect(uow).toBeDefined();
     });
@@ -64,7 +66,7 @@ describe('FileUnitOfWork', () => {
     });
   });
 
-  describe('RED: Transaction Lifecycle', () => {
+  describe('REVIEW: Transaction Lifecycle', () => {
     it('should begin transaction', async () => {
       await uow.begin();
       expect(uow.isActive()).toBe(true);
@@ -112,7 +114,7 @@ describe('FileUnitOfWork', () => {
     });
   });
 
-  describe('RED: Transaction Execute Helper', () => {
+  describe('REVIEW: Transaction Execute Helper', () => {
     it('should execute callback within transaction', async () => {
       let executed = false;
 
@@ -153,7 +155,7 @@ describe('FileUnitOfWork', () => {
     });
   });
 
-  describe('RED: Repository Access', () => {
+  describe('REVIEW: Repository Access', () => {
     it('should provide access to Repository for entity types', async () => {
       const requirementRepo = uow.getRepository<Requirement>('requirement');
       expect(requirementRepo).toBeDefined();
@@ -188,7 +190,7 @@ describe('FileUnitOfWork', () => {
     });
   });
 
-  describe('RED: FileLockManager Integration', () => {
+  describe('REVIEW: FileLockManager Integration', () => {
     it('should use FileLockManager for cross-process safety', async () => {
       const repo = uow.getRepository<Requirement>('requirement');
 
@@ -251,7 +253,7 @@ describe('FileUnitOfWork', () => {
     });
   });
 
-  describe('RED: Rollback Limitations (FIX C5)', () => {
+  describe('REVIEW: Rollback Limitations (FIX C5)', () => {
     it('should emit warning about rollback limitations in file storage', async () => {
       const warnings: string[] = [];
       const warningSpy = (msg: string) => warnings.push(msg);
@@ -299,7 +301,7 @@ describe('FileUnitOfWork', () => {
     });
   });
 
-  describe('RED: Transaction State Management', () => {
+  describe('REVIEW: Transaction State Management', () => {
     it('should track operations during transaction', async () => {
       const repo = uow.getRepository<Requirement>('requirement');
 
@@ -357,7 +359,7 @@ describe('FileUnitOfWork', () => {
     });
   });
 
-  describe('RED: Error Scenarios', () => {
+  describe('REVIEW: Error Scenarios', () => {
     it('should handle repository operation failure during transaction', async () => {
       const repo = uow.getRepository<Requirement>('requirement');
 
@@ -405,7 +407,7 @@ describe('FileUnitOfWork', () => {
     });
   });
 
-  describe('RED: Interface Compatibility', () => {
+  describe('REVIEW: Interface Compatibility', () => {
     it('should implement UnitOfWork interface completely', () => {
       expect(typeof uow.begin).toBe('function');
       expect(typeof uow.commit).toBe('function');
@@ -432,7 +434,7 @@ describe('FileUnitOfWork', () => {
     });
   });
 
-  describe('RED: Multi-Repository Transactions', () => {
+  describe('REVIEW: Multi-Repository Transactions', () => {
     it('should coordinate transaction across multiple repositories', async () => {
       const requirementRepo = uow.getRepository<Requirement>('requirement');
       const linkRepo = uow.getLinkRepository();
@@ -489,7 +491,7 @@ describe('FileUnitOfWork', () => {
     });
   });
 
-  describe('RED: Documentation and Warnings', () => {
+  describe('REVIEW: Documentation and Warnings', () => {
     it('should document LIMITATION in error messages', async () => {
       try {
         await uow.commit(); // No active transaction

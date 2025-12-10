@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import { FileLinkRepository } from '../../src/infrastructure/repositories/file/file-link-repository.js';
 import type { Link, RelationType } from '../../src/domain/entities/types.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 
 describe('FileLinkRepository', () => {
-  const testDir = path.join(process.cwd(), '.test-data', 'file-link-repository');
+  // FIX M-4: Use os.tmpdir() instead of process.cwd()
+  const testDir = path.join(os.tmpdir(), `test-${Date.now()}-file-link-repository`);
   const planId = 'test-plan-1';
 
   let repository: FileLinkRepository;
@@ -37,7 +39,7 @@ describe('FileLinkRepository', () => {
     metadata: { test: true },
   });
 
-  describe('RED: Initialization', () => {
+  describe('REVIEW: Initialization', () => {
     it('should create FileLinkRepository instance', () => {
       expect(repository).toBeDefined();
     });
@@ -61,7 +63,7 @@ describe('FileLinkRepository', () => {
     });
   });
 
-  describe('RED: CRUD - Create', () => {
+  describe('REVIEW: CRUD - Create', () => {
     it('should create new link', async () => {
       const linkData = createTestLink('req-1', 'sol-1', 'implements');
       const created = await repository.createLink(linkData);
@@ -121,7 +123,7 @@ describe('FileLinkRepository', () => {
     });
   });
 
-  describe('RED: CRUD - Read', () => {
+  describe('REVIEW: CRUD - Read', () => {
     it('should find link by ID', async () => {
       const linkData = createTestLink('req-1', 'sol-1', 'implements');
       const created = await repository.createLink(linkData);
@@ -213,7 +215,7 @@ describe('FileLinkRepository', () => {
     });
   });
 
-  describe('RED: CRUD - Delete', () => {
+  describe('REVIEW: CRUD - Delete', () => {
     it('should delete link by ID', async () => {
       const created = await repository.createLink(createTestLink('req-1', 'sol-1', 'implements'));
 
@@ -263,7 +265,7 @@ describe('FileLinkRepository', () => {
     });
   });
 
-  describe('RED: Bulk Operations (createMany)', () => {
+  describe('REVIEW: Bulk Operations (createMany)', () => {
     it('should create multiple links at once', async () => {
       const links = [
         createTestLink('req-1', 'sol-1', 'implements'),
@@ -302,7 +304,7 @@ describe('FileLinkRepository', () => {
     });
   });
 
-  describe('RED: Bulk Operations (deleteMany)', () => {
+  describe('REVIEW: Bulk Operations (deleteMany)', () => {
     it('should delete multiple links by IDs', async () => {
       const link1 = await repository.createLink(createTestLink('req-1', 'sol-1', 'implements'));
       const link2 = await repository.createLink(createTestLink('req-2', 'sol-2', 'implements'));
@@ -369,7 +371,7 @@ describe('FileLinkRepository', () => {
     });
   });
 
-  describe('RED: Concurrent Operations with FileLockManager', () => {
+  describe('REVIEW: Concurrent Operations with FileLockManager', () => {
     it('should handle concurrent creates safely', async () => {
       const promises = Array.from({ length: 10 }, (_, i) =>
         repository.createLink(createTestLink(`req-${i}`, `sol-${i}`, 'implements'))
@@ -414,7 +416,7 @@ describe('FileLinkRepository', () => {
     });
   });
 
-  describe('RED: Index Consistency', () => {
+  describe('REVIEW: Index Consistency', () => {
     it('should maintain source index consistency after multiple operations', async () => {
       const link1 = await repository.createLink(createTestLink('req-1', 'sol-1', 'implements'));
       await repository.createLink(createTestLink('req-1', 'sol-2', 'implements'));
@@ -456,7 +458,7 @@ describe('FileLinkRepository', () => {
     });
   });
 
-  describe('RED: LinkIndexMetadata', () => {
+  describe('REVIEW: LinkIndexMetadata', () => {
     it('should store composite key in index (sourceId+targetId+relationType)', async () => {
       await repository.createLink(createTestLink('req-1', 'sol-1', 'implements'));
 
@@ -484,9 +486,9 @@ describe('FileLinkRepository', () => {
   });
 
   // ============================================================================
-  // RED: RelationType Enum Validation (Code Review Issue H-2)
+  // REVIEW: RelationType Enum Validation (Code Review Issue H-2)
   // ============================================================================
-  describe('RED: RelationType Enum Validation', () => {
+  describe('REVIEW: RelationType Enum Validation', () => {
     it('should reject invalid relationType values', async () => {
       const invalidLink = {
         sourceId: 'req-1',

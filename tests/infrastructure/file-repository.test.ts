@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import { FileRepository } from '../../src/infrastructure/repositories/file/file-repository.js';
 import type { Requirement, EntityType } from '../../src/domain/entities/types.js';
 
 describe('FileRepository', () => {
-  const testDir = path.join(process.cwd(), '.test-data', 'file-repository');
+  // FIX M-4: Use os.tmpdir() instead of process.cwd()
+  const testDir = path.join(os.tmpdir(), `test-${Date.now()}-file-repository`);
   const planId = 'test-plan-1';
   const entityType: EntityType = 'requirement';
 
@@ -44,7 +46,7 @@ describe('FileRepository', () => {
     },
   });
 
-  describe('RED: Initialization', () => {
+  describe('REVIEW: Initialization', () => {
     it('should create FileRepository instance', () => {
       expect(repository).toBeDefined();
       expect(repository.entityType).toBe('requirement');
@@ -67,7 +69,7 @@ describe('FileRepository', () => {
     });
   });
 
-  describe('RED: CRUD - Create', () => {
+  describe('REVIEW: CRUD - Create', () => {
     it('should create new entity', async () => {
       const requirement = createTestRequirement('req-1', 'Test Requirement 1');
       const created = await repository.create(requirement);
@@ -98,7 +100,7 @@ describe('FileRepository', () => {
     });
   });
 
-  describe('RED: CRUD - Read', () => {
+  describe('REVIEW: CRUD - Read', () => {
     it('should find entity by ID', async () => {
       const requirement = createTestRequirement('req-1', 'Test Requirement 1');
       await repository.create(requirement);
@@ -146,7 +148,7 @@ describe('FileRepository', () => {
     });
   });
 
-  describe('RED: CRUD - Update', () => {
+  describe('REVIEW: CRUD - Update', () => {
     it('should update existing entity', async () => {
       const requirement = createTestRequirement('req-1', 'Original Title');
       await repository.create(requirement);
@@ -189,7 +191,7 @@ describe('FileRepository', () => {
     });
   });
 
-  describe('RED: CRUD - Delete', () => {
+  describe('REVIEW: CRUD - Delete', () => {
     it('should delete entity by ID', async () => {
       const requirement = createTestRequirement('req-1', 'Test');
       await repository.create(requirement);
@@ -226,7 +228,7 @@ describe('FileRepository', () => {
     });
   });
 
-  describe('RED: Query Operations', () => {
+  describe('REVIEW: Query Operations', () => {
     beforeEach(async () => {
       await repository.create(createTestRequirement('req-1', 'High Priority Functional'));
       await repository.create({ ...createTestRequirement('req-2', 'Low Priority Functional'), priority: 'low' });
@@ -306,7 +308,7 @@ describe('FileRepository', () => {
     });
   });
 
-  describe('RED: Bulk Operations', () => {
+  describe('REVIEW: Bulk Operations', () => {
     it('should create multiple entities', async () => {
       const requirements = [
         createTestRequirement('req-1', 'Req 1'),
@@ -365,7 +367,7 @@ describe('FileRepository', () => {
     });
   });
 
-  describe('RED: Cache Operations', () => {
+  describe('REVIEW: Cache Operations', () => {
     it('should cache read operations', async () => {
       const requirement = createTestRequirement('req-1', 'Test');
       await repository.create(requirement);
@@ -400,7 +402,7 @@ describe('FileRepository', () => {
     });
   });
 
-  describe('RED: Concurrent Operations', () => {
+  describe('REVIEW: Concurrent Operations', () => {
     it('should handle concurrent creates', async () => {
       const promises = [];
       for (let i = 0; i < 10; i++) {
@@ -428,7 +430,7 @@ describe('FileRepository', () => {
   // ============================================================================
   // BUG FIX: Version Mismatch Detection (Issue #1)
   // ============================================================================
-  describe('RED: Version Mismatch Detection', () => {
+  describe('REVIEW: Version Mismatch Detection', () => {
     it('should throw ConflictError when updating with stale version', async () => {
       // Create entity with version 1
       const requirement = createTestRequirement('req-1', 'Original');
@@ -472,7 +474,7 @@ describe('FileRepository', () => {
   // ============================================================================
   // BUG FIX: Missing Filter Operators (Issue #2)
   // ============================================================================
-  describe('RED: Missing Filter Operators', () => {
+  describe('REVIEW: Missing Filter Operators', () => {
     beforeEach(async () => {
       // Create test data for filter tests
       await repository.create(createTestRequirement('req-1', 'Authentication System'));
@@ -560,7 +562,7 @@ describe('FileRepository', () => {
   // ============================================================================
   // BUG FIX: Lazy Initialization (Issue H-1 from Code Review)
   // ============================================================================
-  describe('RED: Lazy Initialization', () => {
+  describe('REVIEW: Lazy Initialization', () => {
     it('should auto-initialize on create() without explicit initialize() call', async () => {
       // Create fresh repository WITHOUT calling initialize()
       const lazyRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-1', entityType);
@@ -585,7 +587,7 @@ describe('FileRepository', () => {
       const lazyRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-2', entityType);
 
       // Should work - update() should call ensureInitialized() internally
-      // RED: This currently FAILS because update() doesn't call ensureInitialized()
+      // REVIEW: This currently FAILS because update() doesn't call ensureInitialized()
       const updated = await lazyRepo.update('req-lazy-2', { title: 'Updated' });
       expect(updated.title).toBe('Updated');
 
@@ -603,7 +605,7 @@ describe('FileRepository', () => {
       const lazyRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-3', entityType);
 
       // Should work - delete() should call ensureInitialized() internally
-      // RED: This currently FAILS because delete() doesn't call ensureInitialized()
+      // REVIEW: This currently FAILS because delete() doesn't call ensureInitialized()
       await lazyRepo.delete('req-lazy-3');
       expect(await lazyRepo.exists('req-lazy-3')).toBe(false);
 
@@ -629,7 +631,7 @@ describe('FileRepository', () => {
   // ============================================================================
   // BUG FIX: Shared FileLockManager (Issue H-2 from Code Review)
   // ============================================================================
-  describe('RED: Shared FileLockManager', () => {
+  describe('REVIEW: Shared FileLockManager', () => {
     it('should use injected FileLockManager', async () => {
       const { FileLockManager } = await import('../../src/infrastructure/repositories/file/file-lock-manager.js');
 
@@ -685,7 +687,7 @@ describe('FileRepository', () => {
       // Dispose first repository
       await repo1.dispose();
 
-      // RED: Shared lock manager should still be usable!
+      // REVIEW: Shared lock manager should still be usable!
       // This currently FAILS because repo1.dispose() calls sharedLockManager.dispose()
       expect(sharedLockManager.isDisposed()).toBe(false);
 

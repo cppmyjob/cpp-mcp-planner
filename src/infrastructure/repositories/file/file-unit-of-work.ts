@@ -78,9 +78,13 @@ export class FileUnitOfWork implements UnitOfWork {
    */
   async initialize(): Promise<void> {
     // FileLockManager should already be initialized by caller
-    // Just verify it's ready
+    // Just verify it's ready (FIX M-1)
     if (!this.fileLockManager) {
       throw new Error('FileLockManager not provided');
+    }
+
+    if (!this.fileLockManager.isInitialized()) {
+      throw new Error('FileLockManager must be initialized before use');
     }
   }
 
@@ -117,7 +121,8 @@ export class FileUnitOfWork implements UnitOfWork {
     }
 
     // File operations are already persisted, nothing to do
-    this.state = 'committed';
+    // Reset to 'idle' for reuse (FIX M-3)
+    this.state = 'idle';
     this.operationCount = 0;
   }
 
@@ -132,8 +137,8 @@ export class FileUnitOfWork implements UnitOfWork {
         'Changes may have already been persisted. Best-effort cleanup attempted.'
     );
 
-    // Reset state
-    this.state = 'rolled_back';
+    // Reset to 'idle' for reuse (FIX M-3)
+    this.state = 'idle';
     this.operationCount = 0;
 
     // Note: Actual rollback would require tracking all operations and reverting them
