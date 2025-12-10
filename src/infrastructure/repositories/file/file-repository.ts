@@ -48,12 +48,15 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   private fileLockManager: FileLockManager;
   private entityCache: Map<string, T> = new Map();
   private cacheOptions: Required<CacheOptions>;
+  private initialized: boolean = false;
+  private ownsLockManager: boolean;
 
   constructor(
     baseDir: string,
     planId: string,
     entityType: EntityType,
-    cacheOptions?: Partial<CacheOptions>
+    cacheOptions?: Partial<CacheOptions>,
+    fileLockManager?: FileLockManager
   ) {
     this.baseDir = baseDir;
     this.planId = planId;
@@ -67,7 +70,10 @@ export class FileRepository<T extends Entity> implements Repository<T> {
 
     // Initialize managers
     this.indexManager = new IndexManager<IndexMetadata>(indexPath, cacheOptions);
-    this.fileLockManager = new FileLockManager(planDir);
+    // Use shared FileLockManager if provided, otherwise create new one
+    // Track ownership to avoid disposing shared instances
+    this.ownsLockManager = !fileLockManager;
+    this.fileLockManager = fileLockManager || new FileLockManager(planDir);
 
     // Cache options
     this.cacheOptions = {
@@ -82,6 +88,10 @@ export class FileRepository<T extends Entity> implements Repository<T> {
    * Initialize repository
    */
   async initialize(): Promise<void> {
+    if (this.initialized) {
+      return; // Already initialized
+    }
+
     // Create directories
     const planDir = path.join(this.baseDir, 'plans', this.planId);
     const indexesDir = path.join(planDir, 'indexes');
@@ -91,7 +101,22 @@ export class FileRepository<T extends Entity> implements Repository<T> {
 
     // Initialize managers
     await this.indexManager.initialize();
-    await this.fileLockManager.initialize();
+
+    // Only initialize FileLockManager if not already initialized (shared instance)
+    if (!this.fileLockManager.isInitialized()) {
+      await this.fileLockManager.initialize();
+    }
+
+    this.initialized = true;
+  }
+
+  /**
+   * Ensure repository is initialized (lazy initialization)
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
   }
 
   // ============================================================================
@@ -212,6 +237,8 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   // ============================================================================
 
   async create(entity: T): Promise<T> {
+    await this.ensureInitialized();
+
     const lockResource = `${this.entityType}:${entity.id}`;
 
     // Cross-process file lock for concurrent access control
@@ -253,6 +280,8 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   async update(id: string, updates: Partial<T>): Promise<T> {
+    await this.ensureInitialized();
+
     const lockResource = `${this.entityType}:${id}`;
 
     // Cross-process file lock for concurrent access control
@@ -309,6 +338,8 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   async delete(id: string): Promise<void> {
+    await this.ensureInitialized();
+
     const lockResource = `${this.entityType}:${id}`;
 
     // Cross-process file lock for concurrent access control
@@ -618,8 +649,10 @@ export class FileRepository<T extends Entity> implements Repository<T> {
    * Dispose repository and release resources
    */
   async dispose(): Promise<void> {
-    // Dispose file lock manager
-    await this.fileLockManager.dispose();
+    // Only dispose file lock manager if we own it (not shared)
+    if (this.ownsLockManager) {
+      await this.fileLockManager.dispose();
+    }
 
     // Clear cache
     this.entityCache.clear();

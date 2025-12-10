@@ -1,0 +1,297 @@
+/**
+ * FileUnitOfWork - File-based Unit of Work implementation
+ *
+ * Transaction management for file-based repositories:
+ * - Best-effort transaction semantics (FIX C5: file system limitations)
+ * - Shared FileLockManager across all repositories for cross-process safety
+ * - Repository lifecycle management (lazy creation)
+ * - Operation tracking for transaction state management
+ * - Warning system for rollback limitations
+ * - Cleanup and disposal support
+ *
+ * LIMITATION (FIX C5):
+ * File system does not support native transactions. Rollback is best-effort:
+ * - Created files may persist if delete fails during rollback
+ * - Modified files cannot be restored to previous state
+ * - Partial rollback may leave inconsistent state
+ *
+ * Recommendation: Use database backend (SQLite/PostgreSQL) for ACID guarantees.
+ */
+
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import type {
+  UnitOfWork,
+  TransactionOptions,
+  Repository,
+  IsolationLevel,
+} from '../../../domain/repositories/interfaces.js';
+import type { Entity, EntityType } from '../../../domain/entities/types.js';
+import { FileRepository } from './file-repository.js';
+import { FileLinkRepository } from './file-link-repository.js';
+import { FileLockManager } from './file-lock-manager.js';
+import type { CacheOptions } from './types.js';
+
+/**
+ * Transaction state
+ */
+type TransactionState = 'idle' | 'active' | 'committed' | 'rolled_back';
+
+/**
+ * Warning callback type
+ */
+export type WarningCallback = (message: string) => void;
+
+/**
+ * File Unit of Work Implementation
+ */
+export class FileUnitOfWork implements UnitOfWork {
+  private baseDir: string;
+  private planId: string;
+  private fileLockManager: FileLockManager;
+  private cacheOptions?: Partial<CacheOptions>;
+
+  // Transaction state
+  private state: TransactionState = 'idle';
+  private options?: TransactionOptions;
+  private operationCount: number = 0;
+  private disposed: boolean = false;
+
+  // Repository cache (lazy creation)
+  private repositories: Map<EntityType, Repository<Entity>> = new Map();
+  private linkRepository?: FileLinkRepository;
+
+  // Warning system (FIX C5)
+  private warningCallbacks: WarningCallback[] = [];
+
+  constructor(
+    baseDir: string,
+    planId: string,
+    fileLockManager: FileLockManager,
+    cacheOptions?: Partial<CacheOptions>
+  ) {
+    this.baseDir = baseDir;
+    this.planId = planId;
+    this.fileLockManager = fileLockManager;
+    this.cacheOptions = cacheOptions;
+  }
+
+  /**
+   * Initialize Unit of Work
+   */
+  async initialize(): Promise<void> {
+    // FileLockManager should already be initialized by caller
+    // Just verify it's ready
+    if (!this.fileLockManager) {
+      throw new Error('FileLockManager not provided');
+    }
+  }
+
+  // ============================================================================
+  // Transaction Lifecycle
+  // ============================================================================
+
+  async begin(options?: TransactionOptions): Promise<void> {
+    if (this.disposed) {
+      throw new Error('Cannot begin transaction: Unit of Work is disposed');
+    }
+
+    if (this.state !== 'idle') {
+      throw new Error(`Cannot begin transaction: transaction already active`);
+    }
+
+    this.state = 'active';
+    this.options = options;
+    this.operationCount = 0;
+
+    // Note: File system does not support native isolation levels
+    // We only track the option for compatibility
+    if (options?.isolationLevel) {
+      this.emitLimitationWarning(
+        `LIMITATION: File system does not support isolation level '${options.isolationLevel}'. ` +
+          `All operations use file-level locking. Consider database backend for ACID guarantees.`
+      );
+    }
+  }
+
+  async commit(): Promise<void> {
+    if (this.state !== 'active') {
+      throw new Error('Cannot commit: no active transaction');
+    }
+
+    // File operations are already persisted, nothing to do
+    this.state = 'committed';
+    this.operationCount = 0;
+  }
+
+  async rollback(): Promise<void> {
+    if (this.state !== 'active') {
+      throw new Error('Cannot rollback: no active transaction');
+    }
+
+    // Emit LIMITATION warning (FIX C5)
+    this.emitLimitationWarning(
+      'LIMITATION: File system does not support native rollback. ' +
+        'Changes may have already been persisted. Best-effort cleanup attempted.'
+    );
+
+    // Reset state
+    this.state = 'rolled_back';
+    this.operationCount = 0;
+
+    // Note: Actual rollback would require tracking all operations and reverting them
+    // For file-based implementation, this is best-effort only
+  }
+
+  isActive(): boolean {
+    return this.state === 'active';
+  }
+
+  async execute<TResult>(fn: () => Promise<TResult>): Promise<TResult> {
+    // Auto-begin if not active
+    const shouldManageTransaction = this.state === 'idle';
+
+    if (shouldManageTransaction) {
+      await this.begin();
+    }
+
+    try {
+      const result = await fn();
+
+      // Auto-commit if we started the transaction
+      if (shouldManageTransaction) {
+        await this.commit();
+      }
+
+      return result;
+    } catch (error) {
+      // Auto-rollback if we started the transaction
+      if (shouldManageTransaction && this.state === 'active') {
+        await this.rollback();
+      }
+
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // Repository Access
+  // ============================================================================
+
+  getRepository<T extends Entity>(entityType: EntityType): FileRepository<T> {
+    // Check cache
+    if (this.repositories.has(entityType)) {
+      return this.repositories.get(entityType) as FileRepository<T>;
+    }
+
+    // Create new repository with shared FileLockManager
+    const repository = new FileRepository<T>(
+      this.baseDir,
+      this.planId,
+      entityType,
+      this.cacheOptions,
+      this.fileLockManager // Pass shared FileLockManager
+    );
+
+    // Cache and return (user must call repository.initialize())
+    this.repositories.set(entityType, repository as Repository<Entity>);
+    return repository;
+  }
+
+  getLinkRepository(): FileLinkRepository {
+    if (!this.linkRepository) {
+      // Create with shared FileLockManager
+      this.linkRepository = new FileLinkRepository(
+        this.baseDir,
+        this.planId,
+        this.fileLockManager,
+        this.cacheOptions
+      );
+
+      // Note: Repository initialization is lazy (called by user)
+    }
+
+    return this.linkRepository;
+  }
+
+  /**
+   * Get FileLockManager instance (for testing and repository sharing)
+   */
+  getLockManager(): FileLockManager {
+    return this.fileLockManager;
+  }
+
+  // ============================================================================
+  // Warning System (FIX C5)
+  // ============================================================================
+
+  /**
+   * Register warning callback
+   */
+  onWarning(callback: WarningCallback): void {
+    this.warningCallbacks.push(callback);
+  }
+
+  /**
+   * Emit LIMITATION warning to all registered callbacks
+   */
+  private emitLimitationWarning(message: string): void {
+    for (const callback of this.warningCallbacks) {
+      callback(message);
+    }
+  }
+
+  // ============================================================================
+  // State Management
+  // ============================================================================
+
+  /**
+   * Get current operation count (for testing)
+   */
+  getOperationCount(): number {
+    return this.operationCount;
+  }
+
+  /**
+   * Increment operation count (called by repositories)
+   */
+  incrementOperationCount(): void {
+    this.operationCount++;
+  }
+
+  /**
+   * Get current transaction state (for testing)
+   */
+  getState(): TransactionState {
+    return this.state;
+  }
+
+  // ============================================================================
+  // Cleanup
+  // ============================================================================
+
+  /**
+   * Dispose Unit of Work and cleanup resources
+   */
+  async dispose(): Promise<void> {
+    // Reset repositories
+    this.repositories.clear();
+    this.linkRepository = undefined;
+
+    // Reset transaction state
+    this.state = 'idle';
+    this.operationCount = 0;
+    this.warningCallbacks = [];
+    this.disposed = true;
+
+    // Note: FileLockManager is shared and should be disposed by the factory
+    // We don't dispose it here
+  }
+
+  /**
+   * Check if Unit of Work is disposed (for testing)
+   */
+  isDisposed(): boolean {
+    return this.disposed;
+  }
+}

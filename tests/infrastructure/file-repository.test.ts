@@ -556,4 +556,160 @@ describe('FileRepository', () => {
       expect(results.items.length).toBeGreaterThan(0);
     });
   });
+
+  // ============================================================================
+  // BUG FIX: Lazy Initialization (Issue H-1 from Code Review)
+  // ============================================================================
+  describe('RED: Lazy Initialization', () => {
+    it('should auto-initialize on create() without explicit initialize() call', async () => {
+      // Create fresh repository WITHOUT calling initialize()
+      const lazyRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-1', entityType);
+
+      const requirement = createTestRequirement('req-lazy-1', 'Lazy Created');
+
+      // Should work - create() calls ensureInitialized() internally
+      const created = await lazyRepo.create(requirement);
+      expect(created.id).toBe('req-lazy-1');
+
+      await lazyRepo.dispose();
+    });
+
+    it('should auto-initialize on update() without explicit initialize() call', async () => {
+      // First create with initialized repo
+      const initRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-2', entityType);
+      await initRepo.initialize();
+      await initRepo.create(createTestRequirement('req-lazy-2', 'Original'));
+      await initRepo.dispose();
+
+      // Create fresh repository WITHOUT calling initialize()
+      const lazyRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-2', entityType);
+
+      // Should work - update() should call ensureInitialized() internally
+      // RED: This currently FAILS because update() doesn't call ensureInitialized()
+      const updated = await lazyRepo.update('req-lazy-2', { title: 'Updated' });
+      expect(updated.title).toBe('Updated');
+
+      await lazyRepo.dispose();
+    });
+
+    it('should auto-initialize on delete() without explicit initialize() call', async () => {
+      // First create with initialized repo
+      const initRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-3', entityType);
+      await initRepo.initialize();
+      await initRepo.create(createTestRequirement('req-lazy-3', 'To Delete'));
+      await initRepo.dispose();
+
+      // Create fresh repository WITHOUT calling initialize()
+      const lazyRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-3', entityType);
+
+      // Should work - delete() should call ensureInitialized() internally
+      // RED: This currently FAILS because delete() doesn't call ensureInitialized()
+      await lazyRepo.delete('req-lazy-3');
+      expect(await lazyRepo.exists('req-lazy-3')).toBe(false);
+
+      await lazyRepo.dispose();
+    });
+
+    it('should be idempotent - multiple initialize() calls should be safe', async () => {
+      const repo = new FileRepository<Requirement>(testDir, 'idempotent-plan', entityType);
+
+      // Multiple initialize calls should not throw
+      await repo.initialize();
+      await repo.initialize();
+      await repo.initialize();
+
+      const requirement = createTestRequirement('req-idem', 'Idempotent Test');
+      const created = await repo.create(requirement);
+      expect(created.id).toBe('req-idem');
+
+      await repo.dispose();
+    });
+  });
+
+  // ============================================================================
+  // BUG FIX: Shared FileLockManager (Issue H-2 from Code Review)
+  // ============================================================================
+  describe('RED: Shared FileLockManager', () => {
+    it('should use injected FileLockManager', async () => {
+      const { FileLockManager } = await import('../../src/infrastructure/repositories/file/file-lock-manager.js');
+
+      const sharedLockManager = new FileLockManager(path.join(testDir, 'plans', 'shared-plan'));
+      await sharedLockManager.initialize();
+
+      // Create repository with shared lock manager
+      const repo = new FileRepository<Requirement>(
+        testDir,
+        'shared-plan',
+        entityType,
+        undefined,
+        sharedLockManager
+      );
+      await repo.initialize();
+
+      const requirement = createTestRequirement('req-shared', 'Shared Lock Test');
+      const created = await repo.create(requirement);
+      expect(created.id).toBe('req-shared');
+
+      // Clean up - dispose repo first, then lock manager
+      await repo.dispose();
+      await sharedLockManager.dispose();
+    });
+
+    it('should NOT dispose shared FileLockManager when repository disposes', async () => {
+      const { FileLockManager } = await import('../../src/infrastructure/repositories/file/file-lock-manager.js');
+
+      const sharedLockManager = new FileLockManager(path.join(testDir, 'plans', 'shared-plan-2'));
+      await sharedLockManager.initialize();
+
+      // Create first repository with shared lock manager
+      const repo1 = new FileRepository<Requirement>(
+        testDir,
+        'shared-plan-2',
+        entityType,
+        undefined,
+        sharedLockManager
+      );
+      await repo1.initialize();
+      await repo1.create(createTestRequirement('req-1', 'Req 1'));
+
+      // Create second repository with SAME shared lock manager
+      const repo2 = new FileRepository<Requirement>(
+        testDir,
+        'shared-plan-2',
+        'solution' as EntityType, // Different entity type, same lock manager
+        undefined,
+        sharedLockManager
+      );
+      await repo2.initialize();
+
+      // Dispose first repository
+      await repo1.dispose();
+
+      // RED: Shared lock manager should still be usable!
+      // This currently FAILS because repo1.dispose() calls sharedLockManager.dispose()
+      expect(sharedLockManager.isDisposed()).toBe(false);
+
+      // repo2 should still be able to use the lock manager
+      // This would throw if lock manager was disposed
+      const isLocked = await sharedLockManager.isLocked('test-resource');
+      expect(typeof isLocked).toBe('boolean');
+
+      // Clean up
+      await repo2.dispose();
+      await sharedLockManager.dispose();
+    });
+
+    it('should dispose owned FileLockManager when repository disposes', async () => {
+      // Create repository WITHOUT injected lock manager (owns its own)
+      const repo = new FileRepository<Requirement>(testDir, 'owned-plan', entityType);
+      await repo.initialize();
+      await repo.create(createTestRequirement('req-owned', 'Owned Lock Test'));
+
+      // Dispose should clean up owned lock manager
+      await repo.dispose();
+
+      // No assertion needed - just verify no errors thrown
+      // The lock manager is internal, so we can't check its state directly
+    });
+  });
 });
