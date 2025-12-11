@@ -130,6 +130,14 @@ export class RepositoryFactory {
    * ```
    */
   createRepository<T extends Entity>(entityType: EntityType, planId: string): Repository<T> {
+    // Validate inputs
+    if (!entityType || typeof entityType !== 'string' || entityType.trim() === '') {
+      throw new Error('entityType is required and must be a non-empty string');
+    }
+    if (!planId || typeof planId !== 'string' || planId.trim() === '') {
+      throw new Error('planId is required and must be a non-empty string');
+    }
+
     const cacheKey = `${planId}:${entityType}`;
 
     // Check cache
@@ -168,16 +176,24 @@ export class RepositoryFactory {
    * ```
    */
   createLinkRepository(planId: string): LinkRepository {
+    // Validate input
+    if (!planId || typeof planId !== 'string' || planId.trim() === '') {
+      throw new Error('planId is required and must be a non-empty string');
+    }
+
     // Check cache
     if (this.linkRepositoryCache.has(planId)) {
       return this.linkRepositoryCache.get(planId)!;
     }
 
     // Create new link repository
+    // Note: FileLockManager is required (not optional) for factory-created instances.
+    // This differs from FileRepository where lockManager is optional (last parameter).
+    // Factory pattern ensures shared lock manager across all repositories for cross-process safety.
     const linkRepo = new FileLinkRepository(
       this.config.baseDir,
       planId,
-      this.config.lockManager,
+      this.config.lockManager, // Required - factory provides shared instance
       this.config.cacheOptions
     );
 
@@ -207,6 +223,11 @@ export class RepositoryFactory {
    * ```
    */
   createUnitOfWork(planId: string): UnitOfWork {
+    // Validate input
+    if (!planId || typeof planId !== 'string' || planId.trim() === '') {
+      throw new Error('planId is required and must be a non-empty string');
+    }
+
     // Check cache
     if (this.uowCache.has(planId)) {
       return this.uowCache.get(planId)!;

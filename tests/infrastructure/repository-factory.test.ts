@@ -68,6 +68,48 @@ describe('RED: RepositoryFactory', () => {
   });
 
   // ============================================================================
+  // RED: Input Validation
+  // ============================================================================
+
+  describe('Input Validation', () => {
+    it('should validate entityType in createRepository', () => {
+      expect(() => factory.createRepository<Requirement>('' as any, 'plan-123')).toThrow(
+        /entityType is required/
+      );
+      expect(() => factory.createRepository<Requirement>(null as any, 'plan-123')).toThrow(
+        /entityType is required/
+      );
+      expect(() => factory.createRepository<Requirement>('  ' as any, 'plan-123')).toThrow(
+        /entityType is required/
+      );
+    });
+
+    it('should validate planId in createRepository', () => {
+      expect(() => factory.createRepository<Requirement>('requirement', '')).toThrow(
+        /planId is required/
+      );
+      expect(() => factory.createRepository<Requirement>('requirement', null as any)).toThrow(
+        /planId is required/
+      );
+      expect(() => factory.createRepository<Requirement>('requirement', '  ')).toThrow(
+        /planId is required/
+      );
+    });
+
+    it('should validate planId in createLinkRepository', () => {
+      expect(() => factory.createLinkRepository('')).toThrow(/planId is required/);
+      expect(() => factory.createLinkRepository(null as any)).toThrow(/planId is required/);
+      expect(() => factory.createLinkRepository('  ')).toThrow(/planId is required/);
+    });
+
+    it('should validate planId in createUnitOfWork', () => {
+      expect(() => factory.createUnitOfWork('')).toThrow(/planId is required/);
+      expect(() => factory.createUnitOfWork(null as any)).toThrow(/planId is required/);
+      expect(() => factory.createUnitOfWork('  ')).toThrow(/planId is required/);
+    });
+  });
+
+  // ============================================================================
   // RED: Repository Creation
   // ============================================================================
 
