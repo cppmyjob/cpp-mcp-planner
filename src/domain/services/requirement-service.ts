@@ -281,9 +281,20 @@ export class RequirementService {
     // Validate tags format
     validateTags(input.requirement.tags || []);
 
-    // Create requirement via repository
-    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
-    const requirement = await repo.create({
+    const requirementId = uuidv4();
+    const now = new Date().toISOString();
+
+    const requirement: Requirement = {
+      id: requirementId,
+      type: 'requirement',
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      metadata: {
+        createdBy: 'claude-code',
+        tags: input.requirement.tags || [],
+        annotations: [],
+      },
       title: input.requirement.title,
       description: input.requirement.description,
       rationale: input.requirement.rationale,
@@ -294,12 +305,11 @@ export class RequirementService {
       status: 'draft',
       votes: 0,
       impact: input.requirement.impact,
-      metadata: {
-        createdBy: 'claude-code',
-        tags: input.requirement.tags || [],
-        annotations: [],
-      },
-    });
+    };
+
+    // Create requirement via repository
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
+    await repo.create(requirement);
 
     // Update statistics
     await this.planService.updateStatistics(input.planId);
@@ -310,15 +320,8 @@ export class RequirementService {
   }
 
   async getRequirement(input: GetRequirementInput): Promise<GetRequirementResult> {
-    const requirements = await this.storage.loadEntities<Requirement>(
-      input.planId,
-      'requirements'
-    );
-
-    const requirement = requirements.find((r) => r.id === input.requirementId);
-    if (!requirement) {
-      throw new Error('Requirement not found');
-    }
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
+    const requirement = await repo.findById(input.requirementId);
 
     // Apply field filtering - GET operations default to all fields
     const filtered = filterEntity(
@@ -356,18 +359,14 @@ export class RequirementService {
       return { requirements: [], notFound: [] };
     }
 
-    const allRequirements = await this.storage.loadEntities<Requirement>(
-      input.planId,
-      'requirements'
-    );
-
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
     const foundRequirements: Requirement[] = [];
     const notFound: string[] = [];
 
-    // Collect found and not found IDs
+    // Fetch each requirement by ID
     for (const id of input.requirementIds) {
-      const requirement = allRequirements.find((r) => r.id === id);
-      if (requirement) {
+      try {
+        const requirement = await repo.findById(id);
         // Apply field filtering - requirements default to all fields
         const filtered = filterEntity(
           requirement,
@@ -377,7 +376,8 @@ export class RequirementService {
           false
         ) as Requirement;
         foundRequirements.push(filtered);
-      } else {
+      } catch (error) {
+        // NotFoundError - add to notFound list
         notFound.push(id);
       }
     }
@@ -388,18 +388,8 @@ export class RequirementService {
   async updateRequirement(
     input: UpdateRequirementInput
   ): Promise<UpdateRequirementResult> {
-    const requirements = await this.storage.loadEntities<Requirement>(
-      input.planId,
-      'requirements'
-    );
-
-    const index = requirements.findIndex((r) => r.id === input.requirementId);
-    if (index === -1) {
-      throw new Error('Requirement not found');
-    }
-
-    const requirement = requirements[index];
-    const now = new Date().toISOString();
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
+    const requirement = await repo.findById(input.requirementId);
 
     // Sprint 7: Save current version to history BEFORE updating
     if (this.versionHistoryService) {
@@ -446,11 +436,7 @@ export class RequirementService {
       requirement.metadata.tags = input.updates.tags;
     }
 
-    requirement.updatedAt = now;
-    requirement.version += 1;
-
-    requirements[index] = requirement;
-    await this.storage.saveEntities(input.planId, 'requirements', requirements);
+    await repo.update(requirement.id, requirement);
 
     return {
       success: true,
@@ -461,12 +447,18 @@ export class RequirementService {
   async listRequirements(
     input: ListRequirementsInput
   ): Promise<ListRequirementsResult> {
-    let requirements = await this.storage.loadEntities<Requirement>(
-      input.planId,
-      'requirements'
-    );
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
 
-    // Apply filters
+    // Build query options
+    const queryOptions: any = {
+      limit: input.limit || 50,
+      offset: input.offset || 0,
+    };
+
+    // Build filter (Note: Repository pattern may not support complex tag filtering - fallback to in-memory)
+    let requirements = await repo.findAll();
+
+    // Apply filters in-memory (TODO: move to repository layer for performance)
     if (input.filters) {
       if (input.filters.priority) {
         requirements = requirements.filter(
@@ -519,21 +511,14 @@ export class RequirementService {
   async deleteRequirement(
     input: DeleteRequirementInput
   ): Promise<DeleteRequirementResult> {
-    const requirements = await this.storage.loadEntities<Requirement>(
-      input.planId,
-      'requirements'
-    );
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
 
-    const index = requirements.findIndex((r) => r.id === input.requirementId);
-    if (index === -1) {
-      throw new Error('Requirement not found');
-    }
+    // Verify exists (throws NotFoundError if not found)
+    await repo.findById(input.requirementId);
 
     // TODO: Check for links if not force
     // For now, just delete
-
-    requirements.splice(index, 1);
-    await this.storage.saveEntities(input.planId, 'requirements', requirements);
+    await repo.delete(input.requirementId);
 
     // Update statistics
     await this.planService.updateStatistics(input.planId);
@@ -547,18 +532,8 @@ export class RequirementService {
   async voteForRequirement(
     input: VoteForRequirementInput
   ): Promise<VoteForRequirementResult> {
-    const requirements = await this.storage.loadEntities<Requirement>(
-      input.planId,
-      'requirements'
-    );
-
-    const index = requirements.findIndex((r) => r.id === input.requirementId);
-    if (index === -1) {
-      throw new Error('Requirement not found');
-    }
-
-    const requirement = requirements[index];
-    const now = new Date().toISOString();
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
+    const requirement = await repo.findById(input.requirementId);
 
     // Initialize votes if undefined (backward compatibility)
     if (requirement.votes === undefined || requirement.votes === null) {
@@ -567,11 +542,8 @@ export class RequirementService {
 
     // Increment votes
     requirement.votes += 1;
-    requirement.updatedAt = now;
-    requirement.version += 1;
 
-    requirements[index] = requirement;
-    await this.storage.saveEntities(input.planId, 'requirements', requirements);
+    await repo.update(requirement.id, requirement);
 
     return {
       success: true,
@@ -582,17 +554,8 @@ export class RequirementService {
   async unvoteRequirement(
     input: UnvoteRequirementInput
   ): Promise<UnvoteRequirementResult> {
-    const requirements = await this.storage.loadEntities<Requirement>(
-      input.planId,
-      'requirements'
-    );
-
-    const index = requirements.findIndex((r) => r.id === input.requirementId);
-    if (index === -1) {
-      throw new Error('Requirement not found');
-    }
-
-    const requirement = requirements[index];
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
+    const requirement = await repo.findById(input.requirementId);
 
     // Initialize votes if undefined (backward compatibility)
     if (requirement.votes === undefined || requirement.votes === null) {
@@ -604,15 +567,10 @@ export class RequirementService {
       throw new Error('Cannot unvote: votes cannot be negative');
     }
 
-    const now = new Date().toISOString();
-
     // Decrement votes
     requirement.votes -= 1;
-    requirement.updatedAt = now;
-    requirement.version += 1;
 
-    requirements[index] = requirement;
-    await this.storage.saveEntities(input.planId, 'requirements', requirements);
+    await repo.update(requirement.id, requirement);
 
     return {
       success: true,
@@ -645,25 +603,21 @@ export class RequirementService {
     field: RequirementArrayField,
     operation: (currentArray: string[]) => string[]
   ): Promise<ArrayOperationResult> {
-    const exists = await this.storage.planExists(planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
-    const requirements = await this.storage.loadEntities<Requirement>(planId, 'requirements');
-    const requirement = requirements.find((r) => r.id === requirementId);
-    if (!requirement) {
-      throw new Error('Requirement not found');
-    }
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', planId);
+    const requirement = await repo.findById(requirementId);
 
     const currentArray = requirement[field] || [];
     const newArray = operation(currentArray);
 
     requirement[field] = newArray;
-    requirement.updatedAt = new Date().toISOString();
-    requirement.version += 1;
 
-    await this.storage.saveEntities(planId, 'requirements', requirements);
+    await repo.update(requirement.id, requirement);
 
     return {
       success: true,
@@ -767,7 +721,8 @@ export class RequirementService {
       throw new Error('Version history service not available');
     }
 
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
@@ -789,21 +744,15 @@ export class RequirementService {
       throw new Error('Version history service not available');
     }
 
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
     // Load current requirement to support diffing with current version
-    const requirements = await this.storage.loadEntities<Requirement>(
-      input.planId,
-      'requirements'
-    );
-    const currentRequirement = requirements.find((r) => r.id === input.requirementId);
-
-    if (!currentRequirement) {
-      throw new Error('Requirement not found');
-    }
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
+    const currentRequirement = await repo.findById(input.requirementId);
 
     return this.versionHistoryService.diff({
       planId: input.planId,
@@ -823,36 +772,55 @@ export class RequirementService {
   async bulkUpdateRequirements(
     input: BulkUpdateRequirementsInput
   ): Promise<BulkUpdateRequirementsResult> {
-    return bulkUpdateEntities<'requirementId'>({
-      entityType: 'requirements',
-      entityIdField: 'requirementId',
-      updateFn: (requirementId, updates) =>
-        this.updateRequirement({
+    // Note: Using individual updates instead of bulkUpdateEntities utility (which requires FileStorage)
+    const results: Array<{ requirementId: string; success: boolean; error?: string }> = [];
+    let updated = 0;
+    let failed = 0;
+
+    for (const update of input.updates) {
+      try {
+        await this.updateRequirement({
           planId: input.planId,
-          requirementId,
-          updates,
-        }).then(() => {}),
-      planId: input.planId,
-      updates: input.updates,
-      atomic: input.atomic,
-      storage: this.storage,
-    });
+          requirementId: update.requirementId,
+          updates: update.updates,
+        });
+        results.push({
+          requirementId: update.requirementId,
+          success: true,
+        });
+        updated++;
+      } catch (error: any) {
+        results.push({
+          requirementId: update.requirementId,
+          success: false,
+          error: error.message,
+        });
+        failed++;
+        if (input.atomic) {
+          break; // Stop on first error in atomic mode
+        }
+      }
+    }
+
+    return {
+      updated,
+      failed,
+      results,
+    };
   }
 
   async resetAllVotes(
     input: ResetAllVotesInput
   ): Promise<ResetAllVotesResult> {
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
-    const requirements = await this.storage.loadEntities<Requirement>(
-      input.planId,
-      'requirements'
-    );
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
+    const requirements = await repo.findAll();
 
-    const now = new Date().toISOString();
     let updated = 0;
 
     // Reset votes for all requirements
@@ -865,13 +833,10 @@ export class RequirementService {
 
       if (needsUpdate) {
         requirement.votes = 0;
-        requirement.updatedAt = now;
-        requirement.version += 1;
+        await repo.update(requirement.id, requirement);
         updated++;
       }
     }
-
-    await this.storage.saveEntities(input.planId, 'requirements', requirements);
 
     return {
       success: true,
