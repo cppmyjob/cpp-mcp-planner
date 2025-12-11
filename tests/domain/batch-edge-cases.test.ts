@@ -17,13 +17,37 @@ import { PhaseService } from '../../src/domain/services/phase-service.js';
 import { LinkingService } from '../../src/domain/services/linking-service.js';
 import { DecisionService } from '../../src/domain/services/decision-service.js';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
-import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
-import type { Requirement, Solution, Phase, Artifact } from '../../src/domain/entities/types.js';
+import type { Requirement, Solution, Phase, Artifact, Entity, Link } from '../../src/domain/entities/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+
+// Helper functions to replace storage.loadEntities/loadLinks
+async function loadEntities<T extends Entity>(
+  repositoryFactory: RepositoryFactory,
+  planId: string,
+  entityType: 'requirements' | 'solutions' | 'phases' | 'decisions' | 'artifacts'
+): Promise<T[]> {
+  const typeMap: Record<string, string> = {
+    requirements: 'requirement',
+    solutions: 'solution',
+    phases: 'phase',
+    decisions: 'decision',
+    artifacts: 'artifact'
+  };
+  const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
+  return repo.findAll();
+}
+
+async function loadLinks(
+  repositoryFactory: RepositoryFactory,
+  planId: string
+): Promise<Link[]> {
+  const linkRepo = repositoryFactory.createLinkRepository(planId);
+  return linkRepo.findAllLinks();
+}
 
 // Helper to retry directory removal on Windows (EBUSY/ENOTEMPTY errors)
 async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<void> {
@@ -41,7 +65,6 @@ async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<vo
 
 describe('BatchService - Edge Cases', () => {
   let batchService: BatchService;
-  let storage: FileStorage;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let testDir: string;
@@ -49,8 +72,6 @@ describe('BatchService - Edge Cases', () => {
 
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `mcp-batch-edge-${Date.now()}`);
-    storage = new FileStorage(testDir);
-    await storage.initialize();
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -65,16 +86,15 @@ describe('BatchService - Edge Cases', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    const planService = new PlanService(storage, repositoryFactory);
+    const planService = new PlanService(repositoryFactory);
     const requirementService = new RequirementService(repositoryFactory, planService);
     const solutionService = new SolutionService(repositoryFactory, planService);
-    const phaseService = new PhaseService(storage, planService);
+    const phaseService = new PhaseService(repositoryFactory, planService);
     const linkingService = new LinkingService(repositoryFactory);
     const decisionService = new DecisionService(repositoryFactory, planService);
     const artifactService = new ArtifactService(repositoryFactory, planService);
 
     batchService = new BatchService(
-      storage,
       repositoryFactory,
       planService,
       requirementService,
@@ -163,7 +183,7 @@ describe('BatchService - Edge Cases', () => {
       ],
     });
 
-    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
+    const requirements = await loadEntities<Requirement>(repositoryFactory, testPlanId, 'requirements');
     expect(requirements[0].title).toBe('Task with $0 reference in title');
     expect(requirements[0].description).toBe('This description mentions $1 and $2');
     expect(requirements[0].acceptanceCriteria[0]).toBe('Verify $0 works');
@@ -218,7 +238,7 @@ describe('BatchService - Edge Cases', () => {
       ],
     });
 
-    const solutions = await storage.loadEntities<Solution>(testPlanId, 'solutions');
+    const solutions = await loadEntities<Solution>(repositoryFactory, testPlanId, 'solutions');
     expect(solutions[0].addressing[0]).toBe(result.results[0].id); // $0 resolved
     expect(solutions[0].addressing[1]).toBe('550e8400-e29b-41d4-a716-446655440000'); // Real UUID unchanged
   });
@@ -275,7 +295,7 @@ describe('BatchService - Edge Cases', () => {
     expect(result.results.every((r) => r.success)).toBe(true);
 
     // Verify chain
-    const phases = await storage.loadEntities<Phase>(testPlanId, 'phases');
+    const phases = await loadEntities<Phase>(repositoryFactory, testPlanId, 'phases');
     for (let i = 1; i < 10; i++) {
       const phase = phases.find((p) => p.title === `Phase Level ${i}`);
       const parent = phases.find((p) => p.title === `Phase Level ${i - 1}`);
@@ -315,8 +335,8 @@ describe('BatchService - Edge Cases', () => {
       ],
     });
 
-    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
-    const solutions = await storage.loadEntities<Solution>(testPlanId, 'solutions');
+    const requirements = await loadEntities<Requirement>(repositoryFactory, testPlanId, 'requirements');
+    const solutions = await loadEntities<Solution>(repositoryFactory, testPlanId, 'solutions');
 
     // Now batch with only links
     const result = await batchService.executeBatch({
@@ -370,7 +390,7 @@ describe('BatchService - Edge Cases', () => {
       ],
     });
 
-    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
+    const requirements = await loadEntities<Requirement>(repositoryFactory, testPlanId, 'requirements');
     const childReq = requirements.find((r) => r.title === 'Child Req');
     expect(childReq).toBeDefined();
     expect(childReq!.source.parentId).toBe(result.results[0].id);
@@ -428,7 +448,7 @@ describe('BatchService - Edge Cases', () => {
       ],
     });
 
-    const solutions = await storage.loadEntities<Solution>(testPlanId, 'solutions');
+    const solutions = await loadEntities<Solution>(repositoryFactory, testPlanId, 'solutions');
     expect(solutions[0].addressing).toHaveLength(3);
     expect(solutions[0].addressing[0]).toBe(result.results[0].id);
     expect(solutions[0].addressing[1]).toBe(result.results[1].id);
@@ -534,7 +554,7 @@ describe('BatchService - Edge Cases', () => {
       ],
     });
 
-    const artifacts = await storage.loadEntities<Artifact>(testPlanId, 'artifacts');
+    const artifacts = await loadEntities<Artifact>(repositoryFactory, testPlanId, 'artifacts');
     expect(artifacts[0].relatedPhaseId).toBe(result.results[2].id);
     expect(artifacts[0].relatedSolutionId).toBe(result.results[1].id);
     expect(artifacts[0].relatedRequirementIds).toBeDefined();

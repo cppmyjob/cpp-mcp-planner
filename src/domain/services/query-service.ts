@@ -1,4 +1,4 @@
-import type { FileStorage } from '../../infrastructure/file-storage.js';
+import type { RepositoryFactory, PlanRepository } from '../repositories/interfaces.js';
 import type { PlanService } from './plan-service.js';
 import type { LinkingService } from './linking-service.js';
 import * as fs from 'fs/promises';
@@ -134,11 +134,15 @@ export interface ExportPlanResult {
 }
 
 export class QueryService {
+  private planRepo: PlanRepository;
+
   constructor(
-    private storage: FileStorage,
+    private repositoryFactory: RepositoryFactory,
     private planService: PlanService,
     private linkingService: LinkingService
-  ) {}
+  ) {
+    this.planRepo = repositoryFactory.createPlanRepository();
+  }
 
   async searchEntities(input: SearchEntitiesInput): Promise<SearchEntitiesResult> {
     const planData = await this.planService.getPlan({
@@ -688,7 +692,7 @@ export class QueryService {
     // Save export file
     const filename =
       input.format === 'json' ? 'plan-export.json' : 'plan-export.md';
-    const filePath = await this.storage.saveExport(input.planId, filename, content);
+    const filePath = await this.planRepo.saveExport(input.planId, filename, content);
 
     return {
       format: input.format,

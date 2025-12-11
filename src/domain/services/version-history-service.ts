@@ -1,4 +1,4 @@
-import type { FileStorage } from '../../infrastructure/file-storage.js';
+import type { RepositoryFactory, PlanRepository } from '../repositories/interfaces.js';
 import type {
   VersionHistory,
   VersionSnapshot,
@@ -32,13 +32,17 @@ export interface DiffInput {
 }
 
 export class VersionHistoryService {
-  constructor(private storage: FileStorage) {}
+  private planRepo: PlanRepository;
+
+  constructor(private repositoryFactory: RepositoryFactory) {
+    this.planRepo = repositoryFactory.createPlanRepository();
+  }
 
   /**
    * Check if version history is enabled for the plan
    */
   async isHistoryEnabled(planId: string): Promise<boolean> {
-    const manifest = await this.storage.loadManifest(planId);
+    const manifest = await this.planRepo.loadManifest(planId);
     return manifest.enableHistory === true;
   }
 
@@ -46,7 +50,7 @@ export class VersionHistoryService {
    * Get the maximum history depth for the plan
    */
   async getMaxHistoryDepth(planId: string): Promise<number> {
-    const manifest = await this.storage.loadManifest(planId);
+    const manifest = await this.planRepo.loadManifest(planId);
     return manifest.maxHistoryDepth ?? 0; // 0 means unlimited
   }
 
@@ -223,21 +227,18 @@ export class VersionHistoryService {
     entityId: string,
     entityType: EntityType
   ): Promise<VersionHistory> {
-    const historyPath = this.getHistoryPath(planId, entityType, entityId);
-
-    try {
-      const history = await this.storage.readJSON<VersionHistory>(historyPath);
-      return history;
-    } catch {
-      // History file doesn't exist, return empty
-      return {
-        entityId,
-        entityType,
-        currentVersion: 1,
-        versions: [],
-        total: 0,
-      };
+    const history = await this.planRepo.loadVersionHistory(planId, entityType, entityId);
+    if (history) {
+      return history as VersionHistory;
     }
+    // History file doesn't exist, return empty
+    return {
+      entityId,
+      entityType,
+      currentVersion: 1,
+      versions: [],
+      total: 0,
+    };
   }
 
   /**
@@ -249,15 +250,7 @@ export class VersionHistoryService {
     entityType: EntityType,
     history: VersionHistory
   ): Promise<void> {
-    const historyPath = this.getHistoryPath(planId, entityType, entityId);
-    await this.storage.writeJSON(historyPath, history);
-  }
-
-  /**
-   * Get the file path for version history
-   */
-  private getHistoryPath(planId: string, entityType: EntityType, entityId: string): string {
-    return `${planId}/history/${entityType}/${entityId}.json`;
+    await this.planRepo.saveVersionHistory(planId, entityType, entityId, history);
   }
 
   /**
@@ -268,12 +261,7 @@ export class VersionHistoryService {
     entityId: string,
     entityType: EntityType
   ): Promise<void> {
-    const historyPath = this.getHistoryPath(planId, entityType, entityId);
-    try {
-      await this.storage.deleteFile(historyPath);
-    } catch {
-      // File doesn't exist, ignore
-    }
+    await this.planRepo.deleteVersionHistory(planId, entityType, entityId);
   }
 }
 

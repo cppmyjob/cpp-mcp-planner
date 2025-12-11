@@ -4,7 +4,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
@@ -15,7 +14,6 @@ import * as path from 'path';
 import * as os from 'os';
 
 describe('Version History - Basic Tests', () => {
-  let storage: FileStorage;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let planService: PlanService;
@@ -26,8 +24,6 @@ describe('Version History - Basic Tests', () => {
 
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `mcp-version-history-basic-${Date.now()}`);
-    storage = new FileStorage(testDir);
-    await storage.initialize();
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -42,8 +38,8 @@ describe('Version History - Basic Tests', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage, repositoryFactory);
-    versionHistoryService = new VersionHistoryService(storage);
+    planService = new PlanService(repositoryFactory);
+    versionHistoryService = new VersionHistoryService(repositoryFactory);
     requirementService = new RequirementService(repositoryFactory, planService, versionHistoryService);
 
     // Create plan with history enabled
@@ -63,7 +59,8 @@ describe('Version History - Basic Tests', () => {
   });
 
   it('should create plan with enableHistory=true and maxHistoryDepth=5', async () => {
-    const manifest = await storage.loadManifest(planId);
+    const planRepo = repositoryFactory.createPlanRepository();
+    const manifest = await planRepo.loadManifest(planId);
     expect(manifest.enableHistory).toBe(true);
     expect(manifest.maxHistoryDepth).toBe(5);
   });

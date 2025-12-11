@@ -1,23 +1,39 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { PlanService } from '../../src/domain/services/plan-service.js';
-import { FileStorage } from '../../src/infrastructure/file-storage.js';
+import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
+import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
 describe('PlanService', () => {
   let service: PlanService;
-  let storage: FileStorage;
+  let repositoryFactory: RepositoryFactory;
+  let lockManager: FileLockManager;
   let testDir: string;
 
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `mcp-plan-test-${Date.now()}`);
-    storage = new FileStorage(testDir);
-    await storage.initialize();
-    service = new PlanService(storage);
+
+    lockManager = new FileLockManager(testDir);
+    await lockManager.initialize();
+
+    repositoryFactory = new RepositoryFactory({
+      type: 'file',
+      baseDir: testDir,
+      lockManager,
+      cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
+    });
+
+    const planRepo = repositoryFactory.createPlanRepository();
+    await planRepo.initialize();
+
+    service = new PlanService(repositoryFactory);
   });
 
   afterEach(async () => {
+    await repositoryFactory.dispose();
+    await lockManager.dispose();
     await fs.rm(testDir, { recursive: true, force: true });
   });
 
@@ -584,41 +600,41 @@ describe('PlanService', () => {
         description: 'Test',
       });
 
-      // Add phases directly via storage for testing
-      const phases = [
-        {
-          id: 'phase-1',
-          type: 'phase' as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          version: 1,
-          metadata: { createdBy: 'test', tags: [], annotations: [] },
-          title: 'Phase 1',
-          description: 'First phase',
-          status: 'in_progress' as const,
-          progress: 50,
-          order: 1,
-          path: '1',
-          depth: 0,
-        },
-        {
-          id: 'phase-2',
-          type: 'phase' as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          version: 1,
-          metadata: { createdBy: 'test', tags: [], annotations: [] },
-          title: 'Phase 2',
-          description: 'Second phase',
-          status: 'planned' as const,
-          progress: 0,
-          order: 2,
-          path: '2',
-          depth: 0,
-          parentId: 'phase-1',
-        },
-      ];
-      await storage.saveEntities(created.planId, 'phases', phases);
+      // Add phases via repository
+      const phaseRepo = repositoryFactory.createRepository<any>('phase', created.planId);
+      const phase1 = {
+        id: 'phase-1',
+        type: 'phase' as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1,
+        metadata: { createdBy: 'test', tags: [], annotations: [] },
+        title: 'Phase 1',
+        description: 'First phase',
+        status: 'in_progress' as const,
+        progress: 50,
+        order: 1,
+        path: '1',
+        depth: 0,
+      };
+      const phase2 = {
+        id: 'phase-2',
+        type: 'phase' as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1,
+        metadata: { createdBy: 'test', tags: [], annotations: [] },
+        title: 'Phase 2',
+        description: 'Second phase',
+        status: 'planned' as const,
+        progress: 0,
+        order: 2,
+        path: '2',
+        depth: 0,
+        parentId: 'phase-1',
+      };
+      await phaseRepo.create(phase1);
+      await phaseRepo.create(phase2);
 
       const result = await service.getSummary({ planId: created.planId });
 

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { LinkingService } from '../../src/domain/services/linking-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
-import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import * as fs from 'fs/promises';
@@ -11,7 +10,6 @@ import * as os from 'os';
 describe('LinkingService', () => {
   let service: LinkingService;
   let planService: PlanService;
-  let storage: FileStorage;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let testDir: string;
@@ -19,8 +17,6 @@ describe('LinkingService', () => {
 
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `mcp-link-test-${Date.now()}`);
-    storage = new FileStorage(testDir);
-    await storage.initialize();
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -35,7 +31,7 @@ describe('LinkingService', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage, repositoryFactory);
+    planService = new PlanService(repositoryFactory);
     service = new LinkingService(repositoryFactory);
 
     const plan = await planService.createPlan({

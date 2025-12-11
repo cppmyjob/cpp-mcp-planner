@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { PhaseService } from '../../src/domain/services/phase-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
-import { FileStorage } from '../../src/infrastructure/file-storage.js';
+import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
+import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -9,16 +10,29 @@ import * as os from 'os';
 describe('PhaseService', () => {
   let service: PhaseService;
   let planService: PlanService;
-  let storage: FileStorage;
+  let repositoryFactory: RepositoryFactory;
+  let lockManager: FileLockManager;
   let testDir: string;
   let planId: string;
 
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `mcp-phase-test-${Date.now()}`);
-    storage = new FileStorage(testDir);
-    await storage.initialize();
-    planService = new PlanService(storage);
-    service = new PhaseService(storage, planService);
+
+    lockManager = new FileLockManager(testDir);
+    await lockManager.initialize();
+
+    repositoryFactory = new RepositoryFactory({
+      type: 'file',
+      baseDir: testDir,
+      lockManager,
+      cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
+    });
+
+    const planRepo = repositoryFactory.createPlanRepository();
+    await planRepo.initialize();
+
+    planService = new PlanService(repositoryFactory);
+    service = new PhaseService(repositoryFactory, planService);
 
     const plan = await planService.createPlan({
       name: 'Test Plan',
@@ -28,6 +42,7 @@ describe('PhaseService', () => {
   });
 
   afterEach(async () => {
+    await repositoryFactory.dispose();
     await fs.rm(testDir, { recursive: true, force: true });
   });
 

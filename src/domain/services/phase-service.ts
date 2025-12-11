@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { FileStorage } from '../../infrastructure/file-storage.js';
+import type { RepositoryFactory } from '../../infrastructure/factory/repository-factory.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
@@ -316,13 +316,14 @@ export interface UpdatePhaseStatusResult {
 
 export class PhaseService {
   constructor(
-    private storage: FileStorage,
+    private repositoryFactory: RepositoryFactory,
     private planService: PlanService,
     private versionHistoryService?: VersionHistoryService
   ) {}
 
   private async ensurePlanExists(planId: string): Promise<void> {
-    const exists = await this.storage.planExists(planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
@@ -331,7 +332,8 @@ export class PhaseService {
   async getPhase(input: GetPhaseInput): Promise<GetPhaseResult> {
     await this.ensurePlanExists(input.planId);
 
-    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    const phases = await repo.findAll();
     const phase = phases.find((p) => p.id === input.phaseId);
 
     if (!phase) {
@@ -362,7 +364,8 @@ export class PhaseService {
       return { phases: [], notFound: [] };
     }
 
-    const allPhases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    const allPhases = await repo.findAll();
     const foundPhases: Phase[] = [];
     const notFound: string[] = [];
 
@@ -397,7 +400,8 @@ export class PhaseService {
       validatePriority(input.phase.priority);
     }
 
-    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    const phases = await repo.findAll();
     const phaseId = uuidv4();
     const now = new Date().toISOString();
 
@@ -447,15 +451,15 @@ export class PhaseService {
       priority: input.phase.priority ?? 'medium',
     };
 
-    phases.push(phase);
-    await this.storage.saveEntities(input.planId, 'phases', phases);
+    await repo.create(phase);
     await this.planService.updateStatistics(input.planId);
 
     return { phaseId };
   }
 
   async updatePhase(input: UpdatePhaseInput): Promise<UpdatePhaseResult> {
-    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    const phases = await repo.findAll();
     const index = phases.findIndex((p) => p.id === input.phaseId);
 
     if (index === -1) {
@@ -504,25 +508,21 @@ export class PhaseService {
       phase.priority = input.updates.priority;
     }
 
-    phase.updatedAt = now;
-    phase.version += 1;
-    phases[index] = phase;
-
-    await this.storage.saveEntities(input.planId, 'phases', phases);
+    // FIX #12: Don't manually increment version - FileRepository.update() does it automatically
+    await repo.update(phase.id, phase);
 
     return { success: true, phaseId: input.phaseId };
   }
 
   async movePhase(input: MovePhaseInput): Promise<MovePhaseResult> {
-    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
-    const index = phases.findIndex((p) => p.id === input.phaseId);
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    const phases = await repo.findAll();
+    const phase = phases.find((p) => p.id === input.phaseId);
 
-    if (index === -1) {
+    if (!phase) {
       throw new Error('Phase not found');
     }
 
-    const phase = phases[index];
-    const now = new Date().toISOString();
     const affectedPhases: Phase[] = [];
 
     // Update parent if specified
@@ -552,24 +552,26 @@ export class PhaseService {
     }
 
     // Update children paths recursively
-    const updateChildrenPaths = (parentId: string, parentPath: string) => {
+    const collectAffectedChildren = (parentId: string, parentPath: string) => {
       const children = phases.filter((p) => p.parentId === parentId);
       for (const child of children) {
         child.path = `${parentPath}.${child.order}`;
         child.depth = parentPath.split('.').length;
-        child.updatedAt = now;
         affectedPhases.push(child);
-        updateChildrenPaths(child.id, child.path);
+        collectAffectedChildren(child.id, child.path);
       }
     };
 
-    updateChildrenPaths(phase.id, phase.path);
+    collectAffectedChildren(phase.id, phase.path);
 
-    phase.updatedAt = now;
-    phase.version += 1;
-    phases[index] = phase;
+    // FIX #12: Don't manually increment version - FileRepository.update() does it automatically
+    // Update main phase
+    await repo.update(phase.id, phase);
 
-    await this.storage.saveEntities(input.planId, 'phases', phases);
+    // Update all affected children
+    for (const child of affectedPhases) {
+      await repo.update(child.id, child);
+    }
 
     return {
       success: true,
@@ -579,7 +581,8 @@ export class PhaseService {
   }
 
   async getPhaseTree(input: GetPhaseTreeInput): Promise<GetPhaseTreeResult> {
-    let phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    let phases = await repo.findAll();
 
     if (input.includeCompleted === false) {
       phases = phases.filter((p) => p.status !== 'completed');
@@ -641,7 +644,8 @@ export class PhaseService {
   }
 
   async deletePhase(input: DeletePhaseInput): Promise<DeletePhaseResult> {
-    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    const phases = await repo.findAll();
     const deletedIds: string[] = [];
 
     const collectChildren = (parentId: string) => {
@@ -652,8 +656,8 @@ export class PhaseService {
       }
     };
 
-    const index = phases.findIndex((p) => p.id === input.phaseId);
-    if (index === -1) {
+    const phase = phases.find((p) => p.id === input.phaseId);
+    if (!phase) {
       throw new Error('Phase not found');
     }
 
@@ -663,8 +667,10 @@ export class PhaseService {
       collectChildren(input.phaseId);
     }
 
-    const remaining = phases.filter((p) => !deletedIds.includes(p.id));
-    await this.storage.saveEntities(input.planId, 'phases', remaining);
+    // Delete all collected phases
+    for (const id of deletedIds) {
+      await repo.delete(id);
+    }
     await this.planService.updateStatistics(input.planId);
 
     return {
@@ -675,14 +681,14 @@ export class PhaseService {
   }
 
   async updatePhaseStatus(input: UpdatePhaseStatusInput): Promise<UpdatePhaseStatusResult> {
-    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
-    const index = phases.findIndex((p) => p.id === input.phaseId);
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    const phases = await repo.findAll();
+    const phase = phases.find((p) => p.id === input.phaseId);
 
-    if (index === -1) {
+    if (!phase) {
       throw new Error('Phase not found');
     }
 
-    const phase = phases[index];
     const now = new Date().toISOString();
     const autoUpdated: { startedAt?: string; completedAt?: string } = {};
 
@@ -721,11 +727,8 @@ export class PhaseService {
       });
     }
 
-    phase.updatedAt = now;
-    phase.version += 1;
-    phases[index] = phase;
-
-    await this.storage.saveEntities(input.planId, 'phases', phases);
+    // FIX #12: Don't manually increment version - FileRepository.update() does it automatically
+    await repo.update(phase.id, phase);
     await this.planService.updateStatistics(input.planId);
 
     return {
@@ -747,7 +750,8 @@ export class PhaseService {
   }
 
   async getNextActions(input: GetNextActionsInput): Promise<GetNextActionsResult> {
-    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    const phases = await repo.findAll();
     const limit = input.limit || 5;
     const actions: NextAction[] = [];
 
@@ -836,14 +840,14 @@ export class PhaseService {
   async completeAndAdvance(input: CompleteAndAdvanceInput): Promise<CompleteAndAdvanceResult> {
     await this.ensurePlanExists(input.planId);
 
-    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
-    const currentIndex = phases.findIndex((p) => p.id === input.phaseId);
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    const phases = await repo.findAll();
+    const currentPhase = phases.find((p) => p.id === input.phaseId);
 
-    if (currentIndex === -1) {
+    if (!currentPhase) {
       throw new Error('Phase not found');
     }
 
-    const currentPhase = phases[currentIndex];
     const now = new Date().toISOString();
 
     // Validate current phase status
@@ -863,8 +867,6 @@ export class PhaseService {
     currentPhase.status = 'completed';
     currentPhase.progress = 100;
     currentPhase.completedAt = now;
-    currentPhase.updatedAt = now;
-    currentPhase.version += 1;
 
     if (input.actualEffort !== undefined) {
       currentPhase.schedule.actualEffort = input.actualEffort;
@@ -879,22 +881,19 @@ export class PhaseService {
       });
     }
 
-    phases[currentIndex] = currentPhase;
-
     // Find and start next planned phase
     const nextPhase = this.findNextPlannedPhase(currentPhase, phases);
 
     if (nextPhase) {
       nextPhase.status = 'in_progress';
       nextPhase.startedAt = now;
-      nextPhase.updatedAt = now;
-      nextPhase.version += 1;
-
-      const nextIndex = phases.findIndex((p) => p.id === nextPhase.id);
-      phases[nextIndex] = nextPhase;
     }
 
-    await this.storage.saveEntities(input.planId, 'phases', phases);
+    // FIX #12: Don't manually increment version - FileRepository.update() does it automatically
+    await repo.update(currentPhase.id, currentPhase);
+    if (nextPhase) {
+      await repo.update(nextPhase.id, nextPhase);
+    }
     await this.planService.updateStatistics(input.planId);
 
     return {
@@ -971,7 +970,8 @@ export class PhaseService {
   ): Promise<ArrayOperationResult> {
     await this.ensurePlanExists(planId);
 
-    const phases = await this.storage.loadEntities<Phase>(planId, 'phases');
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', planId);
+    const phases = await repo.findAll();
     const phase = phases.find((p) => p.id === phaseId);
     if (!phase) {
       throw new Error('Phase not found');
@@ -981,10 +981,9 @@ export class PhaseService {
     const newArray = operation(currentArray);
 
     phase[field] = newArray;
-    phase.updatedAt = new Date().toISOString();
-    phase.version += 1;
 
-    await this.storage.saveEntities(planId, 'phases', phases);
+    // FIX #12: Don't manually increment version - FileRepository.update() does it automatically
+    await repo.update(phase.id, phase);
 
     return {
       success: true,
@@ -1087,7 +1086,8 @@ export class PhaseService {
       throw new Error('Version history service not available');
     }
 
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
@@ -1109,20 +1109,14 @@ export class PhaseService {
       throw new Error('Version history service not available');
     }
 
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
-    const entities = await this.storage.loadEntities<Phase>(
-      input.planId,
-      'phases'
-    );
-    const current = entities.find((e) => e.id === input.phaseId);
-
-    if (!current) {
-      throw new Error('Phase not found');
-    }
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    const current = await repo.findById(input.phaseId);
 
     return this.versionHistoryService.diff({
       planId: input.planId,
@@ -1140,6 +1134,39 @@ export class PhaseService {
    * REFACTOR: Uses common bulkUpdateEntities utility
    */
   async bulkUpdatePhases(input: BulkUpdatePhasesInput): Promise<BulkUpdatePhasesResult> {
+    const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+
+    // Create storage adapter for bulkUpdateEntities utility
+    const storageAdapter = {
+      loadEntities: async (_planId: string, _entityType: string) => {
+        return repo.findAll();
+      },
+      saveEntities: async (_planId: string, _entityType: string, entities: Phase[]) => {
+        // For atomic rollback, we need to restore all entities
+        // Clear and recreate - this is the rollback scenario
+        const current = await repo.findAll();
+        const currentIds = new Set(current.map(e => e.id));
+        const newIds = new Set(entities.map(e => e.id));
+
+        // Delete entities that no longer exist
+        for (const id of currentIds) {
+          if (!newIds.has(id)) {
+            await repo.delete(id);
+          }
+        }
+
+        // Update/create entities
+        for (const entity of entities) {
+          if (currentIds.has(entity.id)) {
+            // Direct save to bypass version check during rollback
+            await repo.update(entity.id, entity);
+          } else {
+            await repo.create(entity);
+          }
+        }
+      },
+    };
+
     return bulkUpdateEntities<'phaseId'>({
       entityType: 'phases',
       entityIdField: 'phaseId',
@@ -1148,7 +1175,7 @@ export class PhaseService {
       planId: input.planId,
       updates: input.updates,
       atomic: input.atomic,
-      storage: this.storage,
+      storage: storageAdapter,
     });
   }
 

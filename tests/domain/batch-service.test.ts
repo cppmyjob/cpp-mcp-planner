@@ -20,16 +20,40 @@ import { LinkingService } from '../../src/domain/services/linking-service.js';
 import { DecisionService } from '../../src/domain/services/decision-service.js';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
-import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import type { Entity, Link } from '../../src/domain/entities/types.js';
+
+// Helper functions to replace storage.loadEntities/loadLinks
+async function loadEntities<T extends Entity>(
+  repositoryFactory: RepositoryFactory,
+  planId: string,
+  entityType: 'requirements' | 'solutions' | 'phases' | 'decisions' | 'artifacts'
+): Promise<T[]> {
+  const typeMap: Record<string, string> = {
+    requirements: 'requirement',
+    solutions: 'solution',
+    phases: 'phase',
+    decisions: 'decision',
+    artifacts: 'artifact'
+  };
+  const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
+  return repo.findAll();
+}
+
+async function loadLinks(
+  repositoryFactory: RepositoryFactory,
+  planId: string
+): Promise<Link[]> {
+  const linkRepo = repositoryFactory.createLinkRepository(planId);
+  return linkRepo.findAllLinks();
+}
 
 describe('BatchService - Unit Tests', () => {
   let batchService: BatchService;
-  let storage: FileStorage;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let planService: PlanService;
@@ -44,8 +68,6 @@ describe('BatchService - Unit Tests', () => {
 
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `mcp-batch-unit-${Date.now()}`);
-    storage = new FileStorage(testDir);
-    await storage.initialize();
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -60,16 +82,15 @@ describe('BatchService - Unit Tests', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage, repositoryFactory);
+    planService = new PlanService(repositoryFactory);
     requirementService = new RequirementService(repositoryFactory, planService);
     solutionService = new SolutionService(repositoryFactory, planService);
-    phaseService = new PhaseService(storage, planService);
+    phaseService = new PhaseService(repositoryFactory, planService);
     linkingService = new LinkingService(repositoryFactory);
     decisionService = new DecisionService(repositoryFactory, planService);
     artifactService = new ArtifactService(repositoryFactory, planService);
 
     batchService = new BatchService(
-      storage,
       repositoryFactory,
       planService,
       requirementService,
@@ -134,7 +155,7 @@ describe('BatchService - Unit Tests', () => {
     expect(result.results[0].id).toMatch(/^[a-f0-9-]{36}$/);
 
     // Verify entity created in storage
-    const requirements = await storage.loadEntities<any>(planId, 'requirements');
+    const requirements = await loadEntities<any>(repositoryFactory, planId, 'requirements');
     expect(requirements).toHaveLength(1);
     expect(requirements[0].title).toBe('Test Requirement');
   });
@@ -186,7 +207,7 @@ describe('BatchService - Unit Tests', () => {
     expect(result.results).toHaveLength(3);
     result.results.forEach(r => expect(r.success).toBe(true));
 
-    const requirements = await storage.loadEntities<any>(planId, 'requirements');
+    const requirements = await loadEntities<any>(repositoryFactory, planId, 'requirements');
     expect(requirements).toHaveLength(3);
     expect(requirements[0].title).toBe('Req 1');
     expect(requirements[1].title).toBe('Req 2');
@@ -223,7 +244,7 @@ describe('BatchService - Unit Tests', () => {
     expect(result.results).toHaveLength(2);
     expect(result.tempIdMapping['$0']).toBeDefined();
 
-    const phases = await storage.loadEntities<any>(planId, 'phases');
+    const phases = await loadEntities<any>(repositoryFactory, planId, 'phases');
     expect(phases).toHaveLength(2);
 
     const parent = phases.find((p: any) => p.title === 'Parent Phase');
@@ -280,7 +301,7 @@ describe('BatchService - Unit Tests', () => {
     expect(result.tempIdMapping['$0']).toBeDefined();
     expect(result.tempIdMapping['$1']).toBeDefined();
 
-    const links = await storage.loadLinks(planId);
+    const links = await loadLinks(repositoryFactory, planId);
     expect(links).toHaveLength(1);
     expect(links[0].sourceId).toBe(result.tempIdMapping['$0']);
     expect(links[0].targetId).toBe(result.tempIdMapping['$1']);
@@ -334,7 +355,7 @@ describe('BatchService - Unit Tests', () => {
     ).rejects.toThrow('Title is required');
 
     // Verify rollback - storage should be empty
-    const requirements = await storage.loadEntities<any>(planId, 'requirements');
+    const requirements = await loadEntities<any>(repositoryFactory, planId, 'requirements');
     expect(requirements).toHaveLength(0);
   });
 
@@ -452,9 +473,9 @@ describe('BatchService - Unit Tests', () => {
 
     expect(result.results).toHaveLength(3);
 
-    const requirements = await storage.loadEntities<any>(planId, 'requirements');
-    const solutions = await storage.loadEntities<any>(planId, 'solutions');
-    const phases = await storage.loadEntities<any>(planId, 'phases');
+    const requirements = await loadEntities<any>(repositoryFactory, planId, 'requirements');
+    const solutions = await loadEntities<any>(repositoryFactory, planId, 'solutions');
+    const phases = await loadEntities<any>(repositoryFactory, planId, 'phases');
 
     expect(requirements).toHaveLength(1);
     expect(solutions).toHaveLength(1);
@@ -507,7 +528,7 @@ describe('BatchService - Unit Tests', () => {
     ).rejects.toThrow('Title is required');
 
     // Verify rollback
-    const requirements = await storage.loadEntities<any>(planId, 'requirements');
+    const requirements = await loadEntities<any>(repositoryFactory, planId, 'requirements');
     expect(requirements).toHaveLength(0);
   });
 
@@ -556,7 +577,7 @@ describe('BatchService - Unit Tests', () => {
       ]
     });
 
-    const solutions = await storage.loadEntities<any>(planId, 'solutions');
+    const solutions = await loadEntities<any>(repositoryFactory, planId, 'solutions');
     expect(solutions[0].addressing).toContain(result.tempIdMapping['$0']);
     expect(solutions[0].addressing).not.toContain('$0');
   });
@@ -584,7 +605,7 @@ describe('BatchService - Unit Tests', () => {
       ]
     });
 
-    const requirements = await storage.loadEntities<any>(planId, 'requirements');
+    const requirements = await loadEntities<any>(repositoryFactory, planId, 'requirements');
 
     // Temp IDs should NOT be resolved in non-ID fields
     expect(requirements[0].title).toContain('$0');
@@ -629,7 +650,7 @@ describe('BatchService - Unit Tests', () => {
       ]
     });
 
-    const phases = await storage.loadEntities<any>(planId, 'phases');
+    const phases = await loadEntities<any>(repositoryFactory, planId, 'phases');
     expect(phases).toHaveLength(3);
 
     const phase1 = phases.find((p: any) => p.title === 'Phase 1');
@@ -690,8 +711,8 @@ describe('BatchService - Unit Tests', () => {
     ).rejects.toThrow(/circular.*dependency/i);
 
     // Verify rollback - nothing created
-    const phases = await storage.loadEntities<any>(planId, 'phases');
-    const links = await storage.loadLinks(planId);
+    const phases = await loadEntities<any>(repositoryFactory, planId, 'phases');
+    const links = await loadLinks(repositoryFactory, planId);
     expect(phases).toHaveLength(0);
     expect(links).toHaveLength(0);
   });
@@ -719,7 +740,7 @@ describe('BatchService - Unit Tests', () => {
     ).rejects.toThrow(/parent.*not.*found/i);
 
     // Verify rollback
-    const phases = await storage.loadEntities<any>(planId, 'phases');
+    const phases = await loadEntities<any>(repositoryFactory, planId, 'phases');
     expect(phases).toHaveLength(0);
   });
 
@@ -995,7 +1016,7 @@ describe('BatchService - Unit Tests', () => {
       expect(updated.priority).toBe('critical');
 
       // Verify create
-      const requirements = await storage.loadEntities<any>(planId, 'requirements');
+      const requirements = await loadEntities<any>(repositoryFactory, planId, 'requirements');
       expect(requirements).toHaveLength(2);
       const newReq = requirements.find((r: any) => r.title === 'New Req');
       expect(newReq).toBeDefined();

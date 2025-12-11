@@ -18,13 +18,37 @@ import { PhaseService } from '../../src/domain/services/phase-service.js';
 import { LinkingService } from '../../src/domain/services/linking-service.js';
 import { DecisionService } from '../../src/domain/services/decision-service.js';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
-import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
-import type { Requirement, Solution, Phase, Decision, Artifact } from '../../src/domain/entities/types.js';
+import type { Requirement, Solution, Phase, Decision, Artifact, Entity, Link } from '../../src/domain/entities/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+
+// Helper functions to replace storage.loadEntities/loadLinks
+async function loadEntities<T extends Entity>(
+  repositoryFactory: RepositoryFactory,
+  planId: string,
+  entityType: 'requirements' | 'solutions' | 'phases' | 'decisions' | 'artifacts'
+): Promise<T[]> {
+  const typeMap: Record<string, string> = {
+    requirements: 'requirement',
+    solutions: 'solution',
+    phases: 'phase',
+    decisions: 'decision',
+    artifacts: 'artifact'
+  };
+  const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
+  return repo.findAll();
+}
+
+async function loadLinks(
+  repositoryFactory: RepositoryFactory,
+  planId: string
+): Promise<Link[]> {
+  const linkRepo = repositoryFactory.createLinkRepository(planId);
+  return linkRepo.findAllLinks();
+}
 
 // Helper to retry directory removal on Windows (EBUSY/ENOTEMPTY errors)
 async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<void> {
@@ -49,7 +73,6 @@ describe('BatchService - Integration Tests', () => {
   let linkingService: LinkingService;
   let decisionService: DecisionService;
   let artifactService: ArtifactService;
-  let storage: FileStorage;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let testDir: string;
@@ -58,8 +81,6 @@ describe('BatchService - Integration Tests', () => {
   beforeEach(async () => {
     // Create temporary directory for tests
     testDir = path.join(os.tmpdir(), `mcp-batch-test-${Date.now()}`);
-    storage = new FileStorage(testDir);
-    await storage.initialize();
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -75,16 +96,15 @@ describe('BatchService - Integration Tests', () => {
     await planRepo.initialize();
 
     // Initialize all services
-    planService = new PlanService(storage, repositoryFactory);
+    planService = new PlanService(repositoryFactory);
     requirementService = new RequirementService(repositoryFactory, planService);
     solutionService = new SolutionService(repositoryFactory, planService);
-    phaseService = new PhaseService(storage, planService);
+    phaseService = new PhaseService(repositoryFactory, planService);
     linkingService = new LinkingService(repositoryFactory);
     decisionService = new DecisionService(repositoryFactory, planService);
     artifactService = new ArtifactService(repositoryFactory, planService);
 
     batchService = new BatchService(
-      storage,
       repositoryFactory,
       planService,
       requirementService,
@@ -144,7 +164,7 @@ describe('BatchService - Integration Tests', () => {
     expect(result.results[1].success).toBe(true);
 
     // Verify entities persisted to disk by reading directly
-    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
+    const requirements = await loadEntities<Requirement>(repositoryFactory, testPlanId, 'requirements');
     expect(requirements).toHaveLength(2);
     expect(requirements[0].title).toBe('Req 1');
     expect(requirements[1].title).toBe('Req 2');
@@ -188,7 +208,7 @@ describe('BatchService - Integration Tests', () => {
     });
 
     // Verify both batches persisted
-    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
+    const requirements = await loadEntities<Requirement>(repositoryFactory, testPlanId, 'requirements');
     expect(requirements).toHaveLength(2);
     expect(requirements[0].title).toBe('Batch 1 Req');
     expect(requirements[1].title).toBe('Batch 2 Req');
@@ -230,7 +250,7 @@ describe('BatchService - Integration Tests', () => {
     }
 
     // Verify nothing was written to disk
-    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
+    const requirements = await loadEntities<Requirement>(repositoryFactory, testPlanId, 'requirements');
     expect(requirements).toHaveLength(0);
   });
 
@@ -317,7 +337,7 @@ describe('BatchService - Integration Tests', () => {
     });
 
     // Verify link persisted with resolved IDs
-    const links = await storage.loadLinks(testPlanId);
+    const links = await loadLinks(repositoryFactory, testPlanId);
     expect(links).toHaveLength(1);
     expect(links[0].sourceId).toBe(result.results[1].id); // Solution ID
     expect(links[0].targetId).toBe(result.results[0].id); // Requirement ID
@@ -349,7 +369,7 @@ describe('BatchService - Integration Tests', () => {
     expect(result.results.every((r) => r.success)).toBe(true);
 
     // Verify all persisted
-    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
+    const requirements = await loadEntities<Requirement>(repositoryFactory, testPlanId, 'requirements');
     expect(requirements).toHaveLength(50);
   }, 30000); // Increase timeout for large batch operation under parallel test load
 
@@ -428,10 +448,10 @@ describe('BatchService - Integration Tests', () => {
     expect(result.results.every((r) => r.success)).toBe(true);
 
     // Verify dependency tree persisted
-    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
-    const solutions = await storage.loadEntities<Solution>(testPlanId, 'solutions');
-    const phases = await storage.loadEntities<Phase>(testPlanId, 'phases');
-    const links = await storage.loadLinks(testPlanId);
+    const requirements = await loadEntities<Requirement>(repositoryFactory, testPlanId, 'requirements');
+    const solutions = await loadEntities<Solution>(repositoryFactory, testPlanId, 'solutions');
+    const phases = await loadEntities<Phase>(repositoryFactory, testPlanId, 'phases');
+    const links = await loadLinks(repositoryFactory, testPlanId);
 
     expect(requirements).toHaveLength(1);
     expect(solutions).toHaveLength(1);
@@ -518,12 +538,12 @@ describe('BatchService - Integration Tests', () => {
     expect(result.results.every((r) => r.success)).toBe(true);
 
     // Verify all persisted
-    const requirements = await storage.loadEntities<Requirement>(testPlanId, 'requirements');
-    const solutions = await storage.loadEntities<Solution>(testPlanId, 'solutions');
-    const phases = await storage.loadEntities<Phase>(testPlanId, 'phases');
-    const decisions = await storage.loadEntities<Decision>(testPlanId, 'decisions');
-    const artifacts = await storage.loadEntities<Artifact>(testPlanId, 'artifacts');
-    const links = await storage.loadLinks(testPlanId);
+    const requirements = await loadEntities<Requirement>(repositoryFactory, testPlanId, 'requirements');
+    const solutions = await loadEntities<Solution>(repositoryFactory, testPlanId, 'solutions');
+    const phases = await loadEntities<Phase>(repositoryFactory, testPlanId, 'phases');
+    const decisions = await loadEntities<Decision>(repositoryFactory, testPlanId, 'decisions');
+    const artifacts = await loadEntities<Artifact>(repositoryFactory, testPlanId, 'artifacts');
+    const links = await loadLinks(repositoryFactory, testPlanId);
 
     expect(requirements).toHaveLength(1);
     expect(solutions).toHaveLength(1);

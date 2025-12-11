@@ -208,6 +208,69 @@ export class FilePlanRepository implements PlanRepository {
   }
 
   /**
+   * Save export file
+   *
+   * Saves exported content to the plan's exports directory.
+   *
+   * @param planId - Plan ID
+   * @param filename - Export filename (e.g. 'plan-export.md')
+   * @param content - Export content
+   * @returns Full path to saved file
+   */
+  async saveExport(planId: string, filename: string, content: string): Promise<string> {
+    const exportPath = path.join(this.plansDir, planId, 'exports', filename);
+    await fs.writeFile(exportPath, content, 'utf-8');
+    return exportPath;
+  }
+
+  /**
+   * Save version history for an entity
+   *
+   * @param planId - Plan ID
+   * @param entityType - Entity type (requirement, solution, etc.)
+   * @param entityId - Entity ID
+   * @param history - Version history data
+   */
+  async saveVersionHistory(planId: string, entityType: string, entityId: string, history: any): Promise<void> {
+    const historyPath = path.join(this.plansDir, planId, 'history', entityType, `${entityId}.json`);
+    await this.atomicWrite(historyPath, history);
+  }
+
+  /**
+   * Load version history for an entity
+   *
+   * @param planId - Plan ID
+   * @param entityType - Entity type
+   * @param entityId - Entity ID
+   * @returns Version history data, or null if not found
+   */
+  async loadVersionHistory(planId: string, entityType: string, entityId: string): Promise<any | null> {
+    const historyPath = path.join(this.plansDir, planId, 'history', entityType, `${entityId}.json`);
+    try {
+      const content = await fs.readFile(historyPath, 'utf-8');
+      return JSON.parse(content);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Delete version history for an entity
+   *
+   * @param planId - Plan ID
+   * @param entityType - Entity type
+   * @param entityId - Entity ID
+   */
+  async deleteVersionHistory(planId: string, entityType: string, entityId: string): Promise<void> {
+    const historyPath = path.join(this.plansDir, planId, 'history', entityType, `${entityId}.json`);
+    try {
+      await fs.unlink(historyPath);
+    } catch {
+      // File doesn't exist, ignore
+    }
+  }
+
+  /**
    * Atomic write to prevent data corruption
    *
    * WINDOWS EPERM ISSUE:

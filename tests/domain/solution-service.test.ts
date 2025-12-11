@@ -3,7 +3,6 @@ import { SolutionService } from '../../src/domain/services/solution-service.js';
 import { RequirementService } from '../../src/domain/services/requirement-service.js';
 import { DecisionService } from '../../src/domain/services/decision-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
-import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import * as fs from 'fs/promises';
@@ -15,7 +14,6 @@ describe('SolutionService', () => {
   let requirementService: RequirementService;
   let decisionService: DecisionService;
   let planService: PlanService;
-  let storage: FileStorage;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let testDir: string;
@@ -23,8 +21,6 @@ describe('SolutionService', () => {
 
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `mcp-sol-test-${Date.now()}`);
-    storage = new FileStorage(testDir);
-    await storage.initialize();
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -39,7 +35,7 @@ describe('SolutionService', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage, repositoryFactory);
+    planService = new PlanService(repositoryFactory);
     decisionService = new DecisionService(repositoryFactory, planService);
     service = new SolutionService(repositoryFactory, planService, undefined, decisionService);
     requirementService = new RequirementService(repositoryFactory, planService);

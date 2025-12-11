@@ -12,7 +12,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
@@ -23,8 +22,37 @@ import path from 'path';
 import os from 'os';
 import * as fs from 'fs/promises';
 
+import type { Entity } from '../../src/domain/entities/types.js';
+
+// Helper functions for loading/saving entities via repository
+async function loadEntities<T extends Entity>(
+  repositoryFactory: RepositoryFactory,
+  planId: string,
+  entityType: 'phases'
+): Promise<T[]> {
+  const typeMap: Record<string, string> = {
+    phases: 'phase'
+  };
+  const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
+  return repo.findAll();
+}
+
+async function saveEntities<T extends Entity>(
+  repositoryFactory: RepositoryFactory,
+  planId: string,
+  entityType: 'phases',
+  entities: T[]
+): Promise<void> {
+  const typeMap: Record<string, string> = {
+    phases: 'phase'
+  };
+  const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
+  for (const entity of entities) {
+    await repo.update(entity.id, entity);
+  }
+}
+
 describe('Sprint 10: Remove codeExamples from Phase', () => {
-  let storage: FileStorage;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let planService: PlanService;
@@ -36,8 +64,6 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
   beforeEach(async () => {
     // Create temp directory for test
     testDir = path.join(os.tmpdir(), `test-sprint10-${Date.now()}`);
-    storage = new FileStorage(testDir);
-    await storage.initialize();
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -52,8 +78,8 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage, repositoryFactory);
-    phaseService = new PhaseService(storage, planService);
+    planService = new PlanService(repositoryFactory);
+    phaseService = new PhaseService(repositoryFactory, planService);
     artifactService = new ArtifactService(repositoryFactory, planService);
 
     // Create test plan
@@ -151,7 +177,8 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       });
 
       // If phase was created, verify codeExamples was not stored
-      const phases = await storage.loadEntities<Phase>(testPlanId, 'phases');
+      const repo = repositoryFactory.createRepository<Phase>('phase', testPlanId);
+      const phases = await repo.findAll();
       expect((phases[0] as any).codeExamples).toBeUndefined();
     });
   });
@@ -210,7 +237,8 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       });
 
       // Verify codeRefs was not stored
-      const phases = await storage.loadEntities<Phase>(testPlanId, 'phases');
+      const repo = repositoryFactory.createRepository<Phase>('phase', testPlanId);
+      const phases = await repo.findAll();
       expect((phases[0] as any).codeRefs).toBeUndefined();
     });
   });
@@ -323,13 +351,13 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       });
 
       // Simulate legacy data: manually inject codeExamples into storage
-      const phases = await storage.loadEntities<any>(testPlanId, 'phases');
+      const phases = await loadEntities<any>(repositoryFactory, testPlanId, 'phases');
       const legacyPhase = phases.find((p: any) => p.id === phaseResult.phaseId);
       if (legacyPhase) {
         legacyPhase.codeExamples = [
           { language: 'typescript', code: 'legacy code', description: 'old example' },
         ];
-        await storage.saveEntities(testPlanId, 'phases', phases);
+        await saveEntities(repositoryFactory, testPlanId, 'phases', phases);
       }
 
       // Read phase with fields=['*'] - should NOT include codeExamples
@@ -358,11 +386,11 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       });
 
       // Simulate legacy data: manually inject codeRefs into storage
-      const phases = await storage.loadEntities<any>(testPlanId, 'phases');
+      const phases = await loadEntities<any>(repositoryFactory, testPlanId, 'phases');
       const legacyPhase = phases.find((p: any) => p.id === phaseResult.phaseId);
       if (legacyPhase) {
         legacyPhase.codeRefs = ['src/legacy.ts:42', 'tests/old.test.ts:100'];
-        await storage.saveEntities(testPlanId, 'phases', phases);
+        await saveEntities(repositoryFactory, testPlanId, 'phases', phases);
       }
 
       // Read phase with fields=['*'] - should NOT include codeRefs

@@ -6,10 +6,43 @@ import { SolutionService } from '../../src/domain/services/solution-service.js';
 import { PhaseService } from '../../src/domain/services/phase-service.js';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { LinkingService } from '../../src/domain/services/linking-service.js';
-import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
-import type { Requirement, Solution, Phase, Artifact } from '../../src/domain/entities/types.js';
+import type { Requirement, Solution, Phase, Artifact, Entity } from '../../src/domain/entities/types.js';
+
+// Helper functions for loading/saving entities via repository
+async function loadEntities<T extends Entity>(
+  repositoryFactory: RepositoryFactory,
+  planId: string,
+  entityType: 'requirements' | 'solutions' | 'phases' | 'artifacts'
+): Promise<T[]> {
+  const typeMap: Record<string, string> = {
+    requirements: 'requirement',
+    solutions: 'solution',
+    phases: 'phase',
+    artifacts: 'artifact'
+  };
+  const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
+  return repo.findAll();
+}
+
+async function saveEntities<T extends Entity>(
+  repositoryFactory: RepositoryFactory,
+  planId: string,
+  entityType: 'requirements' | 'solutions' | 'phases' | 'artifacts',
+  entities: T[]
+): Promise<void> {
+  const typeMap: Record<string, string> = {
+    requirements: 'requirement',
+    solutions: 'solution',
+    phases: 'phase',
+    artifacts: 'artifact'
+  };
+  const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
+  for (const entity of entities) {
+    await repo.update(entity.id, entity);
+  }
+}
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -22,7 +55,6 @@ describe('QueryService', () => {
   let phaseService: PhaseService;
   let artifactService: ArtifactService;
   let linkingService: LinkingService;
-  let storage: FileStorage;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let testDir: string;
@@ -30,8 +62,6 @@ describe('QueryService', () => {
 
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `mcp-query-test-${Date.now()}`);
-    storage = new FileStorage(testDir);
-    await storage.initialize();
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -46,13 +76,13 @@ describe('QueryService', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage, repositoryFactory);
+    planService = new PlanService(repositoryFactory);
     requirementService = new RequirementService(repositoryFactory, planService);
     solutionService = new SolutionService(repositoryFactory, planService);
-    phaseService = new PhaseService(storage, planService);
+    phaseService = new PhaseService(repositoryFactory, planService);
     artifactService = new ArtifactService(repositoryFactory, planService);
     linkingService = new LinkingService(repositoryFactory);
-    queryService = new QueryService(storage, planService, linkingService);
+    queryService = new QueryService(repositoryFactory, planService, linkingService);
 
     const plan = await planService.createPlan({
       name: 'Test Plan',
@@ -1198,10 +1228,10 @@ describe('QueryService', () => {
 
     // SOLUTION ENTITY
     it('RED: should handle solution with undefined tradeoffs', async () => {
-      const solutions = await storage.loadEntities<Solution>(planId, 'solutions');
+      const solutions = await loadEntities<Solution>(repositoryFactory, planId, 'solutions');
       if (solutions.length > 0) {
         solutions[0].tradeoffs = undefined as any;
-        await storage.saveEntities(planId, 'solutions', solutions);
+        await saveEntities(repositoryFactory, planId, 'solutions', solutions);
       }
 
       const result = await queryService.exportPlan({ planId, format: 'markdown' });
@@ -1209,7 +1239,7 @@ describe('QueryService', () => {
     });
 
     it('RED: should handle tradeoff with undefined pros', async () => {
-      const solutions = await storage.loadEntities<Solution>(planId, 'solutions');
+      const solutions = await loadEntities<Solution>(repositoryFactory, planId, 'solutions');
       if (solutions.length > 0) {
         solutions[0].tradeoffs = [
           {
@@ -1218,7 +1248,7 @@ describe('QueryService', () => {
             cons: ['Slower'],
           },
         ];
-        await storage.saveEntities(planId, 'solutions', solutions);
+        await saveEntities(repositoryFactory, planId, 'solutions', solutions);
       }
 
       const result = await queryService.exportPlan({ planId, format: 'markdown' });
@@ -1226,7 +1256,7 @@ describe('QueryService', () => {
     });
 
     it('RED: should handle tradeoff with undefined cons', async () => {
-      const solutions = await storage.loadEntities<Solution>(planId, 'solutions');
+      const solutions = await loadEntities<Solution>(repositoryFactory, planId, 'solutions');
       if (solutions.length > 0) {
         solutions[0].tradeoffs = [
           {
@@ -1235,7 +1265,7 @@ describe('QueryService', () => {
             cons: undefined as any,
           },
         ];
-        await storage.saveEntities(planId, 'solutions', solutions);
+        await saveEntities(repositoryFactory, planId, 'solutions', solutions);
       }
 
       const result = await queryService.exportPlan({ planId, format: 'markdown' });
@@ -1244,10 +1274,10 @@ describe('QueryService', () => {
 
     // PHASE ENTITY
     it('RED: should handle phase with undefined objectives', async () => {
-      const phases = await storage.loadEntities<Phase>(planId, 'phases');
+      const phases = await loadEntities<Phase>(repositoryFactory, planId, 'phases');
       if (phases.length > 0) {
         phases[0].objectives = undefined as any;
-        await storage.saveEntities(planId, 'phases', phases);
+        await saveEntities(repositoryFactory, planId, 'phases', phases);
       }
 
       const result = await queryService.searchEntities({ planId, query: 'phase' });
@@ -1255,10 +1285,10 @@ describe('QueryService', () => {
     });
 
     it('RED: should handle phase with undefined deliverables', async () => {
-      const phases = await storage.loadEntities<Phase>(planId, 'phases');
+      const phases = await loadEntities<Phase>(repositoryFactory, planId, 'phases');
       if (phases.length > 0) {
         phases[0].deliverables = undefined as any;
-        await storage.saveEntities(planId, 'phases', phases);
+        await saveEntities(repositoryFactory, planId, 'phases', phases);
       }
 
       const result = await queryService.searchEntities({ planId, query: 'phase' });
@@ -1319,12 +1349,12 @@ describe('QueryService', () => {
 
     // INTEGRATION TESTS
     it('RED: should search phase without objectives/deliverables', async () => {
-      const phases = await storage.loadEntities<Phase>(planId, 'phases');
+      const phases = await loadEntities<Phase>(repositoryFactory, planId, 'phases');
       if (phases.length > 0) {
         const phaseTitle = phases[0].title;
         phases[0].objectives = undefined as any;
         phases[0].deliverables = undefined as any;
-        await storage.saveEntities(planId, 'phases', phases);
+        await saveEntities(repositoryFactory, planId, 'phases', phases);
 
         const result = await queryService.searchEntities({
           planId,
@@ -1340,16 +1370,16 @@ describe('QueryService', () => {
 
     it('RED: should export plan with mixed null fields', async () => {
       // Create entities with various undefined fields
-      const phases = await storage.loadEntities<Phase>(planId, 'phases');
+      const phases = await loadEntities<Phase>(repositoryFactory, planId, 'phases');
       if (phases.length > 0) {
         phases[0].objectives = undefined as any;
-        await storage.saveEntities(planId, 'phases', phases);
+        await saveEntities(repositoryFactory, planId, 'phases', phases);
       }
 
-      const requirements = await storage.loadEntities<Requirement>(planId, 'requirements');
+      const requirements = await loadEntities<Requirement>(repositoryFactory, planId, 'requirements');
       if (requirements.length > 0) {
         requirements[0].acceptanceCriteria = undefined as any;
-        await storage.saveEntities(planId, 'requirements', requirements);
+        await saveEntities(repositoryFactory, planId, 'requirements', requirements);
       }
 
       const result = await queryService.exportPlan({ planId, format: 'markdown' });
@@ -1360,10 +1390,10 @@ describe('QueryService', () => {
     });
 
     it('RED: should export markdown with undefined acceptanceCriteria', async () => {
-      const requirements = await storage.loadEntities<Requirement>(planId, 'requirements');
+      const requirements = await loadEntities<Requirement>(repositoryFactory, planId, 'requirements');
       if (requirements.length > 0) {
         requirements[0].acceptanceCriteria = undefined as any;
-        await storage.saveEntities(planId, 'requirements', requirements);
+        await saveEntities(repositoryFactory, planId, 'requirements', requirements);
       }
 
       const result = await queryService.exportPlan({ planId, format: 'markdown' });

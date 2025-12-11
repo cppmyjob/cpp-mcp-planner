@@ -13,7 +13,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { FileStorage } from '../../src/infrastructure/file-storage.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
@@ -27,8 +26,13 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
+// Helper function to load manifest via repository
+async function loadManifest(repositoryFactory: RepositoryFactory, planId: string) {
+  const planRepo = repositoryFactory.createPlanRepository();
+  return planRepo.loadManifest(planId);
+}
+
 describe('Version History Service (Sprint 7)', () => {
-  let storage: FileStorage;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let planService: PlanService;
@@ -42,8 +46,6 @@ describe('Version History Service (Sprint 7)', () => {
 
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `mcp-version-history-test-${Date.now()}`);
-    storage = new FileStorage(testDir);
-    await storage.initialize();
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -58,11 +60,11 @@ describe('Version History Service (Sprint 7)', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage, repositoryFactory);
-    versionHistoryService = new VersionHistoryService(storage);
+    planService = new PlanService(repositoryFactory);
+    versionHistoryService = new VersionHistoryService(repositoryFactory);
     requirementService = new RequirementService(repositoryFactory, planService, versionHistoryService);
     solutionService = new SolutionService(repositoryFactory, planService, versionHistoryService);
-    phaseService = new PhaseService(storage, planService, versionHistoryService);
+    phaseService = new PhaseService(repositoryFactory, planService, versionHistoryService);
     decisionService = new DecisionService(repositoryFactory, planService, versionHistoryService);
     artifactService = new ArtifactService(repositoryFactory, planService, versionHistoryService);
   });
@@ -101,7 +103,7 @@ describe('Version History Service (Sprint 7)', () => {
       expect(plan.planId).toBeDefined();
 
       // History should be disabled by default
-      const manifest = await storage.loadManifest(plan.planId);
+      const manifest = await loadManifest(repositoryFactory, plan.planId);
       expect(manifest.enableHistory).toBeUndefined(); // or false
       expect(manifest.maxHistoryDepth).toBeUndefined(); // or 0
     });
@@ -114,7 +116,7 @@ describe('Version History Service (Sprint 7)', () => {
         enableHistory: false
       });
 
-      const manifest = await storage.loadManifest(plan.planId);
+      const manifest = await loadManifest(repositoryFactory, plan.planId);
       expect(manifest.enableHistory).toBe(false);
       expect(manifest.maxHistoryDepth).toBe(0);
     });
@@ -127,7 +129,7 @@ describe('Version History Service (Sprint 7)', () => {
         enableHistory: true
       });
 
-      const manifest = await storage.loadManifest(plan.planId);
+      const manifest = await loadManifest(repositoryFactory, plan.planId);
       expect(manifest.enableHistory).toBe(true);
       expect(manifest.maxHistoryDepth).toBe(5); // Default depth when enabled
     });
@@ -141,7 +143,7 @@ describe('Version History Service (Sprint 7)', () => {
         maxHistoryDepth: 3
       });
 
-      const manifest = await storage.loadManifest(plan.planId);
+      const manifest = await loadManifest(repositoryFactory, plan.planId);
       expect(manifest.enableHistory).toBe(true);
       expect(manifest.maxHistoryDepth).toBe(3);
     });
@@ -175,7 +177,7 @@ describe('Version History Service (Sprint 7)', () => {
         maxHistoryDepth: 0
       });
 
-      const manifest = await storage.loadManifest(plan.planId);
+      const manifest = await loadManifest(repositoryFactory, plan.planId);
       // maxHistoryDepth=0 means history is effectively disabled
       expect(manifest.maxHistoryDepth).toBe(0);
     });
@@ -188,7 +190,7 @@ describe('Version History Service (Sprint 7)', () => {
         maxHistoryDepth: 5
       });
 
-      const manifest = await storage.loadManifest(plan.planId);
+      const manifest = await loadManifest(repositoryFactory, plan.planId);
       expect(manifest.enableHistory).toBe(true);
       expect(manifest.maxHistoryDepth).toBe(5);
     });
@@ -210,7 +212,7 @@ describe('Version History Service (Sprint 7)', () => {
         maxHistoryDepth: 1
       });
 
-      const manifest = await storage.loadManifest(plan.planId);
+      const manifest = await loadManifest(repositoryFactory, plan.planId);
       expect(manifest.maxHistoryDepth).toBe(1);
       expect(manifest.enableHistory).toBe(true);
     });
@@ -223,7 +225,7 @@ describe('Version History Service (Sprint 7)', () => {
         maxHistoryDepth: 10
       });
 
-      const manifest = await storage.loadManifest(plan.planId);
+      const manifest = await loadManifest(repositoryFactory, plan.planId);
       expect(manifest.maxHistoryDepth).toBe(10);
     });
 
@@ -235,7 +237,7 @@ describe('Version History Service (Sprint 7)', () => {
       });
 
       // Should work without errors
-      const manifest = await storage.loadManifest(plan.planId);
+      const manifest = await loadManifest(repositoryFactory, plan.planId);
       expect(manifest).toBeDefined();
     });
   });
@@ -1591,7 +1593,7 @@ describe('Version History Service (Sprint 7)', () => {
       });
 
       // Get initial lockVersion
-      let manifest = await storage.loadManifest(plan.planId);
+      let manifest = await loadManifest(repositoryFactory, plan.planId);
       const initialLockVersion = manifest.lockVersion;
       expect(initialLockVersion).toBe(1);
 
@@ -1604,7 +1606,7 @@ describe('Version History Service (Sprint 7)', () => {
       });
 
       // lockVersion should increment
-      manifest = await storage.loadManifest(plan.planId);
+      manifest = await loadManifest(repositoryFactory, plan.planId);
       expect(manifest.lockVersion).toBe(initialLockVersion + 1);
       expect(manifest.lockVersion).toBe(2);
 
@@ -1617,7 +1619,7 @@ describe('Version History Service (Sprint 7)', () => {
       });
 
       // lockVersion should increment again
-      manifest = await storage.loadManifest(plan.planId);
+      manifest = await loadManifest(repositoryFactory, plan.planId);
       expect(manifest.lockVersion).toBe(3);
     });
 

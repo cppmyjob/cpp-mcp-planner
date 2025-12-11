@@ -1,6 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { FileStorage } from '../../infrastructure/file-storage.js';
-import type { RepositoryFactory } from '../repositories/interfaces.js';
+import type { RepositoryFactory, PlanRepository } from '../repositories/interfaces.js';
 import type {
   PlanManifest,
   Plan,
@@ -152,10 +151,11 @@ export interface GetSummaryResult {
 }
 
 export class PlanService {
-  constructor(
-    private storage: FileStorage,
-    private repositoryFactory?: RepositoryFactory
-  ) {}
+  private planRepo: PlanRepository;
+
+  constructor(private repositoryFactory: RepositoryFactory) {
+    this.planRepo = repositoryFactory.createPlanRepository();
+  }
 
   async createPlan(input: CreatePlanInput): Promise<CreatePlanResult> {
     const planId = uuidv4();
@@ -209,16 +209,11 @@ export class PlanService {
     }
     // If neither is provided, history remains disabled (fields are undefined)
 
-    await this.storage.createPlanDirectory(planId);
-    await this.storage.saveManifest(planId, manifest);
+    await this.planRepo.createPlan(planId);
+    await this.planRepo.saveManifest(planId, manifest);
 
-    // Initialize empty entity files
-    await this.storage.saveEntities(planId, 'requirements', []);
-    await this.storage.saveEntities(planId, 'solutions', []);
-    await this.storage.saveEntities(planId, 'decisions', []);
-    await this.storage.saveEntities(planId, 'phases', []);
-    await this.storage.saveEntities(planId, 'artifacts', []);
-    await this.storage.saveLinks(planId, []);
+    // Note: Individual entity repositories create their directories on first write
+    // No need to initialize empty entity files with RepositoryFactory pattern
 
     return {
       planId,
@@ -226,12 +221,12 @@ export class PlanService {
   }
 
   async listPlans(input: ListPlansInput): Promise<ListPlansResult> {
-    const planIds = await this.storage.listPlans();
+    const planIds = await this.planRepo.listPlans();
     const manifests: PlanManifest[] = [];
 
     for (const planId of planIds) {
       try {
-        const manifest = await this.storage.loadManifest(planId);
+        const manifest = await this.planRepo.loadManifest(planId);
         manifests.push(manifest);
       } catch {
         // Skip invalid plans
@@ -289,53 +284,39 @@ export class PlanService {
   }
 
   async getPlan(input: GetPlanInput): Promise<GetPlanResult> {
-    const exists = await this.storage.planExists(input.planId);
+    const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
-    const manifest = await this.storage.loadManifest(input.planId);
+    const manifest = await this.planRepo.loadManifest(input.planId);
 
     const result: GetPlanResult = {
       plan: { manifest },
     };
 
     if (input.includeEntities) {
-      // Use RepositoryFactory if available (reads from individual files)
-      let requirements: Requirement[];
-      let solutions: Solution[];
-      let decisions: Decision[];
-      let artifacts: Artifact[];
-      let links: Link[];
+      const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
+      const solRepo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
+      const decRepo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
+      const phaseRepo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+      const artRepo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
+      const linkRepo = this.repositoryFactory.createLinkRepository(input.planId);
 
-      if (this.repositoryFactory) {
-        const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
-        const solRepo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
-        const decRepo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
-        const artRepo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
-        const linkRepo = this.repositoryFactory.createLinkRepository(input.planId);
-
-        [requirements, solutions, decisions, artifacts, links] = await Promise.all([
-          reqRepo.findAll(),
-          solRepo.findAll(),
-          decRepo.findAll(),
-          artRepo.findAll(),
-          linkRepo.findAllLinks(),
-        ]);
-      } else {
-        // Fallback to FileStorage
-        requirements = await this.storage.loadEntities<Requirement>(input.planId, 'requirements');
-        solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
-        decisions = await this.storage.loadEntities<Decision>(input.planId, 'decisions');
-        artifacts = await this.storage.loadEntities<Artifact>(input.planId, 'artifacts');
-        links = await this.storage.loadLinks(input.planId);
-      }
+      const [requirements, solutions, decisions, phases, artifacts, links] = await Promise.all([
+        reqRepo.findAll(),
+        solRepo.findAll(),
+        decRepo.findAll(),
+        phaseRepo.findAll(),
+        artRepo.findAll(),
+        linkRepo.findAllLinks(),
+      ]);
 
       result.plan.entities = {
         requirements,
         solutions,
         decisions,
-        phases: await this.storage.loadEntities<Phase>(input.planId, 'phases'),
+        phases,
         artifacts,
       };
       result.plan.links = links;
@@ -345,12 +326,12 @@ export class PlanService {
   }
 
   async updatePlan(input: UpdatePlanInput): Promise<UpdatePlanResult> {
-    const exists = await this.storage.planExists(input.planId);
+    const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
-    const manifest = await this.storage.loadManifest(input.planId);
+    const manifest = await this.planRepo.loadManifest(input.planId);
     const now = new Date().toISOString();
 
     // Apply updates
@@ -383,7 +364,7 @@ export class PlanService {
     manifest.version += 1;
     manifest.lockVersion += 1;  // Sprint 7 fix: Increment lockVersion for optimistic locking
 
-    await this.storage.saveManifest(input.planId, manifest);
+    await this.planRepo.saveManifest(input.planId, manifest);
 
     return {
       success: true,
@@ -392,13 +373,13 @@ export class PlanService {
   }
 
   async archivePlan(input: ArchivePlanInput): Promise<ArchivePlanResult> {
-    const exists = await this.storage.planExists(input.planId);
+    const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
     if (input.permanent) {
-      await this.storage.deletePlan(input.planId);
+      await this.planRepo.deletePlan(input.planId);
       return {
         success: true,
         message: 'Plan permanently deleted',
@@ -418,22 +399,22 @@ export class PlanService {
   }
 
   async setActivePlan(input: SetActivePlanInput): Promise<SetActivePlanResult> {
-    const exists = await this.storage.planExists(input.planId);
+    const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
-    const manifest = await this.storage.loadManifest(input.planId);
+    const manifest = await this.planRepo.loadManifest(input.planId);
     const workspacePath = input.workspacePath || process.cwd();
     const now = new Date().toISOString();
 
-    const activePlans = await this.storage.loadActivePlans();
+    const activePlans = await this.planRepo.loadActivePlans();
     activePlans[workspacePath] = {
       planId: input.planId,
       lastUpdated: now,
     };
 
-    await this.storage.saveActivePlans(activePlans);
+    await this.planRepo.saveActivePlans(activePlans);
 
     return {
       success: true,
@@ -482,7 +463,7 @@ export class PlanService {
   async getActivePlan(input: GetActivePlanInput): Promise<GetActivePlanResult> {
     const workspacePath = input.workspacePath || process.cwd();
     const includeGuide = input.includeGuide === true; // Default: false (Sprint 6 change)
-    const activePlans = await this.storage.loadActivePlans();
+    const activePlans = await this.planRepo.loadActivePlans();
 
     const mapping = activePlans[workspacePath];
     if (!mapping) {
@@ -490,7 +471,7 @@ export class PlanService {
     }
 
     try {
-      const manifest = await this.storage.loadManifest(mapping.planId);
+      const manifest = await this.planRepo.loadManifest(mapping.planId);
 
       // Build response with optional guide
       const response: GetActivePlanResult = {
@@ -510,19 +491,20 @@ export class PlanService {
     } catch {
       // Plan was deleted, clear mapping
       delete activePlans[workspacePath];
-      await this.storage.saveActivePlans(activePlans);
+      await this.planRepo.saveActivePlans(activePlans);
       return { activePlan: null };
     }
   }
 
   async getSummary(input: GetSummaryInput): Promise<GetSummaryResult> {
-    const exists = await this.storage.planExists(input.planId);
+    const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
-    const manifest = await this.storage.loadManifest(input.planId);
-    const phases = await this.storage.loadEntities<Phase>(input.planId, 'phases');
+    const manifest = await this.planRepo.loadManifest(input.planId);
+    const phaseRepo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
+    const phases = await phaseRepo.findAll();
 
     // Calculate child counts for each phase
     const childCounts = new Map<string, number>();
@@ -558,37 +540,21 @@ export class PlanService {
 
   // Helper to update statistics
   async updateStatistics(planId: string): Promise<void> {
-    const manifest = await this.storage.loadManifest(planId);
+    const manifest = await this.planRepo.loadManifest(planId);
 
-    // Use RepositoryFactory if available (reads from individual files)
-    // Otherwise fall back to FileStorage (reads from monolithic files)
-    let requirements: Requirement[];
-    let solutions: Solution[];
-    let decisions: Decision[];
-    let artifacts: Artifact[];
+    const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', planId);
+    const solRepo = this.repositoryFactory.createRepository<Solution>('solution', planId);
+    const decRepo = this.repositoryFactory.createRepository<Decision>('decision', planId);
+    const phaseRepo = this.repositoryFactory.createRepository<Phase>('phase', planId);
+    const artRepo = this.repositoryFactory.createRepository<Artifact>('artifact', planId);
 
-    if (this.repositoryFactory) {
-      const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', planId);
-      const solRepo = this.repositoryFactory.createRepository<Solution>('solution', planId);
-      const decRepo = this.repositoryFactory.createRepository<Decision>('decision', planId);
-      const artRepo = this.repositoryFactory.createRepository<Artifact>('artifact', planId);
-
-      [requirements, solutions, decisions, artifacts] = await Promise.all([
-        reqRepo.findAll(),
-        solRepo.findAll(),
-        decRepo.findAll(),
-        artRepo.findAll(),
-      ]);
-    } else {
-      // Fallback to FileStorage
-      requirements = await this.storage.loadEntities<Requirement>(planId, 'requirements');
-      solutions = await this.storage.loadEntities<Solution>(planId, 'solutions');
-      decisions = await this.storage.loadEntities<Decision>(planId, 'decisions');
-      artifacts = await this.storage.loadEntities<Artifact>(planId, 'artifacts');
-    }
-
-    // PhaseService still uses FileStorage
-    const phases = await this.storage.loadEntities<Phase>(planId, 'phases');
+    const [requirements, solutions, decisions, phases, artifacts] = await Promise.all([
+      reqRepo.findAll(),
+      solRepo.findAll(),
+      decRepo.findAll(),
+      phaseRepo.findAll(),
+      artRepo.findAll(),
+    ]);
 
     manifest.statistics.totalRequirements = requirements.length;
     manifest.statistics.totalSolutions = solutions.length;
@@ -607,7 +573,7 @@ export class PlanService {
     }
 
     manifest.updatedAt = new Date().toISOString();
-    await this.storage.saveManifest(planId, manifest);
+    await this.planRepo.saveManifest(planId, manifest);
   }
 }
 

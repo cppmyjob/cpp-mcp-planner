@@ -376,6 +376,41 @@ export interface PlanRepository {
    * Load active plans index
    */
   loadActivePlans(): Promise<any>;
+
+  /**
+   * Save export file
+   * @param planId - Plan ID
+   * @param filename - Export filename (e.g. 'plan-export.md')
+   * @param content - Export content
+   * @returns Full path to saved file
+   */
+  saveExport(planId: string, filename: string, content: string): Promise<string>;
+
+  /**
+   * Save version history for an entity
+   * @param planId - Plan ID
+   * @param entityType - Entity type (requirement, solution, etc.)
+   * @param entityId - Entity ID
+   * @param history - Version history data
+   */
+  saveVersionHistory(planId: string, entityType: string, entityId: string, history: any): Promise<void>;
+
+  /**
+   * Load version history for an entity
+   * @param planId - Plan ID
+   * @param entityType - Entity type
+   * @param entityId - Entity ID
+   * @returns Version history data, or null if not found
+   */
+  loadVersionHistory(planId: string, entityType: string, entityId: string): Promise<any | null>;
+
+  /**
+   * Delete version history for an entity
+   * @param planId - Plan ID
+   * @param entityType - Entity type
+   * @param entityId - Entity ID
+   */
+  deleteVersionHistory(planId: string, entityType: string, entityId: string): Promise<void>;
 }
 
 // ============================================================================
