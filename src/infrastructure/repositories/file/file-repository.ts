@@ -13,9 +13,6 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as crypto from 'crypto';
-import * as util from 'util';
-import gracefulFs from 'graceful-fs';
 import type {
   Repository,
   QueryOptions,
@@ -31,24 +28,28 @@ import {
 } from '../../../domain/repositories/errors.js';
 import { IndexManager } from './index-manager.js';
 import { FileLockManager } from './file-lock-manager.js';
+import { BaseFileRepository } from './base-file-repository.js';
 import type { IndexMetadata, CacheOptions } from './types.js';
-
-const gracefulRename = util.promisify(gracefulFs.rename);
 
 /**
  * File Repository Implementation
+ *
+ * Extends BaseFileRepository to inherit common functionality:
+ * - atomicWriteJSON() for safe file writes
+ * - loadJSON() for file reading
+ * - LRU cache operations
  */
-export class FileRepository<T extends Entity> implements Repository<T> {
+export class FileRepository<T extends Entity>
+  extends BaseFileRepository
+  implements Repository<T>
+{
   readonly entityType: EntityType;
 
-  private baseDir: string;
   private planId: string;
   private entitiesDir: string;
   private indexManager: IndexManager<IndexMetadata>;
   private fileLockManager: FileLockManager;
   private entityCache: Map<string, T> = new Map();
-  private cacheOptions: Required<CacheOptions>;
-  private initialized: boolean = false;
   private ownsLockManager: boolean;
 
   constructor(
@@ -58,7 +59,7 @@ export class FileRepository<T extends Entity> implements Repository<T> {
     cacheOptions?: Partial<CacheOptions>,
     fileLockManager?: FileLockManager
   ) {
-    this.baseDir = baseDir;
+    super(baseDir, cacheOptions);
     this.planId = planId;
     this.entityType = entityType;
 
@@ -74,21 +75,13 @@ export class FileRepository<T extends Entity> implements Repository<T> {
     // Track ownership to avoid disposing shared instances
     this.ownsLockManager = !fileLockManager;
     this.fileLockManager = fileLockManager || new FileLockManager(planDir);
-
-    // Cache options
-    this.cacheOptions = {
-      enabled: cacheOptions?.enabled ?? true,
-      ttl: cacheOptions?.ttl ?? 5000,
-      maxSize: cacheOptions?.maxSize ?? 100,
-      invalidation: cacheOptions?.invalidation ?? 'version',
-    };
   }
 
   /**
    * Initialize repository
    */
   async initialize(): Promise<void> {
-    if (this.initialized) {
+    if (this.isInitializedState()) {
       return; // Already initialized
     }
 
@@ -107,17 +100,10 @@ export class FileRepository<T extends Entity> implements Repository<T> {
       await this.fileLockManager.initialize();
     }
 
-    this.initialized = true;
+    this.markInitialized();
   }
 
-  /**
-   * Ensure repository is initialized (lazy initialization)
-   */
-  private async ensureInitialized(): Promise<void> {
-    if (!this.initialized) {
-      await this.initialize();
-    }
-  }
+  // ensureInitialized() is inherited from BaseFileRepository
 
   // ============================================================================
   // Read Operations
@@ -459,36 +445,19 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   /**
-   * Load entity from file
+   * Load entity from file (delegates to base class)
    */
   private async loadEntityFile(filePath: string): Promise<T> {
     const fullPath = path.join(this.entitiesDir, filePath);
-    const content = await fs.readFile(fullPath, 'utf-8');
-    return JSON.parse(content) as T;
+    return this.loadJSON<T>(fullPath);
   }
 
   /**
-   * Save entity to file atomically
+   * Save entity to file atomically (delegates to base class)
    */
   private async saveEntityFile(filePath: string, entity: T): Promise<void> {
     const fullPath = path.join(this.entitiesDir, filePath);
-    const tmpPath = `${fullPath}.tmp.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`;
-
-    try {
-      // Write to temp file
-      await fs.writeFile(tmpPath, JSON.stringify(entity, null, 2), 'utf-8');
-
-      // Verify JSON is valid
-      const written = await fs.readFile(tmpPath, 'utf-8');
-      JSON.parse(written);
-
-      // Atomic rename
-      await gracefulRename(tmpPath, fullPath);
-    } catch (error) {
-      // Cleanup temp file
-      await fs.unlink(tmpPath).catch(() => {});
-      throw error;
-    }
+    await this.atomicWriteJSON(fullPath, entity);
   }
 
   /**
@@ -628,25 +597,17 @@ export class FileRepository<T extends Entity> implements Repository<T> {
   }
 
   /**
-   * Cache entity
+   * Cache entity (delegates to base class with LRU eviction)
    */
   private cacheEntity(id: string, entity: T): void {
-    // LRU eviction
-    if (this.entityCache.size >= this.cacheOptions.maxSize) {
-      const firstKey = this.entityCache.keys().next().value;
-      if (firstKey) {
-        this.entityCache.delete(firstKey);
-      }
-    }
-
-    this.entityCache.set(id, entity);
+    this.cacheSet(this.entityCache, id, entity);
   }
 
   /**
-   * Invalidate cache
+   * Invalidate cache (delegates to base class)
    */
   private invalidateCache(id: string): void {
-    this.entityCache.delete(id);
+    this.cacheInvalidate(this.entityCache, id);
   }
 
   // ============================================================================
@@ -662,7 +623,7 @@ export class FileRepository<T extends Entity> implements Repository<T> {
       await this.fileLockManager.dispose();
     }
 
-    // Clear cache
-    this.entityCache.clear();
+    // Clear cache (delegates to base class)
+    this.cacheClear(this.entityCache);
   }
 }

@@ -7,21 +7,22 @@
  * - Active plans index for workspace tracking
  *
  * Uses atomic writes (graceful-fs) for data integrity on Windows.
+ *
+ * Extends BaseFileRepository to inherit common functionality:
+ * - atomicWriteJSON() for safe file writes
+ * - loadJSON() for file reading
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as crypto from 'crypto';
-import * as util from 'util';
-import gracefulFs from 'graceful-fs';
 import type { PlanRepository } from '../../../domain/repositories/interfaces.js';
 import type { PlanManifest, ActivePlansIndex } from '../../../domain/entities/types.js';
-
-// graceful-fs provides retry logic for Windows file locking issues
-const gracefulRename = util.promisify(gracefulFs.rename);
+import { BaseFileRepository } from './base-file-repository.js';
 
 /**
  * File-based implementation of PlanRepository
+ *
+ * Extends BaseFileRepository for common file operations.
  *
  * Directory structure:
  * ```
@@ -47,14 +48,15 @@ const gracefulRename = util.promisify(gracefulFs.rename);
  *   active-plans.json
  * ```
  */
-export class FilePlanRepository implements PlanRepository {
-  private baseDir: string;
+export class FilePlanRepository
+  extends BaseFileRepository
+  implements PlanRepository
+{
   private plansDir: string;
   private activePlansPath: string;
-  private isInitialized: boolean = false;
 
   constructor(baseDir: string) {
-    this.baseDir = baseDir;
+    super(baseDir);
     this.plansDir = path.join(baseDir, 'plans');
     this.activePlansPath = path.join(baseDir, 'active-plans.json');
   }
@@ -66,14 +68,14 @@ export class FilePlanRepository implements PlanRepository {
    * Safe to call multiple times (idempotent).
    */
   async initialize(): Promise<void> {
-    if (this.isInitialized) {
+    if (this.isInitializedState()) {
       return;
     }
 
     await fs.mkdir(this.plansDir, { recursive: true });
     await fs.mkdir(path.join(this.baseDir, '.history'), { recursive: true });
 
-    this.isInitialized = true;
+    this.markInitialized();
   }
 
   /**
@@ -156,18 +158,20 @@ export class FilePlanRepository implements PlanRepository {
   /**
    * Save plan manifest
    *
-   * Uses atomic write to prevent data corruption.
+   * Uses atomic write to prevent data corruption (delegates to base class).
    *
    * @param planId - Plan ID
    * @param manifest - Plan manifest object
    */
   async saveManifest(planId: string, manifest: PlanManifest): Promise<void> {
     const manifestPath = path.join(this.plansDir, planId, 'manifest.json');
-    await this.atomicWrite(manifestPath, manifest);
+    await this.atomicWriteJSON(manifestPath, manifest);
   }
 
   /**
    * Load plan manifest
+   *
+   * Delegates to base class loadJSON().
    *
    * @param planId - Plan ID
    * @returns Plan manifest object
@@ -175,20 +179,19 @@ export class FilePlanRepository implements PlanRepository {
    */
   async loadManifest(planId: string): Promise<PlanManifest> {
     const manifestPath = path.join(this.plansDir, planId, 'manifest.json');
-    const content = await fs.readFile(manifestPath, 'utf-8');
-    return JSON.parse(content) as PlanManifest;
+    return this.loadJSON<PlanManifest>(manifestPath);
   }
 
   /**
    * Save active plans index
    *
    * Stores workspace -> plan mapping for active plan tracking.
-   * Uses atomic write to prevent data corruption.
+   * Uses atomic write to prevent data corruption (delegates to base class).
    *
    * @param index - Active plans index object
    */
   async saveActivePlans(index: ActivePlansIndex): Promise<void> {
-    await this.atomicWrite(this.activePlansPath, index);
+    await this.atomicWriteJSON(this.activePlansPath, index);
   }
 
   /**
@@ -226,6 +229,8 @@ export class FilePlanRepository implements PlanRepository {
   /**
    * Save version history for an entity
    *
+   * Uses atomic write (delegates to base class).
+   *
    * @param planId - Plan ID
    * @param entityType - Entity type (requirement, solution, etc.)
    * @param entityId - Entity ID
@@ -233,11 +238,13 @@ export class FilePlanRepository implements PlanRepository {
    */
   async saveVersionHistory(planId: string, entityType: string, entityId: string, history: any): Promise<void> {
     const historyPath = path.join(this.plansDir, planId, 'history', entityType, `${entityId}.json`);
-    await this.atomicWrite(historyPath, history);
+    await this.atomicWriteJSON(historyPath, history);
   }
 
   /**
    * Load version history for an entity
+   *
+   * Uses loadJSON from base class.
    *
    * @param planId - Plan ID
    * @param entityType - Entity type
@@ -247,8 +254,7 @@ export class FilePlanRepository implements PlanRepository {
   async loadVersionHistory(planId: string, entityType: string, entityId: string): Promise<any | null> {
     const historyPath = path.join(this.plansDir, planId, 'history', entityType, `${entityId}.json`);
     try {
-      const content = await fs.readFile(historyPath, 'utf-8');
-      return JSON.parse(content);
+      return await this.loadJSON(historyPath);
     } catch {
       return null;
     }
@@ -270,43 +276,5 @@ export class FilePlanRepository implements PlanRepository {
     }
   }
 
-  /**
-   * Atomic write to prevent data corruption
-   *
-   * WINDOWS EPERM ISSUE:
-   * On Windows, fs.rename() often fails with "EPERM: operation not permitted" when:
-   * - Windows Defender is scanning the file
-   * - Windows Search Indexer has the file open
-   * - IDE (VS Code, etc.) holds file handles
-   * - File system cache hasn't released the file
-   *
-   * This is a known Node.js issue marked as "wontfix":
-   * https://github.com/nodejs/node/issues/29481
-   *
-   * SOLUTION:
-   * We use graceful-fs which provides retry logic (up to 60s) for EPERM/EBUSY/EACCES errors.
-   * This is the industry standard solution used by npm, webpack, etc.
-   *
-   * @param filePath - Target file path
-   * @param data - Data to write (will be JSON.stringify'd)
-   */
-  private async atomicWrite(filePath: string, data: unknown): Promise<void> {
-    const tmpPath = `${filePath}.tmp.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`;
-
-    try {
-      // Write to temp file
-      await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
-
-      // Verify JSON is valid before committing
-      const written = await fs.readFile(tmpPath, 'utf-8');
-      JSON.parse(written);
-
-      // Atomic rename using graceful-fs (retries on EPERM/EBUSY/EACCES up to 60s)
-      await gracefulRename(tmpPath, filePath);
-    } catch (error) {
-      // Cleanup temp file on error
-      await fs.unlink(tmpPath).catch(() => {});
-      throw error;
-    }
-  }
+  // atomicWrite() is now provided by BaseFileRepository.atomicWriteJSON()
 }

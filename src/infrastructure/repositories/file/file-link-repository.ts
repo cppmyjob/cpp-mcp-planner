@@ -8,12 +8,17 @@
  * - Source/Target indexes for efficient queries
  * - Bulk operations with transaction semantics
  * - Support for RelationType filtering
+ *
+ * Extends BaseFileRepository to inherit common functionality:
+ * - atomicWriteJSON() for safe file writes
+ * - loadJSON() for file reading
+ * - LRU cache operations
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
+
 import type { LinkRepository } from '../../../domain/repositories/interfaces.js';
 import type { Link, RelationType } from '../../../domain/entities/types.js';
 import {
@@ -23,20 +28,23 @@ import {
 } from '../../../domain/repositories/errors.js';
 import { IndexManager } from './index-manager.js';
 import { FileLockManager } from './file-lock-manager.js';
+import { BaseFileRepository } from './base-file-repository.js';
 import type { LinkIndexMetadata, CacheOptions } from './types.js';
 
 /**
  * File Link Repository Implementation
+ *
+ * Extends BaseFileRepository for common file operations
  */
-export class FileLinkRepository implements LinkRepository {
-  private baseDir: string;
+export class FileLinkRepository
+  extends BaseFileRepository
+  implements LinkRepository
+{
   private planId: string;
   private linksDir: string;
   private indexManager: IndexManager<LinkIndexMetadata>;
   private fileLockManager: FileLockManager;
   private linkCache: Map<string, Link> = new Map();
-  private cacheOptions: Required<CacheOptions>;
-  private initialized: boolean = false;
 
   constructor(
     baseDir: string,
@@ -44,7 +52,7 @@ export class FileLinkRepository implements LinkRepository {
     fileLockManager: FileLockManager,
     cacheOptions?: Partial<CacheOptions>
   ) {
-    this.baseDir = baseDir;
+    super(baseDir, cacheOptions);
     this.planId = planId;
     this.fileLockManager = fileLockManager;
 
@@ -56,21 +64,13 @@ export class FileLinkRepository implements LinkRepository {
 
     // Initialize index manager
     this.indexManager = new IndexManager<LinkIndexMetadata>(indexPath, cacheOptions);
-
-    // Cache options
-    this.cacheOptions = {
-      enabled: cacheOptions?.enabled ?? true,
-      ttl: cacheOptions?.ttl ?? 5000,
-      maxSize: cacheOptions?.maxSize ?? 100,
-      invalidation: cacheOptions?.invalidation ?? 'version',
-    };
   }
 
   /**
    * Initialize repository
    */
   async initialize(): Promise<void> {
-    if (this.initialized) {
+    if (this.isInitializedState()) {
       return; // Already initialized
     }
 
@@ -84,17 +84,10 @@ export class FileLinkRepository implements LinkRepository {
     // Initialize index manager
     await this.indexManager.initialize();
 
-    this.initialized = true;
+    this.markInitialized();
   }
 
-  /**
-   * Ensure repository is initialized (lazy initialization)
-   */
-  private async ensureInitialized(): Promise<void> {
-    if (!this.initialized) {
-      await this.initialize();
-    }
-  }
+  // ensureInitialized() is inherited from BaseFileRepository
 
   /**
    * Get FileLockManager instance (for testing)
@@ -159,9 +152,9 @@ export class FileLinkRepository implements LinkRepository {
 
       await this.indexManager.add(metadata);
 
-      // Cache
+      // Cache with LRU eviction
       if (this.cacheOptions.enabled) {
-        this.linkCache.set(id, fullLink);
+        this.cacheLink(id, fullLink);
       }
 
       return fullLink;
@@ -196,9 +189,9 @@ export class FileLinkRepository implements LinkRepository {
     // Load from file
     const link = await this.loadLinkFile(metadata.filePath);
 
-    // Cache
+    // Cache with LRU eviction
     if (this.cacheOptions.enabled) {
-      this.linkCache.set(id, link);
+      this.cacheLink(id, link);
     }
 
     return link;
@@ -261,8 +254,8 @@ export class FileLinkRepository implements LinkRepository {
       // Remove from index
       await this.indexManager.delete(id);
 
-      // Invalidate cache
-      this.linkCache.delete(id);
+      // Invalidate cache (delegates to base class)
+      this.cacheInvalidate(this.linkCache, id);
     });
   }
 
@@ -394,41 +387,33 @@ export class FileLinkRepository implements LinkRepository {
     return path.join(this.linksDir, `${id}.json`);
   }
 
+  /**
+   * Load link from file (delegates to base class)
+   */
   private async loadLinkFile(filePath: string): Promise<Link> {
-    const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content) as Link;
+    return this.loadJSON<Link>(filePath);
   }
 
   /**
-   * Save link to file atomically (FIX H-1)
-   * Uses temp file + rename pattern for crash safety
+   * Cache link with LRU eviction (delegates to base class)
+   */
+  private cacheLink(id: string, link: Link): void {
+    this.cacheSet(this.linkCache, id, link);
+  }
+
+  /**
+   * Save link to file atomically (delegates to base class)
    */
   private async saveLinkFile(filePath: string, link: Link): Promise<void> {
-    const tmpPath = `${filePath}.tmp.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`;
-
-    try {
-      // Write to temp file
-      await fs.writeFile(tmpPath, JSON.stringify(link, null, 2), 'utf-8');
-
-      // Verify JSON is valid
-      const written = await fs.readFile(tmpPath, 'utf-8');
-      JSON.parse(written);
-
-      // Atomic rename
-      await fs.rename(tmpPath, filePath);
-    } catch (error) {
-      // Cleanup temp file on error
-      await fs.unlink(tmpPath).catch(() => {});
-      throw error;
-    }
+    await this.atomicWriteJSON(filePath, link);
   }
 
   /**
-   * Dispose repository and release resources (FIX H-3)
+   * Dispose repository and release resources
    */
   async dispose(): Promise<void> {
-    // Clear cache
-    this.linkCache.clear();
+    // Clear cache (delegates to base class)
+    this.cacheClear(this.linkCache);
 
     // Note: FileLockManager is shared and should be disposed by caller
     // We don't dispose it here as we don't own it
