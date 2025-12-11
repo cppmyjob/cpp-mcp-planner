@@ -778,41 +778,101 @@ export class RequirementService {
   async bulkUpdateRequirements(
     input: BulkUpdateRequirementsInput
   ): Promise<BulkUpdateRequirementsResult> {
-    // Note: Using individual updates instead of bulkUpdateEntities utility (which requires FileStorage)
-    const results: Array<{ requirementId: string; success: boolean; error?: string }> = [];
-    let updated = 0;
-    let failed = 0;
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
 
-    for (const update of input.updates) {
-      try {
-        await this.updateRequirement({
-          planId: input.planId,
-          requirementId: update.requirementId,
-          updates: update.updates,
-        });
-        results.push({
-          requirementId: update.requirementId,
-          success: true,
-        });
-        updated++;
-      } catch (error: any) {
-        results.push({
-          requirementId: update.requirementId,
-          success: false,
-          error: error.message,
-        });
-        failed++;
-        if (input.atomic) {
-          break; // Stop on first error in atomic mode
+    if (input.atomic) {
+      // ATOMIC MODE: All-or-nothing with true rollback
+      // Phase 1: Load all entities and validate
+      const toUpdate: Requirement[] = [];
+      const results: Array<{ requirementId: string; success: boolean; error?: string }> = [];
+
+      for (const update of input.updates) {
+        try {
+          // Load requirement (create deep copy to avoid mutations until save)
+          const originalRequirement = await repo.findById(update.requirementId);
+          const requirement = JSON.parse(JSON.stringify(originalRequirement)) as Requirement;
+
+          // Save original to history before update
+          if (this.versionHistoryService) {
+            await this.versionHistoryService.saveVersion(
+              input.planId,
+              update.requirementId,
+              'requirement',
+              originalRequirement,
+              originalRequirement.version,
+              'claude-code',
+              'Auto-saved before bulk update'
+            );
+          }
+
+          // Apply updates with validation
+          if (update.updates.title !== undefined) requirement.title = update.updates.title;
+          if (update.updates.description !== undefined) requirement.description = update.updates.description;
+          if (update.updates.rationale !== undefined) requirement.rationale = update.updates.rationale;
+          if (update.updates.acceptanceCriteria !== undefined)
+            requirement.acceptanceCriteria = update.updates.acceptanceCriteria;
+          if (update.updates.priority !== undefined) requirement.priority = update.updates.priority;
+          if (update.updates.category !== undefined) requirement.category = update.updates.category;
+          if (update.updates.status !== undefined) requirement.status = update.updates.status;
+          if (update.updates.impact !== undefined) requirement.impact = update.updates.impact;
+          if (update.updates.tags !== undefined) {
+            validateTags(update.updates.tags);
+            requirement.metadata.tags = update.updates.tags;
+          }
+
+          requirement.updatedAt = new Date().toISOString();
+          requirement.version = requirement.version + 1;
+
+          toUpdate.push(requirement);
+          results.push({ requirementId: update.requirementId, success: true });
+        } catch (error: any) {
+          // In atomic mode, any error causes full rejection (no partial updates)
+          throw new Error(`Atomic bulk update failed: ${error.message}`);
         }
       }
-    }
 
-    return {
-      updated,
-      failed,
-      results,
-    };
+      // Phase 2: All validations passed - save atomically
+      await repo.upsertMany(toUpdate);
+
+      return {
+        updated: toUpdate.length,
+        failed: 0,
+        results,
+      };
+    } else {
+      // NON-ATOMIC MODE: Continue on errors (partial success allowed)
+      const results: Array<{ requirementId: string; success: boolean; error?: string }> = [];
+      let updated = 0;
+      let failed = 0;
+
+      for (const update of input.updates) {
+        try {
+          await this.updateRequirement({
+            planId: input.planId,
+            requirementId: update.requirementId,
+            updates: update.updates,
+          });
+          results.push({
+            requirementId: update.requirementId,
+            success: true,
+          });
+          updated++;
+        } catch (error: any) {
+          results.push({
+            requirementId: update.requirementId,
+            success: false,
+            error: error.message,
+          });
+          failed++;
+        }
+      }
+
+      return {
+        updated,
+        failed,
+        results,
+      };
+    }
   }
 
   async resetAllVotes(

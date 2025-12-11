@@ -60,7 +60,7 @@ describe('BatchService - Unit Tests', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage);
+    planService = new PlanService(storage, repositoryFactory);
     requirementService = new RequirementService(repositoryFactory, planService);
     solutionService = new SolutionService(repositoryFactory, planService);
     phaseService = new PhaseService(storage, planService);
@@ -70,6 +70,7 @@ describe('BatchService - Unit Tests', () => {
 
     batchService = new BatchService(
       storage,
+      repositoryFactory,
       planService,
       requirementService,
       solutionService,
@@ -930,7 +931,7 @@ describe('BatchService - Unit Tests', () => {
             },
           ],
         })
-      ).rejects.toThrow('Requirement not found');
+      ).rejects.toThrow(/requirement.*not found/i);
 
       // Verify rollback - all requirements should remain unchanged
       const { requirement: r1 } = await requirementService.getRequirement({

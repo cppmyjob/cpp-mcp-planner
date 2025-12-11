@@ -634,41 +634,108 @@ export class SolutionService {
    * REFACTOR: Uses common bulkUpdateEntities utility
    */
   async bulkUpdateSolutions(input: BulkUpdateSolutionsInput): Promise<BulkUpdateSolutionsResult> {
-    // Note: Using individual updates instead of bulkUpdateEntities utility (which requires FileStorage)
-    const results: Array<{ solutionId: string; success: boolean; error?: string }> = [];
-    let updated = 0;
-    let failed = 0;
+    const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
 
-    for (const update of input.updates) {
-      try {
-        await this.updateSolution({
-          planId: input.planId,
-          solutionId: update.solutionId,
-          updates: update.updates,
-        });
-        results.push({
-          solutionId: update.solutionId,
-          success: true,
-        });
-        updated++;
-      } catch (error: any) {
-        results.push({
-          solutionId: update.solutionId,
-          success: false,
-          error: error.message,
-        });
-        failed++;
-        if (input.atomic) {
-          break; // Stop on first error in atomic mode
+    if (input.atomic) {
+      // ATOMIC MODE: All-or-nothing with true rollback
+      // Phase 1: Load all entities and validate
+      const toUpdate: Solution[] = [];
+      const results: Array<{ solutionId: string; success: boolean; error?: string }> = [];
+
+      for (const update of input.updates) {
+        try {
+          // Load solution (create deep copy to avoid mutations until save)
+          const originalSolution = await repo.findById(update.solutionId);
+          const solution = JSON.parse(JSON.stringify(originalSolution)) as Solution;
+
+          // Save original to history before update
+          if (this.versionHistoryService) {
+            await this.versionHistoryService.saveVersion(
+              input.planId,
+              update.solutionId,
+              'solution',
+              originalSolution,
+              originalSolution.version,
+              'claude-code',
+              'Auto-saved before bulk update'
+            );
+          }
+
+          // Apply updates with validation
+          if (update.updates.title !== undefined) solution.title = update.updates.title;
+          if (update.updates.description !== undefined) solution.description = update.updates.description;
+          if (update.updates.approach !== undefined) solution.approach = update.updates.approach;
+          if (update.updates.implementationNotes !== undefined)
+            solution.implementationNotes = update.updates.implementationNotes;
+          if (update.updates.tradeoffs !== undefined) {
+            this.validateTradeoffs(update.updates.tradeoffs);
+            solution.tradeoffs = update.updates.tradeoffs;
+          }
+          if (update.updates.addressing !== undefined) solution.addressing = update.updates.addressing;
+          if (update.updates.evaluation !== undefined) {
+            validateEffortEstimate(update.updates.evaluation.effortEstimate);
+            solution.evaluation = update.updates.evaluation;
+          }
+          // Tags validation (using type assertion due to Partial<> limitations)
+          const updates = update.updates as any;
+          if (updates.tags !== undefined) {
+            validateTags(updates.tags);
+            solution.metadata.tags = updates.tags;
+          }
+
+          solution.updatedAt = new Date().toISOString();
+          solution.version = solution.version + 1;
+
+          toUpdate.push(solution);
+          results.push({ solutionId: update.solutionId, success: true });
+        } catch (error: any) {
+          // In atomic mode, any error causes full rejection (no partial updates)
+          throw new Error(`Atomic bulk update failed: ${error.message}`);
         }
       }
-    }
 
-    return {
-      updated,
-      failed,
-      results,
-    };
+      // Phase 2: All validations passed - save atomically
+      await repo.upsertMany(toUpdate);
+
+      return {
+        updated: toUpdate.length,
+        failed: 0,
+        results,
+      };
+    } else {
+      // NON-ATOMIC MODE: Continue on errors (partial success allowed)
+      const results: Array<{ solutionId: string; success: boolean; error?: string }> = [];
+      let updated = 0;
+      let failed = 0;
+
+      for (const update of input.updates) {
+        try {
+          await this.updateSolution({
+            planId: input.planId,
+            solutionId: update.solutionId,
+            updates: update.updates,
+          });
+          results.push({
+            solutionId: update.solutionId,
+            success: true,
+          });
+          updated++;
+        } catch (error: any) {
+          results.push({
+            solutionId: update.solutionId,
+            success: false,
+            error: error.message,
+          });
+          failed++;
+        }
+      }
+
+      return {
+        updated,
+        failed,
+        results,
+      };
+    }
   }
 
   /**

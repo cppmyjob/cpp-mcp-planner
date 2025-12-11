@@ -58,13 +58,13 @@ describe('Version History Service (Sprint 7)', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage);
+    planService = new PlanService(storage, repositoryFactory);
     versionHistoryService = new VersionHistoryService(storage);
     requirementService = new RequirementService(repositoryFactory, planService, versionHistoryService);
     solutionService = new SolutionService(repositoryFactory, planService, versionHistoryService);
     phaseService = new PhaseService(storage, planService, versionHistoryService);
     decisionService = new DecisionService(repositoryFactory, planService, versionHistoryService);
-    artifactService = new ArtifactService(storage, planService, versionHistoryService);
+    artifactService = new ArtifactService(repositoryFactory, planService, versionHistoryService);
   });
 
   afterEach(async () => {
@@ -981,6 +981,7 @@ describe('Version History Service (Sprint 7)', () => {
       const plan = await planService.createPlan({
         name: 'Test Plan',
         description: 'Test',
+        enableHistory: true,
         maxHistoryDepth: 10
       });
       planId = plan.planId;

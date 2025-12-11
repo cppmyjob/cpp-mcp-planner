@@ -65,7 +65,7 @@ describe('BatchService - Edge Cases', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    const planService = new PlanService(storage);
+    const planService = new PlanService(storage, repositoryFactory);
     const requirementService = new RequirementService(repositoryFactory, planService);
     const solutionService = new SolutionService(repositoryFactory, planService);
     const phaseService = new PhaseService(storage, planService);
@@ -75,6 +75,7 @@ describe('BatchService - Edge Cases', () => {
 
     batchService = new BatchService(
       storage,
+      repositoryFactory,
       planService,
       requirementService,
       solutionService,

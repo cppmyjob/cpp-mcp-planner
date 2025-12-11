@@ -334,8 +334,6 @@ export class DecisionService {
     if (input.supersede) {
       // Mark old decision as superseded
       decision.status = 'superseded';
-      decision.updatedAt = now;
-      decision.version += 1;
 
       const newDecisionId = uuidv4();
       decision.supersededBy = newDecisionId;
@@ -398,8 +396,7 @@ export class DecisionService {
       }
     }
 
-    decision.updatedAt = now;
-    decision.version += 1;
+    // FIX #12: Don't manually increment version - FileRepository.update() does it automatically
     await repo.update(decision.id, decision);
 
     return { success: true, decisionId: input.decisionId };

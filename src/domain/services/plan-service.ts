@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
+import type { RepositoryFactory } from '../repositories/interfaces.js';
 import type {
   PlanManifest,
   Plan,
@@ -151,7 +152,10 @@ export interface GetSummaryResult {
 }
 
 export class PlanService {
-  constructor(private storage: FileStorage) {}
+  constructor(
+    private storage: FileStorage,
+    private repositoryFactory?: RepositoryFactory
+  ) {}
 
   async createPlan(input: CreatePlanInput): Promise<CreatePlanResult> {
     const planId = uuidv4();
@@ -297,23 +301,44 @@ export class PlanService {
     };
 
     if (input.includeEntities) {
+      // Use RepositoryFactory if available (reads from individual files)
+      let requirements: Requirement[];
+      let solutions: Solution[];
+      let decisions: Decision[];
+      let artifacts: Artifact[];
+      let links: Link[];
+
+      if (this.repositoryFactory) {
+        const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
+        const solRepo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
+        const decRepo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
+        const artRepo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
+        const linkRepo = this.repositoryFactory.createLinkRepository(input.planId);
+
+        [requirements, solutions, decisions, artifacts, links] = await Promise.all([
+          reqRepo.findAll(),
+          solRepo.findAll(),
+          decRepo.findAll(),
+          artRepo.findAll(),
+          linkRepo.findAllLinks(),
+        ]);
+      } else {
+        // Fallback to FileStorage
+        requirements = await this.storage.loadEntities<Requirement>(input.planId, 'requirements');
+        solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
+        decisions = await this.storage.loadEntities<Decision>(input.planId, 'decisions');
+        artifacts = await this.storage.loadEntities<Artifact>(input.planId, 'artifacts');
+        links = await this.storage.loadLinks(input.planId);
+      }
+
       result.plan.entities = {
-        requirements: await this.storage.loadEntities<Requirement>(
-          input.planId,
-          'requirements'
-        ),
-        solutions: await this.storage.loadEntities<Solution>(
-          input.planId,
-          'solutions'
-        ),
-        decisions: await this.storage.loadEntities<Decision>(
-          input.planId,
-          'decisions'
-        ),
+        requirements,
+        solutions,
+        decisions,
         phases: await this.storage.loadEntities<Phase>(input.planId, 'phases'),
-        artifacts: await this.storage.loadEntities<Artifact>(input.planId, 'artifacts'),
+        artifacts,
       };
-      result.plan.links = await this.storage.loadLinks(input.planId);
+      result.plan.links = links;
     }
 
     return result;
@@ -535,20 +560,35 @@ export class PlanService {
   async updateStatistics(planId: string): Promise<void> {
     const manifest = await this.storage.loadManifest(planId);
 
-    const requirements = await this.storage.loadEntities<Requirement>(
-      planId,
-      'requirements'
-    );
-    const solutions = await this.storage.loadEntities<Solution>(
-      planId,
-      'solutions'
-    );
-    const decisions = await this.storage.loadEntities<Decision>(
-      planId,
-      'decisions'
-    );
+    // Use RepositoryFactory if available (reads from individual files)
+    // Otherwise fall back to FileStorage (reads from monolithic files)
+    let requirements: Requirement[];
+    let solutions: Solution[];
+    let decisions: Decision[];
+    let artifacts: Artifact[];
+
+    if (this.repositoryFactory) {
+      const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', planId);
+      const solRepo = this.repositoryFactory.createRepository<Solution>('solution', planId);
+      const decRepo = this.repositoryFactory.createRepository<Decision>('decision', planId);
+      const artRepo = this.repositoryFactory.createRepository<Artifact>('artifact', planId);
+
+      [requirements, solutions, decisions, artifacts] = await Promise.all([
+        reqRepo.findAll(),
+        solRepo.findAll(),
+        decRepo.findAll(),
+        artRepo.findAll(),
+      ]);
+    } else {
+      // Fallback to FileStorage
+      requirements = await this.storage.loadEntities<Requirement>(planId, 'requirements');
+      solutions = await this.storage.loadEntities<Solution>(planId, 'solutions');
+      decisions = await this.storage.loadEntities<Decision>(planId, 'decisions');
+      artifacts = await this.storage.loadEntities<Artifact>(planId, 'artifacts');
+    }
+
+    // PhaseService still uses FileStorage
     const phases = await this.storage.loadEntities<Phase>(planId, 'phases');
-    const artifacts = await this.storage.loadEntities<Artifact>(planId, 'artifacts');
 
     manifest.statistics.totalRequirements = requirements.length;
     manifest.statistics.totalSolutions = solutions.length;

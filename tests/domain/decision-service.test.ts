@@ -35,7 +35,7 @@ describe('DecisionService', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage);
+    planService = new PlanService(storage, repositoryFactory);
     service = new DecisionService(repositoryFactory, planService);
 
     const plan = await planService.createPlan({

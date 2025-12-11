@@ -11,17 +11,22 @@
  * - Migration to Artifacts (2 tests)
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { FileStorage } from '../../src/infrastructure/file-storage.js';
+import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
+import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
 import { PhaseService } from '../../src/domain/services/phase-service.js';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import type { Phase } from '../../src/domain/entities/types.js';
 import path from 'path';
 import os from 'os';
+import * as fs from 'fs/promises';
 
 describe('Sprint 10: Remove codeExamples from Phase', () => {
   let storage: FileStorage;
+  let repositoryFactory: RepositoryFactory;
+  let lockManager: FileLockManager;
   let planService: PlanService;
   let phaseService: PhaseService;
   let artifactService: ArtifactService;
@@ -32,10 +37,24 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
     // Create temp directory for test
     testDir = path.join(os.tmpdir(), `test-sprint10-${Date.now()}`);
     storage = new FileStorage(testDir);
+    await storage.initialize();
 
-    planService = new PlanService(storage);
+    lockManager = new FileLockManager(testDir);
+    await lockManager.initialize();
+
+    repositoryFactory = new RepositoryFactory({
+      type: 'file',
+      baseDir: testDir,
+      lockManager,
+      cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
+    });
+
+    const planRepo = repositoryFactory.createPlanRepository();
+    await planRepo.initialize();
+
+    planService = new PlanService(storage, repositoryFactory);
     phaseService = new PhaseService(storage, planService);
-    artifactService = new ArtifactService(storage, planService);
+    artifactService = new ArtifactService(repositoryFactory, planService);
 
     // Create test plan
     const createResult = await planService.createPlan({
@@ -44,6 +63,12 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       author: 'test-runner',
     });
     testPlanId = createResult.planId;
+  });
+
+  afterEach(async () => {
+    await repositoryFactory.dispose();
+    await lockManager.dispose();
+    await fs.rm(testDir, { recursive: true, force: true });
   });
 
   // ============================================================================

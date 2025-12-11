@@ -1613,7 +1613,7 @@ describe('Tool Handlers Integration', () => {
           { action: 'get', planId: ctx.planId, artifactId: 'non-existent-artifact' },
           ctx.services
         )
-      ).rejects.toThrow(/Artifact not found/i);
+      ).rejects.toThrow(/artifact.*not found/i);
     });
   });
 

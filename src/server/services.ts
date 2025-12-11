@@ -48,7 +48,7 @@ export async function createServices(storagePath: string): Promise<Services> {
   const planRepo = repositoryFactory.createPlanRepository();
   await planRepo.initialize();
 
-  const planService = new PlanService(storage);
+  const planService = new PlanService(storage, repositoryFactory);
   const versionHistoryService = new VersionHistoryService(storage);
 
   const requirementService = new RequirementService(repositoryFactory, planService, versionHistoryService);
@@ -60,6 +60,7 @@ export async function createServices(storagePath: string): Promise<Services> {
   const queryService = new QueryService(storage, planService, linkingService);
   const batchService = new BatchService(
     storage,
+    repositoryFactory,
     planService,
     requirementService,
     solutionService,

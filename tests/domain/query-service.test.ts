@@ -46,11 +46,11 @@ describe('QueryService', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage);
+    planService = new PlanService(storage, repositoryFactory);
     requirementService = new RequirementService(repositoryFactory, planService);
     solutionService = new SolutionService(repositoryFactory, planService);
     phaseService = new PhaseService(storage, planService);
-    artifactService = new ArtifactService(storage, planService);
+    artifactService = new ArtifactService(repositoryFactory, planService);
     linkingService = new LinkingService(repositoryFactory);
     queryService = new QueryService(storage, planService, linkingService);
 
@@ -268,7 +268,7 @@ describe('QueryService', () => {
           planId,
           requirementId: 'non-existent-id',
         })
-      ).rejects.toThrow('Requirement not found');
+      ).rejects.toThrow(/requirement.*not found/i);
     });
   });
 
@@ -526,7 +526,7 @@ describe('QueryService', () => {
 
     // RED TEST 6: File existence - detect missing file in artifact.fileTable
     it('should detect missing file in artifact.fileTable', async () => {
-      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(storage, planService);
+      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(repositoryFactory, planService);
 
       await artifactService.addArtifact({
         planId,
@@ -552,7 +552,7 @@ describe('QueryService', () => {
 
     // GREEN TEST 7: File existence - skip files with action='create'
     it('should NOT check files with action=create (will be created)', async () => {
-      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(storage, planService);
+      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(repositoryFactory, planService);
 
       await artifactService.addArtifact({
         planId,
@@ -574,7 +574,7 @@ describe('QueryService', () => {
 
     // RED TEST 8: File existence - check files with action='modify' exist
     it('should check that files with action=modify exist', async () => {
-      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(storage, planService);
+      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(repositoryFactory, planService);
       const fs = await import('fs/promises');
       const path = await import('path');
       const os = await import('os');
@@ -609,7 +609,7 @@ describe('QueryService', () => {
 
     // GREEN TEST 9: File existence - skip check if artifact.fileTable is undefined
     it('should skip file check if artifact.fileTable is undefined', async () => {
-      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(storage, planService);
+      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(repositoryFactory, planService);
 
       await artifactService.addArtifact({
         planId,
@@ -998,9 +998,9 @@ describe('QueryService', () => {
 
     it('should handle solutions without tradeoffs field (undefined)', async () => {
       // Simulate solution created without tradeoffs field (as happens via MCP tool)
-      const solutions = await storage.loadEntities(planId, 'solutions');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      solutions.push({
+      // Use RepositoryFactory directly to bypass validation
+      const repo = repositoryFactory.createRepository<any>('solution', planId);
+      await repo.create({
         id: 'solution-without-tradeoffs',
         type: 'solution',
         createdAt: new Date().toISOString(),
@@ -1022,8 +1022,7 @@ describe('QueryService', () => {
         },
         status: 'proposed',
         // NOTE: tradeoffs field is intentionally missing (undefined)
-      } as any);
-      await storage.saveEntities(planId, 'solutions', solutions);
+      });
 
       // This should NOT throw "Cannot read properties of undefined (reading 'length')"
       const result = await queryService.exportPlan({
@@ -1149,9 +1148,12 @@ describe('QueryService', () => {
 
     // REQUIREMENT ENTITY
     it('RED: should handle requirement with undefined acceptanceCriteria', async () => {
-      const requirements = await storage.loadEntities<Requirement>(planId, 'requirements');
-      requirements[0].acceptanceCriteria = undefined as any;
-      await storage.saveEntities(planId, 'requirements', requirements);
+      // Use RepositoryFactory instead of FileStorage
+      const repo = repositoryFactory.createRepository<any>('requirement', planId);
+      const requirements = await repo.findAll();
+      const requirement = requirements[0];
+      delete requirement.acceptanceCriteria; // Set to undefined
+      await repo.update(requirement.id, requirement);
 
       const result = await queryService.searchEntities({
         planId,
@@ -1183,9 +1185,12 @@ describe('QueryService', () => {
     });
 
     it('RED: should handle requirement with null rationale', async () => {
-      const requirements = await storage.loadEntities<Requirement>(planId, 'requirements');
-      requirements[0].rationale = null as any;
-      await storage.saveEntities(planId, 'requirements', requirements);
+      // Use RepositoryFactory instead of FileStorage
+      const repo = repositoryFactory.createRepository<any>('requirement', planId);
+      const requirements = await repo.findAll();
+      const requirement = requirements[0];
+      requirement.rationale = null as any;
+      await repo.update(requirement.id, requirement);
 
       const result = await queryService.searchEntities({ planId, query: 'test' });
       expect(result).toBeDefined();
@@ -2419,7 +2424,7 @@ describe('QueryService', () => {
             requirementId: 'invalid-id',
             depth: 1,
           } as any)
-        ).rejects.toThrow('Requirement not found');
+        ).rejects.toThrow(/requirement.*not found/i);
       });
 
       it('RED 6.4: depth=1.5 (float) should throw ValidationError', async () => {

@@ -35,7 +35,7 @@ describe('ArtifactService', () => {
     const planRepo = repositoryFactory.createPlanRepository();
     await planRepo.initialize();
 
-    planService = new PlanService(storage);
+    planService = new PlanService(storage, repositoryFactory);
     service = new ArtifactService(repositoryFactory, planService);
 
     const plan = await planService.createPlan({

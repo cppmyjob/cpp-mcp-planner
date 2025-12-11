@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { RequirementService } from '../../src/domain/services/requirement-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
 import { FileStorage } from '../../src/infrastructure/file-storage.js';
+import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
+import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -10,6 +12,8 @@ describe('RequirementService', () => {
   let service: RequirementService;
   let planService: PlanService;
   let storage: FileStorage;
+  let repositoryFactory: RepositoryFactory;
+  let lockManager: FileLockManager;
   let testDir: string;
   let planId: string;
 
@@ -17,8 +21,22 @@ describe('RequirementService', () => {
     testDir = path.join(os.tmpdir(), `mcp-req-test-${Date.now()}`);
     storage = new FileStorage(testDir);
     await storage.initialize();
-    planService = new PlanService(storage);
-    service = new RequirementService(storage, planService);
+
+    lockManager = new FileLockManager(testDir);
+    await lockManager.initialize();
+
+    repositoryFactory = new RepositoryFactory({
+      type: 'file',
+      baseDir: testDir,
+      lockManager,
+      cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
+    });
+
+    const planRepo = repositoryFactory.createPlanRepository();
+    await planRepo.initialize();
+
+    planService = new PlanService(storage, repositoryFactory);
+    service = new RequirementService(repositoryFactory, planService);
 
     // Create a test plan
     const plan = await planService.createPlan({
@@ -29,6 +47,8 @@ describe('RequirementService', () => {
   });
 
   afterEach(async () => {
+    await repositoryFactory.dispose();
+    await lockManager.dispose();
     await fs.rm(testDir, { recursive: true, force: true });
   });
 
@@ -142,7 +162,7 @@ describe('RequirementService', () => {
     it('should throw if requirement not found', async () => {
       await expect(
         service.getRequirement({ planId, requirementId: 'non-existent' })
-      ).rejects.toThrow('Requirement not found');
+      ).rejects.toThrow(/requirement.*not found/i);
     });
   });
 
@@ -327,7 +347,7 @@ describe('RequirementService', () => {
     it('should throw if requirement not found', async () => {
       await expect(
         service.deleteRequirement({ planId, requirementId: 'non-existent' })
-      ).rejects.toThrow('Requirement not found');
+      ).rejects.toThrow(/requirement.*not found/i);
     });
   });
 
@@ -452,7 +472,7 @@ describe('RequirementService', () => {
     it('should throw if requirement not found', async () => {
       await expect(
         service.voteForRequirement({ planId, requirementId: 'non-existent' })
-      ).rejects.toThrow('Requirement not found');
+      ).rejects.toThrow(/requirement.*not found/i);
     });
 
     it('should handle undefined votes (backward compatibility)', async () => {
@@ -469,10 +489,10 @@ describe('RequirementService', () => {
       });
 
       // Simulate legacy requirement by setting votes to undefined
-      const requirements = await storage.loadEntities<any>(planId, 'requirements');
-      const reqIndex = requirements.findIndex((r: any) => r.id === added.requirementId);
-      delete requirements[reqIndex].votes; // Remove votes field
-      await storage.saveEntities(planId, 'requirements', requirements);
+      const repo = repositoryFactory.createRepository<any>('requirement', planId);
+      const requirement = await repo.findById(added.requirementId);
+      delete requirement.votes; // Remove votes field
+      await repo.update(requirement.id, requirement);
 
       // Now vote should initialize to 0 and increment to 1
       const result = await service.voteForRequirement({
@@ -484,11 +504,11 @@ describe('RequirementService', () => {
       expect(result.votes).toBe(1); // Should be 1, not NaN or null
 
       // Verify persistence
-      const { requirement } = await service.getRequirement({
+      const { requirement: updated } = await service.getRequirement({
         planId,
         requirementId: added.requirementId,
       });
-      expect(requirement.votes).toBe(1);
+      expect(updated.votes).toBe(1);
     });
   });
 
@@ -548,7 +568,7 @@ describe('RequirementService', () => {
     it('should throw if requirement not found', async () => {
       await expect(
         service.unvoteRequirement({ planId, requirementId: 'non-existent' })
-      ).rejects.toThrow('Requirement not found');
+      ).rejects.toThrow(/requirement.*not found/i);
     });
 
     it('should handle undefined votes (backward compatibility)', async () => {
@@ -565,10 +585,10 @@ describe('RequirementService', () => {
       });
 
       // Simulate legacy requirement by setting votes to undefined
-      const requirements = await storage.loadEntities<any>(planId, 'requirements');
-      const reqIndex = requirements.findIndex((r: any) => r.id === added.requirementId);
-      delete requirements[reqIndex].votes; // Remove votes field
-      await storage.saveEntities(planId, 'requirements', requirements);
+      const repo = repositoryFactory.createRepository<any>('requirement', planId);
+      const requirement = await repo.findById(added.requirementId);
+      delete requirement.votes; // Remove votes field
+      await repo.update(requirement.id, requirement);
 
       // Should initialize to 0 and throw error (cannot go below 0)
       await expect(
@@ -673,10 +693,10 @@ describe('RequirementService', () => {
       });
 
       // Simulate legacy requirement by deleting votes field
-      const requirements = await storage.loadEntities<any>(planId, 'requirements');
-      const reqIndex = requirements.findIndex((r: any) => r.id === req.requirementId);
-      delete requirements[reqIndex].votes;
-      await storage.saveEntities(planId, 'requirements', requirements);
+      const repo = repositoryFactory.createRepository<any>('requirement', planId);
+      const requirement = await repo.findById(req.requirementId);
+      delete requirement.votes;
+      await repo.update(requirement.id, requirement);
 
       // Reset should initialize to 0 and count as updated
       const result = await service.resetAllVotes({ planId });

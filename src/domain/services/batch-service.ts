@@ -476,6 +476,7 @@ class InMemoryStorage {
 
   constructor(
     private realStorage: FileStorage,
+    private repositoryFactory: RepositoryFactory,
     private planId: string
   ) {}
 
@@ -483,13 +484,19 @@ class InMemoryStorage {
    * Load all entities for a plan into memory
    */
   async loadAllIntoMemory(): Promise<void> {
-    // Load all entity types into memory
-    const [requirements, solutions, phases, decisions, artifacts, links, manifest] = await Promise.all([
-      this.realStorage.loadEntities<Requirement>(this.planId, 'requirements'),
-      this.realStorage.loadEntities<Solution>(this.planId, 'solutions'),
-      this.realStorage.loadEntities<Phase>(this.planId, 'phases'),
-      this.realStorage.loadEntities<Decision>(this.planId, 'decisions'),
-      this.realStorage.loadEntities<Artifact>(this.planId, 'artifacts'),
+    // Create repositories for each entity type
+    const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', this.planId);
+    const solRepo = this.repositoryFactory.createRepository<Solution>('solution', this.planId);
+    const decRepo = this.repositoryFactory.createRepository<Decision>('decision', this.planId);
+    const artRepo = this.repositoryFactory.createRepository<Artifact>('artifact', this.planId);
+
+    // Load all entity types into memory via repositories
+    const [requirements, solutions, decisions, artifacts, phases, links, manifest] = await Promise.all([
+      reqRepo.findAll(),
+      solRepo.findAll(),
+      decRepo.findAll(),
+      artRepo.findAll(),
+      this.realStorage.loadEntities<Phase>(this.planId, 'phases'), // PhaseService still uses FileStorage
       this.realStorage.loadLinks(this.planId),
       this.realStorage.loadManifest(this.planId)
     ]);
@@ -515,14 +522,48 @@ class InMemoryStorage {
     const links = this.linksMap.get(this.planId) || [];
     const manifest = this.manifestsMap.get(this.planId);
 
-    // Atomic write of all changes
+    // Create repositories for each entity type
+    const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', this.planId);
+    const solRepo = this.repositoryFactory.createRepository<Solution>('solution', this.planId);
+    const decRepo = this.repositoryFactory.createRepository<Decision>('decision', this.planId);
+    const artRepo = this.repositoryFactory.createRepository<Artifact>('artifact', this.planId);
+    const realLinkRepo = this.repositoryFactory.createLinkRepository(this.planId);
+
+    // Save links through real LinkRepository (individual files)
+    // LinkRepository doesn't have bulk method, so save one by one
+    for (const link of links) {
+      try {
+        await realLinkRepo.createLink({
+          sourceId: link.sourceId,
+          targetId: link.targetId,
+          relationType: link.relationType,
+          metadata: link.metadata,
+        });
+      } catch (err: any) {
+        // If link already exists (ConflictError with duplicate), skip it
+        // This can happen if batch is retried or link was created outside batch
+        if (err.conflictType !== 'duplicate') {
+          throw err;
+        }
+      }
+    }
+
+    // Atomic write of all changes via upsertMany (creates or updates to individual files)
+    // PLUS save to monolithic files for backward compatibility
     await Promise.all([
+      // Save to individual files via RepositoryFactory
+      requirements.length > 0 ? reqRepo.upsertMany(requirements) : Promise.resolve([]),
+      solutions.length > 0 ? solRepo.upsertMany(solutions) : Promise.resolve([]),
+      decisions.length > 0 ? decRepo.upsertMany(decisions) : Promise.resolve([]),
+      artifacts.length > 0 ? artRepo.upsertMany(artifacts) : Promise.resolve([]),
+
+      // Save to monolithic files via FileStorage (backward compatibility)
       this.realStorage.saveEntities(this.planId, 'requirements', requirements),
       this.realStorage.saveEntities(this.planId, 'solutions', solutions),
-      this.realStorage.saveEntities(this.planId, 'phases', phases),
       this.realStorage.saveEntities(this.planId, 'decisions', decisions),
       this.realStorage.saveEntities(this.planId, 'artifacts', artifacts),
-      this.realStorage.saveLinks(this.planId, links),
+      this.realStorage.saveEntities(this.planId, 'phases', phases), // PhaseService still uses FileStorage
+      this.realStorage.saveLinks(this.planId, links), // Backward compatibility
       manifest ? this.realStorage.saveManifest(this.planId, manifest) : Promise.resolve()
     ]);
   }
@@ -605,6 +646,7 @@ class InMemoryStorage {
 export class BatchService {
   constructor(
     private storage: FileStorage,
+    private repositoryFactory: RepositoryFactory,
     private planService: PlanService,
     private requirementService: RequirementService,
     private solutionService: SolutionService,
@@ -622,7 +664,7 @@ export class BatchService {
     }
 
     // 1. Create in-memory storage and load all entities
-    const memoryStorage = new InMemoryStorage(this.storage, input.planId);
+    const memoryStorage = new InMemoryStorage(this.storage, this.repositoryFactory, input.planId);
     await memoryStorage.loadAllIntoMemory();
 
     // 2. Create in-memory RepositoryFactory
