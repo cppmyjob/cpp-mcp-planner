@@ -31,8 +31,10 @@ import type { CacheOptions } from './types.js';
 
 /**
  * Transaction state
+ * FIX M-2: Simplified to only used states. 'committed' and 'rolled_back' were
+ * never actually set - the state resets to 'idle' after commit/rollback for reuse.
  */
-type TransactionState = 'idle' | 'active' | 'committed' | 'rolled_back';
+type TransactionState = 'idle' | 'active';
 
 /**
  * Warning callback type

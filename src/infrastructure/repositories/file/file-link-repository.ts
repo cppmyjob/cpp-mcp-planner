@@ -113,32 +113,35 @@ export class FileLinkRepository implements LinkRepository {
     // Validate
     this.validateLinkData(link);
 
-    // Check for existing link with same composite key
-    const exists = await this.linkExists(link.sourceId, link.targetId, link.relationType);
-    if (exists) {
-      throw new ConflictError(
-        `Link already exists: ${link.sourceId} -> ${link.targetId} (${link.relationType})`,
-        'duplicate',
-        { sourceId: link.sourceId, targetId: link.targetId, relationType: link.relationType }
-      );
-    }
+    // FIX H-1: Lock on composite key to prevent race condition
+    // The lock must be acquired BEFORE the duplicate check to avoid TOCTOU
+    const compositeKey = `link:${link.sourceId}:${link.targetId}:${link.relationType}`;
 
-    // Create link with generated fields
-    const id = uuidv4();
-    const now = new Date().toISOString();
-    const fullLink: Link = {
-      ...link,
-      id,
-      createdAt: now,
-      createdBy: 'system', // Default system user; context-based user tracking not yet implemented
-    };
+    return await this.fileLockManager.withLock(compositeKey, async () => {
+      // Check for existing link with same composite key (now inside lock)
+      const exists = await this.linkExists(link.sourceId, link.targetId, link.relationType);
+      if (exists) {
+        throw new ConflictError(
+          `Link already exists: ${link.sourceId} -> ${link.targetId} (${link.relationType})`,
+          'duplicate',
+          { sourceId: link.sourceId, targetId: link.targetId, relationType: link.relationType }
+        );
+      }
 
-    // Get file path
-    const filePath = this.getLinkFilePath(id);
+      // Create link with generated fields
+      const id = uuidv4();
+      const now = new Date().toISOString();
+      const fullLink: Link = {
+        ...link,
+        id,
+        createdAt: now,
+        createdBy: 'system', // Default system user; context-based user tracking not yet implemented
+      };
 
-    // Use FileLockManager with withLock for atomic create (FIX M-2)
-    return await this.fileLockManager.withLock(`link:${id}`, async () => {
-      // Atomic write link file (FIX H-1)
+      // Get file path
+      const filePath = this.getLinkFilePath(id);
+
+      // Atomic write link file
       await this.saveLinkFile(filePath, fullLink);
 
       // Update index
@@ -297,6 +300,7 @@ export class FileLinkRepository implements LinkRepository {
   }
 
   async deleteLinksForEntity(entityId: string): Promise<number> {
+    await this.ensureInitialized(); // FIX M-1: Consistent initialization pattern
     // Find all links for entity
     const links = await this.findLinksByEntity(entityId, 'both');
 

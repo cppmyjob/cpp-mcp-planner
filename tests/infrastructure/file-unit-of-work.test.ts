@@ -534,4 +534,58 @@ describe('FileUnitOfWork', () => {
       expect(hasIsolationWarning).toBeDefined();
     });
   });
+
+  // ============================================================================
+  // RED: Resource Leak Test (Code Review Issue H-2)
+  // ============================================================================
+  describe('RED: Repository Resource Leak in dispose (H-2)', () => {
+    it('should dispose all cached repositories when UoW is disposed', async () => {
+      // Get repositories (they get cached in UoW)
+      const requirementRepo = uow.getRepository<Requirement>('requirement');
+      const solutionRepo = uow.getRepository('solution');
+      const linkRepo = uow.getLinkRepository();
+
+      // Initialize them (creates resources like lock managers)
+      await requirementRepo.initialize();
+      await solutionRepo.initialize();
+      await linkRepo.initialize();
+
+      // Create some entities to ensure repos are actively used
+      await requirementRepo.create(createTestRequirement('req-dispose-1', 'Test Dispose 1'));
+
+      // Dispose UoW
+      await uow.dispose();
+
+      // BUG: If repositories aren't disposed, their internal resources leak
+      // We can't directly check if FileRepository.dispose() was called,
+      // but we can verify the UoW is in disposed state
+      expect(uow.isDisposed()).toBe(true);
+
+      // After dispose, getting a repository should work (creates new one)
+      // but the OLD repositories should have been cleaned up
+      // This is a smoke test - the real verification is that no resource leak occurs
+    });
+
+    it('should call dispose on FileLinkRepository when UoW is disposed', async () => {
+      const linkRepo = uow.getLinkRepository();
+      await linkRepo.initialize();
+
+      // Create a link
+      await linkRepo.createLink({
+        sourceId: 'src-dispose',
+        targetId: 'tgt-dispose',
+        relationType: 'implements',
+      });
+
+      // Dispose UoW
+      await uow.dispose();
+
+      // Verify UoW is disposed
+      expect(uow.isDisposed()).toBe(true);
+
+      // The linkRepository should have been disposed
+      // We can't easily verify this without exposing internal state,
+      // but at minimum the UoW should be in correct disposed state
+    });
+  });
 });

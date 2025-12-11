@@ -516,4 +516,49 @@ describe('FileLinkRepository', () => {
       }
     });
   });
+
+  // ============================================================================
+  // RED: Race Condition Test (Code Review Issue H-1)
+  // ============================================================================
+  describe('RED: Race Condition in createLink (H-1)', () => {
+    it('should NOT allow duplicate links when concurrent createLink calls race', async () => {
+      // This test exposes the TOCTOU race condition where:
+      // 1. Two concurrent calls both pass linkExists() check
+      // 2. Both proceed to create the same composite key link
+      // 3. Result: duplicate data or index corruption
+
+      const linkData = {
+        sourceId: 'race-req-1',
+        targetId: 'race-sol-1',
+        relationType: 'implements' as const,
+      };
+
+      // Launch many concurrent creates with SAME composite key
+      // With the race condition bug, some may succeed when they shouldn't
+      const concurrentAttempts = 20;
+      const promises = Array.from({ length: concurrentAttempts }, () =>
+        repository.createLink(linkData).catch((e: Error) => e)
+      );
+
+      const results = await Promise.all(promises);
+
+      // Count successes and failures
+      const successes = results.filter((r): r is Link => !(r instanceof Error));
+      const failures = results.filter((r): r is Error => r instanceof Error);
+
+      // EXPECTED: Exactly 1 success, rest should fail with ConflictError
+      // BUG: With race condition, multiple may succeed
+      expect(successes.length).toBe(1);
+      expect(failures.length).toBe(concurrentAttempts - 1);
+
+      // All failures should be ConflictError (duplicate)
+      for (const failure of failures) {
+        expect(failure.message).toMatch(/already exists|conflict|duplicate/i);
+      }
+
+      // Verify only one link exists in storage
+      const allLinks = await repository.findLinksBySource('race-req-1');
+      expect(allLinks.length).toBe(1);
+    });
+  });
 });
