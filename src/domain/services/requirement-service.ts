@@ -12,6 +12,7 @@ import type {
   VersionHistory,
   VersionDiff,
 } from '../entities/types.js';
+import { NotFoundError } from '../repositories/errors.js';
 import { validateTags } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
 import { bulkUpdateEntities } from '../utils/bulk-operations.js';
@@ -376,9 +377,14 @@ export class RequirementService {
           false
         ) as Requirement;
         foundRequirements.push(filtered);
-      } catch (error) {
-        // NotFoundError - add to notFound list
-        notFound.push(id);
+      } catch (error: any) {
+        // FIX M-1: Only treat NotFoundError as "not found", re-throw other errors
+        if (error instanceof NotFoundError || error.constructor.name === 'NotFoundError') {
+          notFound.push(id);
+        } else {
+          // Preserve error context and re-throw
+          throw error;
+        }
       }
     }
 

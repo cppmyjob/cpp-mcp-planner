@@ -3,6 +3,7 @@ import type { RepositoryFactory } from '../repositories/interfaces.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { Decision, DecisionStatus, AlternativeConsidered, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
+import { NotFoundError } from '../repositories/errors.js';
 import { validateAlternativesConsidered, validateTags } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
@@ -167,9 +168,11 @@ export class DecisionService {
         ) as Decision;
         foundDecisions.push(filtered);
       } catch (error: any) {
-        if (error.message?.includes('not found')) {
+        // FIX M-2: Only treat NotFoundError as "not found", re-throw other errors
+        if (error instanceof NotFoundError || error.constructor.name === 'NotFoundError') {
           notFound.push(id);
         } else {
+          // Preserve error context
           throw error;
         }
       }
