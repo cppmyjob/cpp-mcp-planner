@@ -33,7 +33,11 @@ describe('RED: RepositoryFactory', () => {
   });
 
   afterEach(async () => {
+    // Dispose factory first (doesn't own lockManager)
+    await factory?.dispose();
+    // Then dispose the shared lockManager (we own it in tests)
     await lockManager?.dispose();
+    // Finally cleanup file system
     await fs.rm(testDir, { recursive: true, force: true });
   });
 
@@ -201,10 +205,14 @@ describe('RED: RepositoryFactory', () => {
       // (This depends on implementation - factory might be reusable or not)
     });
 
-    it('should dispose shared FileLockManager on factory dispose', async () => {
+    it('should NOT dispose shared FileLockManager on factory dispose', async () => {
       await factory.dispose();
 
-      // Lock manager should be disposed
+      // Lock manager should still be usable - factory doesn't own it
+      expect(lockManager.isDisposed()).toBe(false);
+
+      // Caller is responsible for disposing
+      await lockManager.dispose();
       expect(lockManager.isDisposed()).toBe(true);
     });
   });

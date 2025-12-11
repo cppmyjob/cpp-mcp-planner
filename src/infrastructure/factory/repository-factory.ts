@@ -228,16 +228,19 @@ export class RepositoryFactory {
   /**
    * Dispose factory and all cached repositories
    *
-   * Cleans up all cached repositories, link repositories, UnitOfWork instances,
-   * and the shared FileLockManager.
+   * Cleans up all cached repositories, link repositories, and UnitOfWork instances.
    *
-   * IMPORTANT: After dispose(), the factory should not be used.
-   * Create a new factory instance if needed.
+   * IMPORTANT:
+   * - After dispose(), the factory should not be used. Create a new factory instance if needed.
+   * - The shared FileLockManager is NOT disposed - caller owns it and is responsible for disposal.
    *
    * @example
    * ```typescript
+   * const factory = new RepositoryFactory({ type: 'file', baseDir, lockManager });
+   * // ... use factory ...
    * await factory.dispose();
-   * // factory is now unusable - create new one if needed
+   * // factory is now unusable, but lockManager is still valid
+   * await lockManager.dispose(); // Caller disposes when done
    * ```
    */
   async dispose(): Promise<void> {
@@ -265,7 +268,7 @@ export class RepositoryFactory {
     }
     this.uowCache.clear();
 
-    // Dispose shared lock manager
-    await this.config.lockManager.dispose();
+    // DO NOT dispose shared lock manager - caller owns it
+    // The FileLockManager is injected via constructor and should be disposed by the caller
   }
 }
