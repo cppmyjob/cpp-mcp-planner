@@ -206,46 +206,16 @@ export class FileLinkRepository implements LinkRepository {
 
   async findLinksBySource(sourceId: string, relationType?: string): Promise<Link[]> {
     await this.ensureInitialized();
-    const allMetadata = await this.indexManager.getAll();
-
-    // Filter by source
-    let filtered = allMetadata.filter((m: LinkIndexMetadata) => m.sourceId === sourceId);
-
-    // Filter by relation type if provided
-    if (relationType) {
-      filtered = filtered.filter((m: LinkIndexMetadata) => m.relationType === relationType);
-    }
-
-    // Load links
-    const links: Link[] = [];
-    for (const metadata of filtered) {
-      const link = await this.loadLinkFile(metadata.filePath);
-      links.push(link);
-    }
-
-    return links;
+    return this.findLinksByPredicate(
+      (m: LinkIndexMetadata) => m.sourceId === sourceId && (!relationType || m.relationType === relationType)
+    );
   }
 
   async findLinksByTarget(targetId: string, relationType?: string): Promise<Link[]> {
     await this.ensureInitialized();
-    const allMetadata = await this.indexManager.getAll();
-
-    // Filter by target
-    let filtered = allMetadata.filter((m: LinkIndexMetadata) => m.targetId === targetId);
-
-    // Filter by relation type if provided
-    if (relationType) {
-      filtered = filtered.filter((m: LinkIndexMetadata) => m.relationType === relationType);
-    }
-
-    // Load links
-    const links: Link[] = [];
-    for (const metadata of filtered) {
-      const link = await this.loadLinkFile(metadata.filePath);
-      links.push(link);
-    }
-
-    return links;
+    return this.findLinksByPredicate(
+      (m: LinkIndexMetadata) => m.targetId === targetId && (!relationType || m.relationType === relationType)
+    );
   }
 
   async findLinksByEntity(
@@ -253,29 +223,14 @@ export class FileLinkRepository implements LinkRepository {
     direction: 'incoming' | 'outgoing' | 'both' = 'both'
   ): Promise<Link[]> {
     await this.ensureInitialized();
-    const allMetadata = await this.indexManager.getAll();
 
-    // Filter based on direction
-    let filtered: LinkIndexMetadata[];
-    if (direction === 'outgoing') {
-      filtered = allMetadata.filter((m: LinkIndexMetadata) => m.sourceId === entityId);
-    } else if (direction === 'incoming') {
-      filtered = allMetadata.filter((m: LinkIndexMetadata) => m.targetId === entityId);
-    } else {
-      // both
-      filtered = allMetadata.filter(
-        (m: LinkIndexMetadata) => m.sourceId === entityId || m.targetId === entityId
-      );
-    }
+    const predicates: Record<typeof direction, (m: LinkIndexMetadata) => boolean> = {
+      outgoing: (m) => m.sourceId === entityId,
+      incoming: (m) => m.targetId === entityId,
+      both: (m) => m.sourceId === entityId || m.targetId === entityId,
+    };
 
-    // Load links
-    const links: Link[] = [];
-    for (const metadata of filtered) {
-      const link = await this.loadLinkFile(metadata.filePath);
-      links.push(link);
-    }
-
-    return links;
+    return this.findLinksByPredicate(predicates[direction]);
   }
 
   async deleteLink(id: string): Promise<void> {
@@ -470,24 +425,25 @@ export class FileLinkRepository implements LinkRepository {
 
   private async findLinksByFilter(filter: LinkFilter): Promise<Link[]> {
     await this.ensureInitialized(); // FIX M-1: Defensive consistency
+    return this.findLinksByPredicate((m: LinkIndexMetadata) => {
+      if (filter.sourceId && m.sourceId !== filter.sourceId) return false;
+      if (filter.targetId && m.targetId !== filter.targetId) return false;
+      if (filter.relationType && m.relationType !== filter.relationType) return false;
+      return true;
+    });
+  }
+
+  /**
+   * Generic helper for filtering and loading links by predicate
+   * Eliminates code duplication across findLinksBySource/Target/Entity/Filter
+   */
+  private async findLinksByPredicate(
+    predicate: (metadata: LinkIndexMetadata) => boolean
+  ): Promise<Link[]> {
     const allMetadata = await this.indexManager.getAll();
+    const filtered = allMetadata.filter(predicate);
 
-    // Apply filters
-    let filtered = allMetadata;
-
-    if (filter.sourceId) {
-      filtered = filtered.filter((m: LinkIndexMetadata) => m.sourceId === filter.sourceId);
-    }
-
-    if (filter.targetId) {
-      filtered = filtered.filter((m: LinkIndexMetadata) => m.targetId === filter.targetId);
-    }
-
-    if (filter.relationType) {
-      filtered = filtered.filter((m: LinkIndexMetadata) => m.relationType === filter.relationType);
-    }
-
-    // Load links
+    // Load all matching links
     const links: Link[] = [];
     for (const metadata of filtered) {
       const link = await this.loadLinkFile(metadata.filePath);
