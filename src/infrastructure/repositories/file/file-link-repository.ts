@@ -233,6 +233,17 @@ export class FileLinkRepository implements LinkRepository {
     return this.findLinksByPredicate(predicates[direction]);
   }
 
+  async findAllLinks(relationType?: string): Promise<Link[]> {
+    await this.ensureInitialized();
+
+    if (relationType) {
+      return this.findLinksByPredicate((m: LinkIndexMetadata) => m.relationType === relationType);
+    }
+
+    // Return all links
+    return this.findLinksByPredicate(() => true);
+  }
+
   async deleteLink(id: string): Promise<void> {
     await this.ensureInitialized();
 

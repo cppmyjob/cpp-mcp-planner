@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { FileStorage } from '../../infrastructure/file-storage.js';
+import type { RepositoryFactory } from '../../infrastructure/factory/repository-factory.js';
 import type { Link, RelationType, Entity } from '../entities/types.js';
 
 // Input types
@@ -44,13 +44,14 @@ export interface UnlinkEntitiesResult {
 }
 
 export class LinkingService {
-  constructor(private storage: FileStorage) {}
+  constructor(private repositoryFactory: RepositoryFactory) {}
 
   async linkEntities(input: LinkEntitiesInput): Promise<LinkEntitiesResult> {
-    const links = await this.storage.loadLinks(input.planId);
+    const linkRepo = this.repositoryFactory.createLinkRepository(input.planId);
 
     // Check for cycle if depends_on
     if (input.relationType === 'depends_on') {
+      const links = await linkRepo.findAllLinks('depends_on');
       const hasCycle = this.detectCycle(links, input.sourceId, input.targetId);
       if (hasCycle) {
         throw new Error('Circular dependency detected');
@@ -58,55 +59,35 @@ export class LinkingService {
     }
 
     // Check if link already exists
-    const existing = links.find(
-      (l) =>
-        l.sourceId === input.sourceId &&
-        l.targetId === input.targetId &&
-        l.relationType === input.relationType
-    );
-
-    if (existing) {
+    const exists = await linkRepo.linkExists(input.sourceId, input.targetId, input.relationType);
+    if (exists) {
       throw new Error('Link already exists');
     }
 
-    const linkId = uuidv4();
-    const now = new Date().toISOString();
-
-    const link: Link = {
-      id: linkId,
+    // Create link
+    const link = await linkRepo.createLink({
       sourceId: input.sourceId,
       targetId: input.targetId,
       relationType: input.relationType,
       metadata: input.metadata,
-      createdAt: now,
-      createdBy: 'claude-code',
-    };
+    });
 
-    links.push(link);
-    await this.storage.saveLinks(input.planId, links);
-
-    return { linkId };
+    return { linkId: link.id };
   }
 
   async getEntityLinks(input: GetEntityLinksInput): Promise<GetEntityLinksResult> {
-    const links = await this.storage.loadLinks(input.planId);
-    const direction = input.direction || 'both';
+    const linkRepo = this.repositoryFactory.createLinkRepository(input.planId);
 
+    const direction = input.direction || 'both';
     let outgoing: Link[] = [];
     let incoming: Link[] = [];
 
     if (direction === 'outgoing' || direction === 'both') {
-      outgoing = links.filter((l) => l.sourceId === input.entityId);
-      if (input.relationType) {
-        outgoing = outgoing.filter((l) => l.relationType === input.relationType);
-      }
+      outgoing = await linkRepo.findLinksBySource(input.entityId, input.relationType);
     }
 
     if (direction === 'incoming' || direction === 'both') {
-      incoming = links.filter((l) => l.targetId === input.entityId);
-      if (input.relationType) {
-        incoming = incoming.filter((l) => l.relationType === input.relationType);
-      }
+      incoming = await linkRepo.findLinksByTarget(input.entityId, input.relationType);
     }
 
     return {
@@ -118,36 +99,28 @@ export class LinkingService {
   }
 
   async unlinkEntities(input: UnlinkEntitiesInput): Promise<UnlinkEntitiesResult> {
-    const links = await this.storage.loadLinks(input.planId);
-    const deletedIds: string[] = [];
+    const linkRepo = this.repositoryFactory.createLinkRepository(input.planId);
 
-    let remaining: Link[];
+    const deletedIds: string[] = [];
 
     if (input.linkId) {
       // Delete by linkId
-      remaining = links.filter((l) => {
-        if (l.id === input.linkId) {
-          deletedIds.push(l.id);
-          return false;
-        }
-        return true;
-      });
+      await linkRepo.deleteLink(input.linkId);
+      deletedIds.push(input.linkId);
     } else {
-      // Delete by source/target/type
-      remaining = links.filter((l) => {
-        const matchSource = input.sourceId ? l.sourceId === input.sourceId : true;
-        const matchTarget = input.targetId ? l.targetId === input.targetId : true;
-        const matchType = input.relationType ? l.relationType === input.relationType : true;
+      // Delete by source/target/type - need to find matching links first
+      const allLinks = await linkRepo.findAllLinks(input.relationType);
 
-        if (matchSource && matchTarget && matchType) {
-          deletedIds.push(l.id);
-          return false;
+      for (const link of allLinks) {
+        const matchSource = input.sourceId ? link.sourceId === input.sourceId : true;
+        const matchTarget = input.targetId ? link.targetId === input.targetId : true;
+
+        if (matchSource && matchTarget) {
+          await linkRepo.deleteLink(link.id);
+          deletedIds.push(link.id);
         }
-        return true;
-      });
+      }
     }
-
-    await this.storage.saveLinks(input.planId, remaining);
 
     return {
       success: true,
@@ -201,19 +174,14 @@ export class LinkingService {
 
   // Helper to get all links for an entity (for referential integrity check)
   async getLinksForEntity(planId: string, entityId: string): Promise<Link[]> {
-    const links = await this.storage.loadLinks(planId);
-    return links.filter((l) => l.sourceId === entityId || l.targetId === entityId);
+    const linkRepo = this.repositoryFactory.createLinkRepository(planId);
+    return linkRepo.findLinksByEntity(entityId, 'both');
   }
 
   // Delete all links for an entity (for cascading delete)
   async deleteLinksForEntity(planId: string, entityId: string): Promise<number> {
-    const links = await this.storage.loadLinks(planId);
-    const remaining = links.filter(
-      (l) => l.sourceId !== entityId && l.targetId !== entityId
-    );
-    const deleted = links.length - remaining.length;
-    await this.storage.saveLinks(planId, remaining);
-    return deleted;
+    const linkRepo = this.repositoryFactory.createLinkRepository(planId);
+    return linkRepo.deleteLinksForEntity(entityId);
   }
 }
 

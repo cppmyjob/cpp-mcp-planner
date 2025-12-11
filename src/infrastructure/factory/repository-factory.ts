@@ -8,11 +8,12 @@
  * - Unified cache configuration
  */
 
-import type { Repository, LinkRepository, UnitOfWork } from '../../domain/repositories/interfaces.js';
+import type { Repository, LinkRepository, UnitOfWork, PlanRepository } from '../../domain/repositories/interfaces.js';
 import type { Entity, EntityType } from '../../domain/entities/types.js';
 import { FileRepository } from '../repositories/file/file-repository.js';
 import { FileLinkRepository } from '../repositories/file/file-link-repository.js';
 import { FileUnitOfWork } from '../repositories/file/file-unit-of-work.js';
+import { FilePlanRepository } from '../repositories/file/file-plan-repository.js';
 import type { FileLockManager } from '../repositories/file/file-lock-manager.js';
 import type { CacheOptions } from '../repositories/file/types.js';
 
@@ -99,6 +100,7 @@ export class RepositoryFactory {
   private repositoryCache: Map<string, Repository<any>> = new Map();
   private linkRepositoryCache: Map<string, LinkRepository> = new Map();
   private uowCache: Map<string, UnitOfWork> = new Map();
+  private planRepository?: PlanRepository;
 
   constructor(config: StorageConfig) {
     if (!config) {
@@ -203,6 +205,34 @@ export class RepositoryFactory {
   }
 
   /**
+   * Create or retrieve cached Plan Repository
+   *
+   * Returns singleton instance - only one PlanRepository per factory.
+   * Repository is lazily initialized - call planRepo.initialize() before use.
+   *
+   * @returns PlanRepository instance (cached if already created)
+   *
+   * @example
+   * ```typescript
+   * const planRepo = factory.createPlanRepository();
+   * await planRepo.initialize();
+   *
+   * const planIds = await planRepo.listPlans();
+   * const manifest = await planRepo.loadManifest('plan-123');
+   * ```
+   */
+  createPlanRepository(): PlanRepository {
+    if (this.planRepository) {
+      return this.planRepository;
+    }
+
+    // Create new PlanRepository
+    this.planRepository = new FilePlanRepository(this.config.baseDir);
+
+    return this.planRepository;
+  }
+
+  /**
    * Create or retrieve cached Unit of Work
    *
    * Returns the same instance for the same planId.
@@ -288,6 +318,12 @@ export class RepositoryFactory {
       }
     }
     this.uowCache.clear();
+
+    // Dispose plan repository if exists
+    if (this.planRepository && 'dispose' in this.planRepository && typeof (this.planRepository as any).dispose === 'function') {
+      await (this.planRepository as any).dispose();
+    }
+    this.planRepository = undefined;
 
     // DO NOT dispose shared lock manager - caller owns it
     // The FileLockManager is injected via constructor and should be disposed by the caller

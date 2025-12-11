@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { FileStorage } from '../../infrastructure/file-storage.js';
+import type { RepositoryFactory } from '../../infrastructure/factory/repository-factory.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type {
@@ -258,13 +258,14 @@ export interface ResetAllVotesResult {
 
 export class RequirementService {
   constructor(
-    private storage: FileStorage,
+    private repositoryFactory: RepositoryFactory,
     private planService: PlanService,
     private versionHistoryService?: VersionHistoryService // Sprint 7: Optional for backward compatibility
   ) {}
 
   async addRequirement(input: AddRequirementInput): Promise<AddRequirementResult> {
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
@@ -280,20 +281,9 @@ export class RequirementService {
     // Validate tags format
     validateTags(input.requirement.tags || []);
 
-    const requirementId = uuidv4();
-    const now = new Date().toISOString();
-
-    const requirement: Requirement = {
-      id: requirementId,
-      type: 'requirement',
-      createdAt: now,
-      updatedAt: now,
-      version: 1,
-      metadata: {
-        createdBy: 'claude-code',
-        tags: input.requirement.tags || [],
-        annotations: [],
-      },
+    // Create requirement via repository
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
+    const requirement = await repo.create({
       title: input.requirement.title,
       description: input.requirement.description,
       rationale: input.requirement.rationale,
@@ -302,23 +292,20 @@ export class RequirementService {
       priority: input.requirement.priority,
       category: input.requirement.category,
       status: 'draft',
-      votes: 0, // Initialize vote count
+      votes: 0,
       impact: input.requirement.impact,
-    };
-
-    // Load existing requirements, add new one, save
-    const requirements = await this.storage.loadEntities<Requirement>(
-      input.planId,
-      'requirements'
-    );
-    requirements.push(requirement);
-    await this.storage.saveEntities(input.planId, 'requirements', requirements);
+      metadata: {
+        createdBy: 'claude-code',
+        tags: input.requirement.tags || [],
+        annotations: [],
+      },
+    });
 
     // Update statistics
     await this.planService.updateStatistics(input.planId);
 
     return {
-      requirementId,
+      requirementId: requirement.id,
     };
   }
 

@@ -252,6 +252,11 @@ export interface LinkRepository {
   findLinksByEntity(entityId: string, direction?: 'incoming' | 'outgoing' | 'both'): Promise<Link[]>;
 
   /**
+   * Find all links (optionally filtered by relation type)
+   */
+  findAllLinks(relationType?: string): Promise<Link[]>;
+
+  /**
    * Delete link by ID
    */
   deleteLink(id: string): Promise<void>;
@@ -312,6 +317,65 @@ export interface UnitOfWork {
    * Execute operation within transaction
    */
   execute<TResult>(fn: () => Promise<TResult>): Promise<TResult>;
+}
+
+// ============================================================================
+// Plan Repository
+// ============================================================================
+
+/**
+ * Plan Repository for managing plans, manifests, and active plans index
+ *
+ * Handles plan-level operations that are not entity-specific:
+ * - Plan directory management
+ * - Manifest CRUD operations
+ * - Active plans index (workspace tracking)
+ */
+export interface PlanRepository {
+  /**
+   * Initialize plan storage (create base directories)
+   */
+  initialize(): Promise<void>;
+
+  /**
+   * Create a new plan directory structure
+   */
+  createPlan(planId: string): Promise<void>;
+
+  /**
+   * Delete a plan and all its data
+   */
+  deletePlan(planId: string): Promise<void>;
+
+  /**
+   * List all plan IDs
+   */
+  listPlans(): Promise<string[]>;
+
+  /**
+   * Check if plan exists
+   */
+  planExists(planId: string): Promise<boolean>;
+
+  /**
+   * Save plan manifest
+   */
+  saveManifest(planId: string, manifest: any): Promise<void>;
+
+  /**
+   * Load plan manifest
+   */
+  loadManifest(planId: string): Promise<any>;
+
+  /**
+   * Save active plans index
+   */
+  saveActivePlans(index: any): Promise<void>;
+
+  /**
+   * Load active plans index
+   */
+  loadActivePlans(): Promise<any>;
 }
 
 // ============================================================================
