@@ -278,9 +278,19 @@ export class FileUnitOfWork implements UnitOfWork {
    * Dispose Unit of Work and cleanup resources
    */
   async dispose(): Promise<void> {
-    // Reset repositories
+    // Dispose all cached repositories BEFORE clearing (FIX H-1)
+    for (const repo of this.repositories.values()) {
+      if ('dispose' in repo && typeof repo.dispose === 'function') {
+        await (repo as any).dispose();
+      }
+    }
     this.repositories.clear();
-    this.linkRepository = undefined;
+
+    // Dispose link repository if exists (FIX H-1)
+    if (this.linkRepository) {
+      await this.linkRepository.dispose();
+      this.linkRepository = undefined;
+    }
 
     // Reset transaction state
     this.state = 'idle';

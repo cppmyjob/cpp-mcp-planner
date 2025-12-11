@@ -518,6 +518,50 @@ describe('FileLinkRepository', () => {
   });
 
   // ============================================================================
+  // RED: Race Condition in deleteLink (Code Review Issue H-2)
+  // ============================================================================
+  describe('RED: TOCTOU Race in deleteLink (H-2)', () => {
+    it('should handle concurrent deleteLink calls on same ID without errors', async () => {
+      // This test exposes the TOCTOU race in deleteLink where:
+      // 1. metadata is fetched OUTSIDE the lock
+      // 2. Two concurrent deletes both get metadata
+      // 3. First delete removes file and index entry
+      // 4. Second delete tries to use stale metadata -> ENOENT or index corruption
+
+      const link = await repository.createLink({
+        sourceId: 'delete-race-1',
+        targetId: 'delete-target-1',
+        relationType: 'implements',
+      });
+
+      // Launch concurrent deletes on SAME link ID
+      const concurrentDeletes = 10;
+      const promises = Array.from({ length: concurrentDeletes }, () =>
+        repository.deleteLink(link.id).catch((e: Error) => e)
+      );
+
+      const results = await Promise.all(promises);
+
+      // Count successes and failures
+      const successes = results.filter((r) => r === undefined);
+      const errors = results.filter((r): r is Error => r instanceof Error);
+
+      // EXPECTED: Exactly 1 success, rest should fail with NotFoundError
+      // BUG: With TOCTOU race, may get ENOENT errors or index corruption
+      expect(successes.length).toBe(1);
+      expect(errors.length).toBe(concurrentDeletes - 1);
+
+      // All errors should be NotFoundError (already deleted)
+      for (const error of errors) {
+        expect(error.message).toMatch(/not found/i);
+      }
+
+      // Verify link is deleted
+      await expect(repository.getLinkById(link.id)).rejects.toThrow(/not found/i);
+    });
+  });
+
+  // ============================================================================
   // RED: Race Condition Test (Code Review Issue H-1)
   // ============================================================================
   describe('RED: Race Condition in createLink (H-1)', () => {

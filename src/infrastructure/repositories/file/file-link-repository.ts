@@ -280,14 +280,15 @@ export class FileLinkRepository implements LinkRepository {
 
   async deleteLink(id: string): Promise<void> {
     await this.ensureInitialized();
-    // Check existence
-    const metadata = await this.indexManager.get(id);
-    if (!metadata) {
-      throw new NotFoundError('link', id);
-    }
 
-    // Use FileLockManager with withLock for atomic delete (FIX M-2)
+    // Use FileLockManager with withLock for atomic delete (FIX M-2, FIX H-2)
     await this.fileLockManager.withLock(`link:${id}`, async () => {
+      // Re-check existence INSIDE lock to avoid TOCTOU (FIX H-2)
+      const metadata = await this.indexManager.get(id);
+      if (!metadata) {
+        throw new NotFoundError('link', id);
+      }
+
       // Delete file
       await fs.unlink(metadata.filePath);
 
@@ -468,6 +469,7 @@ export class FileLinkRepository implements LinkRepository {
   }
 
   private async findLinksByFilter(filter: LinkFilter): Promise<Link[]> {
+    await this.ensureInitialized(); // FIX M-1: Defensive consistency
     const allMetadata = await this.indexManager.getAll();
 
     // Apply filters
