@@ -14,6 +14,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { FileStorage } from '../../src/infrastructure/file-storage.js';
+import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
+import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
 import { RequirementService } from '../../src/domain/services/requirement-service.js';
 import { SolutionService } from '../../src/domain/services/solution-service.js';
@@ -27,6 +29,8 @@ import * as os from 'os';
 
 describe('Version History Service (Sprint 7)', () => {
   let storage: FileStorage;
+  let repositoryFactory: RepositoryFactory;
+  let lockManager: FileLockManager;
   let planService: PlanService;
   let versionHistoryService: VersionHistoryService;
   let requirementService: RequirementService;
@@ -40,16 +44,32 @@ describe('Version History Service (Sprint 7)', () => {
     testDir = path.join(os.tmpdir(), `mcp-version-history-test-${Date.now()}`);
     storage = new FileStorage(testDir);
     await storage.initialize();
+
+    lockManager = new FileLockManager(testDir);
+    await lockManager.initialize();
+
+    repositoryFactory = new RepositoryFactory({
+      type: 'file',
+      baseDir: testDir,
+      lockManager,
+      cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
+    });
+
+    const planRepo = repositoryFactory.createPlanRepository();
+    await planRepo.initialize();
+
     planService = new PlanService(storage);
     versionHistoryService = new VersionHistoryService(storage);
-    requirementService = new RequirementService(storage, planService, versionHistoryService);
-    solutionService = new SolutionService(storage, planService, versionHistoryService);
+    requirementService = new RequirementService(repositoryFactory, planService, versionHistoryService);
+    solutionService = new SolutionService(repositoryFactory, planService, versionHistoryService);
     phaseService = new PhaseService(storage, planService, versionHistoryService);
-    decisionService = new DecisionService(storage, planService, versionHistoryService);
+    decisionService = new DecisionService(repositoryFactory, planService, versionHistoryService);
     artifactService = new ArtifactService(storage, planService, versionHistoryService);
   });
 
   afterEach(async () => {
+    await repositoryFactory.dispose();
+    await lockManager.dispose();
     await fs.rm(testDir, { recursive: true, force: true });
   });
 

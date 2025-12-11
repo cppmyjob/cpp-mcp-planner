@@ -404,17 +404,22 @@ export interface RepositoryFactory {
   /**
    * Create repository for entity type
    */
-  createRepository<T extends Entity>(entityType: EntityType): Repository<T>;
+  createRepository<T extends Entity>(entityType: EntityType, planId: string): Repository<T>;
 
   /**
    * Create link repository
    */
-  createLinkRepository(): LinkRepository;
+  createLinkRepository(planId: string): LinkRepository;
+
+  /**
+   * Create plan repository (singleton, no planId needed)
+   */
+  createPlanRepository(): PlanRepository;
 
   /**
    * Create unit of work
    */
-  createUnitOfWork(): UnitOfWork;
+  createUnitOfWork(planId: string): UnitOfWork;
 
   /**
    * Get storage backend type

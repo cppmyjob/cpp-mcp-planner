@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { FileStorage } from '../../infrastructure/file-storage.js';
+import type { RepositoryFactory } from '../repositories/interfaces.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { Decision, DecisionStatus, AlternativeConsidered, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
@@ -117,18 +117,14 @@ export interface ListDecisionsResult {
 
 export class DecisionService {
   constructor(
-    private storage: FileStorage,
+    private repositoryFactory: RepositoryFactory,
     private planService: PlanService,
     private versionHistoryService?: VersionHistoryService
   ) {}
 
   async getDecision(input: GetDecisionInput): Promise<GetDecisionResult> {
-    const decisions = await this.storage.loadEntities<Decision>(input.planId, 'decisions');
-    const decision = decisions.find((d) => d.id === input.decisionId);
-
-    if (!decision) {
-      throw new Error('Decision not found');
-    }
+    const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
+    const decision = await repo.findById(input.decisionId);
 
     // Apply field filtering - GET operations default to all fields
     const filtered = filterEntity(
@@ -153,14 +149,14 @@ export class DecisionService {
       return { decisions: [], notFound: [] };
     }
 
-    const allDecisions = await this.storage.loadEntities<Decision>(input.planId, 'decisions');
+    const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
     const foundDecisions: Decision[] = [];
     const notFound: string[] = [];
 
-    // Collect found and not found IDs
+    // Collect found and not found IDs using batch findById
     for (const id of input.decisionIds) {
-      const decision = allDecisions.find((d) => d.id === id);
-      if (decision) {
+      try {
+        const decision = await repo.findById(id);
         // Apply field filtering - decisions default to all fields
         const filtered = filterEntity(
           decision,
@@ -170,8 +166,12 @@ export class DecisionService {
           false
         ) as Decision;
         foundDecisions.push(filtered);
-      } else {
-        notFound.push(id);
+      } catch (error: any) {
+        if (error.message?.includes('not found')) {
+          notFound.push(id);
+        } else {
+          throw error;
+        }
       }
     }
 
@@ -179,23 +179,19 @@ export class DecisionService {
   }
 
   async supersedeDecision(input: SupersedeDecisionInput): Promise<SupersedeDecisionResult> {
-    const decisions = await this.storage.loadEntities<Decision>(input.planId, 'decisions');
-    const index = decisions.findIndex((d) => d.id === input.decisionId);
+    const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
+    const oldDecision = await repo.findById(input.decisionId);
 
-    if (index === -1) {
-      throw new Error('Decision not found');
-    }
-
-    const oldDecision = decisions[index];
     const now = new Date().toISOString();
+    const newDecisionId = uuidv4();
 
     // Mark old decision as superseded
     oldDecision.status = 'superseded';
     oldDecision.updatedAt = now;
     oldDecision.version += 1;
+    oldDecision.supersededBy = newDecisionId;
 
     // Create new decision
-    const newDecisionId = uuidv4();
     const newDecision: Decision = {
       id: newDecisionId,
       type: 'decision',
@@ -225,11 +221,9 @@ export class DecisionService {
       supersedes: oldDecision.id,
     };
 
-    oldDecision.supersededBy = newDecisionId;
-    decisions[index] = oldDecision;
-    decisions.push(newDecision);
-
-    await this.storage.saveEntities(input.planId, 'decisions', decisions);
+    // Update old decision and create new one
+    await repo.update(oldDecision.id, oldDecision);
+    await repo.create(newDecision);
 
     return {
       success: true,
@@ -268,16 +262,16 @@ export class DecisionService {
       status: 'active',
     };
 
-    const decisions = await this.storage.loadEntities<Decision>(input.planId, 'decisions');
-    decisions.push(decision);
-    await this.storage.saveEntities(input.planId, 'decisions', decisions);
+    const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
+    await repo.create(decision);
     await this.planService.updateStatistics(input.planId);
 
     return { decisionId };
   }
 
   async getDecisionHistory(input: GetDecisionHistoryInput): Promise<GetDecisionHistoryResult> {
-    let decisions = await this.storage.loadEntities<Decision>(input.planId, 'decisions');
+    const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
+    let decisions = await repo.findAll();
 
     if (input.filters) {
       if (input.filters.search) {
@@ -314,14 +308,9 @@ export class DecisionService {
   }
 
   async updateDecision(input: UpdateDecisionInput): Promise<UpdateDecisionResult> {
-    const decisions = await this.storage.loadEntities<Decision>(input.planId, 'decisions');
-    const index = decisions.findIndex((d) => d.id === input.decisionId);
+    const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
+    const decision = await repo.findById(input.decisionId);
 
-    if (index === -1) {
-      throw new Error('Decision not found');
-    }
-
-    const decision = decisions[index];
     const now = new Date().toISOString();
 
     // Sprint 7: Save current version to history BEFORE updating
@@ -338,17 +327,17 @@ export class DecisionService {
       );
     }
 
-
     // Handle supersede
     if (input.supersede) {
       // Mark old decision as superseded
       decision.status = 'superseded';
       decision.updatedAt = now;
       decision.version += 1;
-      decisions[index] = decision;
+
+      const newDecisionId = uuidv4();
+      decision.supersededBy = newDecisionId;
 
       // Create new decision
-      const newDecisionId = uuidv4();
       const newDecision: Decision = {
         id: newDecisionId,
         type: 'decision',
@@ -378,9 +367,8 @@ export class DecisionService {
         supersedes: decision.id,
       };
 
-      decision.supersededBy = newDecisionId;
-      decisions.push(newDecision);
-      await this.storage.saveEntities(input.planId, 'decisions', decisions);
+      await repo.update(decision.id, decision);
+      await repo.create(newDecision);
 
       return {
         success: true,
@@ -409,14 +397,14 @@ export class DecisionService {
 
     decision.updatedAt = now;
     decision.version += 1;
-    decisions[index] = decision;
-    await this.storage.saveEntities(input.planId, 'decisions', decisions);
+    await repo.update(decision.id, decision);
 
     return { success: true, decisionId: input.decisionId };
   }
 
   async listDecisions(input: ListDecisionsInput): Promise<ListDecisionsResult> {
-    let decisions = await this.storage.loadEntities<Decision>(input.planId, 'decisions');
+    const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
+    let decisions = await repo.findAll();
 
     if (input.filters) {
       if (input.filters.status) {
@@ -460,7 +448,8 @@ export class DecisionService {
       throw new Error('Version history service not available');
     }
 
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
@@ -482,20 +471,14 @@ export class DecisionService {
       throw new Error('Version history service not available');
     }
 
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
-    const entities = await this.storage.loadEntities<Decision>(
-      input.planId,
-      'decisions'
-    );
-    const current = entities.find((e) => e.id === input.decisionId);
-
-    if (!current) {
-      throw new Error('Decision not found');
-    }
+    const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
+    const current = await repo.findById(input.decisionId);
 
     return this.versionHistoryService.diff({
       planId: input.planId,

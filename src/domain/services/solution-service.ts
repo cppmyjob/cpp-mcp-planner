@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { FileStorage } from '../../infrastructure/file-storage.js';
+import type { RepositoryFactory } from '../../domain/repositories/interfaces.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { DecisionService } from './decision-service.js';
@@ -206,19 +206,15 @@ export interface DeleteSolutionResult {
 
 export class SolutionService {
   constructor(
-    private storage: FileStorage,
+    private repositoryFactory: RepositoryFactory,
     private planService: PlanService,
     private versionHistoryService?: VersionHistoryService,
     private decisionService?: DecisionService // TDD Sprint: Optional DecisionService for auto-creating Decision records
   ) {}
 
   async getSolution(input: GetSolutionInput): Promise<GetSolutionResult> {
-    const solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
-    const solution = solutions.find((s) => s.id === input.solutionId);
-
-    if (!solution) {
-      throw new Error('Solution not found');
-    }
+    const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
+    const solution = await repo.findById(input.solutionId);
 
     // Apply field filtering - GET operations default to all fields
     const filtered = filterEntity(
@@ -243,14 +239,14 @@ export class SolutionService {
       return { solutions: [], notFound: [] };
     }
 
-    const allSolutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
+    const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
     const foundSolutions: Solution[] = [];
     const notFound: string[] = [];
 
-    // Collect found and not found IDs
+    // Fetch each solution by ID
     for (const id of input.solutionIds) {
-      const solution = allSolutions.find((s) => s.id === id);
-      if (solution) {
+      try {
+        const solution = await repo.findById(id);
         // Apply field filtering - solutions default to all fields
         const filtered = filterEntity(
           solution,
@@ -260,7 +256,8 @@ export class SolutionService {
           false
         ) as Solution;
         foundSolutions.push(filtered);
-      } else {
+      } catch (error) {
+        // NotFoundError - add to notFound list
         notFound.push(id);
       }
     }
@@ -300,12 +297,11 @@ export class SolutionService {
       status: 'proposed',
     };
 
-    const solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
-    solutions.push(solution);
-    await this.storage.saveEntities(input.planId, 'solutions', solutions);
+    const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
+    await repo.create(solution);
     await this.planService.updateStatistics(input.planId);
 
-    return { solutionId };
+    return { solutionId: solution.id };
   }
 
   async compareSolutions(input: CompareSolutionsInput): Promise<CompareSolutionsResult> {
@@ -314,8 +310,16 @@ export class SolutionService {
       throw new Error('solutionIds must be a non-empty array');
     }
 
-    const allSolutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
-    const solutions = allSolutions.filter((s) => input.solutionIds.includes(s.id));
+    const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
+    const solutions: Solution[] = [];
+    for (const id of input.solutionIds) {
+      try {
+        const solution = await repo.findById(id);
+        solutions.push(solution);
+      } catch (error) {
+        // Skip not found solutions
+      }
+    }
 
     // Collect all aspects
     const aspectsSet = new Set<string>();
@@ -406,27 +410,21 @@ export class SolutionService {
    * console.log(result.decisionId); // ID of created Decision record
    */
   async selectSolution(input: SelectSolutionInput): Promise<SelectSolutionResult> {
-    const solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
-    const index = solutions.findIndex((s) => s.id === input.solutionId);
+    const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
+    const solution = await repo.findById(input.solutionId);
 
-    if (index === -1) {
-      throw new Error('Solution not found');
-    }
-
-    const solution = solutions[index];
-    const now = new Date().toISOString();
-
-    // Deselect other solutions that address the same requirements
+    // Find and deselect other solutions that address the same requirements
+    const allSolutions = await repo.findAll();
     const deselected: Solution[] = [];
-    for (const s of solutions) {
+
+    for (const s of allSolutions) {
       if (
         s.id !== input.solutionId &&
         s.status === 'selected' &&
         s.addressing.some((r) => solution.addressing.includes(r))
       ) {
         s.status = 'rejected';
-        s.updatedAt = now;
-        s.version += 1;
+        await repo.update(s.id, s);
         deselected.push(s);
       }
     }
@@ -434,17 +432,13 @@ export class SolutionService {
     // Select this solution
     solution.status = 'selected';
     solution.selectionReason = input.reason;
-    solution.updatedAt = now;
-    solution.version += 1;
-
-    solutions[index] = solution;
-    await this.storage.saveEntities(input.planId, 'solutions', solutions);
+    await repo.update(solution.id, solution);
 
     // TDD Sprint: Auto-create Decision record if requested
     const decisionId = await this.createDecisionRecordIfRequested(
       input,
       solution,
-      solutions
+      allSolutions
     );
 
     return {
@@ -456,15 +450,8 @@ export class SolutionService {
   }
 
   async updateSolution(input: UpdateSolutionInput): Promise<UpdateSolutionResult> {
-    const solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
-    const index = solutions.findIndex((s) => s.id === input.solutionId);
-
-    if (index === -1) {
-      throw new Error('Solution not found');
-    }
-
-    const solution = solutions[index];
-    const now = new Date().toISOString();
+    const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
+    const solution = await repo.findById(input.solutionId);
 
     // Sprint 7: Save current version to history BEFORE updating
     if (this.versionHistoryService) {
@@ -501,17 +488,14 @@ export class SolutionService {
       solution.metadata.tags = input.updates.tags;
     }
 
-    solution.updatedAt = now;
-    solution.version += 1;
-
-    solutions[index] = solution;
-    await this.storage.saveEntities(input.planId, 'solutions', solutions);
+    await repo.update(solution.id, solution);
 
     return { success: true, solutionId: input.solutionId };
   }
 
   async listSolutions(input: ListSolutionsInput): Promise<ListSolutionsResult> {
-    let solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
+    const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
+    let solutions = await repo.findAll();
 
     if (input.filters) {
       if (input.filters.status) {
@@ -546,15 +530,12 @@ export class SolutionService {
   }
 
   async deleteSolution(input: DeleteSolutionInput): Promise<DeleteSolutionResult> {
-    const solutions = await this.storage.loadEntities<Solution>(input.planId, 'solutions');
-    const index = solutions.findIndex((s) => s.id === input.solutionId);
+    const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
 
-    if (index === -1) {
-      throw new Error('Solution not found');
-    }
+    // Verify exists (throws NotFoundError if not found)
+    await repo.findById(input.solutionId);
 
-    solutions.splice(index, 1);
-    await this.storage.saveEntities(input.planId, 'solutions', solutions);
+    await repo.delete(input.solutionId);
     await this.planService.updateStatistics(input.planId);
 
     return { success: true, message: 'Solution deleted' };
@@ -605,7 +586,8 @@ export class SolutionService {
       throw new Error('Version history service not available');
     }
 
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
@@ -627,20 +609,14 @@ export class SolutionService {
       throw new Error('Version history service not available');
     }
 
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
-    const entities = await this.storage.loadEntities<Solution>(
-      input.planId,
-      'solutions'
-    );
-    const current = entities.find((e) => e.id === input.solutionId);
-
-    if (!current) {
-      throw new Error('Solution not found');
-    }
+    const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
+    const current = await repo.findById(input.solutionId);
 
     return this.versionHistoryService.diff({
       planId: input.planId,
@@ -658,16 +634,41 @@ export class SolutionService {
    * REFACTOR: Uses common bulkUpdateEntities utility
    */
   async bulkUpdateSolutions(input: BulkUpdateSolutionsInput): Promise<BulkUpdateSolutionsResult> {
-    return bulkUpdateEntities<'solutionId'>({
-      entityType: 'solutions',
-      entityIdField: 'solutionId',
-      updateFn: (solutionId, updates) =>
-        this.updateSolution({ planId: input.planId, solutionId, updates }).then(() => {}),
-      planId: input.planId,
-      updates: input.updates,
-      atomic: input.atomic,
-      storage: this.storage,
-    });
+    // Note: Using individual updates instead of bulkUpdateEntities utility (which requires FileStorage)
+    const results: Array<{ solutionId: string; success: boolean; error?: string }> = [];
+    let updated = 0;
+    let failed = 0;
+
+    for (const update of input.updates) {
+      try {
+        await this.updateSolution({
+          planId: input.planId,
+          solutionId: update.solutionId,
+          updates: update.updates,
+        });
+        results.push({
+          solutionId: update.solutionId,
+          success: true,
+        });
+        updated++;
+      } catch (error: any) {
+        results.push({
+          solutionId: update.solutionId,
+          success: false,
+          error: error.message,
+        });
+        failed++;
+        if (input.atomic) {
+          break; // Stop on first error in atomic mode
+        }
+      }
+    }
+
+    return {
+      updated,
+      failed,
+      results,
+    };
   }
 
   /**

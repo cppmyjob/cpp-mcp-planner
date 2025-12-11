@@ -18,6 +18,8 @@ import { LinkingService } from '../../src/domain/services/linking-service.js';
 import { DecisionService } from '../../src/domain/services/decision-service.js';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { FileStorage } from '../../src/infrastructure/file-storage.js';
+import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
+import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import type { Requirement, Solution, Phase, Artifact } from '../../src/domain/entities/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -40,6 +42,8 @@ async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<vo
 describe('BatchService - Edge Cases', () => {
   let batchService: BatchService;
   let storage: FileStorage;
+  let repositoryFactory: RepositoryFactory;
+  let lockManager: FileLockManager;
   let testDir: string;
   let testPlanId: string;
 
@@ -48,13 +52,26 @@ describe('BatchService - Edge Cases', () => {
     storage = new FileStorage(testDir);
     await storage.initialize();
 
+    lockManager = new FileLockManager(testDir);
+    await lockManager.initialize();
+
+    repositoryFactory = new RepositoryFactory({
+      type: 'file',
+      baseDir: testDir,
+      lockManager,
+      cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
+    });
+
+    const planRepo = repositoryFactory.createPlanRepository();
+    await planRepo.initialize();
+
     const planService = new PlanService(storage);
-    const requirementService = new RequirementService(storage, planService);
-    const solutionService = new SolutionService(storage, planService);
+    const requirementService = new RequirementService(repositoryFactory, planService);
+    const solutionService = new SolutionService(repositoryFactory, planService);
     const phaseService = new PhaseService(storage, planService);
-    const linkingService = new LinkingService(storage);
-    const decisionService = new DecisionService(storage, planService);
-    const artifactService = new ArtifactService(storage, planService);
+    const linkingService = new LinkingService(repositoryFactory);
+    const decisionService = new DecisionService(repositoryFactory, planService);
+    const artifactService = new ArtifactService(repositoryFactory, planService);
 
     batchService = new BatchService(
       storage,
@@ -75,6 +92,8 @@ describe('BatchService - Edge Cases', () => {
   });
 
   afterEach(async () => {
+    await repositoryFactory.dispose();
+    await lockManager.dispose();
     await removeDirectoryWithRetry(testDir);
   });
 

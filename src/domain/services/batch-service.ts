@@ -1,5 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { FileStorage } from '../../infrastructure/file-storage.js';
+import type { RepositoryFactory, Repository, LinkRepository } from '../repositories/interfaces.js';
+import { NotFoundError } from '../repositories/errors.js';
 import type { PlanService } from './plan-service.js';
 import type { RequirementService } from './requirement-service.js';
 import type { SolutionService } from './solution-service.js';
@@ -9,6 +11,7 @@ import type { DecisionService } from './decision-service.js';
 import type { ArtifactService } from './artifact-service.js';
 import type {
   Entity,
+  EntityType,
   Link,
   Requirement,
   Solution,
@@ -20,10 +23,10 @@ import type {
 import { resolveFieldTempIds } from '../utils/temp-id-resolver.js';
 
 // Batch operation types
-export type EntityType = 'requirement' | 'solution' | 'phase' | 'link' | 'decision' | 'artifact';
+export type BatchEntityType = 'requirement' | 'solution' | 'phase' | 'link' | 'decision' | 'artifact';
 
 export interface BatchOperation {
-  entity_type: EntityType;
+  entity_type: BatchEntityType;
   payload: any;
 }
 
@@ -38,19 +41,218 @@ export interface ExecuteBatchInput {
 }
 
 /**
+ * In-Memory Repository - implements Repository<T> interface but works with in-memory maps
+ */
+class InMemoryRepository<T extends Entity> implements Repository<T> {
+  constructor(
+    private entityType: EntityType,
+    private planId: string,
+    private entitiesMap: Map<string, Entity[]>
+  ) {}
+
+  async findById(id: string): Promise<T> {
+    const entities = await this.findAll();
+    const entity = entities.find(e => e.id === id);
+    if (!entity) {
+      throw new NotFoundError(this.entityType, id);
+    }
+    return entity;
+  }
+
+  async findAll(): Promise<T[]> {
+    const entities = this.entitiesMap.get(this.planId) || [];
+    return entities as T[];
+  }
+
+  async create(entity: T): Promise<T> {
+    const entities = await this.findAll();
+    entities.push(entity);
+    this.entitiesMap.set(this.planId, entities);
+    return entity;
+  }
+
+  async update(id: string, updates: Partial<T>): Promise<T> {
+    const entities = await this.findAll();
+    const index = entities.findIndex(e => e.id === id);
+    if (index === -1) {
+      throw new NotFoundError(this.entityType, id);
+    }
+
+    const existing = entities[index];
+    const updated: T = {
+      ...existing,
+      ...updates,
+      id,
+      version: existing.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+
+    entities[index] = updated;
+    this.entitiesMap.set(this.planId, entities);
+    return updated;
+  }
+
+  async delete(id: string): Promise<void> {
+    const entities = await this.findAll();
+    const index = entities.findIndex(e => e.id === id);
+    if (index === -1) {
+      throw new NotFoundError(this.entityType, id);
+    }
+    entities.splice(index, 1);
+    this.entitiesMap.set(this.planId, entities);
+  }
+
+  async exists(id: string): Promise<boolean> {
+    const entities = await this.findAll();
+    return entities.some(e => e.id === id);
+  }
+}
+
+/**
+ * In-Memory Link Repository
+ */
+class InMemoryLinkRepository implements LinkRepository {
+  constructor(
+    private planId: string,
+    private linksMap: Map<string, Link[]>
+  ) {}
+
+  async findById(id: string): Promise<Link> {
+    const links = await this.findAll();
+    const link = links.find(l => l.id === id);
+    if (!link) {
+      throw new NotFoundError('link', id);
+    }
+    return link;
+  }
+
+  async findAll(): Promise<Link[]> {
+    return this.linksMap.get(this.planId) || [];
+  }
+
+  async create(link: Link): Promise<Link> {
+    const links = await this.findAll();
+    links.push(link);
+    this.linksMap.set(this.planId, links);
+    return link;
+  }
+
+  async delete(id: string): Promise<void> {
+    const links = await this.findAll();
+    const index = links.findIndex(l => l.id === id);
+    if (index === -1) {
+      throw new NotFoundError('link', id);
+    }
+    links.splice(index, 1);
+    this.linksMap.set(this.planId, links);
+  }
+
+  async findBySource(sourceId: string): Promise<Link[]> {
+    const links = await this.findAll();
+    return links.filter(l => l.sourceId === sourceId);
+  }
+
+  async findByTarget(targetId: string): Promise<Link[]> {
+    const links = await this.findAll();
+    return links.filter(l => l.targetId === targetId);
+  }
+
+  async findByRelation(relationType: string): Promise<Link[]> {
+    const links = await this.findAll();
+    return links.filter(l => l.relationType === relationType);
+  }
+}
+
+/**
+ * In-Memory Repository Factory
+ */
+class InMemoryRepositoryFactory implements RepositoryFactory {
+  private repositoryCache = new Map<string, Repository<any>>();
+  private linkRepo: InMemoryLinkRepository;
+
+  constructor(
+    private planId: string,
+    private requirementsMap: Map<string, Requirement[]>,
+    private solutionsMap: Map<string, Solution[]>,
+    private phasesMap: Map<string, Phase[]>,
+    private decisionsMap: Map<string, Decision[]>,
+    private artifactsMap: Map<string, Artifact[]>,
+    private linksMap: Map<string, Link[]>
+  ) {
+    this.linkRepo = new InMemoryLinkRepository(planId, linksMap);
+  }
+
+  createRepository<T extends Entity>(entityType: EntityType, planId: string): Repository<T> {
+    const cacheKey = `${entityType}:${planId}`;
+    if (this.repositoryCache.has(cacheKey)) {
+      return this.repositoryCache.get(cacheKey)!;
+    }
+
+    let entitiesMap: Map<string, Entity[]>;
+    switch (entityType) {
+      case 'requirement':
+        entitiesMap = this.requirementsMap as Map<string, Entity[]>;
+        break;
+      case 'solution':
+        entitiesMap = this.solutionsMap as Map<string, Entity[]>;
+        break;
+      case 'phase':
+        entitiesMap = this.phasesMap as Map<string, Entity[]>;
+        break;
+      case 'decision':
+        entitiesMap = this.decisionsMap as Map<string, Entity[]>;
+        break;
+      case 'artifact':
+        entitiesMap = this.artifactsMap as Map<string, Entity[]>;
+        break;
+      default:
+        throw new Error(`Unsupported entity type: ${entityType}`);
+    }
+
+    const repo = new InMemoryRepository<T>(entityType, planId, entitiesMap);
+    this.repositoryCache.set(cacheKey, repo);
+    return repo;
+  }
+
+  createLinkRepository(planId: string): LinkRepository {
+    return this.linkRepo;
+  }
+
+  createPlanRepository(): any {
+    throw new Error('PlanRepository not supported in batch mode');
+  }
+
+  createUnitOfWork(planId: string): any {
+    throw new Error('UnitOfWork not supported in batch mode');
+  }
+
+  getBackend(): any {
+    return 'memory';
+  }
+
+  async close(): Promise<void> {
+    // No-op for in-memory
+  }
+
+  async dispose(): Promise<void> {
+    this.repositoryCache.clear();
+  }
+}
+
+/**
  * In-Memory Storage Adapter
  *
  * This adapter wraps FileStorage and provides an in-memory layer for batch operations.
  * All reads/writes go through memory, allowing for transactional rollback.
  */
 class InMemoryStorage {
-  // In-memory entity stores
-  private requirementsMap: Map<string, Requirement[]> = new Map();
-  private solutionsMap: Map<string, Solution[]> = new Map();
-  private phasesMap: Map<string, Phase[]> = new Map();
-  private decisionsMap: Map<string, Decision[]> = new Map();
-  private artifactsMap: Map<string, Artifact[]> = new Map();
-  private linksMap: Map<string, Link[]> = new Map();
+  // In-memory entity stores (public for InMemoryRepositoryFactory access)
+  public requirementsMap: Map<string, Requirement[]> = new Map();
+  public solutionsMap: Map<string, Solution[]> = new Map();
+  public phasesMap: Map<string, Phase[]> = new Map();
+  public decisionsMap: Map<string, Decision[]> = new Map();
+  public artifactsMap: Map<string, Artifact[]> = new Map();
+  public linksMap: Map<string, Link[]> = new Map();
   private manifestsMap: Map<string, PlanManifest> = new Map();
 
   constructor(
@@ -204,28 +406,39 @@ export class BatchService {
     const memoryStorage = new InMemoryStorage(this.storage, input.planId);
     await memoryStorage.loadAllIntoMemory();
 
-    // 2. Create in-memory service instances
+    // 2. Create in-memory RepositoryFactory
+    const memoryRepoFactory = new InMemoryRepositoryFactory(
+      input.planId,
+      memoryStorage.requirementsMap,
+      memoryStorage.solutionsMap,
+      memoryStorage.phasesMap,
+      memoryStorage.decisionsMap,
+      memoryStorage.artifactsMap,
+      memoryStorage.linksMap
+    );
+
+    // 3. Create in-memory service instances with RepositoryFactory
     const memReqService = new (this.requirementService.constructor as any)(
-      memoryStorage,
+      memoryRepoFactory,
       this.planService
     );
     const memSolService = new (this.solutionService.constructor as any)(
-      memoryStorage,
+      memoryRepoFactory,
       this.planService
     );
     const memPhaseService = new (this.phaseService.constructor as any)(
-      memoryStorage,
+      memoryStorage, // PhaseService still uses FileStorage
       this.planService
     );
     const memLinkService = new (this.linkingService.constructor as any)(
-      memoryStorage
+      memoryRepoFactory
     );
     const memDecService = new (this.decisionService.constructor as any)(
-      memoryStorage,
+      memoryRepoFactory,
       this.planService
     );
     const memArtService = new (this.artifactService.constructor as any)(
-      memoryStorage,
+      memoryRepoFactory,
       this.planService
     );
 

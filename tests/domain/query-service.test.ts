@@ -7,6 +7,8 @@ import { PhaseService } from '../../src/domain/services/phase-service.js';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { LinkingService } from '../../src/domain/services/linking-service.js';
 import { FileStorage } from '../../src/infrastructure/file-storage.js';
+import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
+import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import type { Requirement, Solution, Phase, Artifact } from '../../src/domain/entities/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -21,6 +23,8 @@ describe('QueryService', () => {
   let artifactService: ArtifactService;
   let linkingService: LinkingService;
   let storage: FileStorage;
+  let repositoryFactory: RepositoryFactory;
+  let lockManager: FileLockManager;
   let testDir: string;
   let planId: string;
 
@@ -28,12 +32,26 @@ describe('QueryService', () => {
     testDir = path.join(os.tmpdir(), `mcp-query-test-${Date.now()}`);
     storage = new FileStorage(testDir);
     await storage.initialize();
+
+    lockManager = new FileLockManager(testDir);
+    await lockManager.initialize();
+
+    repositoryFactory = new RepositoryFactory({
+      type: 'file',
+      baseDir: testDir,
+      lockManager,
+      cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
+    });
+
+    const planRepo = repositoryFactory.createPlanRepository();
+    await planRepo.initialize();
+
     planService = new PlanService(storage);
-    requirementService = new RequirementService(storage, planService);
-    solutionService = new SolutionService(storage, planService);
+    requirementService = new RequirementService(repositoryFactory, planService);
+    solutionService = new SolutionService(repositoryFactory, planService);
     phaseService = new PhaseService(storage, planService);
     artifactService = new ArtifactService(storage, planService);
-    linkingService = new LinkingService(storage);
+    linkingService = new LinkingService(repositoryFactory);
     queryService = new QueryService(storage, planService, linkingService);
 
     const plan = await planService.createPlan({
@@ -44,6 +62,8 @@ describe('QueryService', () => {
   });
 
   afterEach(async () => {
+    await repositoryFactory.dispose();
+    await lockManager.dispose();
     await fs.rm(testDir, { recursive: true, force: true });
   });
 
@@ -640,7 +660,7 @@ describe('QueryService', () => {
       await solutionService.selectSolution({ planId, solutionId, reason: 'Best approach' });
 
       // Create link
-      const linkingService = new (await import('../../src/domain/services/linking-service.js')).LinkingService(storage);
+      const linkingService = new (await import('../../src/domain/services/linking-service.js')).LinkingService(repositoryFactory);
       await linkingService.linkEntities({
         planId,
         sourceId: solutionId,
@@ -704,7 +724,7 @@ describe('QueryService', () => {
       });
 
       // Link phase to requirement
-      const linkingService = new (await import('../../src/domain/services/linking-service.js')).LinkingService(storage);
+      const linkingService = new (await import('../../src/domain/services/linking-service.js')).LinkingService(repositoryFactory);
       await linkingService.linkEntities({
         planId,
         sourceId: phaseId,

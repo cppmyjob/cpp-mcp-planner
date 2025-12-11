@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { FileStorage } from '../../infrastructure/file-storage.js';
+import type { RepositoryFactory } from '../repositories/interfaces.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type {
@@ -141,13 +141,14 @@ export interface DeleteArtifactResult {
 
 export class ArtifactService {
   constructor(
-    private storage: FileStorage,
+    private repositoryFactory: RepositoryFactory,
     private planService: PlanService,
     private versionHistoryService?: VersionHistoryService
   ) {}
 
   private async ensurePlanExists(planId: string): Promise<void> {
-    const exists = await this.storage.planExists(planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
@@ -189,7 +190,9 @@ export class ArtifactService {
     // Validate codeRefs format
     validateCodeRefs(input.artifact.codeRefs || []);
 
-    const artifacts = await this.storage.loadEntities<Artifact>(input.planId, 'artifacts');
+    const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
+    const artifacts = await repo.findAll();
+
     const artifactId = uuidv4();
     const slug = input.artifact.slug || slugify(input.artifact.title, artifactId);
 
@@ -229,8 +232,7 @@ export class ArtifactService {
       codeRefs: input.artifact.codeRefs,
     };
 
-    artifacts.push(artifact);
-    await this.storage.saveEntities(input.planId, 'artifacts', artifacts);
+    await repo.create(artifact);
     await this.planService.updateStatistics(input.planId);
 
     return { artifactId };
@@ -239,12 +241,8 @@ export class ArtifactService {
   async getArtifact(input: GetArtifactInput): Promise<GetArtifactResult> {
     await this.ensurePlanExists(input.planId);
 
-    const artifacts = await this.storage.loadEntities<Artifact>(input.planId, 'artifacts');
-    const artifact = artifacts.find((a) => a.id === input.artifactId);
-
-    if (!artifact) {
-      throw new Error('Artifact not found');
-    }
+    const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
+    const artifact = await repo.findById(input.artifactId);
 
     // Auto-migrate fileTable to targets if needed
     // If artifact has fileTable but no targets, convert fileTable to targets
@@ -285,15 +283,8 @@ export class ArtifactService {
       validateCodeRefs(input.updates.codeRefs);
     }
 
-    const artifacts = await this.storage.loadEntities<Artifact>(input.planId, 'artifacts');
-    const index = artifacts.findIndex((a) => a.id === input.artifactId);
-
-    if (index === -1) {
-      throw new Error('Artifact not found');
-    }
-
-    const artifact = artifacts[index];
-    const now = new Date().toISOString();
+    const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
+    const artifact = await repo.findById(input.artifactId);
 
     // Sprint 7: Save current version to history BEFORE updating
     if (this.versionHistoryService) {
@@ -312,8 +303,9 @@ export class ArtifactService {
     if (input.updates.title !== undefined) artifact.title = input.updates.title;
     if (input.updates.description !== undefined) artifact.description = input.updates.description;
     if (input.updates.slug !== undefined) {
-      // Validate slug uniqueness (exclude current artifact)
-      this.validateSlugUniqueness(artifacts, input.updates.slug, input.artifactId);
+      // Validate slug uniqueness (exclude current artifact) - need all artifacts for this
+      const allArtifacts = await repo.findAll();
+      this.validateSlugUniqueness(allArtifacts, input.updates.slug, input.artifactId);
       artifact.slug = input.updates.slug;
     }
     if (input.updates.status !== undefined) artifact.status = input.updates.status;
@@ -328,11 +320,8 @@ export class ArtifactService {
     if (input.updates.codeRefs !== undefined) artifact.codeRefs = input.updates.codeRefs;
     if (input.updates.tags !== undefined) artifact.metadata.tags = input.updates.tags;
 
-    artifact.updatedAt = now;
-    artifact.version += 1;
-    artifacts[index] = artifact;
-
-    await this.storage.saveEntities(input.planId, 'artifacts', artifacts);
+    // repo.update() will auto-increment version and set updatedAt
+    await repo.update(artifact.id, artifact);
 
     return { success: true, artifactId: input.artifactId };
   }
@@ -340,7 +329,8 @@ export class ArtifactService {
   async listArtifacts(input: ListArtifactsInput): Promise<ListArtifactsResult> {
     await this.ensurePlanExists(input.planId);
 
-    let artifacts = await this.storage.loadEntities<Artifact>(input.planId, 'artifacts');
+    const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
+    let artifacts = await repo.findAll();
 
     // Apply filters
     if (input.filters) {
@@ -382,15 +372,8 @@ export class ArtifactService {
   async deleteArtifact(input: DeleteArtifactInput): Promise<DeleteArtifactResult> {
     await this.ensurePlanExists(input.planId);
 
-    const artifacts = await this.storage.loadEntities<Artifact>(input.planId, 'artifacts');
-    const index = artifacts.findIndex((a) => a.id === input.artifactId);
-
-    if (index === -1) {
-      throw new Error('Artifact not found');
-    }
-
-    artifacts.splice(index, 1);
-    await this.storage.saveEntities(input.planId, 'artifacts', artifacts);
+    const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
+    await repo.delete(input.artifactId);
     await this.planService.updateStatistics(input.planId);
 
     return {
@@ -408,7 +391,8 @@ export class ArtifactService {
       throw new Error('Version history service not available');
     }
 
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
@@ -430,21 +414,15 @@ export class ArtifactService {
       throw new Error('Version history service not available');
     }
 
-    const exists = await this.storage.planExists(input.planId);
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
     // Load current artifact to support diffing with current version
-    const artifacts = await this.storage.loadEntities<Artifact>(
-      input.planId,
-      'artifacts'
-    );
-    const currentArtifact = artifacts.find((a) => a.id === input.artifactId);
-
-    if (!currentArtifact) {
-      throw new Error('Artifact not found');
-    }
+    const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
+    const currentArtifact = await repo.findById(input.artifactId);
 
     return this.versionHistoryService.diff({
       planId: input.planId,

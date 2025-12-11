@@ -52,10 +52,10 @@ export async function createServices(storagePath: string): Promise<Services> {
   const versionHistoryService = new VersionHistoryService(storage);
 
   const requirementService = new RequirementService(repositoryFactory, planService, versionHistoryService);
-  const solutionService = new SolutionService(storage, planService, versionHistoryService);
-  const decisionService = new DecisionService(storage, planService, versionHistoryService);
+  const solutionService = new SolutionService(repositoryFactory, planService, versionHistoryService);
+  const decisionService = new DecisionService(repositoryFactory, planService, versionHistoryService);
   const phaseService = new PhaseService(storage, planService, versionHistoryService);
-  const artifactService = new ArtifactService(storage, planService, versionHistoryService);
+  const artifactService = new ArtifactService(repositoryFactory, planService, versionHistoryService);
   const linkingService = new LinkingService(repositoryFactory); // MIGRATED!
   const queryService = new QueryService(storage, planService, linkingService);
   const batchService = new BatchService(

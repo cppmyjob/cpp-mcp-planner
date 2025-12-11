@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
 import { FileStorage } from '../../src/infrastructure/file-storage.js';
+import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
+import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -10,6 +12,8 @@ describe('ArtifactService', () => {
   let service: ArtifactService;
   let planService: PlanService;
   let storage: FileStorage;
+  let repositoryFactory: RepositoryFactory;
+  let lockManager: FileLockManager;
   let testDir: string;
   let planId: string;
 
@@ -17,8 +21,22 @@ describe('ArtifactService', () => {
     testDir = path.join(os.tmpdir(), `mcp-artifact-test-${Date.now()}`);
     storage = new FileStorage(testDir);
     await storage.initialize();
+
+    lockManager = new FileLockManager(testDir);
+    await lockManager.initialize();
+
+    repositoryFactory = new RepositoryFactory({
+      type: 'file',
+      baseDir: testDir,
+      lockManager,
+      cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
+    });
+
+    const planRepo = repositoryFactory.createPlanRepository();
+    await planRepo.initialize();
+
     planService = new PlanService(storage);
-    service = new ArtifactService(storage, planService);
+    service = new ArtifactService(repositoryFactory, planService);
 
     const plan = await planService.createPlan({
       name: 'Test Plan',
@@ -28,6 +46,8 @@ describe('ArtifactService', () => {
   });
 
   afterEach(async () => {
+    await repositoryFactory.dispose();
+    await lockManager.dispose();
     await fs.rm(testDir, { recursive: true, force: true });
   });
 
@@ -132,7 +152,7 @@ describe('ArtifactService', () => {
           planId,
           artifactId: 'non-existent',
         })
-      ).rejects.toThrow('Artifact not found');
+      ).rejects.toThrow('not found');
     });
   });
 
@@ -314,7 +334,7 @@ describe('ArtifactService', () => {
           planId,
           artifactId: 'non-existent',
         })
-      ).rejects.toThrow('Artifact not found');
+      ).rejects.toThrow('not found');
     });
   });
 
@@ -796,28 +816,28 @@ describe('ArtifactService', () => {
 
     describe('RED: fileTable to targets migration', () => {
       it('RED: should auto-migrate fileTable to targets on read', async () => {
-        // Create artifact with old fileTable field by directly manipulating storage
+        // Create artifact with old fileTable field by directly via repository
         const artifactId = 'test-migration-' + Date.now();
-        const artifacts = await storage.loadEntities(planId, 'artifacts');
+        const repo = repositoryFactory.createRepository('artifact', planId);
 
-        artifacts.push({
+        const legacyArtifact = {
           id: artifactId,
-          type: 'artifact',
+          type: 'artifact' as const,
           title: 'Legacy Artifact',
           description: 'Test',
-          artifactType: 'code',
-          status: 'draft',
+          artifactType: 'code' as const,
+          status: 'draft' as const,
           content: {},
           fileTable: [
-            { path: 'src/old.ts', action: 'create', description: 'Old format' },
+            { path: 'src/old.ts', action: 'create' as const, description: 'Old format' },
           ],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           version: 1,
           metadata: { createdBy: 'test', tags: [], annotations: [] },
-        } as any);
+        };
 
-        await storage.saveEntities(planId, 'artifacts', artifacts);
+        await repo.create(legacyArtifact as any);
 
         // Read via service - should auto-migrate
         const retrieved = await service.getArtifact({ planId, artifactId });
@@ -831,25 +851,25 @@ describe('ArtifactService', () => {
       it('RED: should preserve targets if both fileTable and targets exist', async () => {
         // Edge case: if both exist, targets takes precedence
         const artifactId = 'test-both-' + Date.now();
-        const artifacts = await storage.loadEntities(planId, 'artifacts');
+        const repo = repositoryFactory.createRepository('artifact', planId);
 
-        artifacts.push({
+        const artifact = {
           id: artifactId,
-          type: 'artifact',
+          type: 'artifact' as const,
           title: 'Both Fields',
           description: 'Test',
-          artifactType: 'code',
-          status: 'draft',
+          artifactType: 'code' as const,
+          status: 'draft' as const,
           content: {},
-          fileTable: [{ path: 'src/old.ts', action: 'create' }],
-          targets: [{ path: 'src/new.ts', action: 'modify', lineNumber: 5 }],
+          fileTable: [{ path: 'src/old.ts', action: 'create' as const }],
+          targets: [{ path: 'src/new.ts', action: 'modify' as const, lineNumber: 5 }],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           version: 1,
           metadata: { createdBy: 'test', tags: [], annotations: [] },
-        } as any);
+        };
 
-        await storage.saveEntities(planId, 'artifacts', artifacts);
+        await repo.create(artifact as any);
 
         const retrieved = await service.getArtifact({ planId, artifactId });
         expect(retrieved.artifact.targets).toHaveLength(1);

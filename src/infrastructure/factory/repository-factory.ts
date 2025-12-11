@@ -8,7 +8,7 @@
  * - Unified cache configuration
  */
 
-import type { Repository, LinkRepository, UnitOfWork, PlanRepository } from '../../domain/repositories/interfaces.js';
+import type { Repository, LinkRepository, UnitOfWork, PlanRepository, StorageBackend } from '../../domain/repositories/interfaces.js';
 import type { Entity, EntityType } from '../../domain/entities/types.js';
 import { FileRepository } from '../repositories/file/file-repository.js';
 import { FileLinkRepository } from '../repositories/file/file-link-repository.js';
@@ -327,5 +327,19 @@ export class RepositoryFactory {
 
     // DO NOT dispose shared lock manager - caller owns it
     // The FileLockManager is injected via constructor and should be disposed by the caller
+  }
+
+  /**
+   * Get the storage backend type
+   */
+  getBackend(): StorageBackend {
+    return this.config.type as StorageBackend;
+  }
+
+  /**
+   * Close all connections and cleanup (alias for dispose)
+   */
+  async close(): Promise<void> {
+    return this.dispose();
   }
 }
