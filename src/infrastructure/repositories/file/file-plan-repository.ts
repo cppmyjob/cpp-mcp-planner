@@ -286,6 +286,4 @@ export class FilePlanRepository
       // File doesn't exist, ignore
     }
   }
-
-  // atomicWrite() is now provided by BaseFileRepository.atomicWriteJSON()
 }
