@@ -1,5 +1,69 @@
 # MCP Planning Server — Best Practices
 
+## Code Style & Conventions
+
+### TypeScript Naming
+- **NO** `I` prefix for interfaces — use `User`, not `IUser`
+- **NO** `_` prefix for private members — use `private` modifier alone
+- **Explicit visibility** — always specify `public`/`private`/`protected` on all class members
+- File names: `kebab-case.ts` (e.g., `plan-service.ts`)
+- Classes/Interfaces: `PascalCase`
+- Functions/variables: `camelCase`
+- Constants: `SCREAMING_SNAKE_CASE` for true constants, `camelCase` for const references
+
+### Type Safety (Strict)
+- **NO** `any` — ever. Use specific types or generics
+- **NO** `unknown` where avoidable — prefer type guards and discriminated unions
+- Enable `strict: true` in tsconfig (includes `noImplicitAny`, `strictNullChecks`)
+- Use `as const` for literal types
+- Use `readonly` for immutable data
+- Prefer `type` for unions/intersections, `interface` for object shapes
+
+```typescript
+// ❌ Bad
+private _cache: any;
+function process(data: unknown) { ... }
+
+// ✅ Good
+private cache: Map<string, Entity>;
+function process(data: ProcessInput) { ... }
+```
+
+### Exhaustiveness & Safety
+- Use exhaustive switch with `never` for discriminated unions
+- Early return pattern — reduce nesting
+- Nullish coalescing (`??`) over logical OR (`||`) for defaults
+- Optional chaining (`?.`) for safe property access
+
+```typescript
+// Exhaustive switch
+function getStatus(s: Status): string {
+  switch (s) {
+    case 'active': return 'Active';
+    case 'archived': return 'Archived';
+    default: {
+      const _exhaustive: never = s;
+      throw new Error(`Unknown status: ${_exhaustive}`);
+    }
+  }
+}
+```
+
+### Module Organization
+- One primary export per file (class, interface, or related group)
+- Barrel exports (`index.ts`) for public API
+- Named exports only — **NO** default exports
+- Imports order: node builtins → external packages → internal modules
+
+### Code Quality
+- Functions: single responsibility, max ~50 lines
+- Max 3-4 parameters; use options object for more
+- Avoid nested callbacks — use async/await
+- No magic numbers — use named constants
+- Prefer composition over inheritance
+
+---
+
 ## Architecture Overview
 
 ```
