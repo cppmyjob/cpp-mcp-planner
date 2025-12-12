@@ -194,7 +194,7 @@ export function filterArtifact<T>(
   if (shouldRemoveSourceCode && filteredObj.content) {
     const content = filteredObj.content as Record<string, unknown>;
     if ('sourceCode' in content) {
-      const { sourceCode, ...restContent } = content;
+      const { sourceCode: _sourceCode, ...restContent } = content;
       filteredObj.content = restContent;
     }
   }

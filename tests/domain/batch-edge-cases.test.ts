@@ -19,7 +19,7 @@ import { DecisionService } from '../../src/domain/services/decision-service.js';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
-import type { Requirement, Solution, Phase, Artifact, Entity, Link } from '../../src/domain/entities/types.js';
+import type { Requirement, Solution, Phase, Artifact, Entity } from '../../src/domain/entities/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -39,14 +39,6 @@ async function loadEntities<T extends Entity>(
   };
   const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
   return repo.findAll();
-}
-
-async function loadLinks(
-  repositoryFactory: RepositoryFactory,
-  planId: string
-): Promise<Link[]> {
-  const linkRepo = repositoryFactory.createLinkRepository(planId);
-  return linkRepo.findAllLinks();
 }
 
 // Helper to retry directory removal on Windows (EBUSY/ENOTEMPTY errors)
@@ -133,7 +125,7 @@ describe('BatchService - Edge Cases', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Single Req',
             description: 'Only one',
@@ -150,13 +142,13 @@ describe('BatchService - Edge Cases', () => {
     expect(result.results[0].success).toBe(true);
   });
 
-  it('Test 42: Invalid entity_type throws error', async () => {
+  it('Test 42: Invalid entityType throws error', async () => {
     await expect(
       batchService.executeBatch({
         planId: testPlanId,
         operations: [
           {
-            entity_type: 'invalid' as any,
+            entityType: 'invalid' as any,
             payload: {},
           },
         ],
@@ -165,11 +157,11 @@ describe('BatchService - Edge Cases', () => {
   });
 
   it('Test 43: Temp ID in text content is NOT resolved', async () => {
-    const result = await batchService.executeBatch({
+    const _result = await batchService.executeBatch({
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Task with $0 reference in title',
@@ -196,7 +188,7 @@ describe('BatchService - Edge Cases', () => {
         planId: testPlanId,
         operations: [
           {
-            entity_type: 'phase',
+            entityType: 'phase',
             payload: {
               title: 'Phase with unresolved parent',
               description: 'References non-existent parent',
@@ -215,7 +207,7 @@ describe('BatchService - Edge Cases', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Req 1',
@@ -227,7 +219,7 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
-          entity_type: 'solution',
+          entityType: 'solution',
           payload: {
             title: 'Solution',
             description: 'Implementation',
@@ -247,7 +239,7 @@ describe('BatchService - Edge Cases', () => {
     const operations = [];
     for (let i = 0; i < 100; i++) {
       operations.push({
-        entity_type: 'requirement' as const,
+        entityType: 'requirement' as const,
         payload: {
           title: `Requirement ${i}`,
           description: `Description for requirement ${i}`,
@@ -274,7 +266,7 @@ describe('BatchService - Edge Cases', () => {
     // Create 10 phases with parent-child relationships
     for (let i = 0; i < 10; i++) {
       operations.push({
-        entity_type: 'phase' as const,
+        entityType: 'phase' as const,
         payload: {
           tempId: `$${i}`,
           title: `Phase Level ${i}`,
@@ -311,7 +303,7 @@ describe('BatchService - Edge Cases', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Req',
@@ -323,7 +315,7 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
-          entity_type: 'solution',
+          entityType: 'solution',
           payload: {
             tempId: '$1',
             title: 'Sol',
@@ -343,7 +335,7 @@ describe('BatchService - Edge Cases', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'link',
+          entityType: 'link',
           payload: {
             sourceId: solutions[0].id,
             targetId: requirements[0].id,
@@ -362,7 +354,7 @@ describe('BatchService - Edge Cases', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Parent Req',
@@ -374,7 +366,7 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Child Req',
             description: 'Child',
@@ -401,7 +393,7 @@ describe('BatchService - Edge Cases', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Req 1',
@@ -413,7 +405,7 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$1',
             title: 'Req 2',
@@ -425,7 +417,7 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$2',
             title: 'Req 3',
@@ -437,7 +429,7 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
-          entity_type: 'solution',
+          entityType: 'solution',
           payload: {
             title: 'Multi-solution',
             description: 'Addresses multiple requirements',
@@ -460,7 +452,7 @@ describe('BatchService - Edge Cases', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'First',
@@ -472,7 +464,7 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$1',
             title: 'Second',
@@ -484,7 +476,7 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$2',
             title: 'Third',
@@ -509,7 +501,7 @@ describe('BatchService - Edge Cases', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Req',
@@ -521,7 +513,7 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
-          entity_type: 'solution',
+          entityType: 'solution',
           payload: {
             tempId: '$1',
             title: 'Sol',
@@ -531,7 +523,7 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
-          entity_type: 'phase',
+          entityType: 'phase',
           payload: {
             tempId: '$2',
             title: 'Phase',
@@ -541,7 +533,7 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
-          entity_type: 'artifact',
+          entityType: 'artifact',
           payload: {
             title: 'Code Artifact',
             description: 'Implementation code',

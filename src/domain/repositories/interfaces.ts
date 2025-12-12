@@ -8,7 +8,7 @@
  * - MongoDB (future)
  */
 
-import type { Entity, Link, EntityType } from '../entities/types.js';
+import type { Entity, Link, EntityType, PlanManifest, ActivePlansIndex, VersionHistory } from '../entities/types.js';
 
 // ============================================================================
 // Query Types
@@ -35,10 +35,10 @@ export type FilterOperator =
 /**
  * Filter condition
  */
-export interface FilterCondition<T = any> {
+export interface FilterCondition<T = Record<string, unknown>> {
   field: keyof T | string;
   operator: FilterOperator;
-  value: any;
+  value: unknown;
 }
 
 /**
@@ -49,7 +49,7 @@ export type LogicalOperator = 'and' | 'or' | 'not';
 /**
  * Complex filter with logical operators
  */
-export interface Filter<T = any> {
+export interface Filter<T = Record<string, unknown>> {
   conditions?: FilterCondition<T>[];
   operator?: LogicalOperator;
   nested?: Filter<T>[];
@@ -63,7 +63,7 @@ export type SortDirection = 'asc' | 'desc';
 /**
  * Sort specification
  */
-export interface SortSpec<T = any> {
+export interface SortSpec<T = Record<string, unknown>> {
   field: keyof T | string;
   direction: SortDirection;
 }
@@ -79,7 +79,7 @@ export interface Pagination {
 /**
  * Query options
  */
-export interface QueryOptions<T = any> {
+export interface QueryOptions<T = Record<string, unknown>> {
   filter?: Filter<T>;
   sort?: SortSpec<T>[];
   pagination?: Pagination;
@@ -360,22 +360,22 @@ export interface PlanRepository {
   /**
    * Save plan manifest
    */
-  saveManifest(planId: string, manifest: any): Promise<void>;
+  saveManifest(planId: string, manifest: PlanManifest): Promise<void>;
 
   /**
    * Load plan manifest
    */
-  loadManifest(planId: string): Promise<any>;
+  loadManifest(planId: string): Promise<PlanManifest>;
 
   /**
    * Save active plans index
    */
-  saveActivePlans(index: any): Promise<void>;
+  saveActivePlans(index: ActivePlansIndex): Promise<void>;
 
   /**
    * Load active plans index
    */
-  loadActivePlans(): Promise<any>;
+  loadActivePlans(): Promise<ActivePlansIndex>;
 
   /**
    * Save export file
@@ -393,7 +393,7 @@ export interface PlanRepository {
    * @param entityId - Entity ID
    * @param history - Version history data
    */
-  saveVersionHistory(planId: string, entityType: string, entityId: string, history: any): Promise<void>;
+  saveVersionHistory(planId: string, entityType: string, entityId: string, history: VersionHistory): Promise<void>;
 
   /**
    * Load version history for an entity
@@ -402,7 +402,7 @@ export interface PlanRepository {
    * @param entityId - Entity ID
    * @returns Version history data, or null if not found
    */
-  loadVersionHistory(planId: string, entityType: string, entityId: string): Promise<any | null>;
+  loadVersionHistory(planId: string, entityType: string, entityId: string): Promise<VersionHistory | null>;
 
   /**
    * Delete version history for an entity

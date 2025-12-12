@@ -48,15 +48,15 @@ export function validateAlternativesConsidered(alternatives: unknown[]): void {
   for (let i = 0; i < alternatives.length; i++) {
     const alt = alternatives[i] as Record<string, unknown>;
 
-    if (typeof alt.option !== 'string' || !alt.option) {
+    if (typeof alt.option !== 'string' || alt.option === '') {
       throw new Error(
-        `Invalid alternativesConsidered at index ${i}: 'option' must be a non-empty string`
+        `Invalid alternativesConsidered at index ${String(i)}: 'option' must be a non-empty string`
       );
     }
 
-    if (typeof alt.reasoning !== 'string' || !alt.reasoning) {
+    if (typeof alt.reasoning !== 'string' || alt.reasoning === '') {
       throw new Error(
-        `Invalid alternativesConsidered at index ${i}: 'reasoning' must be a non-empty string`
+        `Invalid alternativesConsidered at index ${String(i)}: 'reasoning' must be a non-empty string`
       );
     }
   }
@@ -70,15 +70,15 @@ export function validateTags(tags: unknown[]): void {
   for (let i = 0; i < tags.length; i++) {
     const tag = tags[i] as Record<string, unknown>;
 
-    if (typeof tag.key !== 'string' || !tag.key) {
+    if (typeof tag.key !== 'string' || tag.key === '') {
       throw new Error(
-        `Invalid tag at index ${i}: 'key' must be a non-empty string`
+        `Invalid tag at index ${String(i)}: 'key' must be a non-empty string`
       );
     }
 
     if (typeof tag.value !== 'string') {
       throw new Error(
-        `Invalid tag at index ${i}: 'value' must be a string`
+        `Invalid tag at index ${String(i)}: 'value' must be a string`
       );
     }
   }
@@ -92,15 +92,15 @@ export function validateCodeExamples(examples: unknown[]): void {
   for (let i = 0; i < examples.length; i++) {
     const ex = examples[i] as Record<string, unknown>;
 
-    if (typeof ex.language !== 'string' || !ex.language) {
+    if (typeof ex.language !== 'string' || ex.language === '') {
       throw new Error(
-        `Invalid codeExample at index ${i}: 'language' must be a non-empty string`
+        `Invalid codeExample at index ${String(i)}: 'language' must be a non-empty string`
       );
     }
 
     if (typeof ex.code !== 'string') {
       throw new Error(
-        `Invalid codeExample at index ${i}: 'code' must be a string`
+        `Invalid codeExample at index ${String(i)}: 'code' must be a string`
       );
     }
   }
@@ -122,15 +122,15 @@ export function validateFileTable(fileTable: unknown[]): void {
   for (let i = 0; i < fileTable.length; i++) {
     const entry = fileTable[i] as Record<string, unknown>;
 
-    if (typeof entry.path !== 'string' || !entry.path) {
+    if (typeof entry.path !== 'string' || entry.path === '') {
       throw new Error(
-        `Invalid fileTable entry at index ${i}: 'path' must be a non-empty string`
+        `Invalid fileTable entry at index ${String(i)}: 'path' must be a non-empty string`
       );
     }
 
     if (!VALID_FILE_ACTIONS.includes(entry.action as typeof VALID_FILE_ACTIONS[number])) {
       throw new Error(
-        `Invalid fileTable entry at index ${i}: 'action' must be one of: ${VALID_FILE_ACTIONS.join(', ')}`
+        `Invalid fileTable entry at index ${String(i)}: 'action' must be one of: ${VALID_FILE_ACTIONS.join(', ')}`
       );
     }
   }
@@ -141,7 +141,7 @@ export function validateFileTable(fileTable: unknown[]): void {
  * Replaces validateFileTable with additional precision fields (lineNumber, lineEnd, searchPattern).
  */
 export function validateTargets(targets: unknown[]): void {
-  if (targets === undefined || targets === null) {
+  if (targets === undefined) {
     return; // Optional field
   }
 
@@ -155,21 +155,21 @@ export function validateTargets(targets: unknown[]): void {
     // Validate path - must be non-empty string (after trimming)
     if (typeof target.path !== 'string') {
       throw new Error(
-        `Invalid target at index ${i}: path must be a non-empty string`
+        `Invalid target at index ${String(i)}: path must be a non-empty string`
       );
     }
 
     const trimmedPath = target.path.trim();
-    if (!trimmedPath) {
+    if (trimmedPath === '') {
       throw new Error(
-        `Invalid target at index ${i}: path must be a non-empty string`
+        `Invalid target at index ${String(i)}: path must be a non-empty string`
       );
     }
 
     // Validate action
     if (!VALID_FILE_ACTIONS.includes(target.action as typeof VALID_FILE_ACTIONS[number])) {
       throw new Error(
-        `Invalid target at index ${i}: action must be one of: ${VALID_FILE_ACTIONS.join(', ')}`
+        `Invalid target at index ${String(i)}: action must be one of: ${VALID_FILE_ACTIONS.join(', ')}`
       );
     }
 
@@ -177,19 +177,19 @@ export function validateTargets(targets: unknown[]): void {
     if (target.lineNumber !== undefined) {
       if (typeof target.lineNumber !== 'number') {
         throw new Error(
-          `Invalid target at index ${i}: lineNumber must be a number`
+          `Invalid target at index ${String(i)}: lineNumber must be a number`
         );
       }
 
       if (!Number.isInteger(target.lineNumber)) {
         throw new Error(
-          `Invalid target at index ${i}: lineNumber must be an integer`
+          `Invalid target at index ${String(i)}: lineNumber must be an integer`
         );
       }
 
       if (target.lineNumber < 1) {
         throw new Error(
-          `Invalid target at index ${i}: lineNumber must be a positive integer`
+          `Invalid target at index ${String(i)}: lineNumber must be a positive integer`
         );
       }
     }
@@ -198,25 +198,25 @@ export function validateTargets(targets: unknown[]): void {
     if (target.lineEnd !== undefined) {
       if (target.lineNumber === undefined) {
         throw new Error(
-          `Invalid target at index ${i}: lineEnd requires lineNumber`
+          `Invalid target at index ${String(i)}: lineEnd requires lineNumber`
         );
       }
 
       if (typeof target.lineEnd !== 'number') {
         throw new Error(
-          `Invalid target at index ${i}: lineEnd must be a number`
+          `Invalid target at index ${String(i)}: lineEnd must be a number`
         );
       }
 
       if (!Number.isInteger(target.lineEnd)) {
         throw new Error(
-          `Invalid target at index ${i}: lineEnd must be an integer`
+          `Invalid target at index ${String(i)}: lineEnd must be an integer`
         );
       }
 
       if (target.lineEnd < (target.lineNumber)) {
         throw new Error(
-          `Invalid target at index ${i}: lineEnd must be >= lineNumber`
+          `Invalid target at index ${String(i)}: lineEnd must be >= lineNumber`
         );
       }
     }
@@ -225,28 +225,28 @@ export function validateTargets(targets: unknown[]): void {
     if (target.searchPattern !== undefined) {
       if (target.lineNumber !== undefined) {
         throw new Error(
-          `Invalid target at index ${i}: cannot use both lineNumber and searchPattern`
+          `Invalid target at index ${String(i)}: cannot use both lineNumber and searchPattern`
         );
       }
 
       if (typeof target.searchPattern !== 'string') {
         throw new Error(
-          `Invalid target at index ${i}: searchPattern must be a non-empty string`
+          `Invalid target at index ${String(i)}: searchPattern must be a non-empty string`
         );
       }
 
-      if (!target.searchPattern) {
+      if (target.searchPattern === '') {
         throw new Error(
-          `Invalid target at index ${i}: searchPattern must be a non-empty string`
+          `Invalid target at index ${String(i)}: searchPattern must be a non-empty string`
         );
       }
 
       // Validate regex syntax
       try {
         new RegExp(target.searchPattern);
-      } catch (e) {
+      } catch {
         throw new Error(
-          `Invalid target at index ${i}: invalid regex in searchPattern`
+          `Invalid target at index ${String(i)}: invalid regex in searchPattern`
         );
       }
     }
@@ -272,13 +272,13 @@ export function validateCodeRefs(codeRefs: unknown[]): void {
 
     if (typeof ref !== 'string') {
       throw new Error(
-        `Invalid codeRef at index ${i}: must be a string`
+        `Invalid codeRef at index ${String(i)}: must be a string`
       );
     }
 
-    if (!ref) {
+    if (ref === '') {
       throw new Error(
-        `Invalid codeRef at index ${i}: cannot be empty`
+        `Invalid codeRef at index ${String(i)}: cannot be empty`
       );
     }
 
@@ -287,7 +287,7 @@ export function validateCodeRefs(codeRefs: unknown[]): void {
 
     if (lastColonIndex === -1) {
       throw new Error(
-        `Invalid codeRef at index ${i}: must be in format 'file_path:line_number' (e.g., 'src/file.ts:42')`
+        `Invalid codeRef at index ${String(i)}: must be in format 'file_path:line_number' (e.g., 'src/file.ts:42')`
       );
     }
 
@@ -297,14 +297,14 @@ export function validateCodeRefs(codeRefs: unknown[]): void {
     // Check if it's a positive integer
     if (!Number.isInteger(lineNumber) || lineNumber < 1 || lineNumberStr !== String(lineNumber)) {
       throw new Error(
-        `Invalid codeRef at index ${i}: line number must be a positive integer (got '${lineNumberStr}')`
+        `Invalid codeRef at index ${String(i)}: line number must be a positive integer (got '${lineNumberStr}')`
       );
     }
   }
 }
 
 export function validatePriority(priority: unknown): void {
-  if (priority === undefined || priority === null) {
+  if (priority === undefined) {
     return; // Optional field
   }
 

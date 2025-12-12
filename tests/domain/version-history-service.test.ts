@@ -78,14 +78,14 @@ describe('Version History Service (Sprint 7)', () => {
   // Helper function to create a valid requirement object
   const createRequirement = (title: string, additionalFields: any = {}) => ({
     title,
-    description: additionalFields.description || `Description for ${title}`,
-    priority: additionalFields.priority || 'high' as const,
-    category: additionalFields.category || 'functional' as const,
-    source: additionalFields.source || {
+    description: additionalFields.description ?? `Description for ${title}`,
+    priority: additionalFields.priority ?? 'high' as const,
+    category: additionalFields.category ?? 'functional' as const,
+    source: additionalFields.source ?? {
       type: 'user-request' as const,
       context: 'Test context'
     },
-    acceptanceCriteria: additionalFields.acceptanceCriteria || ['Criteria 1', 'Criteria 2'],
+    acceptanceCriteria: additionalFields.acceptanceCriteria ?? ['Criteria 1', 'Criteria 2'],
     ...additionalFields
   });
 
@@ -1162,8 +1162,8 @@ describe('Version History Service (Sprint 7)', () => {
       });
 
       expect(diff.changes.evaluation).toBeDefined();
-      expect(diff.changes.evaluation.from.technicalFeasibility).toBe('high');
-      expect(diff.changes.evaluation.to.technicalFeasibility).toBe('medium');
+      expect((diff.changes.evaluation.from as { technicalFeasibility: string }).technicalFeasibility).toBe('high');
+      expect((diff.changes.evaluation.to as { technicalFeasibility: string }).technicalFeasibility).toBe('medium');
     });
 
     // Test 39: diff returns empty when no changes

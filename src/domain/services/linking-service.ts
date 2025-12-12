@@ -1,6 +1,5 @@
-import { v4 as uuidv4 } from 'uuid';
 import type { RepositoryFactory } from '../../infrastructure/factory/repository-factory.js';
-import type { Link, RelationType, Entity } from '../entities/types.js';
+import type { Link, RelationType } from '../entities/types.js';
 
 // Input types
 export interface LinkEntitiesInput {
@@ -46,7 +45,7 @@ export interface UnlinkEntitiesResult {
 export class LinkingService {
   constructor(private readonly repositoryFactory: RepositoryFactory) {}
 
-  async linkEntities(input: LinkEntitiesInput): Promise<LinkEntitiesResult> {
+  public async linkEntities(input: LinkEntitiesInput): Promise<LinkEntitiesResult> {
     const linkRepo = this.repositoryFactory.createLinkRepository(input.planId);
 
     // Check for cycle if depends_on
@@ -75,10 +74,10 @@ export class LinkingService {
     return { linkId: link.id };
   }
 
-  async getEntityLinks(input: GetEntityLinksInput): Promise<GetEntityLinksResult> {
+  public async getEntityLinks(input: GetEntityLinksInput): Promise<GetEntityLinksResult> {
     const linkRepo = this.repositoryFactory.createLinkRepository(input.planId);
 
-    const direction = input.direction || 'both';
+    const direction = input.direction ?? 'both';
     let outgoing: Link[] = [];
     let incoming: Link[] = [];
 
@@ -98,12 +97,12 @@ export class LinkingService {
     };
   }
 
-  async unlinkEntities(input: UnlinkEntitiesInput): Promise<UnlinkEntitiesResult> {
+  public async unlinkEntities(input: UnlinkEntitiesInput): Promise<UnlinkEntitiesResult> {
     const linkRepo = this.repositoryFactory.createLinkRepository(input.planId);
 
     const deletedIds: string[] = [];
 
-    if (input.linkId) {
+    if (input.linkId !== undefined && input.linkId !== null && input.linkId !== '') {
       // Delete by linkId
       await linkRepo.deleteLink(input.linkId);
       deletedIds.push(input.linkId);
@@ -112,8 +111,8 @@ export class LinkingService {
       const allLinks = await linkRepo.findAllLinks(input.relationType);
 
       for (const link of allLinks) {
-        const matchSource = input.sourceId ? link.sourceId === input.sourceId : true;
-        const matchTarget = input.targetId ? link.targetId === input.targetId : true;
+        const matchSource = (input.sourceId !== undefined && input.sourceId !== null && input.sourceId !== '') ? link.sourceId === input.sourceId : true;
+        const matchTarget = (input.targetId !== undefined && input.targetId !== null && input.targetId !== '') ? link.targetId === input.targetId : true;
 
         if (matchSource && matchTarget) {
           await linkRepo.deleteLink(link.id);
@@ -138,7 +137,10 @@ export class LinkingService {
         if (!graph.has(link.sourceId)) {
           graph.set(link.sourceId, []);
         }
-        graph.get(link.sourceId)!.push(link.targetId);
+        const sourceLinks = graph.get(link.sourceId);
+        if (sourceLinks) {
+          sourceLinks.push(link.targetId);
+        }
       }
     }
 
@@ -146,7 +148,10 @@ export class LinkingService {
     if (!graph.has(sourceId)) {
       graph.set(sourceId, []);
     }
-    graph.get(sourceId)!.push(targetId);
+    const proposedSourceLinks = graph.get(sourceId);
+    if (proposedSourceLinks) {
+      proposedSourceLinks.push(targetId);
+    }
 
     // DFS to detect cycle
     const visited = new Set<string>();
@@ -159,7 +164,7 @@ export class LinkingService {
       visited.add(node);
       stack.add(node);
 
-      const neighbors = graph.get(node) || [];
+      const neighbors = graph.get(node) ?? [];
       for (const neighbor of neighbors) {
         if (dfs(neighbor)) return true;
       }
@@ -173,16 +178,14 @@ export class LinkingService {
   }
 
   // Helper to get all links for an entity (for referential integrity check)
-  async getLinksForEntity(planId: string, entityId: string): Promise<Link[]> {
+  public async getLinksForEntity(planId: string, entityId: string): Promise<Link[]> {
     const linkRepo = this.repositoryFactory.createLinkRepository(planId);
     return linkRepo.findLinksByEntity(entityId, 'both');
   }
 
   // Delete all links for an entity (for cascading delete)
-  async deleteLinksForEntity(planId: string, entityId: string): Promise<number> {
+  public async deleteLinksForEntity(planId: string, entityId: string): Promise<number> {
     const linkRepo = this.repositoryFactory.createLinkRepository(planId);
     return linkRepo.deleteLinksForEntity(entityId);
   }
 }
-
-export default LinkingService;

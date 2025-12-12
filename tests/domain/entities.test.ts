@@ -1,17 +1,15 @@
 import { describe, it, expect } from '@jest/globals';
 import type {
-  Entity,
   Requirement,
   Solution,
-  Decision,
   Phase,
   Artifact,
   ArtifactTarget,
-  Link,
   PlanManifest,
   Tag,
-  EntityType,
   RelationType,
+  EntityType,
+  Link,
 } from '../../src/domain/entities/types.js';
 
 describe('Entity Types', () => {

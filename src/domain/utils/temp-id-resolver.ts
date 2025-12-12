@@ -37,7 +37,7 @@ export function resolveTempId(
   }
 
   // Look up in mapping
-  if (mapping[value]) {
+  if (mapping[value] !== undefined && mapping[value] !== '') {
     return mapping[value];
   }
 
@@ -53,15 +53,15 @@ export function resolveTempId(
  * @returns Object with temp IDs resolved in specified fields
  */
 export function resolveFieldTempIds(
-  obj: any,
+  obj: Record<string, unknown> | null | undefined,
   fieldMap: Record<string, boolean>,
   mapping: Record<string, string>
-): any {
-  if (!obj || typeof obj !== 'object' || Object.keys(fieldMap).length === 0) {
+): Record<string, unknown> | null | undefined {
+  if (obj === undefined || obj === null || typeof obj !== 'object' || Object.keys(fieldMap).length === 0) {
     return obj;
   }
 
-  const resolved: any = Array.isArray(obj) ? [] : {};
+  const resolved: Record<string, unknown> = (Array.isArray(obj) ? [] : {}) as Record<string, unknown>;
 
   for (const [key, value] of Object.entries(obj)) {
     if (fieldMap[key]) {
@@ -100,7 +100,7 @@ export function resolveFieldTempIds(
       }
 
       if (Object.keys(nestedFieldMap).length > 0) {
-        resolved[key] = resolveFieldTempIds(value, nestedFieldMap, mapping);
+        resolved[key] = resolveFieldTempIds(value as Record<string, unknown>, nestedFieldMap, mapping);
       } else {
         resolved[key] = value;
       }

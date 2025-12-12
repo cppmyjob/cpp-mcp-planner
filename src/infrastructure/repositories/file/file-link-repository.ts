@@ -69,7 +69,7 @@ export class FileLinkRepository
   /**
    * Initialize repository
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     if (this.isInitializedState()) {
       return; // Already initialized
     }
@@ -92,7 +92,7 @@ export class FileLinkRepository
   /**
    * Get FileLockManager instance (for testing)
    */
-  getLockManager(): FileLockManager {
+  public getLockManager(): FileLockManager {
     return this.fileLockManager;
   }
 
@@ -100,7 +100,7 @@ export class FileLinkRepository
   // CRUD Operations
   // ============================================================================
 
-  async createLink(link: Omit<Link, 'id' | 'createdAt' | 'createdBy'>): Promise<Link> {
+  public async createLink(link: Omit<Link, 'id' | 'createdAt' | 'createdBy'>): Promise<Link> {
     await this.ensureInitialized();
 
     // Validate
@@ -161,7 +161,7 @@ export class FileLinkRepository
     });
   }
 
-  async getLinkById(id: string): Promise<Link> {
+  public async getLinkById(id: string): Promise<Link> {
     await this.ensureInitialized();
     const link = await this.getLinkByIdOrNull(id);
     if (!link) {
@@ -197,21 +197,21 @@ export class FileLinkRepository
     return link;
   }
 
-  async findLinksBySource(sourceId: string, relationType?: string): Promise<Link[]> {
+  public async findLinksBySource(sourceId: string, relationType?: string): Promise<Link[]> {
     await this.ensureInitialized();
     return this.findLinksByPredicate(
-      (m: LinkIndexMetadata) => m.sourceId === sourceId && (!relationType || m.relationType === relationType)
+      (m: LinkIndexMetadata) => m.sourceId === sourceId && (relationType === undefined || relationType === null || relationType === '' || m.relationType === relationType)
     );
   }
 
-  async findLinksByTarget(targetId: string, relationType?: string): Promise<Link[]> {
+  public async findLinksByTarget(targetId: string, relationType?: string): Promise<Link[]> {
     await this.ensureInitialized();
     return this.findLinksByPredicate(
-      (m: LinkIndexMetadata) => m.targetId === targetId && (!relationType || m.relationType === relationType)
+      (m: LinkIndexMetadata) => m.targetId === targetId && (relationType === undefined || relationType === null || relationType === '' || m.relationType === relationType)
     );
   }
 
-  async findLinksByEntity(
+  public async findLinksByEntity(
     entityId: string,
     direction: 'incoming' | 'outgoing' | 'both' = 'both'
   ): Promise<Link[]> {
@@ -226,10 +226,10 @@ export class FileLinkRepository
     return this.findLinksByPredicate(predicates[direction]);
   }
 
-  async findAllLinks(relationType?: string): Promise<Link[]> {
+  public async findAllLinks(relationType?: string): Promise<Link[]> {
     await this.ensureInitialized();
 
-    if (relationType) {
+    if (relationType !== undefined && relationType !== '') {
       return this.findLinksByPredicate((m: LinkIndexMetadata) => m.relationType === relationType);
     }
 
@@ -237,7 +237,7 @@ export class FileLinkRepository
     return this.findLinksByPredicate(() => true);
   }
 
-  async deleteLink(id: string): Promise<void> {
+  public async deleteLink(id: string): Promise<void> {
     await this.ensureInitialized();
 
     // Use FileLockManager with withLock for atomic delete (FIX M-2, FIX H-2)
@@ -259,7 +259,7 @@ export class FileLinkRepository
     });
   }
 
-  async deleteLinksForEntity(entityId: string): Promise<number> {
+  public async deleteLinksForEntity(entityId: string): Promise<number> {
     await this.ensureInitialized(); // FIX M-1: Consistent initialization pattern
     // Find all links for entity
     const links = await this.findLinksByEntity(entityId, 'both');
@@ -272,7 +272,7 @@ export class FileLinkRepository
     return links.length;
   }
 
-  async linkExists(sourceId: string, targetId: string, relationType: string): Promise<boolean> {
+  public async linkExists(sourceId: string, targetId: string, relationType: string): Promise<boolean> {
     await this.ensureInitialized();
     const allMetadata = await this.indexManager.getAll();
 
@@ -287,7 +287,7 @@ export class FileLinkRepository
   // Bulk Operations (FIX M2)
   // ============================================================================
 
-  async createMany(
+  public async createMany(
     links: Omit<Link, 'id' | 'createdAt' | 'createdBy'>[]
   ): Promise<Link[]> {
     const created: Link[] = [];
@@ -315,7 +315,7 @@ export class FileLinkRepository
     }
   }
 
-  async deleteMany(idsOrFilter: string[] | LinkFilter): Promise<number> {
+  public async deleteMany(idsOrFilter: string[] | LinkFilter): Promise<number> {
     let idsToDelete: string[];
 
     if (Array.isArray(idsOrFilter)) {
@@ -356,15 +356,15 @@ export class FileLinkRepository
   private validateLinkData(link: Partial<Link>): void {
     const errors: { field: string; message: string; value?: unknown }[] = [];
 
-    if (!link.sourceId || link.sourceId.trim() === '') {
+    if (link.sourceId === undefined || link.sourceId === null || link.sourceId === '' || link.sourceId.trim() === '') {
       errors.push({ field: 'sourceId', message: 'sourceId is required', value: link.sourceId });
     }
 
-    if (!link.targetId || link.targetId.trim() === '') {
+    if (link.targetId === undefined || link.targetId === null || link.targetId === '' || link.targetId.trim() === '') {
       errors.push({ field: 'targetId', message: 'targetId is required', value: link.targetId });
     }
 
-    if (!link.relationType || link.relationType.trim() === '') {
+    if (link.relationType === undefined || link.relationType === null) {
       errors.push({
         field: 'relationType',
         message: 'relationType is required',
@@ -411,20 +411,22 @@ export class FileLinkRepository
   /**
    * Dispose repository and release resources
    */
-  async dispose(): Promise<void> {
+  public dispose(): Promise<void> {
     // Clear cache (delegates to base class)
     this.cacheClear(this.linkCache);
 
     // Note: FileLockManager is shared and should be disposed by caller
     // We don't dispose it here as we don't own it
+
+    return Promise.resolve();
   }
 
   private async findLinksByFilter(filter: LinkFilter): Promise<Link[]> {
     await this.ensureInitialized(); // FIX M-1: Defensive consistency
     return this.findLinksByPredicate((m: LinkIndexMetadata) => {
-      if (filter.sourceId && m.sourceId !== filter.sourceId) return false;
-      if (filter.targetId && m.targetId !== filter.targetId) return false;
-      if (filter.relationType && m.relationType !== filter.relationType) return false;
+      if (filter.sourceId !== undefined && filter.sourceId !== null && filter.sourceId !== '' && m.sourceId !== filter.sourceId) return false;
+      if (filter.targetId !== undefined && filter.targetId !== null && filter.targetId !== '' && m.targetId !== filter.targetId) return false;
+      if (filter.relationType !== undefined && filter.relationType !== null && m.relationType !== filter.relationType) return false;
       return true;
     });
   }

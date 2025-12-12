@@ -2,7 +2,7 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createMcpServer, createServices } from './server/index.js';
 
-const storagePath = process.env.MCP_PLANNING_STORAGE_PATH || './.mcp-plans';
+const storagePath = process.env.MCP_PLANNING_STORAGE_PATH ?? './.mcp-plans';
 
 async function main() {
   const services = await createServices(storagePath);

@@ -6,7 +6,10 @@ import type { DecisionService } from './decision-service.js';
 import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
 import { validateEffortEstimate, validateTags } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
-import { bulkUpdateEntities } from '../utils/bulk-operations.js';
+
+// Constants
+const MAX_SOLUTIONS_BATCH_SIZE = 100;
+const DEFAULT_SOLUTIONS_PAGE_LIMIT = 50;
 
 // Input types
 export interface ProposeSolutionInput {
@@ -212,7 +215,7 @@ export class SolutionService {
     private readonly decisionService?: DecisionService // TDD Sprint: Optional DecisionService for auto-creating Decision records
   ) {}
 
-  async getSolution(input: GetSolutionInput): Promise<GetSolutionResult> {
+  public async getSolution(input: GetSolutionInput): Promise<GetSolutionResult> {
     const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
     const solution = await repo.findById(input.solutionId);
 
@@ -228,10 +231,10 @@ export class SolutionService {
     return { solution: filtered };
   }
 
-  async getSolutions(input: GetSolutionsInput): Promise<GetSolutionsResult> {
+  public async getSolutions(input: GetSolutionsInput): Promise<GetSolutionsResult> {
     // Enforce max limit
-    if (input.solutionIds.length > 100) {
-      throw new Error('Cannot fetch more than 100 solutions at once');
+    if (input.solutionIds.length > MAX_SOLUTIONS_BATCH_SIZE) {
+      throw new Error(`Cannot fetch more than ${MAX_SOLUTIONS_BATCH_SIZE} solutions at once`);
     }
 
     // Handle empty array
@@ -256,7 +259,7 @@ export class SolutionService {
           false
         ) as Solution;
         foundSolutions.push(filtered);
-      } catch (error) {
+      } catch {
         // NotFoundError - add to notFound list
         notFound.push(id);
       }
@@ -265,13 +268,13 @@ export class SolutionService {
     return { solutions: foundSolutions, notFound };
   }
 
-  async proposeSolution(input: ProposeSolutionInput): Promise<ProposeSolutionResult> {
+  public async proposeSolution(input: ProposeSolutionInput): Promise<ProposeSolutionResult> {
     // Validate tradeoffs format
     this.validateTradeoffs(input.solution.tradeoffs);
     // Validate effortEstimate format
     validateEffortEstimate(input.solution.evaluation?.effortEstimate);
     // Validate tags format
-    validateTags(input.solution.tags || []);
+    validateTags(input.solution.tags ?? []);
 
     const solutionId = uuidv4();
     const now = new Date().toISOString();
@@ -284,7 +287,7 @@ export class SolutionService {
       version: 1,
       metadata: {
         createdBy: 'claude-code',
-        tags: input.solution.tags || [],
+        tags: input.solution.tags ?? [],
         annotations: [],
       },
       title: input.solution.title,
@@ -304,9 +307,9 @@ export class SolutionService {
     return { solutionId: solution.id };
   }
 
-  async compareSolutions(input: CompareSolutionsInput): Promise<CompareSolutionsResult> {
+  public async compareSolutions(input: CompareSolutionsInput): Promise<CompareSolutionsResult> {
     // Validate solutionIds parameter
-    if (!input.solutionIds || !Array.isArray(input.solutionIds) || input.solutionIds.length === 0) {
+    if (input.solutionIds === undefined || input.solutionIds === null || !Array.isArray(input.solutionIds) || input.solutionIds.length === 0) {
       throw new Error('solutionIds must be a non-empty array');
     }
 
@@ -316,7 +319,7 @@ export class SolutionService {
       try {
         const solution = await repo.findById(id);
         solutions.push(solution);
-      } catch (error) {
+      } catch {
         // Skip not found solutions
       }
     }
@@ -327,7 +330,8 @@ export class SolutionService {
 
     let aspects = Array.from(aspectsSet);
     if (input.aspects && input.aspects.length > 0) {
-      aspects = aspects.filter((a) => input.aspects!.includes(a));
+      const filterAspects = input.aspects;
+      aspects = aspects.filter((a) => filterAspects.includes(a));
     }
 
     // Build comparison matrix
@@ -337,8 +341,8 @@ export class SolutionService {
         return {
           solutionId: s.id,
           solutionTitle: s.title,
-          pros: tradeoff?.pros || [],
-          cons: tradeoff?.cons || [],
+          pros: tradeoff?.pros ?? [],
+          cons: tradeoff?.cons ?? [],
           score: tradeoff?.score,
         };
       });
@@ -348,7 +352,7 @@ export class SolutionService {
       let winner: string | undefined;
       if (withScores.length > 0) {
         const best = withScores.reduce((a, b) =>
-          (a.score || 0) > (b.score || 0) ? a : b
+          (a.score ?? 0) > (b.score ?? 0) ? a : b
         );
         winner = best.solutionId;
       }
@@ -359,7 +363,14 @@ export class SolutionService {
     // Calculate overall best
     const scores: Record<string, number[]> = {};
     solutions.forEach((s) => {
-      scores[s.id] = s.tradeoffs.filter((t) => t.score !== undefined).map((t) => t.score!);
+      scores[s.id] = s.tradeoffs
+        .filter((t) => t.score !== undefined)
+        .map((t) => {
+          if (t.score === undefined) {
+            throw new Error('Unexpected undefined score after filtering');
+          }
+          return t.score;
+        });
     });
 
     let bestOverall: string | undefined;
@@ -380,8 +391,8 @@ export class SolutionService {
         matrix,
         summary: {
           bestOverall,
-          recommendations: bestOverall
-            ? [`${solutions.find((s) => s.id === bestOverall)?.title} has the highest average score`]
+          recommendations: bestOverall !== undefined && bestOverall !== ''
+            ? [`${String(solutions.find((s) => s.id === bestOverall)?.title)} has the highest average score`]
             : [],
         },
       },
@@ -409,7 +420,7 @@ export class SolutionService {
    * });
    * console.log(result.decisionId); // ID of created Decision record
    */
-  async selectSolution(input: SelectSolutionInput): Promise<SelectSolutionResult> {
+  public async selectSolution(input: SelectSolutionInput): Promise<SelectSolutionResult> {
     const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
     const solution = await repo.findById(input.solutionId);
 
@@ -449,7 +460,7 @@ export class SolutionService {
     };
   }
 
-  async updateSolution(input: UpdateSolutionInput): Promise<UpdateSolutionResult> {
+  public async updateSolution(input: UpdateSolutionInput): Promise<UpdateSolutionResult> {
     const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
     const solution = await repo.findById(input.solutionId);
 
@@ -493,24 +504,26 @@ export class SolutionService {
     return { success: true, solutionId: input.solutionId };
   }
 
-  async listSolutions(input: ListSolutionsInput): Promise<ListSolutionsResult> {
+  public async listSolutions(input: ListSolutionsInput): Promise<ListSolutionsResult> {
     const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
     let solutions = await repo.findAll();
 
-    if (input.filters) {
-      if (input.filters.status) {
-        solutions = solutions.filter((s) => s.status === input.filters!.status);
+    if (input.filters !== undefined && input.filters !== null) {
+      const filters = input.filters;
+      if (filters.status !== undefined && filters.status !== null) {
+        solutions = solutions.filter((s) => s.status === filters.status);
       }
-      if (input.filters.addressingRequirement) {
+      if (filters.addressingRequirement !== undefined && filters.addressingRequirement !== null && filters.addressingRequirement !== '') {
+        const reqId = filters.addressingRequirement;
         solutions = solutions.filter((s) =>
-          s.addressing.includes(input.filters!.addressingRequirement!)
+          s.addressing.includes(reqId)
         );
       }
     }
 
     const total = solutions.length;
-    const offset = input.offset || 0;
-    const limit = input.limit || 50;
+    const offset = input.offset ?? 0;
+    const limit = input.limit ?? DEFAULT_SOLUTIONS_PAGE_LIMIT;
     const paginated = solutions.slice(offset, offset + limit);
 
     // Apply field filtering
@@ -529,7 +542,7 @@ export class SolutionService {
     };
   }
 
-  async deleteSolution(input: DeleteSolutionInput): Promise<DeleteSolutionResult> {
+  public async deleteSolution(input: DeleteSolutionInput): Promise<DeleteSolutionResult> {
     const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
 
     // Verify exists (throws NotFoundError if not found)
@@ -552,27 +565,27 @@ export class SolutionService {
       // Check for invalid { pro, con } format
       if ('pro' in t || 'con' in t) {
         throw new Error(
-          `Invalid tradeoff format at index ${i}: found { pro, con } format. ` +
+          `Invalid tradeoff format at index ${String(i)}: found { pro, con } format. ` +
           `Expected { aspect: string, pros: string[], cons: string[] }`
         );
       }
 
       // Validate required fields
-      if (typeof t.aspect !== 'string' || !t.aspect) {
+      if (typeof t.aspect !== 'string' || t.aspect === '') {
         throw new Error(
-          `Invalid tradeoff at index ${i}: 'aspect' must be a non-empty string`
+          `Invalid tradeoff at index ${String(i)}: 'aspect' must be a non-empty string`
         );
       }
 
       if (!Array.isArray(t.pros)) {
         throw new Error(
-          `Invalid tradeoff at index ${i}: 'pros' must be an array of strings`
+          `Invalid tradeoff at index ${String(i)}: 'pros' must be an array of strings`
         );
       }
 
       if (!Array.isArray(t.cons)) {
         throw new Error(
-          `Invalid tradeoff at index ${i}: 'cons' must be an array of strings`
+          `Invalid tradeoff at index ${String(i)}: 'cons' must be an array of strings`
         );
       }
     }
@@ -581,7 +594,7 @@ export class SolutionService {
   /**
    * Sprint 7: Get version history
    */
-  async getHistory(input: { planId: string; solutionId: string; limit?: number; offset?: number }): Promise<VersionHistory<Solution>> {
+  public async getHistory(input: { planId: string; solutionId: string; limit?: number; offset?: number }): Promise<VersionHistory<Solution>> {
     if (!this.versionHistoryService) {
       throw new Error('Version history service not available');
     }
@@ -592,19 +605,20 @@ export class SolutionService {
       throw new Error('Plan not found');
     }
 
-    return this.versionHistoryService.getHistory({
+    const history = await this.versionHistoryService.getHistory({
       planId: input.planId,
       entityId: input.solutionId,
       entityType: 'solution',
       limit: input.limit,
       offset: input.offset,
     });
+    return history as VersionHistory<Solution>;
   }
 
   /**
    * Sprint 7: Compare two versions
    */
-  async diff(input: { planId: string; solutionId: string; version1: number; version2: number }): Promise<VersionDiff> {
+  public async diff(input: { planId: string; solutionId: string; version1: number; version2: number }): Promise<VersionDiff> {
     if (!this.versionHistoryService) {
       throw new Error('Version history service not available');
     }
@@ -633,10 +647,10 @@ export class SolutionService {
    * Sprint 9: Bulk update multiple solutions in one call
    * REFACTOR: Uses common bulkUpdateEntities utility
    */
-  async bulkUpdateSolutions(input: BulkUpdateSolutionsInput): Promise<BulkUpdateSolutionsResult> {
+  public async bulkUpdateSolutions(input: BulkUpdateSolutionsInput): Promise<BulkUpdateSolutionsResult> {
     const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
 
-    if (input.atomic) {
+    if (input.atomic === true) {
       // ATOMIC MODE: All-or-nothing with true rollback
       // Phase 1: Load all entities and validate
       const toUpdate: Solution[] = [];
@@ -677,10 +691,10 @@ export class SolutionService {
             solution.evaluation = update.updates.evaluation;
           }
           // Tags validation (using type assertion due to Partial<> limitations)
-          const updates = update.updates as any;
-          if (updates.tags !== undefined) {
-            validateTags(updates.tags);
-            solution.metadata.tags = updates.tags;
+          const updates = update.updates as Record<string, unknown>;
+          if (updates.tags !== undefined && updates.tags !== null) {
+            validateTags(updates.tags as unknown[]);
+            solution.metadata.tags = updates.tags as typeof solution.metadata.tags;
           }
 
           solution.updatedAt = new Date().toISOString();
@@ -688,9 +702,10 @@ export class SolutionService {
 
           toUpdate.push(solution);
           results.push({ solutionId: update.solutionId, success: true });
-        } catch (error: any) {
+        } catch (error: unknown) {
           // In atomic mode, any error causes full rejection (no partial updates)
-          throw new Error(`Atomic bulk update failed: ${error.message}`);
+          const message = error instanceof Error ? error.message : String(error);
+          throw new Error(`Atomic bulk update failed: ${message}`);
         }
       }
 
@@ -720,11 +735,12 @@ export class SolutionService {
             success: true,
           });
           updated++;
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
           results.push({
             solutionId: update.solutionId,
             success: false,
-            error: error.message,
+            error: message,
           });
           failed++;
         }
@@ -754,7 +770,7 @@ export class SolutionService {
     selectedSolution: Solution,
     allSolutions: Solution[]
   ): Promise<string | undefined> {
-    if (!input.createDecisionRecord || !this.decisionService) {
+    if (input.createDecisionRecord !== true || this.decisionService === undefined || this.decisionService === null) {
       return undefined;
     }
 
@@ -768,7 +784,7 @@ export class SolutionService {
       .filter((s) => s.id !== input.solutionId)
       .map((altSolution) => ({
         option: altSolution.title,
-        reasoning: altSolution.description || altSolution.approach,
+        reasoning: (altSolution.description !== undefined && altSolution.description !== null && altSolution.description !== '') ? altSolution.description : altSolution.approach,
         whyNotChosen:
           altSolution.status === 'rejected'
             ? `Rejected in favor of ${selectedSolution.title}`
@@ -782,13 +798,13 @@ export class SolutionService {
         title: `Solution Selection: ${selectedSolution.title}`,
         question: `Which solution should be selected for requirements ${selectedSolution.addressing.join(', ')}?`,
         context: `${selectedSolution.description}\n\nApproach: ${selectedSolution.approach}${
-          selectedSolution.implementationNotes
+          selectedSolution.implementationNotes !== undefined && selectedSolution.implementationNotes !== null && selectedSolution.implementationNotes !== ''
             ? `\n\nImplementation Notes: ${selectedSolution.implementationNotes}`
             : ''
         }`,
-        decision: `Selected: ${selectedSolution.title}${input.reason ? ` - ${input.reason}` : ''}`,
+        decision: `Selected: ${selectedSolution.title}${input.reason !== undefined && input.reason !== null && input.reason !== '' ? ` - ${input.reason}` : ''}`,
         alternativesConsidered,
-        consequences: selectedSolution.evaluation?.riskAssessment || 'To be determined',
+        consequences: (selectedSolution.evaluation?.riskAssessment !== undefined && selectedSolution.evaluation?.riskAssessment !== null && selectedSolution.evaluation?.riskAssessment !== '') ? selectedSolution.evaluation.riskAssessment : 'To be determined',
         impactScope: selectedSolution.addressing,
       },
     };
@@ -798,5 +814,3 @@ export class SolutionService {
   }
 
 }
-
-export default SolutionService;

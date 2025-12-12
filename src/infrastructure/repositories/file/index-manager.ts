@@ -47,7 +47,7 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
    *
    * Uses shared loadJSON from file-utils.ts.
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     try {
       const indexFile = await loadJSON<IndexFile<TMetadata>>(this.indexPath);
 
@@ -68,7 +68,7 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
   /**
    * Add new entry to index
    */
-  async add(entry: TMetadata): Promise<void> {
+  public async add(entry: TMetadata): Promise<void> {
     this.inMemoryIndex.set(entry.id, entry);
     this.isDirty = true;
     this.invalidateCache(entry.id);
@@ -78,12 +78,12 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
   /**
    * Get entry by ID
    */
-  async get(id: string): Promise<TMetadata | undefined> {
+  public get(id: string): Promise<TMetadata | undefined> {
     // Check cache first
     if (this.cacheOptions.enabled) {
       const cached = this.getCached(id);
       if (cached !== undefined) {
-        return cached;
+        return Promise.resolve(cached);
       }
     }
 
@@ -94,13 +94,13 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
       this.setCached(id, entry);
     }
 
-    return entry;
+    return Promise.resolve(entry);
   }
 
   /**
    * Update existing entry
    */
-  async update(entry: TMetadata): Promise<void> {
+  public async update(entry: TMetadata): Promise<void> {
     if (!this.inMemoryIndex.has(entry.id)) {
       throw new Error(`Entry with ID '${entry.id}' not found`);
     }
@@ -114,7 +114,7 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
   /**
    * Delete entry by ID
    */
-  async delete(id: string): Promise<void> {
+  public async delete(id: string): Promise<void> {
     this.inMemoryIndex.delete(id);
     this.isDirty = true;
     this.invalidateCache(id);
@@ -124,14 +124,14 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
   /**
    * Get all entries
    */
-  async getAll(): Promise<TMetadata[]> {
-    return Array.from(this.inMemoryIndex.values());
+  public getAll(): Promise<TMetadata[]> {
+    return Promise.resolve(Array.from(this.inMemoryIndex.values()));
   }
 
   /**
    * Clear all entries
    */
-  async clear(): Promise<void> {
+  public async clear(): Promise<void> {
     this.inMemoryIndex.clear();
     this.cache.clear();
     this.isDirty = true;
@@ -141,46 +141,46 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
   /**
    * Find entries matching predicate
    */
-  async find(predicate: (entry: TMetadata) => boolean): Promise<TMetadata[]> {
+  public find(predicate: (entry: TMetadata) => boolean): Promise<TMetadata[]> {
     const results: TMetadata[] = [];
     for (const entry of this.inMemoryIndex.values()) {
       if (predicate(entry)) {
         results.push(entry);
       }
     }
-    return results;
+    return Promise.resolve(results);
   }
 
   /**
    * Find first entry matching predicate
    */
-  async findOne(predicate: (entry: TMetadata) => boolean): Promise<TMetadata | undefined> {
+  public findOne(predicate: (entry: TMetadata) => boolean): Promise<TMetadata | undefined> {
     for (const entry of this.inMemoryIndex.values()) {
       if (predicate(entry)) {
-        return entry;
+        return Promise.resolve(entry);
       }
     }
-    return undefined;
+    return Promise.resolve(undefined);
   }
 
   /**
    * Check if entry exists
    */
-  async has(id: string): Promise<boolean> {
-    return this.inMemoryIndex.has(id);
+  public has(id: string): Promise<boolean> {
+    return Promise.resolve(this.inMemoryIndex.has(id));
   }
 
   /**
    * Get index size
    */
-  async size(): Promise<number> {
-    return this.inMemoryIndex.size;
+  public size(): Promise<number> {
+    return Promise.resolve(this.inMemoryIndex.size);
   }
 
   /**
    * Save entire index (for batch updates)
    */
-  async saveIndex(entries: TMetadata[]): Promise<void> {
+  public async saveIndex(entries: TMetadata[]): Promise<void> {
     this.inMemoryIndex.clear();
     for (const entry of entries) {
       this.inMemoryIndex.set(entry.id, entry);
@@ -193,7 +193,7 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
   /**
    * Rebuild index (refresh from source)
    */
-  async rebuild(): Promise<void> {
+  public async rebuild(): Promise<void> {
     // Rebuild keeps existing entries and forces save
     this.isDirty = true;
     await this.saveIndexFile();
@@ -259,7 +259,7 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
     if (this.cache.size >= this.cacheOptions.maxSize) {
       // Remove oldest entry
       const firstKey = this.cache.keys().next().value;
-      if (firstKey) {
+      if (firstKey !== undefined && firstKey !== '') {
         this.cache.delete(firstKey);
       }
     }

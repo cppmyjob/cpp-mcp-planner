@@ -3,7 +3,7 @@
  * Sprint 9 BUGFIX: Atomic mode API contract validation
  */
 
-import { bulkUpdateEntities, BulkUpdateConfig, BulkUpdateResult } from '../../../src/domain/utils/bulk-operations';
+import { bulkUpdateEntities } from '../../../src/domain/utils/bulk-operations';
 
 describe('bulkUpdateEntities utility', () => {
   describe('API contract validation', () => {

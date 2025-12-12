@@ -7,6 +7,10 @@ import { NotFoundError } from '../repositories/errors.js';
 import { validateAlternativesConsidered, validateTags } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
+// Constants
+const MAX_DECISIONS_BATCH_SIZE = 100;
+const DEFAULT_DECISIONS_PAGE_LIMIT = 50;
+
 // Input types
 export interface RecordDecisionInput {
   planId: string;
@@ -123,7 +127,7 @@ export class DecisionService {
     private readonly versionHistoryService?: VersionHistoryService
   ) {}
 
-  async getDecision(input: GetDecisionInput): Promise<GetDecisionResult> {
+  public async getDecision(input: GetDecisionInput): Promise<GetDecisionResult> {
     const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
     const decision = await repo.findById(input.decisionId);
 
@@ -139,10 +143,10 @@ export class DecisionService {
     return { decision: filtered };
   }
 
-  async getDecisions(input: GetDecisionsInput): Promise<GetDecisionsResult> {
+  public async getDecisions(input: GetDecisionsInput): Promise<GetDecisionsResult> {
     // Enforce max limit
-    if (input.decisionIds.length > 100) {
-      throw new Error('Cannot fetch more than 100 decisions at once');
+    if (input.decisionIds.length > MAX_DECISIONS_BATCH_SIZE) {
+      throw new Error(`Cannot fetch more than ${MAX_DECISIONS_BATCH_SIZE} decisions at once`);
     }
 
     // Handle empty array
@@ -167,9 +171,9 @@ export class DecisionService {
           false
         ) as Decision;
         foundDecisions.push(filtered);
-      } catch (error: any) {
+      } catch (error: unknown) {
         // FIX M-2: Only treat NotFoundError as "not found", re-throw other errors
-        if (error instanceof NotFoundError || error.constructor.name === 'NotFoundError') {
+        if (error instanceof NotFoundError || (error instanceof Error && error.constructor.name === 'NotFoundError')) {
           notFound.push(id);
         } else {
           // Preserve error context
@@ -181,7 +185,7 @@ export class DecisionService {
     return { decisions: foundDecisions, notFound };
   }
 
-  async supersedeDecision(input: SupersedeDecisionInput): Promise<SupersedeDecisionResult> {
+  public async supersedeDecision(input: SupersedeDecisionInput): Promise<SupersedeDecisionResult> {
     const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
     const oldDecision = await repo.findById(input.decisionId);
 
@@ -208,7 +212,7 @@ export class DecisionService {
       },
       title: oldDecision.title,
       question: oldDecision.question,
-      context: input.newDecision.context || oldDecision.context,
+      context: input.newDecision.context ?? oldDecision.context,
       decision: input.newDecision.decision,
       alternativesConsidered: [
         ...oldDecision.alternativesConsidered,
@@ -218,7 +222,7 @@ export class DecisionService {
           whyNotChosen: input.reason,
         },
       ],
-      consequences: input.newDecision.consequences || oldDecision.consequences,
+      consequences: input.newDecision.consequences ?? oldDecision.consequences,
       impactScope: oldDecision.impactScope,
       status: 'active',
       supersedes: oldDecision.id,
@@ -235,11 +239,11 @@ export class DecisionService {
     };
   }
 
-  async recordDecision(input: RecordDecisionInput): Promise<RecordDecisionResult> {
+  public async recordDecision(input: RecordDecisionInput): Promise<RecordDecisionResult> {
     // Validate alternativesConsidered format
     validateAlternativesConsidered(input.decision.alternativesConsidered);
     // Validate tags format
-    validateTags(input.decision.tags || []);
+    validateTags(input.decision.tags ?? []);
 
     const decisionId = uuidv4();
     const now = new Date().toISOString();
@@ -252,7 +256,7 @@ export class DecisionService {
       version: 1,
       metadata: {
         createdBy: 'claude-code',
-        tags: input.decision.tags || [],
+        tags: input.decision.tags ?? [],
         annotations: [],
       },
       title: input.decision.title,
@@ -272,12 +276,12 @@ export class DecisionService {
     return { decisionId };
   }
 
-  async getDecisionHistory(input: GetDecisionHistoryInput): Promise<GetDecisionHistoryResult> {
+  public async getDecisionHistory(input: GetDecisionHistoryInput): Promise<GetDecisionHistoryResult> {
     const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
     let decisions = await repo.findAll();
 
     if (input.filters) {
-      if (input.filters.search) {
+      if (input.filters.search !== undefined && input.filters.search !== null && input.filters.search !== '') {
         const search = input.filters.search.toLowerCase();
         decisions = decisions.filter(
           (d) =>
@@ -287,8 +291,9 @@ export class DecisionService {
         );
       }
       if (input.filters.tags && input.filters.tags.length > 0) {
+        const filterTags = input.filters.tags;
         decisions = decisions.filter((d) =>
-          input.filters!.tags!.some((filterTag) =>
+          filterTags.some((filterTag) =>
             d.metadata.tags.some((t) => t.key === filterTag.key && t.value === filterTag.value)
           )
         );
@@ -299,8 +304,8 @@ export class DecisionService {
     decisions.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
     const total = decisions.length;
-    const offset = input.offset || 0;
-    const limit = input.limit || 50;
+    const offset = input.offset ?? 0;
+    const limit = input.limit ?? DEFAULT_DECISIONS_PAGE_LIMIT;
     const paginated = decisions.slice(offset, offset + limit);
 
     return {
@@ -310,7 +315,7 @@ export class DecisionService {
     };
   }
 
-  async updateDecision(input: UpdateDecisionInput): Promise<UpdateDecisionResult> {
+  public async updateDecision(input: UpdateDecisionInput): Promise<UpdateDecisionResult> {
     const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
     const decision = await repo.findById(input.decisionId);
 
@@ -402,17 +407,19 @@ export class DecisionService {
     return { success: true, decisionId: input.decisionId };
   }
 
-  async listDecisions(input: ListDecisionsInput): Promise<ListDecisionsResult> {
+  public async listDecisions(input: ListDecisionsInput): Promise<ListDecisionsResult> {
     const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
     let decisions = await repo.findAll();
 
     if (input.filters) {
-      if (input.filters.status) {
-        decisions = decisions.filter((d) => d.status === input.filters!.status);
+      const filters = input.filters;
+      if (filters.status !== undefined && filters.status !== null) {
+        decisions = decisions.filter((d) => d.status === filters.status);
       }
       if (input.filters.tags && input.filters.tags.length > 0) {
+        const filterTags = input.filters.tags;
         decisions = decisions.filter((d) =>
-          input.filters!.tags!.some((filterTag) =>
+          filterTags.some((filterTag) =>
             d.metadata.tags.some((t) => t.key === filterTag.key && t.value === filterTag.value)
           )
         );
@@ -420,8 +427,8 @@ export class DecisionService {
     }
 
     const total = decisions.length;
-    const offset = input.offset || 0;
-    const limit = input.limit || 50;
+    const offset = input.offset ?? 0;
+    const limit = input.limit ?? DEFAULT_DECISIONS_PAGE_LIMIT;
     const paginated = decisions.slice(offset, offset + limit);
 
     // Apply field filtering
@@ -443,7 +450,7 @@ export class DecisionService {
   /**
    * Sprint 7: Get version history
    */
-  async getHistory(input: { planId: string; decisionId: string; limit?: number; offset?: number }): Promise<VersionHistory<Decision>> {
+  public async getHistory(input: { planId: string; decisionId: string; limit?: number; offset?: number }): Promise<VersionHistory<Decision>> {
     if (!this.versionHistoryService) {
       throw new Error('Version history service not available');
     }
@@ -454,19 +461,20 @@ export class DecisionService {
       throw new Error('Plan not found');
     }
 
-    return this.versionHistoryService.getHistory({
+    const history = await this.versionHistoryService.getHistory({
       planId: input.planId,
       entityId: input.decisionId,
       entityType: 'decision',
       limit: input.limit,
       offset: input.offset,
     });
+    return history as VersionHistory<Decision>;
   }
 
   /**
    * Sprint 7: Compare two versions
    */
-  async diff(input: { planId: string; decisionId: string; version1: number; version2: number }): Promise<VersionDiff> {
+  public async diff(input: { planId: string; decisionId: string; version1: number; version2: number }): Promise<VersionDiff> {
     if (!this.versionHistoryService) {
       throw new Error('Version history service not available');
     }
@@ -492,5 +500,3 @@ export class DecisionService {
   }
 
 }
-
-export default DecisionService;

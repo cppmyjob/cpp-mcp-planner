@@ -524,7 +524,7 @@ export const tools = [
           items: {
             type: 'object',
             properties: {
-              entity_type: {
+              entityType: {
                 type: 'string',
                 enum: ['requirement', 'solution', 'phase', 'link', 'decision', 'artifact'],
               },
@@ -533,7 +533,7 @@ export const tools = [
                 description: 'Entity-specific payload. For temp ID support, use tempId field. For referencing other entities in the batch, use $0, $1, $2, etc. in ID fields (parentId, addressing, sourceId, targetId, relatedPhaseId, relatedSolutionId, relatedRequirementIds, source.parentId). For update operations, set action: "update", id: entity_id, and updates: {...fields to update}.',
               },
             },
-            required: ['entity_type', 'payload'],
+            required: ['entityType', 'payload'],
           },
         },
       },

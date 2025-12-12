@@ -45,7 +45,7 @@ export abstract class BaseFileRepository {
    * Initialize repository
    * Must be implemented by subclasses to setup directories, indexes, etc.
    */
-  abstract initialize(): Promise<void>;
+  public abstract initialize(): Promise<void>;
 
   // ============================================================================
   // Initialization
@@ -137,7 +137,7 @@ export abstract class BaseFileRepository {
     // LRU eviction - remove oldest entry if cache is full
     if (cache.size >= this.cacheOptions.maxSize) {
       const firstKey = cache.keys().next().value;
-      if (firstKey) {
+      if (firstKey !== undefined && firstKey !== '') {
         cache.delete(firstKey);
       }
     }

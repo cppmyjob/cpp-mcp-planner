@@ -33,7 +33,7 @@ const gracefulRename = util.promisify(gracefulFs.rename);
  * @param data - Data to write (will be JSON.stringify'd)
  */
 export async function atomicWriteJSON(filePath: string, data: unknown): Promise<void> {
-  const tmpPath = `${filePath}.tmp.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`;
+  const tmpPath = `${filePath}.tmp.${String(Date.now())}.${crypto.randomBytes(4).toString('hex')}`;
 
   try {
     // Write to temp file

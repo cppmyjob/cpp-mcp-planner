@@ -176,7 +176,7 @@ describe('RequirementService', () => {
         },
       });
 
-      const result = await service.updateRequirement({
+      const _result = await service.updateRequirement({
         planId,
         requirementId: added.requirementId,
         updates: {
@@ -705,7 +705,7 @@ describe('RequirementService', () => {
     });
 
     it('should only count actually modified requirements', async () => {
-      const req1 = await service.addRequirement({
+      const _req1 = await service.addRequirement({
         planId,
         requirement: {
           title: 'Already Zero',

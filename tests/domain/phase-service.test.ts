@@ -329,7 +329,7 @@ describe('PhaseService', () => {
         },
       });
 
-      const updated = await service.updatePhase({
+      const _updated = await service.updatePhase({
         planId,
         phaseId: added.phaseId,
         updates: { priority: 'critical' },

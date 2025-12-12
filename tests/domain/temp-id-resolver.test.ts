@@ -69,7 +69,7 @@ describe('TempIdResolver', () => {
         description: 'This references $1',
       };
 
-      const result = resolveFieldTempIds(obj, { parentId: true }, mapping);
+      const result = resolveFieldTempIds(obj, { parentId: true }, mapping) as Record<string, unknown>;
 
       expect(result.parentId).toBe('550e8400-e29b-41d4-a716-446655440000');
       expect(result.title).toBe('Task with $0 in title'); // Not resolved
@@ -87,7 +87,7 @@ describe('TempIdResolver', () => {
         obj,
         { addressing: true, relatedRequirementIds: true },
         mapping
-      );
+      ) as Record<string, unknown>;
 
       expect(result.addressing).toEqual([
         '550e8400-e29b-41d4-a716-446655440000',
@@ -109,7 +109,7 @@ describe('TempIdResolver', () => {
         objWithNull,
         { parentId: true, addressing: true },
         mapping
-      );
+      ) as Record<string, unknown>;
 
       expect(result.parentId).toBeNull();
       expect(result.addressing).toBeUndefined();
@@ -121,7 +121,7 @@ describe('TempIdResolver', () => {
         title: 'Task',
       };
 
-      const result = resolveFieldTempIds(obj, {}, mapping);
+      const result = resolveFieldTempIds(obj, {}, mapping) as Record<string, unknown>;
 
       expect(result.parentId).toBe('$0'); // Not resolved
       expect(result.title).toBe('Task');
@@ -137,11 +137,11 @@ describe('TempIdResolver', () => {
         title: 'Requirement',
       };
 
-      const result = resolveFieldTempIds(obj, { 'source.parentId': true }, mapping);
+      const result = resolveFieldTempIds(obj, { 'source.parentId': true }, mapping) as Record<string, unknown>;
 
-      expect(result.source.parentId).toBe('550e8400-e29b-41d4-a716-446655440000');
-      expect(result.source.context).toBe('Reference to $1'); // Not resolved
-      expect(result.source.type).toBe('user-request');
+      expect((result.source as Record<string, unknown>).parentId).toBe('550e8400-e29b-41d4-a716-446655440000');
+      expect((result.source as Record<string, unknown>).context).toBe('Reference to $1'); // Not resolved
+      expect((result.source as Record<string, unknown>).type).toBe('user-request');
     });
 
     it('Test 30: should handle unresolved temp IDs gracefully', () => {
@@ -151,7 +151,7 @@ describe('TempIdResolver', () => {
       };
 
       // Should not throw, just keep the unresolved ID
-      const result = resolveFieldTempIds(obj, { parentId: true }, mapping);
+      const result = resolveFieldTempIds(obj, { parentId: true }, mapping) as Record<string, unknown>;
       expect(result.parentId).toBe('$99');
     });
 
@@ -160,7 +160,7 @@ describe('TempIdResolver', () => {
         addressing: ['$0', '990e8400-e29b-41d4-a716-446655440099', '$1'],
       };
 
-      const result = resolveFieldTempIds(obj, { addressing: true }, mapping);
+      const result = resolveFieldTempIds(obj, { addressing: true }, mapping) as Record<string, unknown>;
 
       expect(result.addressing).toEqual([
         '550e8400-e29b-41d4-a716-446655440000',

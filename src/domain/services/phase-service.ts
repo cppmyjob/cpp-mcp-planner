@@ -4,8 +4,17 @@ import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
 import { validateEffortEstimate, validateTags, validatePriority } from './validators.js';
-import { filterEntity, filterPhase } from '../utils/field-filter.js';
+import { filterPhase } from '../utils/field-filter.js';
 import { bulkUpdateEntities } from '../utils/bulk-operations.js';
+
+// Constants
+const MAX_PHASES_BATCH_SIZE = 100;
+const PROGRESS_COMPLETE = 100;
+const DEFAULT_NEXT_ACTIONS_LIMIT = 5;
+const PRIORITY_CRITICAL = 0;
+const PRIORITY_HIGH = 1;
+const PRIORITY_MEDIUM = 2;
+const PRIORITY_LOW = 3;
 
 /**
  * Calculate the next valid order for a phase.
@@ -26,7 +35,7 @@ function calculateNextOrder(siblings: Phase[], explicitOrder?: number): number {
     const conflicting = siblings.find((s) => s.order === explicitOrder);
     if (conflicting) {
       throw new Error(
-        `Order ${explicitOrder} already exists for sibling phase "${conflicting.title}". ` +
+        `Order ${String(explicitOrder)} already exists for sibling phase "${conflicting.title}". ` +
           `Use a different order value or omit to auto-generate.`
       );
     }
@@ -329,7 +338,7 @@ export class PhaseService {
     }
   }
 
-  async getPhase(input: GetPhaseInput): Promise<GetPhaseResult> {
+  public async getPhase(input: GetPhaseInput): Promise<GetPhaseResult> {
     await this.ensurePlanExists(input.planId);
 
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
@@ -351,12 +360,12 @@ export class PhaseService {
     return { phase: filtered };
   }
 
-  async getPhases(input: GetPhasesInput): Promise<GetPhasesResult> {
+  public async getPhases(input: GetPhasesInput): Promise<GetPhasesResult> {
     await this.ensurePlanExists(input.planId);
 
     // Enforce max limit
-    if (input.phaseIds.length > 100) {
-      throw new Error('Cannot fetch more than 100 phases at once');
+    if (input.phaseIds.length > MAX_PHASES_BATCH_SIZE) {
+      throw new Error(`Cannot fetch more than ${MAX_PHASES_BATCH_SIZE} phases at once`);
     }
 
     // Handle empty array
@@ -389,12 +398,12 @@ export class PhaseService {
     return { phases: foundPhases, notFound };
   }
 
-  async addPhase(input: AddPhaseInput): Promise<AddPhaseResult> {
+  public async addPhase(input: AddPhaseInput): Promise<AddPhaseResult> {
     // Validate estimatedEffort format (support both direct and schedule.estimatedEffort)
     const effort = input.phase.estimatedEffort ?? input.phase.schedule?.estimatedEffort;
     validateEffortEstimate(effort, 'estimatedEffort');
     // Validate tags format
-    validateTags(input.phase.tags || []);
+    validateTags(input.phase.tags ?? []);
     // Validate priority if provided
     if (input.phase.priority !== undefined) {
       validatePriority(input.phase.priority);
@@ -413,13 +422,13 @@ export class PhaseService {
     let depth = 0;
     let path = String(order);
 
-    if (parentId) {
+    if (parentId !== null && parentId !== '') {
       const parent = phases.find((p) => p.id === parentId);
       if (!parent) {
         throw new Error('Parent phase not found');
       }
       depth = parent.depth + 1;
-      path = `${parent.path}.${order}`;
+      path = `${parent.path}.${String(order)}`;
     }
 
     const phase: Phase = {
@@ -430,7 +439,7 @@ export class PhaseService {
       version: 1,
       metadata: {
         createdBy: 'claude-code',
-        tags: input.phase.tags || [],
+        tags: input.phase.tags ?? [],
         annotations: [],
       },
       title: input.phase.title,
@@ -443,7 +452,7 @@ export class PhaseService {
       deliverables: input.phase.deliverables,
       successCriteria: input.phase.successCriteria,
       schedule: {
-        estimatedEffort: effort || { value: 0, unit: 'hours', confidence: 'low' },
+        estimatedEffort: effort ?? { value: 0, unit: 'hours', confidence: 'low' },
       },
       status: 'planned',
       progress: 0,
@@ -457,7 +466,7 @@ export class PhaseService {
     return { phaseId };
   }
 
-  async updatePhase(input: UpdatePhaseInput): Promise<UpdatePhaseResult> {
+  public async updatePhase(input: UpdatePhaseInput): Promise<UpdatePhaseResult> {
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     const phases = await repo.findAll();
     const index = phases.findIndex((p) => p.id === input.phaseId);
@@ -467,7 +476,6 @@ export class PhaseService {
     }
 
     const phase = phases[index];
-    const now = new Date().toISOString();
 
     // Sprint 7: Save current version to history BEFORE updating
     if (this.versionHistoryService) {
@@ -514,7 +522,7 @@ export class PhaseService {
     return { success: true, phaseId: input.phaseId };
   }
 
-  async movePhase(input: MovePhaseInput): Promise<MovePhaseResult> {
+  public async movePhase(input: MovePhaseInput): Promise<MovePhaseResult> {
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     const phases = await repo.findAll();
     const phase = phases.find((p) => p.id === input.phaseId);
@@ -529,7 +537,7 @@ export class PhaseService {
     if (input.newParentId !== undefined) {
       phase.parentId = input.newParentId;
 
-      if (input.newParentId) {
+      if (input.newParentId !== null && input.newParentId !== '') {
         const parent = phases.find((p) => p.id === input.newParentId);
         if (!parent) throw new Error('New parent not found');
         phase.depth = parent.depth + 1;
@@ -544,9 +552,12 @@ export class PhaseService {
     }
 
     // Recalculate path
-    if (phase.parentId) {
+    if (phase.parentId !== undefined && phase.parentId !== null && phase.parentId !== '') {
       const parent = phases.find((p) => p.id === phase.parentId);
-      phase.path = `${parent!.path}.${phase.order}`;
+      if (!parent) {
+        throw new Error(`Parent phase not found: ${phase.parentId}`);
+      }
+      phase.path = `${parent.path}.${String(phase.order)}`;
     } else {
       phase.path = String(phase.order);
     }
@@ -555,7 +566,7 @@ export class PhaseService {
     const collectAffectedChildren = (parentId: string, parentPath: string) => {
       const children = phases.filter((p) => p.parentId === parentId);
       for (const child of children) {
-        child.path = `${parentPath}.${child.order}`;
+        child.path = `${parentPath}.${String(child.order)}`;
         child.depth = parentPath.split('.').length;
         affectedPhases.push(child);
         collectAffectedChildren(child.id, child.path);
@@ -580,7 +591,7 @@ export class PhaseService {
     };
   }
 
-  async getPhaseTree(input: GetPhaseTreeInput): Promise<GetPhaseTreeResult> {
+  public async getPhaseTree(input: GetPhaseTreeInput): Promise<GetPhaseTreeResult> {
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     let phases = await repo.findAll();
 
@@ -588,14 +599,11 @@ export class PhaseService {
       phases = phases.filter((p) => p.status !== 'completed');
     }
 
-    const requestedFields = input.fields || [];
-    const isFullMode = requestedFields.includes('*');
-
     // Pre-calculate child counts for all phases
     const childCounts = new Map<string | null, number>();
     for (const p of phases) {
       const parentKey = p.parentId ?? null;
-      childCounts.set(parentKey, (childCounts.get(parentKey) || 0) + 1);
+      childCounts.set(parentKey, (childCounts.get(parentKey) ?? 0) + 1);
     }
 
     // Build phase data based on fields parameter
@@ -603,7 +611,7 @@ export class PhaseService {
       // Add childCount to phase (computed field)
       const phaseWithChildCount = {
         ...phase,
-        childCount: childCounts.get(phase.id) || 0,
+        childCount: childCounts.get(phase.id) ?? 0,
       };
 
       // Apply field filtering with Lazy-Load support
@@ -622,7 +630,7 @@ export class PhaseService {
         .filter((p) => p.parentId === parentId)
         .sort((a, b) => a.order - b.order)
         .map((phase) => {
-          const hasChildPhases = (childCounts.get(phase.id) || 0) > 0;
+          const hasChildPhases = (childCounts.get(phase.id) ?? 0) > 0;
 
           // Respect maxDepth: truncate children if we've reached the limit
           const shouldTruncate = input.maxDepth !== undefined && currentDepth >= input.maxDepth;
@@ -637,13 +645,13 @@ export class PhaseService {
         });
     };
 
-    const rootId = input.rootPhaseId || null;
+    const rootId = input.rootPhaseId ?? null;
     const tree = buildTree(rootId, 0);
 
     return { tree };
   }
 
-  async deletePhase(input: DeletePhaseInput): Promise<DeletePhaseResult> {
+  public async deletePhase(input: DeletePhaseInput): Promise<DeletePhaseResult> {
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     const phases = await repo.findAll();
     const deletedIds: string[] = [];
@@ -663,7 +671,7 @@ export class PhaseService {
 
     deletedIds.push(input.phaseId);
 
-    if (input.deleteChildren) {
+    if (input.deleteChildren === true) {
       collectChildren(input.phaseId);
     }
 
@@ -675,12 +683,12 @@ export class PhaseService {
 
     return {
       success: true,
-      message: `Deleted ${deletedIds.length} phase(s)`,
+      message: `Deleted ${String(deletedIds.length)} phase(s)`,
       deletedPhaseIds: deletedIds,
     };
   }
 
-  async updatePhaseStatus(input: UpdatePhaseStatusInput): Promise<UpdatePhaseStatusResult> {
+  public async updatePhaseStatus(input: UpdatePhaseStatusInput): Promise<UpdatePhaseStatusResult> {
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     const phases = await repo.findAll();
     const phase = phases.find((p) => p.id === input.phaseId);
@@ -700,11 +708,11 @@ export class PhaseService {
 
     if (input.status === 'completed') {
       phase.completedAt = now;
-      phase.progress = 100;
+      phase.progress = PROGRESS_COMPLETE;
       autoUpdated.completedAt = now;
     }
 
-    if (input.status === 'blocked' && !input.notes) {
+    if (input.status === 'blocked' && (input.notes === undefined || input.notes === null || input.notes === '')) {
       throw new Error('Notes required when setting status to blocked');
     }
 
@@ -718,7 +726,7 @@ export class PhaseService {
       phase.schedule.actualEffort = input.actualEffort;
     }
 
-    if (input.notes) {
+    if (input.notes !== undefined && input.notes !== null && input.notes !== '') {
       phase.metadata.annotations.push({
         id: uuidv4(),
         text: input.notes,
@@ -739,20 +747,20 @@ export class PhaseService {
 
   private comparePriority(a: Phase, b: Phase): number {
     const priorityOrder: Record<PhasePriority, number> = {
-      critical: 0,
-      high: 1,
-      medium: 2,
-      low: 3,
+      critical: PRIORITY_CRITICAL,
+      high: PRIORITY_HIGH,
+      medium: PRIORITY_MEDIUM,
+      low: PRIORITY_LOW,
     };
     const aPrio = a.priority ?? 'medium';
     const bPrio = b.priority ?? 'medium';
     return priorityOrder[aPrio] - priorityOrder[bPrio];
   }
 
-  async getNextActions(input: GetNextActionsInput): Promise<GetNextActionsResult> {
+  public async getNextActions(input: GetNextActionsInput): Promise<GetNextActionsResult> {
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     const phases = await repo.findAll();
-    const limit = input.limit || 5;
+    const limit = input.limit ?? DEFAULT_NEXT_ACTIONS_LIMIT;
     const actions: NextAction[] = [];
 
     // Collect stats
@@ -786,7 +794,7 @@ export class PhaseService {
           phaseTitle: phase.title,
           phasePath: phase.path,
           action: 'complete',
-          reason: `Phase is ${phase.progress}% complete`,
+          reason: `Phase is ${String(phase.progress)}% complete`,
           priority: 'medium',
         });
       } else {
@@ -795,7 +803,7 @@ export class PhaseService {
           phaseTitle: phase.title,
           phasePath: phase.path,
           action: 'continue',
-          reason: `Phase is ${phase.progress}% complete`,
+          reason: `Phase is ${String(phase.progress)}% complete`,
           priority: 'medium',
         });
       }
@@ -805,7 +813,7 @@ export class PhaseService {
     const readyToStart = planned
       .filter((p) => {
         // A phase is ready if it has no parent or parent is completed
-        if (!p.parentId) return true;
+        if (p.parentId === undefined || p.parentId === null || p.parentId === '') return true;
         const parent = phases.find((x) => x.id === p.parentId);
         return !parent || parent.status === 'completed' || parent.status === 'in_progress';
       })
@@ -837,7 +845,7 @@ export class PhaseService {
     };
   }
 
-  async completeAndAdvance(input: CompleteAndAdvanceInput): Promise<CompleteAndAdvanceResult> {
+  public async completeAndAdvance(input: CompleteAndAdvanceInput): Promise<CompleteAndAdvanceResult> {
     await this.ensurePlanExists(input.planId);
 
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
@@ -865,14 +873,14 @@ export class PhaseService {
 
     // Complete current phase
     currentPhase.status = 'completed';
-    currentPhase.progress = 100;
+    currentPhase.progress = PROGRESS_COMPLETE;
     currentPhase.completedAt = now;
 
     if (input.actualEffort !== undefined) {
       currentPhase.schedule.actualEffort = input.actualEffort;
     }
 
-    if (input.notes) {
+    if (input.notes !== undefined && input.notes !== null && input.notes !== '') {
       currentPhase.metadata.annotations.push({
         id: uuidv4(),
         text: input.notes,
@@ -898,7 +906,7 @@ export class PhaseService {
 
     return {
       completedPhaseId: currentPhase.id,
-      nextPhaseId: nextPhase?.id || null,
+      nextPhaseId: nextPhase?.id ?? null,
       success: true as const,
     };
   }
@@ -932,7 +940,7 @@ export class PhaseService {
     }
 
     // 3. Move up to parent and recursively find its next sibling
-    if (currentPhase.parentId) {
+    if (currentPhase.parentId !== undefined && currentPhase.parentId !== null && currentPhase.parentId !== '') {
       const parent = allPhases.find((p) => p.id === currentPhase.parentId);
       if (parent) {
         return this.findNextPlannedPhase(parent, allPhases);
@@ -977,7 +985,7 @@ export class PhaseService {
       throw new Error('Phase not found');
     }
 
-    const currentArray = phase[field] || [];
+    const currentArray = phase[field] ?? [];
     const newArray = operation(currentArray);
 
     phase[field] = newArray;
@@ -995,7 +1003,7 @@ export class PhaseService {
   /**
    * Append item to end of array field
    */
-  async arrayAppend(input: ArrayAppendInput): Promise<ArrayOperationResult> {
+  public async arrayAppend(input: ArrayAppendInput): Promise<ArrayOperationResult> {
     this.validateArrayField(input.field);
     return this.executeArrayOperation(
       input.planId,
@@ -1008,7 +1016,7 @@ export class PhaseService {
   /**
    * Prepend item to beginning of array field
    */
-  async arrayPrepend(input: ArrayPrependInput): Promise<ArrayOperationResult> {
+  public async arrayPrepend(input: ArrayPrependInput): Promise<ArrayOperationResult> {
     this.validateArrayField(input.field);
     return this.executeArrayOperation(
       input.planId,
@@ -1021,7 +1029,7 @@ export class PhaseService {
   /**
    * Insert item at specific index in array field
    */
-  async arrayInsertAt(input: ArrayInsertAtInput): Promise<ArrayOperationResult> {
+  public async arrayInsertAt(input: ArrayInsertAtInput): Promise<ArrayOperationResult> {
     this.validateArrayField(input.field);
     return this.executeArrayOperation(
       input.planId,
@@ -1029,7 +1037,7 @@ export class PhaseService {
       input.field,
       (currentArray) => {
         if (input.index < 0 || input.index > currentArray.length) {
-          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+          throw new Error(`Index ${String(input.index)} is out of bounds for array of length ${String(currentArray.length)}`);
         }
         const newArray = [...currentArray];
         newArray.splice(input.index, 0, input.value);
@@ -1041,7 +1049,7 @@ export class PhaseService {
   /**
    * Update item at specific index in array field
    */
-  async arrayUpdateAt(input: ArrayUpdateAtInput): Promise<ArrayOperationResult> {
+  public async arrayUpdateAt(input: ArrayUpdateAtInput): Promise<ArrayOperationResult> {
     this.validateArrayField(input.field);
     return this.executeArrayOperation(
       input.planId,
@@ -1049,7 +1057,7 @@ export class PhaseService {
       input.field,
       (currentArray) => {
         if (input.index < 0 || input.index >= currentArray.length) {
-          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+          throw new Error(`Index ${String(input.index)} is out of bounds for array of length ${String(currentArray.length)}`);
         }
         const newArray = [...currentArray];
         newArray[input.index] = input.value;
@@ -1061,7 +1069,7 @@ export class PhaseService {
   /**
    * Remove item at specific index in array field
    */
-  async arrayRemoveAt(input: ArrayRemoveAtInput): Promise<ArrayOperationResult> {
+  public async arrayRemoveAt(input: ArrayRemoveAtInput): Promise<ArrayOperationResult> {
     this.validateArrayField(input.field);
     return this.executeArrayOperation(
       input.planId,
@@ -1069,7 +1077,7 @@ export class PhaseService {
       input.field,
       (currentArray) => {
         if (input.index < 0 || input.index >= currentArray.length) {
-          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+          throw new Error(`Index ${String(input.index)} is out of bounds for array of length ${String(currentArray.length)}`);
         }
         const newArray = [...currentArray];
         newArray.splice(input.index, 1);
@@ -1081,7 +1089,7 @@ export class PhaseService {
   /**
    * Sprint 7: Get version history
    */
-  async getHistory(input: { planId: string; phaseId: string; limit?: number; offset?: number }): Promise<VersionHistory<Phase>> {
+  public async getHistory(input: { planId: string; phaseId: string; limit?: number; offset?: number }): Promise<VersionHistory<Phase>> {
     if (!this.versionHistoryService) {
       throw new Error('Version history service not available');
     }
@@ -1092,19 +1100,20 @@ export class PhaseService {
       throw new Error('Plan not found');
     }
 
-    return this.versionHistoryService.getHistory({
+    const history = await this.versionHistoryService.getHistory({
       planId: input.planId,
       entityId: input.phaseId,
       entityType: 'phase',
       limit: input.limit,
       offset: input.offset,
     });
+    return history as VersionHistory<Phase>;
   }
 
   /**
    * Sprint 7: Compare two versions
    */
-  async diff(input: { planId: string; phaseId: string; version1: number; version2: number }): Promise<VersionDiff> {
+  public async diff(input: { planId: string; phaseId: string; version1: number; version2: number }): Promise<VersionDiff> {
     if (!this.versionHistoryService) {
       throw new Error('Version history service not available');
     }
@@ -1133,20 +1142,21 @@ export class PhaseService {
    * Sprint 9: Bulk update multiple phases in one call
    * REFACTOR: Uses common bulkUpdateEntities utility
    */
-  async bulkUpdatePhases(input: BulkUpdatePhasesInput): Promise<BulkUpdatePhasesResult> {
+  public async bulkUpdatePhases(input: BulkUpdatePhasesInput): Promise<BulkUpdatePhasesResult> {
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
 
     // Create storage adapter for bulkUpdateEntities utility
     const storageAdapter = {
-      loadEntities: async (_planId: string, _entityType: string) => {
-        return repo.findAll();
+      loadEntities: async (_planId: string, _entityType: string): Promise<Record<string, unknown>[]> => {
+        return repo.findAll() as unknown as Record<string, unknown>[];
       },
-      saveEntities: async (_planId: string, _entityType: string, entities: Phase[]) => {
+      saveEntities: async (_planId: string, _entityType: string, entities: Record<string, unknown>[]): Promise<void> => {
+        const phases = entities as unknown as Phase[];
         // For atomic rollback, we need to restore all entities
         // Clear and recreate - this is the rollback scenario
         const current = await repo.findAll();
         const currentIds = new Set(current.map(e => e.id));
-        const newIds = new Set(entities.map(e => e.id));
+        const newIds = new Set(phases.map(e => e.id));
 
         // Delete entities that no longer exist
         for (const id of currentIds) {
@@ -1156,12 +1166,12 @@ export class PhaseService {
         }
 
         // Update/create entities
-        for (const entity of entities) {
-          if (currentIds.has(entity.id)) {
+        for (const phase of phases) {
+          if (currentIds.has(phase.id)) {
             // Direct save to bypass version check during rollback
-            await repo.update(entity.id, entity);
+            await repo.update(phase.id, phase);
           } else {
-            await repo.create(entity);
+            await repo.create(phase);
           }
         }
       },
@@ -1180,5 +1190,3 @@ export class PhaseService {
   }
 
 }
-
-export default PhaseService;

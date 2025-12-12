@@ -42,7 +42,7 @@ describe('FileLockManager Issues', () => {
       await lockManager.initialize();
 
       // Acquire first lock
-      const release1 = await lockManager.acquire('resource');
+      const _release1 = await lockManager.acquire('resource');
 
       // Track events
       const events: string[] = [];

@@ -39,7 +39,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       });
 
       // Race: extend and release simultaneously
-      const results = await Promise.all([
+      const _results = await Promise.all([
         lockManager.extend(lockId!, 5000),
         lockManager.release(lockId!),
       ]);
@@ -121,7 +121,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
   describe('CRITICAL #2: doAcquire() infinite loop protection', () => {
     it('should timeout even with constantly contested resource', async () => {
       // Create a "hot" resource that keeps getting grabbed
-      const { lockId: initialLock } = await lockManager.acquire('hot-resource', {
+      const { lockId: _initialLock } = await lockManager.acquire('hot-resource', {
         acquireTimeout: 0,
         ttl: 50, // Short TTL - will auto-release often
       });
@@ -147,7 +147,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       expect(duration).toBeLessThan(1000); // Should be ~200ms, definitely not infinite
 
       // At least some should have timed out (high contention)
-      const timeouts = results.filter(r => !r.acquired);
+      const _timeouts = results.filter(r => !r.acquired);
       // We don't assert exact count because it's timing-dependent
     });
 
@@ -180,7 +180,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
 
       // Try to acquire while churning
       const start = Date.now();
-      const result = await lm.acquire('churning-resource', {
+      const _result = await lm.acquire('churning-resource', {
         holderId: 'victim',
         acquireTimeout: 100,
       });
@@ -357,7 +357,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       const lm = new LockManager({ defaultAcquireTimeout: 5000 });
 
       // Block the resource
-      const { lockId } = await lm.acquire('resource-1', {
+      const { lockId: _lockId } = await lm.acquire('resource-1', {
         holderId: 'blocker',
         acquireTimeout: 0,
       });
@@ -390,7 +390,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       const lm = new LockManager({ defaultAcquireTimeout: 5000 });
 
       // Create contention scenario
-      const { lockId: lock1 } = await lm.acquire('resource', {
+      const { lockId: _lock1 } = await lm.acquire('resource', {
         holderId: 'holder-1',
         acquireTimeout: 0,
         ttl: 100,

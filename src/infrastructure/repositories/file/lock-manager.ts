@@ -190,7 +190,7 @@ export class LockManager {
    * Acquire lock on resource (atomic operation)
    * Uses per-resource mutex to serialize concurrent acquire attempts
    */
-  async acquire(resource: string, options?: LockOptions): Promise<LockResult> {
+  public async acquire(resource: string, options?: LockOptions): Promise<LockResult> {
     // Check if disposed
     if (this.disposed) {
       this.log('debug', 'acquire rejected - disposed', { resource });
@@ -201,7 +201,7 @@ export class LockManager {
     }
 
     // Validate resource name
-    if (!resource || resource.trim() === '') {
+    if (resource === undefined || resource === null || resource === '' || resource.trim() === '') {
       throw new Error('resource name cannot be empty');
     }
 
@@ -215,7 +215,7 @@ export class LockManager {
     // For backwards compatibility: if only timeout is specified, use it for TTL too
     const ttl = options?.ttl ?? (options?.timeout !== undefined && options?.acquireTimeout === undefined ? options.timeout : this.defaultTtl);
 
-    const holderId = options?.holderId ?? `pid-${process.pid}`;
+    const holderId = options?.holderId ?? `pid-${String(process.pid)}`;
     const reentrant = options?.reentrant ?? false;
     const startTime = Date.now();
 
@@ -242,7 +242,7 @@ export class LockManager {
         this.log('warn', 'acquire timeout waiting for mutex', { resource, acquireTimeout });
         return {
           acquired: false,
-          reason: `timeout waiting for lock on '${resource}' after ${acquireTimeout}ms`,
+          reason: `timeout waiting for lock on '${resource}' after ${String(acquireTimeout)}ms`,
         };
       }
 
@@ -252,7 +252,7 @@ export class LockManager {
         this.log('warn', 'acquire timeout after mutex acquired', { resource, acquireTimeout });
         return {
           acquired: false,
-          reason: `timeout waiting for lock on '${resource}' after ${acquireTimeout}ms`,
+          reason: `timeout waiting for lock on '${resource}' after ${String(acquireTimeout)}ms`,
         };
       }
 
@@ -353,7 +353,7 @@ export class LockManager {
       // Check if resource is already locked
       const existingLockId = this.locksByResource.get(resource);
 
-      if (existingLockId) {
+      if (existingLockId !== undefined && existingLockId !== '') {
         const existingLock = this.locks.get(existingLockId);
 
         // Handle reentrant case (same holder)
@@ -367,7 +367,7 @@ export class LockManager {
           this.log('warn', 'acquire timeout in doAcquire', { resource, acquireTimeout });
           return {
             acquired: false,
-            reason: `timeout waiting for lock on '${resource}' after ${acquireTimeout}ms`,
+            reason: `timeout waiting for lock on '${resource}' after ${String(acquireTimeout)}ms`,
           };
         }
 
@@ -376,7 +376,7 @@ export class LockManager {
           this.log('warn', 'acquire timeout waiting for release', { resource, acquireTimeout });
           return {
             acquired: false,
-            reason: `timeout waiting for lock on '${resource}' after ${acquireTimeout}ms`,
+            reason: `timeout waiting for lock on '${resource}' after ${String(acquireTimeout)}ms`,
           };
         }
 
@@ -432,12 +432,12 @@ export class LockManager {
       const newExpiration = now + ttl;
 
       // Only extend if new expiration is later than current (prevents timer drift)
-      if (!existingLock.expiresAt || newExpiration > existingLock.expiresAt) {
+      if (existingLock.expiresAt === undefined || existingLock.expiresAt === null || newExpiration > existingLock.expiresAt) {
         const timeUntilExpiration = newExpiration - now;
         existingLock.expiresAt = newExpiration;
 
         // Clear old timer FIRST, then create new one (prevents timer leak)
-        if (existingLock.timer) {
+        if (existingLock.timer !== undefined && existingLock.timer !== null) {
           clearTimeout(existingLock.timer);
         }
         existingLock.timer = setTimeout(() => {
@@ -474,7 +474,7 @@ export class LockManager {
     };
 
     // Store timer reference for cleanup
-    if (lock.expiresAt) {
+    if (lock.expiresAt !== undefined && lock.expiresAt !== null) {
       lock.timer = setTimeout(() => {
         this.autoRelease(lockId);
       }, ttl);
@@ -519,7 +519,7 @@ export class LockManager {
    * If disposed, returns silently (lock already released by releaseAll).
    * This enables safe usage in finally blocks during graceful shutdown.
    */
-  async release(lockId: string): Promise<void> {
+  public async release(lockId: string): Promise<void> {
     // If disposed, return silently - releaseAll() already cleaned up all locks
     // This enables safe usage in finally blocks (e.g., withLock)
     if (this.disposed) {
@@ -535,7 +535,7 @@ export class LockManager {
 
     // Validate refCount before decrement (prevents double-release corruption)
     if (lock.refCount <= 0) {
-      throw new Error(`Lock with ID '${lockId}' has invalid refCount: ${lock.refCount}`);
+      throw new Error(`Lock with ID '${lockId}' has invalid refCount: ${String(lock.refCount)}`);
     }
 
     // Decrement refCount for reentrant locks
@@ -564,6 +564,8 @@ export class LockManager {
       // Emit release event (for waiters)
       this.lockEvents.emit(`lock:release:${resource}`);
     }
+
+    return Promise.resolve();
   }
 
   /**
@@ -626,46 +628,46 @@ export class LockManager {
    * Expiration is handled by auto-release timers, not by isLocked().
    * This ensures consistent behavior: if lock is in the map, it's locked.
    */
-  async isLocked(resource: string): Promise<boolean> {
+  public isLocked(resource: string): Promise<boolean> {
     // Check if disposed
     if (this.disposed) {
-      return false; // Disposed manager has no locks
+      return Promise.resolve(false); // Disposed manager has no locks
     }
 
     const lockId = this.locksByResource.get(resource);
-    if (!lockId) {
-      return false;
+    if (lockId === undefined || lockId === null || lockId === '') {
+      return Promise.resolve(false);
     }
 
     // Lock exists in map = resource is locked
     // Don't check expiration here - that's the timer's job
-    return this.locks.has(lockId);
+    return Promise.resolve(this.locks.has(lockId));
   }
 
   /**
    * Get lock holder information (read-only)
    */
-  async getLockHolder(resource: string): Promise<LockHolder | undefined> {
+  public getLockHolder(resource: string): Promise<LockHolder | undefined> {
     // Check if disposed
     if (this.disposed) {
-      return undefined; // Disposed manager has no locks
+      return Promise.resolve(undefined); // Disposed manager has no locks
     }
 
     const lockId = this.locksByResource.get(resource);
-    if (!lockId) {
-      return undefined;
+    if (lockId === undefined || lockId === null || lockId === '') {
+      return Promise.resolve(undefined);
     }
 
-    return this.locks.get(lockId);
+    return Promise.resolve(this.locks.get(lockId));
   }
 
   /**
    * Release all locks and clear all pending mutexes
    */
-  async releaseAll(): Promise<void> {
+  public releaseAll(): Promise<void> {
     // Clear all timers first
     for (const lock of this.locks.values()) {
-      if (lock.timer) {
+      if (lock.timer !== undefined && lock.timer !== null) {
         clearTimeout(lock.timer);
       }
     }
@@ -686,6 +688,8 @@ export class LockManager {
     for (const resource of resources) {
       this.lockEvents.emit(`lock:release:${resource}`);
     }
+
+    return Promise.resolve();
   }
 
   /**
@@ -697,7 +701,7 @@ export class LockManager {
    * 3. Wait briefly for in-flight operations to complete
    * 4. Remove all listeners
    */
-  async dispose(): Promise<void> {
+  public async dispose(): Promise<void> {
     // Already disposed - idempotent
     if (this.disposed) {
       return;
@@ -723,36 +727,36 @@ export class LockManager {
   /**
    * Check if LockManager has been disposed
    */
-  isDisposed(): boolean {
+  public isDisposed(): boolean {
     return this.disposed;
   }
 
   /**
    * Get active locks count (read-only)
    */
-  async getActiveLocksCount(): Promise<number> {
+  public getActiveLocksCount(): Promise<number> {
     // Check if disposed
     if (this.disposed) {
-      return 0; // Disposed manager has no locks
+      return Promise.resolve(0); // Disposed manager has no locks
     }
-    return this.locks.size;
+    return Promise.resolve(this.locks.size);
   }
 
   /**
    * Get all active locks (read-only)
    */
-  async getActiveLocks(): Promise<LockHolder[]> {
+  public getActiveLocks(): Promise<LockHolder[]> {
     // Check if disposed
     if (this.disposed) {
-      return []; // Disposed manager has no locks
+      return Promise.resolve([]); // Disposed manager has no locks
     }
-    return Array.from(this.locks.values());
+    return Promise.resolve(Array.from(this.locks.values()));
   }
 
   /**
    * Execute callback with lock held
    */
-  async withLock<T>(
+  public async withLock<T>(
     resource: string,
     callback: () => Promise<T>,
     options?: LockOptions
@@ -760,13 +764,13 @@ export class LockManager {
     const result = await this.acquire(resource, options);
 
     if (!result.acquired) {
-      throw new Error(result.reason || 'Failed to acquire lock');
+      throw new Error(result.reason ?? 'Failed to acquire lock');
     }
 
     try {
       return await callback();
     } finally {
-      if (result.lockId) {
+      if (result.lockId !== undefined && result.lockId !== null && result.lockId !== '') {
         await this.release(result.lockId);
       }
     }
@@ -782,7 +786,7 @@ export class LockManager {
    * @param ttl - New TTL in milliseconds (must be > 0)
    * @returns ExtendResult with extended=true and newExpiresAt on success
    */
-  async extend(lockId: string, ttl: number): Promise<ExtendResult> {
+  public async extend(lockId: string, ttl: number): Promise<ExtendResult> {
     // Check if disposed
     if (this.disposed) {
       this.log('debug', 'extend rejected - disposed', { lockId });
@@ -871,7 +875,7 @@ export class LockManager {
     }
 
     // Check if lock has expired
-    if (lock.expiresAt && Date.now() >= lock.expiresAt) {
+    if (lock.expiresAt !== undefined && lock.expiresAt !== null && Date.now() >= lock.expiresAt) {
       // For reentrant locks, only auto-release if refCount is 1
       if (lock.refCount > 1) {
         return;

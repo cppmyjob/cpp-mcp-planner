@@ -25,8 +25,8 @@ import { resolveFieldTempIds } from '../utils/temp-id-resolver.js';
 export type BatchEntityType = 'requirement' | 'solution' | 'phase' | 'link' | 'decision' | 'artifact';
 
 export interface BatchOperation {
-  entity_type: BatchEntityType;
-  payload: any;
+  entityType: BatchEntityType;
+  payload: Record<string, unknown>;
 }
 
 export interface BatchResult {
@@ -53,7 +53,7 @@ export interface ExecuteBatchInput {
  * @internal
  */
 class InMemoryRepository<T extends Entity> implements Repository<T> {
-  readonly entityType: EntityType;
+  public readonly entityType: EntityType;
 
   constructor(
     entityType: EntityType,
@@ -63,7 +63,7 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
     this.entityType = entityType;
   }
 
-  async findById(id: string): Promise<T> {
+  public async findById(id: string): Promise<T> {
     const entity = await this.findByIdOrNull(id);
     if (!entity) {
       throw new NotFoundError(this.entityType, id);
@@ -71,31 +71,31 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
     return entity;
   }
 
-  async findByIdOrNull(id: string): Promise<T | null> {
+  public async findByIdOrNull(id: string): Promise<T | null> {
     const entities = await this.findAll();
-    return entities.find(e => e.id === id) || null;
+    return entities.find(e => e.id === id) ?? null;
   }
 
-  async exists(id: string): Promise<boolean> {
+  public async exists(id: string): Promise<boolean> {
     const entities = await this.findAll();
     return entities.some(e => e.id === id);
   }
 
-  async findByIds(ids: string[]): Promise<T[]> {
+  public async findByIds(ids: string[]): Promise<T[]> {
     const entities = await this.findAll();
     return entities.filter(e => ids.includes(e.id));
   }
 
-  async findAll(): Promise<T[]> {
-    const entities = this.entitiesMap.get(this.planId) || [];
-    return entities as T[];
+  public findAll(): Promise<T[]> {
+    const entities = this.entitiesMap.get(this.planId) ?? [];
+    return Promise.resolve(entities as T[]);
   }
 
-  async query(options: QueryOptions<T>): Promise<QueryResult<T>> {
+  public async query(options: QueryOptions<T>): Promise<QueryResult<T>> {
     // Simple implementation for batch mode - no filtering/sorting
     const entities = await this.findAll();
-    const offset = options.pagination?.offset || 0;
-    const limit = options.pagination?.limit || entities.length;
+    const offset = options.pagination?.offset ?? 0;
+    const limit = options.pagination?.limit ?? entities.length;
 
     const items = entities.slice(offset, offset + limit);
 
@@ -108,24 +108,24 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
     };
   }
 
-  async count(filter?: Filter<T>): Promise<number> {
+  public async count(_filter?: Filter<T>): Promise<number> {
     const entities = await this.findAll();
     return entities.length;
   }
 
-  async findOne(filter: Filter<T>): Promise<T | null> {
+  public async findOne(_filter: Filter<T>): Promise<T | null> {
     const entities = await this.findAll();
-    return entities[0] || null;
+    return entities[0] ?? null;
   }
 
-  async create(entity: T): Promise<T> {
+  public async create(entity: T): Promise<T> {
     const entities = await this.findAll();
     entities.push(entity);
     this.entitiesMap.set(this.planId, entities);
     return entity;
   }
 
-  async update(id: string, updates: Partial<T>): Promise<T> {
+  public async update(id: string, updates: Partial<T>): Promise<T> {
     const entities = await this.findAll();
     const index = entities.findIndex(e => e.id === id);
     if (index === -1) {
@@ -137,7 +137,7 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
     // FIX C-1: Optimistic locking - check version if provided in updates
     if ('version' in updates && updates.version !== undefined && updates.version !== existing.version) {
       throw new ConflictError(
-        `Version mismatch for ${this.entityType} ${id}: expected ${existing.version}, got ${updates.version}`,
+        `Version mismatch for ${this.entityType} ${id}: expected ${String(existing.version)}, got ${String(updates.version)}`,
         'version',
         { expectedVersion: existing.version, providedVersion: updates.version }
       );
@@ -159,7 +159,7 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
     return updated;
   }
 
-  async delete(id: string): Promise<void> {
+  public async delete(id: string): Promise<void> {
     const entities = await this.findAll();
     const index = entities.findIndex(e => e.id === id);
     if (index === -1) {
@@ -169,7 +169,7 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
     this.entitiesMap.set(this.planId, entities);
   }
 
-  async deleteMany(ids: string[]): Promise<number> {
+  public async deleteMany(ids: string[]): Promise<number> {
     let count = 0;
     for (const id of ids) {
       try {
@@ -182,7 +182,7 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
     return count;
   }
 
-  async createMany(entities: T[]): Promise<T[]> {
+  public async createMany(entities: T[]): Promise<T[]> {
     const created: T[] = [];
     for (const entity of entities) {
       created.push(await this.create(entity));
@@ -190,7 +190,7 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
     return created;
   }
 
-  async updateMany(updates: { id: string; data: Partial<T> }[]): Promise<T[]> {
+  public async updateMany(updates: { id: string; data: Partial<T> }[]): Promise<T[]> {
     const updated: T[] = [];
     for (const { id, data } of updates) {
       updated.push(await this.update(id, data));
@@ -198,7 +198,7 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
     return updated;
   }
 
-  async upsertMany(entities: T[]): Promise<T[]> {
+  public async upsertMany(entities: T[]): Promise<T[]> {
     const upserted: T[] = [];
     for (const entity of entities) {
       const exists = await this.exists(entity.id);
@@ -226,11 +226,11 @@ class InMemoryLinkRepository implements LinkRepository {
     private readonly linksMap: Map<string, Link[]>
   ) {}
 
-  private async findAll(): Promise<Link[]> {
-    return this.linksMap.get(this.planId) || [];
+  private findAll(): Promise<Link[]> {
+    return Promise.resolve(this.linksMap.get(this.planId) ?? []);
   }
 
-  async getLinkById(id: string): Promise<Link> {
+  public async getLinkById(id: string): Promise<Link> {
     const links = await this.findAll();
     const link = links.find(l => l.id === id);
     if (!link) {
@@ -239,7 +239,7 @@ class InMemoryLinkRepository implements LinkRepository {
     return link;
   }
 
-  async createLink(link: Omit<Link, 'id' | 'createdAt' | 'createdBy'>): Promise<Link> {
+  public async createLink(link: Omit<Link, 'id' | 'createdAt' | 'createdBy'>): Promise<Link> {
     const id = uuidv4();
     const fullLink: Link = {
       ...link,
@@ -253,7 +253,7 @@ class InMemoryLinkRepository implements LinkRepository {
     return fullLink;
   }
 
-  async deleteLink(id: string): Promise<void> {
+  public async deleteLink(id: string): Promise<void> {
     const links = await this.findAll();
     const index = links.findIndex(l => l.id === id);
     if (index === -1) {
@@ -263,25 +263,25 @@ class InMemoryLinkRepository implements LinkRepository {
     this.linksMap.set(this.planId, links);
   }
 
-  async findLinksBySource(sourceId: string, relationType?: string): Promise<Link[]> {
+  public async findLinksBySource(sourceId: string, relationType?: string): Promise<Link[]> {
     const links = await this.findAll();
     return links.filter(l =>
       l.sourceId === sourceId &&
-      (!relationType || l.relationType === relationType)
+      (relationType === undefined || relationType === null || relationType === '' || l.relationType === relationType)
     );
   }
 
-  async findLinksByTarget(targetId: string, relationType?: string): Promise<Link[]> {
+  public async findLinksByTarget(targetId: string, relationType?: string): Promise<Link[]> {
     const links = await this.findAll();
     return links.filter(l =>
       l.targetId === targetId &&
-      (!relationType || l.relationType === relationType)
+      (relationType === undefined || relationType === null || relationType === '' || l.relationType === relationType)
     );
   }
 
-  async findLinksByEntity(entityId: string, direction?: 'incoming' | 'outgoing' | 'both'): Promise<Link[]> {
+  public async findLinksByEntity(entityId: string, direction?: 'incoming' | 'outgoing' | 'both'): Promise<Link[]> {
     const links = await this.findAll();
-    const dir = direction || 'both';
+    const dir = direction ?? 'both';
 
     if (dir === 'outgoing') {
       return links.filter(l => l.sourceId === entityId);
@@ -292,15 +292,15 @@ class InMemoryLinkRepository implements LinkRepository {
     return links.filter(l => l.sourceId === entityId || l.targetId === entityId);
   }
 
-  async findAllLinks(relationType?: string): Promise<Link[]> {
+  public async findAllLinks(relationType?: string): Promise<Link[]> {
     const links = await this.findAll();
-    if (!relationType) {
+    if (relationType === undefined || relationType === null || relationType === '') {
       return links;
     }
     return links.filter(l => l.relationType === relationType);
   }
 
-  async deleteLinksForEntity(entityId: string): Promise<number> {
+  public async deleteLinksForEntity(entityId: string): Promise<number> {
     const links = await this.findAll();
     const toDelete = links.filter(l => l.sourceId === entityId || l.targetId === entityId);
 
@@ -311,7 +311,7 @@ class InMemoryLinkRepository implements LinkRepository {
     return toDelete.length;
   }
 
-  async linkExists(sourceId: string, targetId: string, relationType: string): Promise<boolean> {
+  public async linkExists(sourceId: string, targetId: string, relationType: string): Promise<boolean> {
     const links = await this.findAll();
     return links.some(l =>
       l.sourceId === sourceId &&
@@ -332,40 +332,56 @@ class InMemoryLinkRepository implements LinkRepository {
 class InMemoryPlanRepository {
   constructor(private readonly validPlanId: string) {}
 
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     // No-op
   }
 
-  async planExists(planId: string): Promise<boolean> {
-    return planId === this.validPlanId;
+  public planExists(planId: string): Promise<boolean> {
+    return Promise.resolve(planId === this.validPlanId);
   }
 
-  async createPlan(): Promise<void> {
+  public createPlan(): Promise<void> {
     throw new Error('createPlan not supported in batch mode');
   }
 
-  async deletePlan(): Promise<void> {
+  public deletePlan(): Promise<void> {
     throw new Error('deletePlan not supported in batch mode');
   }
 
-  async listPlans(): Promise<string[]> {
+  public listPlans(): Promise<string[]> {
     throw new Error('listPlans not supported in batch mode');
   }
 
-  async saveManifest(): Promise<void> {
+  public saveManifest(): Promise<void> {
     throw new Error('saveManifest not supported in batch mode');
   }
 
-  async loadManifest(): Promise<any> {
+  public loadManifest(): Promise<PlanManifest> {
     throw new Error('loadManifest not supported in batch mode');
   }
 
-  async saveActivePlans(): Promise<void> {
+  public saveActivePlans(): Promise<void> {
     throw new Error('saveActivePlans not supported in batch mode');
   }
 
-  async loadActivePlans(): Promise<any> {
+  public loadActivePlans(): Promise<never> {
     throw new Error('loadActivePlans not supported in batch mode');
+  }
+
+  public saveExport(): Promise<string> {
+    throw new Error('saveExport not supported in batch mode');
+  }
+
+  public saveVersionHistory(): Promise<void> {
+    throw new Error('saveVersionHistory not supported in batch mode');
+  }
+
+  public loadVersionHistory(): Promise<never> {
+    throw new Error('loadVersionHistory not supported in batch mode');
+  }
+
+  public deleteVersionHistory(): Promise<void> {
+    throw new Error('deleteVersionHistory not supported in batch mode');
   }
 }
 
@@ -382,7 +398,7 @@ class InMemoryPlanRepository {
  * @internal
  */
 class InMemoryRepositoryFactory implements RepositoryFactory {
-  private readonly repositoryCache = new Map<string, Repository<any>>();
+  private readonly repositoryCache = new Map<string, Repository<Entity>>();
   private readonly linkRepo: InMemoryLinkRepository;
   private readonly planRepo: InMemoryPlanRepository;
 
@@ -399,10 +415,14 @@ class InMemoryRepositoryFactory implements RepositoryFactory {
     this.planRepo = new InMemoryPlanRepository(planId);
   }
 
-  createRepository<T extends Entity>(entityType: EntityType, planId: string): Repository<T> {
+  public createRepository<T extends Entity>(entityType: EntityType, planId: string): Repository<T> {
     const cacheKey = `${entityType}:${planId}`;
     if (this.repositoryCache.has(cacheKey)) {
-      return this.repositoryCache.get(cacheKey)!;
+      const cached = this.repositoryCache.get(cacheKey);
+      if (!cached) {
+        throw new Error(`Repository cache inconsistency for ${cacheKey}`);
+      }
+      return cached as Repository<T>;
     }
 
     let entitiesMap: Map<string, Entity[]>;
@@ -423,7 +443,7 @@ class InMemoryRepositoryFactory implements RepositoryFactory {
         entitiesMap = this.artifactsMap as Map<string, Entity[]>;
         break;
       default:
-        throw new Error(`Unsupported entity type: ${entityType}`);
+        throw new Error(`Unsupported entity type: ${String(entityType)}`);
     }
 
     const repo = new InMemoryRepository<T>(entityType, planId, entitiesMap);
@@ -431,29 +451,30 @@ class InMemoryRepositoryFactory implements RepositoryFactory {
     return repo;
   }
 
-  createLinkRepository(planId: string): LinkRepository {
+  public createLinkRepository(_planId: string): LinkRepository {
     return this.linkRepo;
   }
 
-  createPlanRepository(): any {
+  public createPlanRepository(): PlanRepository {
     return this.planRepo;
   }
 
-  createUnitOfWork(planId: string): any {
+  public createUnitOfWork(_planId: string): never {
     throw new Error('UnitOfWork not supported in batch mode');
   }
 
   // FIX M-3: Return 'file' as this is memory-backed simulation of file storage
-  getBackend(): 'file' {
+  public getBackend(): 'file' {
     return 'file';
   }
 
-  async close(): Promise<void> {
+  public async close(): Promise<void> {
     // No-op for in-memory
   }
 
-  async dispose(): Promise<void> {
+  public dispose(): Promise<void> {
     this.repositoryCache.clear();
+    return Promise.resolve();
   }
 }
 
@@ -484,7 +505,7 @@ class InMemoryStorage {
   /**
    * Load all entities for a plan into memory
    */
-  async loadAllIntoMemory(): Promise<void> {
+  public async loadAllIntoMemory(): Promise<void> {
     // Create repositories for each entity type
     const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', this.planId);
     const solRepo = this.repositoryFactory.createRepository<Solution>('solution', this.planId);
@@ -516,13 +537,13 @@ class InMemoryStorage {
   /**
    * Flush all in-memory changes to disk atomically
    */
-  async flushToDisk(): Promise<void> {
-    const requirements = this.requirementsMap.get(this.planId) || [];
-    const solutions = this.solutionsMap.get(this.planId) || [];
-    const phases = this.phasesMap.get(this.planId) || [];
-    const decisions = this.decisionsMap.get(this.planId) || [];
-    const artifacts = this.artifactsMap.get(this.planId) || [];
-    const links = this.linksMap.get(this.planId) || [];
+  public async flushToDisk(): Promise<void> {
+    const requirements = this.requirementsMap.get(this.planId) ?? [];
+    const solutions = this.solutionsMap.get(this.planId) ?? [];
+    const phases = this.phasesMap.get(this.planId) ?? [];
+    const decisions = this.decisionsMap.get(this.planId) ?? [];
+    const artifacts = this.artifactsMap.get(this.planId) ?? [];
+    const links = this.linksMap.get(this.planId) ?? [];
     const manifest = this.manifestsMap.get(this.planId);
 
     // Create repositories for each entity type
@@ -542,12 +563,13 @@ class InMemoryStorage {
           relationType: link.relationType,
           metadata: link.metadata,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         // If link already exists (ConflictError with duplicate), skip it
         // This can happen if batch is retried or link was created outside batch
-        if (err.conflictType !== 'duplicate') {
+        if (err instanceof ConflictError && err.conflictType !== 'duplicate') {
           throw err;
         }
+        // Silently ignore duplicate link errors
       }
     }
 
@@ -564,24 +586,24 @@ class InMemoryStorage {
 
   // FileStorage-compatible methods (work in-memory)
 
-  async loadEntities<T extends Entity>(planId: string, entityType: string): Promise<T[]> {
+  public loadEntities<T extends Entity>(planId: string, entityType: string): Promise<T[]> {
     switch (entityType) {
       case 'requirements':
-        return (this.requirementsMap.get(planId) || []) as unknown as T[];
+        return Promise.resolve((this.requirementsMap.get(planId) ?? []) as unknown as T[]);
       case 'solutions':
-        return (this.solutionsMap.get(planId) || []) as unknown as T[];
+        return Promise.resolve((this.solutionsMap.get(planId) ?? []) as unknown as T[]);
       case 'phases':
-        return (this.phasesMap.get(planId) || []) as unknown as T[];
+        return Promise.resolve((this.phasesMap.get(planId) ?? []) as unknown as T[]);
       case 'decisions':
-        return (this.decisionsMap.get(planId) || []) as unknown as T[];
+        return Promise.resolve((this.decisionsMap.get(planId) ?? []) as unknown as T[]);
       case 'artifacts':
-        return (this.artifactsMap.get(planId) || []) as unknown as T[];
+        return Promise.resolve((this.artifactsMap.get(planId) ?? []) as unknown as T[]);
       default:
-        return [];
+        return Promise.resolve([]);
     }
   }
 
-  async saveEntities<T extends Entity>(
+  public saveEntities<T extends Entity>(
     planId: string,
     entityType: string,
     entities: T[]
@@ -604,29 +626,32 @@ class InMemoryStorage {
         this.artifactsMap.set(planId, entities as unknown as Artifact[]);
         break;
     }
+    return Promise.resolve();
   }
 
-  async loadLinks(planId: string): Promise<Link[]> {
-    return this.linksMap.get(planId) || [];
+  public loadLinks(planId: string): Promise<Link[]> {
+    return Promise.resolve(this.linksMap.get(planId) ?? []);
   }
 
-  async saveLinks(planId: string, links: Link[]): Promise<void> {
+  public saveLinks(planId: string, links: Link[]): Promise<void> {
     this.linksMap.set(planId, links);
+    return Promise.resolve();
   }
 
-  async loadManifest(planId: string): Promise<PlanManifest> {
+  public loadManifest(planId: string): Promise<PlanManifest> {
     const manifest = this.manifestsMap.get(planId);
     if (!manifest) {
       throw new Error('Manifest not found');
     }
-    return manifest;
+    return Promise.resolve(manifest);
   }
 
-  async saveManifest(planId: string, manifest: PlanManifest): Promise<void> {
+  public saveManifest(planId: string, manifest: PlanManifest): Promise<void> {
     this.manifestsMap.set(planId, manifest);
+    return Promise.resolve();
   }
 
-  async planExists(planId: string): Promise<boolean> {
+  public async planExists(planId: string): Promise<boolean> {
     return this.planRepo.planExists(planId);
   }
 }
@@ -653,7 +678,7 @@ export class BatchService {
     this.planRepo = repositoryFactory.createPlanRepository();
   }
 
-  async executeBatch(input: ExecuteBatchInput): Promise<BatchResult> {
+  public async executeBatch(input: ExecuteBatchInput): Promise<BatchResult> {
     // Validate plan exists
     const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
@@ -676,26 +701,28 @@ export class BatchService {
     );
 
     // 3. Create in-memory service instances with RepositoryFactory
-    const memReqService = new (this.requirementService.constructor as any)(
+    type ServiceConstructor<T> = new (factory: RepositoryFactory, planService?: PlanService) => T;
+
+    const memReqService = new (this.requirementService.constructor as ServiceConstructor<RequirementService>)(
       memoryRepoFactory,
       this.planService
     );
-    const memSolService = new (this.solutionService.constructor as any)(
+    const memSolService = new (this.solutionService.constructor as ServiceConstructor<SolutionService>)(
       memoryRepoFactory,
       this.planService
     );
-    const memPhaseService = new (this.phaseService.constructor as any)(
+    const memPhaseService = new (this.phaseService.constructor as ServiceConstructor<PhaseService>)(
       memoryRepoFactory, // PhaseService migrated to RepositoryFactory
       this.planService
     );
-    const memLinkService = new (this.linkingService.constructor as any)(
+    const memLinkService = new (this.linkingService.constructor as new (factory: RepositoryFactory) => LinkingService)(
       memoryRepoFactory
     );
-    const memDecService = new (this.decisionService.constructor as any)(
+    const memDecService = new (this.decisionService.constructor as ServiceConstructor<DecisionService>)(
       memoryRepoFactory,
       this.planService
     );
-    const memArtService = new (this.artifactService.constructor as any)(
+    const memArtService = new (this.artifactService.constructor as ServiceConstructor<ArtifactService>)(
       memoryRepoFactory,
       this.planService
     );
@@ -706,137 +733,158 @@ export class BatchService {
     try {
       // 3. Execute operations sequentially in memory
       for (const op of input.operations) {
-        let result: any;
+        let result: { id?: string; requirementId?: string; solutionId?: string; phaseId?: string; linkId?: string; decisionId?: string; artifactId?: string } | undefined;
 
         // Resolve temp IDs in payload
-        const resolvedPayload = this.resolveTempIds(op.payload, tempIdMapping, op.entity_type);
+        const resolvedPayload = this.resolveTempIds(op.payload, tempIdMapping, op.entityType);
 
         // Check if this is an update operation
-        const isUpdate = resolvedPayload.action === 'update';
+        const isUpdate = (resolvedPayload as { action?: string }).action === 'update';
 
-        switch (op.entity_type) {
+        switch (op.entityType) {
           case 'requirement':
             if (isUpdate) {
               // Resolve temp ID in id field if needed
-              const requirementId = tempIdMapping[resolvedPayload.id] || resolvedPayload.id;
+              const payloadWithId = resolvedPayload as { id: string; updates: Record<string, unknown> };
+              const requirementId = (tempIdMapping[payloadWithId.id] !== undefined && tempIdMapping[payloadWithId.id] !== null && tempIdMapping[payloadWithId.id] !== '') ? tempIdMapping[payloadWithId.id] : payloadWithId.id;
               result = await memReqService.updateRequirement({
                 planId: input.planId,
                 requirementId,
-                updates: resolvedPayload.updates
+                updates: payloadWithId.updates as Partial<Requirement>
               });
               results.push({ success: true, id: requirementId });
             } else {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
               result = await memReqService.addRequirement({
                 planId: input.planId,
-                requirement: resolvedPayload
+                requirement: resolvedPayload as any
               });
               results.push({ success: true, id: result.requirementId });
 
               // Track temp ID mapping
-              if (resolvedPayload.tempId) {
-                tempIdMapping[resolvedPayload.tempId] = result.requirementId;
+              const payloadWithTempId = resolvedPayload as { tempId?: string };
+              const tempId = payloadWithTempId.tempId;
+              if (typeof tempId === 'string' && result.requirementId !== undefined) {
+                tempIdMapping[tempId] = result.requirementId;
               }
             }
             break;
 
           case 'solution':
             if (isUpdate) {
-              const solutionId = tempIdMapping[resolvedPayload.id] || resolvedPayload.id;
+              const payloadWithId = resolvedPayload as { id: string; updates: Record<string, unknown> };
+              const solutionId = (tempIdMapping[payloadWithId.id] !== undefined && tempIdMapping[payloadWithId.id] !== null && tempIdMapping[payloadWithId.id] !== '') ? tempIdMapping[payloadWithId.id] : payloadWithId.id;
               result = await memSolService.updateSolution({
                 planId: input.planId,
                 solutionId,
-                updates: resolvedPayload.updates
+                updates: payloadWithId.updates as Partial<Solution>
               });
               results.push({ success: true, id: solutionId });
             } else {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
               result = await memSolService.proposeSolution({
                 planId: input.planId,
-                solution: resolvedPayload
+                solution: resolvedPayload as any
               });
               results.push({ success: true, id: result.solutionId });
 
-              if (resolvedPayload.tempId) {
-                tempIdMapping[resolvedPayload.tempId] = result.solutionId;
+              const payloadWithTempId = resolvedPayload as { tempId?: string };
+              const tempId = payloadWithTempId.tempId;
+              if (typeof tempId === 'string' && result.solutionId !== undefined) {
+                tempIdMapping[tempId] = result.solutionId;
               }
             }
             break;
 
           case 'phase':
             if (isUpdate) {
-              const phaseId = tempIdMapping[resolvedPayload.id] || resolvedPayload.id;
+              const payloadWithId = resolvedPayload as { id: string; updates: Record<string, unknown> };
+              const phaseId = (tempIdMapping[payloadWithId.id] !== undefined && tempIdMapping[payloadWithId.id] !== null && tempIdMapping[payloadWithId.id] !== '') ? tempIdMapping[payloadWithId.id] : payloadWithId.id;
               result = await memPhaseService.updatePhase({
                 planId: input.planId,
                 phaseId,
-                updates: resolvedPayload.updates
+                updates: payloadWithId.updates as Partial<Phase>
               });
               results.push({ success: true, id: phaseId });
             } else {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
               result = await memPhaseService.addPhase({
                 planId: input.planId,
-                phase: resolvedPayload
+                phase: resolvedPayload as any
               });
               results.push({ success: true, id: result.phaseId });
 
-              if (resolvedPayload.tempId) {
-                tempIdMapping[resolvedPayload.tempId] = result.phaseId;
+              const payloadWithTempId = resolvedPayload as { tempId?: string };
+              const tempId = payloadWithTempId.tempId;
+              if (typeof tempId === 'string' && result.phaseId !== undefined) {
+                tempIdMapping[tempId] = result.phaseId;
               }
             }
             break;
 
           case 'link':
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
             result = await memLinkService.linkEntities({
               planId: input.planId,
-              ...resolvedPayload
+              ...(resolvedPayload as any)
             });
             results.push({ success: true, id: result.linkId });
             break;
 
           case 'decision':
             if (isUpdate) {
-              const decisionId = tempIdMapping[resolvedPayload.id] || resolvedPayload.id;
+              const payloadWithId = resolvedPayload as { id: string; updates: Record<string, unknown> };
+              const decisionId = (tempIdMapping[payloadWithId.id] !== undefined && tempIdMapping[payloadWithId.id] !== null && tempIdMapping[payloadWithId.id] !== '') ? tempIdMapping[payloadWithId.id] : payloadWithId.id;
               result = await memDecService.updateDecision({
                 planId: input.planId,
                 decisionId,
-                updates: resolvedPayload.updates
+                updates: payloadWithId.updates as Partial<Decision>
               });
               results.push({ success: true, id: decisionId });
             } else {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
               result = await memDecService.recordDecision({
                 planId: input.planId,
-                decision: resolvedPayload
+                decision: resolvedPayload as any
               });
               results.push({ success: true, id: result.decisionId });
 
-              if (resolvedPayload.tempId) {
-                tempIdMapping[resolvedPayload.tempId] = result.decisionId;
+              const payloadWithTempId = resolvedPayload as { tempId?: string };
+              const tempId = payloadWithTempId.tempId;
+              if (typeof tempId === 'string' && result.decisionId !== undefined) {
+                tempIdMapping[tempId] = result.decisionId;
               }
             }
             break;
 
           case 'artifact':
             if (isUpdate) {
-              const artifactId = tempIdMapping[resolvedPayload.id] || resolvedPayload.id;
+              const payloadWithId = resolvedPayload as { id: string; updates: Record<string, unknown> };
+              const artifactId = (tempIdMapping[payloadWithId.id] !== undefined && tempIdMapping[payloadWithId.id] !== null && tempIdMapping[payloadWithId.id] !== '') ? tempIdMapping[payloadWithId.id] : payloadWithId.id;
               result = await memArtService.updateArtifact({
                 planId: input.planId,
                 artifactId,
-                updates: resolvedPayload.updates
+                updates: payloadWithId.updates as Partial<Artifact>
               });
               results.push({ success: true, id: artifactId });
             } else {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
               result = await memArtService.addArtifact({
                 planId: input.planId,
-                artifact: resolvedPayload
+                artifact: resolvedPayload as any
               });
               results.push({ success: true, id: result.artifactId });
 
-              if (resolvedPayload.tempId) {
-                tempIdMapping[resolvedPayload.tempId] = result.artifactId;
+              const payloadWithTempId = resolvedPayload as { tempId?: string };
+              const tempId = payloadWithTempId.tempId;
+              if (typeof tempId === 'string' && result.artifactId !== undefined) {
+                tempIdMapping[tempId] = result.artifactId;
               }
             }
             break;
 
           default:
-            throw new Error(`Unknown entity_type: ${op.entity_type}`);
+            throw new Error(`Unknown entityType: ${String(op.entityType)}`);
         }
       }
 
@@ -865,8 +913,8 @@ export class BatchService {
    * - artifact: relatedPhaseId, relatedSolutionId, relatedRequirementIds[]
    * - link: sourceId, targetId
    */
-  private resolveTempIds(payload: any, mapping: Record<string, string>, entityType?: string): any {
-    if (!payload || typeof payload !== 'object') {
+  private resolveTempIds(payload: Record<string, unknown>, mapping: Record<string, string>, entityType?: string): Record<string, unknown> {
+    if (payload === null || payload === undefined || typeof payload !== 'object') {
       return payload;
     }
 
@@ -884,8 +932,8 @@ export class BatchService {
       link: { 'sourceId': true, 'targetId': true }
     };
 
-    const fieldMap = entityType ? ID_FIELDS[entityType] || {} : {};
+    const fieldMap = (entityType !== undefined && entityType !== '') ? (ID_FIELDS[entityType] ?? {}) : {};
 
-    return resolveFieldTempIds(payload, fieldMap, mapping);
+    return resolveFieldTempIds(payload, fieldMap, mapping) as Record<string, unknown>;
   }
 }

@@ -146,7 +146,7 @@ describe('PlanService', () => {
     it('should update plan name', async () => {
       const created = await service.createPlan({ name: 'Old Name', description: 'Test' });
 
-      const result = await service.updatePlan({
+      const _result = await service.updatePlan({
         planId: created.planId,
         updates: { name: 'New Name' },
       });
@@ -159,7 +159,7 @@ describe('PlanService', () => {
     it('should update plan status', async () => {
       const created = await service.createPlan({ name: 'Test', description: 'Test' });
 
-      const result = await service.updatePlan({
+      const _result2 = await service.updatePlan({
         planId: created.planId,
         updates: { status: 'completed' },
       });

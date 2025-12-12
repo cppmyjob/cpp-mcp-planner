@@ -954,7 +954,7 @@ describe('Tool Handlers Integration', () => {
 
       it('should calculate order based on max existing order after delete', async () => {
         // Add 3 phases
-        const phase1 = await handleToolCall(
+        const _phase1 = await handleToolCall(
           'phase',
           { action: 'add', planId: ctx.planId, phase: { title: 'Phase 1', description: 'First' } },
           ctx.services
@@ -971,7 +971,7 @@ describe('Tool Handlers Integration', () => {
         );
 
         const p2 = JSON.parse(phase2.content[0].text);
-        const p3 = JSON.parse(phase3.content[0].text);
+        const _p3 = JSON.parse(phase3.content[0].text);
 
         // Delete phase 2
         await handleToolCall(
@@ -1120,9 +1120,9 @@ describe('Tool Handlers Integration', () => {
           ctx.services
         );
 
-        const c1 = JSON.parse(child1.content[0].text);
+        const _c1 = JSON.parse(child1.content[0].text);
         const c2 = JSON.parse(child2.content[0].text);
-        const c3 = JSON.parse(child3.content[0].text);
+        const _c3 = JSON.parse(child3.content[0].text);
 
         // Delete child 2 (creates gap: 1, _, 3)
         await handleToolCall(

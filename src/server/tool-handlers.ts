@@ -311,8 +311,8 @@ export async function handleToolCall(
     // - Error objects: use message (but fallback if undefined)
     // - Non-Error objects: convert to string
     const message = error instanceof Error
-      ? (error.message || 'Error without message')
-      : (error != null ? String(error) : 'Unknown error');
+      ? (error.message !== undefined && error.message !== null && error.message !== '' ? error.message : 'Error without message')
+      : (error !== undefined && error !== null ? String(error) : 'Unknown error');
     throw new ToolError('InternalError', message);
   }
 }

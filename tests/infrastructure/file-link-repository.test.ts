@@ -108,8 +108,6 @@ describe('FileLinkRepository', () => {
     });
 
     it('should use FileLockManager during create', async () => {
-      const linkData = createTestLink('req-1', 'sol-1', 'implements');
-
       // This test verifies that FileLockManager is used
       // If implementation doesn't use locks, concurrent creates could cause race conditions
       const promises = [

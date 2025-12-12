@@ -43,7 +43,7 @@ export class FileRepository<T extends Entity>
   extends BaseFileRepository
   implements Repository<T>
 {
-  readonly entityType: EntityType;
+  public readonly entityType: EntityType;
 
   private readonly planId: string;
   private readonly entitiesDir: string;
@@ -74,13 +74,13 @@ export class FileRepository<T extends Entity>
     // Use shared FileLockManager if provided, otherwise create new one
     // Track ownership to avoid disposing shared instances
     this.ownsLockManager = !fileLockManager;
-    this.fileLockManager = fileLockManager || new FileLockManager(planDir);
+    this.fileLockManager = fileLockManager ?? new FileLockManager(planDir);
   }
 
   /**
    * Initialize repository
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     if (this.isInitializedState()) {
       return; // Already initialized
     }
@@ -109,7 +109,7 @@ export class FileRepository<T extends Entity>
   // Read Operations
   // ============================================================================
 
-  async findById(id: string): Promise<T> {
+  public async findById(id: string): Promise<T> {
     await this.ensureInitialized(); // FIX H-2
     const entity = await this.findByIdOrNull(id);
     if (!entity) {
@@ -118,7 +118,7 @@ export class FileRepository<T extends Entity>
     return entity;
   }
 
-  async findByIdOrNull(id: string): Promise<T | null> {
+  public async findByIdOrNull(id: string): Promise<T | null> {
     await this.ensureInitialized(); // FIX H-2
     // Check cache first (delegates to base class)
     if (this.cacheOptions.enabled) {
@@ -145,12 +145,12 @@ export class FileRepository<T extends Entity>
     return entity;
   }
 
-  async exists(id: string): Promise<boolean> {
+  public async exists(id: string): Promise<boolean> {
     await this.ensureInitialized(); // FIX H-2
     return await this.indexManager.has(id);
   }
 
-  async findByIds(ids: string[]): Promise<T[]> {
+  public async findByIds(ids: string[]): Promise<T[]> {
     await this.ensureInitialized(); // FIX H-2
     const results: T[] = [];
     for (const id of ids) {
@@ -162,7 +162,7 @@ export class FileRepository<T extends Entity>
     return results;
   }
 
-  async findAll(): Promise<T[]> {
+  public async findAll(): Promise<T[]> {
     await this.ensureInitialized(); // FIX H-2
     const allMetadata = await this.indexManager.getAll();
     const entities: T[] = [];
@@ -175,7 +175,7 @@ export class FileRepository<T extends Entity>
     return entities;
   }
 
-  async query(options: QueryOptions<T>): Promise<QueryResult<T>> {
+  public async query(options: QueryOptions<T>): Promise<QueryResult<T>> {
     await this.ensureInitialized(); // FIX H-2
     // Load all entities
     let entities = await this.findAll();
@@ -208,7 +208,7 @@ export class FileRepository<T extends Entity>
     };
   }
 
-  async count(filter?: Filter<T>): Promise<number> {
+  public async count(filter?: Filter<T>): Promise<number> {
     await this.ensureInitialized(); // FIX H-2
     if (!filter) {
       return await this.indexManager.size();
@@ -219,7 +219,7 @@ export class FileRepository<T extends Entity>
     return filtered.length;
   }
 
-  async findOne(filter: Filter<T>): Promise<T | null> {
+  public async findOne(filter: Filter<T>): Promise<T | null> {
     await this.ensureInitialized(); // FIX H-2
     const entities = await this.findAll();
     const filtered = this.applyFilter(entities, filter);
@@ -230,7 +230,7 @@ export class FileRepository<T extends Entity>
   // Write Operations
   // ============================================================================
 
-  async create(entity: T): Promise<T> {
+  public async create(entity: T): Promise<T> {
     await this.ensureInitialized();
 
     const lockResource = `${this.entityType}:${entity.id}`;
@@ -273,7 +273,7 @@ export class FileRepository<T extends Entity>
     });
   }
 
-  async update(id: string, updates: Partial<T>): Promise<T> {
+  public async update(id: string, updates: Partial<T>): Promise<T> {
     await this.ensureInitialized();
 
     const lockResource = `${this.entityType}:${id}`;
@@ -287,7 +287,7 @@ export class FileRepository<T extends Entity>
       // If caller provides version, it must match current version
       if (updates.version !== undefined && updates.version !== existing.version) {
         throw new ConflictError(
-          `Version mismatch for ${this.entityType} '${id}': expected ${updates.version}, found ${existing.version}`,
+          `Version mismatch for ${this.entityType} '${id}': expected ${String(updates.version)}, found ${String(existing.version)}`,
           'version',
           {
             entityType: this.entityType,
@@ -331,7 +331,7 @@ export class FileRepository<T extends Entity>
     });
   }
 
-  async delete(id: string): Promise<void> {
+  public async delete(id: string): Promise<void> {
     await this.ensureInitialized();
 
     const lockResource = `${this.entityType}:${id}`;
@@ -359,7 +359,7 @@ export class FileRepository<T extends Entity>
   // Bulk Operations
   // ============================================================================
 
-  async createMany(entities: T[]): Promise<T[]> {
+  public async createMany(entities: T[]): Promise<T[]> {
     const created: T[] = [];
     const rollback: string[] = [];
 
@@ -383,7 +383,7 @@ export class FileRepository<T extends Entity>
     }
   }
 
-  async updateMany(updates: { id: string; data: Partial<T> }[]): Promise<T[]> {
+  public async updateMany(updates: { id: string; data: Partial<T> }[]): Promise<T[]> {
     const results: T[] = [];
 
     for (const { id, data } of updates) {
@@ -394,7 +394,7 @@ export class FileRepository<T extends Entity>
     return results;
   }
 
-  async deleteMany(ids: string[]): Promise<number> {
+  public async deleteMany(ids: string[]): Promise<number> {
     let deleted = 0;
 
     for (const id of ids) {
@@ -412,7 +412,7 @@ export class FileRepository<T extends Entity>
     return deleted;
   }
 
-  async upsertMany(entities: T[]): Promise<T[]> {
+  public async upsertMany(entities: T[]): Promise<T[]> {
     const results: T[] = [];
 
     for (const entity of entities) {
@@ -466,7 +466,7 @@ export class FileRepository<T extends Entity>
   private validateEntity(entity: T): void {
     const errors: { field: string; message: string; value?: unknown }[] = [];
 
-    if (!entity.id || entity.id.trim() === '') {
+    if (entity.id === undefined || entity.id === null || entity.id === '' || entity.id.trim() === '') {
       errors.push({
         field: 'id',
         message: 'Entity ID cannot be empty',
@@ -474,7 +474,7 @@ export class FileRepository<T extends Entity>
       });
     }
 
-    if (!entity.type) {
+    if (entity.type === undefined || entity.type === null) {
       errors.push({
         field: 'type',
         message: 'Entity type is required',
@@ -504,9 +504,10 @@ export class FileRepository<T extends Entity>
   private applyFilter(entities: T[], filter: Filter<T>): T[] {
     if ('conditions' in filter && Array.isArray(filter.conditions)) {
       const operator = filter.operator ?? 'and';
+      const conditions = filter.conditions;
 
       return entities.filter((entity) => {
-        const results = filter.conditions!.map((condition) => {
+        const results = conditions.map((condition) => {
           const field = condition.field as keyof T;
           const value = entity[field];
 
@@ -516,13 +517,13 @@ export class FileRepository<T extends Entity>
             case 'ne':
               return value !== condition.value;
             case 'gt':
-              return value > condition.value;
+              return typeof value === 'number' && typeof condition.value === 'number' && value > condition.value;
             case 'gte':
-              return value >= condition.value;
+              return typeof value === 'number' && typeof condition.value === 'number' && value >= condition.value;
             case 'lt':
-              return value < condition.value;
+              return typeof value === 'number' && typeof condition.value === 'number' && value < condition.value;
             case 'lte':
-              return value <= condition.value;
+              return typeof value === 'number' && typeof condition.value === 'number' && value <= condition.value;
             case 'in':
               return Array.isArray(condition.value) && condition.value.includes(value);
             case 'nin':
@@ -535,7 +536,7 @@ export class FileRepository<T extends Entity>
               return typeof value === 'string' && value.endsWith(String(condition.value));
             case 'exists':
               // Check if field exists and has a value (not undefined/null)
-              return condition.value ? value !== undefined && value !== null : value === undefined || value === null;
+              return condition.value ? value !== undefined : value === undefined;
             case 'regex': {
               if (typeof value !== 'string') return false;
               try {
@@ -617,7 +618,7 @@ export class FileRepository<T extends Entity>
   /**
    * Dispose repository and release resources
    */
-  async dispose(): Promise<void> {
+  public async dispose(): Promise<void> {
     // Only dispose file lock manager if we own it (not shared)
     if (this.ownsLockManager) {
       await this.fileLockManager.dispose();

@@ -6,15 +6,15 @@
 export interface BulkUpdateConfig<TIdField extends string> {
   entityType: string;
   entityIdField: TIdField;
-  updateFn: (entityId: string, updates: any) => Promise<void>;
+  updateFn: (entityId: string, updates: Record<string, unknown>) => Promise<void>;
   planId: string;
-  updates: (Record<TIdField, string> & { updates: any })[];
+  updates: (Record<TIdField, string> & { updates: Record<string, unknown> })[];
   atomic?: boolean;
   storage?: {
     // BUGFIX: loadEntities must return full entities (not just { id }), so snapshot/rollback
     // preserves ALL fields. Previously declared Array<{ id: string }> which was too narrow.
-    loadEntities: (planId: string, entityType: string) => Promise<any[]>;
-    saveEntities: (planId: string, entityType: string, entities: any[]) => Promise<void>;
+    loadEntities: (planId: string, entityType: string) => Promise<Record<string, unknown>[]>;
+    saveEntities: (planId: string, entityType: string, entities: Record<string, unknown>[]) => Promise<void>;
   };
 }
 
@@ -93,20 +93,22 @@ export async function bulkUpdateEntities<TIdField extends string>(
         const entityId = update[entityIdField];
         // Each updateFn call saves to disk immediately
         await updateFn(entityId, update.updates);
-        results.push({ [entityIdField]: entityId, success: true } as any);
+        results.push({ [entityIdField]: entityId, success: true } as Record<TIdField, string> & { success: boolean });
         updated++;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // CRITICAL: Rollback all changes by restoring snapshot
       // BUGFIX: Capture both original error and any rollback failure for complete diagnostics
+      const errorMessage = error instanceof Error ? error.message : String(error);
       try {
         await storage.saveEntities(planId, entityType, snapshot);
-        throw new Error(`Atomic bulk update failed: ${error.message} (rolled back all changes)`);
-      } catch (rollbackError: any) {
+        throw new Error(`Atomic bulk update failed: ${errorMessage} (rolled back all changes)`);
+      } catch (rollbackError: unknown) {
         // If rollback also fails, include BOTH errors in the message
+        const rollbackMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
         throw new Error(
-          `Atomic bulk update failed: ${error.message}. ` +
-          `Rollback also failed: ${rollbackError.message}`
+          `Atomic bulk update failed: ${errorMessage}. ` +
+          `Rollback also failed: ${rollbackMessage}`
         );
       }
     }
@@ -116,14 +118,15 @@ export async function bulkUpdateEntities<TIdField extends string>(
       const entityId = update[entityIdField];
       try {
         await updateFn(entityId, update.updates);
-        results.push({ [entityIdField]: entityId, success: true } as any);
+        results.push({ [entityIdField]: entityId, success: true } as Record<TIdField, string> & { success: boolean });
         updated++;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         results.push({
           [entityIdField]: entityId,
           success: false,
-          error: error.message,
-        } as any);
+          error: errorMessage,
+        } as Record<TIdField, string> & { success: boolean; error: string });
         failed++;
       }
     }

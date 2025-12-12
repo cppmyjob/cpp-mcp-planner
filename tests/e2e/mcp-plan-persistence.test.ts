@@ -57,7 +57,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
     expect(planId).toBeDefined();
 
     // Set it as active
-    const setActiveResult = await client1.callTool({
+    const _setActiveResult = await client1.callTool({
       name: 'plan',
       arguments: {
         action: 'set_active',

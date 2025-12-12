@@ -1724,9 +1724,9 @@ describe('E2E: All MCP Tools Validation', () => {
           },
         });
 
-        const c1 = parseResult<{ phaseId: string }>(child1Result);
+        const _c1 = parseResult<{ phaseId: string }>(child1Result);
         const c2 = parseResult<{ phaseId: string }>(child2Result);
-        const c3 = parseResult<{ phaseId: string }>(child3Result);
+        const _c3 = parseResult<{ phaseId: string }>(child3Result);
 
         // Delete child 2
         await client.callTool({
@@ -2426,7 +2426,7 @@ describe('E2E: All MCP Tools Validation', () => {
           planId,
           operations: [
             {
-              entity_type: 'requirement',
+              entityType: 'requirement',
               payload: {
                 title: 'Batch Test Requirement',
                 description: 'Created via batch operation',
@@ -2457,7 +2457,7 @@ describe('E2E: All MCP Tools Validation', () => {
           planId,
           operations: [
             {
-              entity_type: 'requirement',
+              entityType: 'requirement',
               payload: {
                 tempId: '$0',
                 title: 'Batch Requirement 1',
@@ -2469,7 +2469,7 @@ describe('E2E: All MCP Tools Validation', () => {
               },
             },
             {
-              entity_type: 'requirement',
+              entityType: 'requirement',
               payload: {
                 tempId: '$1',
                 title: 'Batch Requirement 2',
@@ -2481,7 +2481,7 @@ describe('E2E: All MCP Tools Validation', () => {
               },
             },
             {
-              entity_type: 'solution',
+              entityType: 'solution',
               payload: {
                 tempId: '$2',
                 title: 'Batch Solution',
@@ -2544,7 +2544,7 @@ describe('E2E: All MCP Tools Validation', () => {
           planId,
           operations: [
             {
-              entity_type: 'requirement',
+              entityType: 'requirement',
               payload: {
                 tempId: '$0',
                 title: 'Cross-ref Requirement',
@@ -2556,7 +2556,7 @@ describe('E2E: All MCP Tools Validation', () => {
               },
             },
             {
-              entity_type: 'phase',
+              entityType: 'phase',
               payload: {
                 tempId: '$1',
                 title: 'Cross-ref Phase',
@@ -2567,7 +2567,7 @@ describe('E2E: All MCP Tools Validation', () => {
               },
             },
             {
-              entity_type: 'link',
+              entityType: 'link',
               payload: {
                 sourceId: '$1', // Phase
                 targetId: '$0', // Requirement
@@ -2615,7 +2615,7 @@ describe('E2E: All MCP Tools Validation', () => {
           planId,
           operations: [
             {
-              entity_type: 'requirement',
+              entityType: 'requirement',
               payload: {
                 tempId: '$0',
                 title: 'All Types Requirement',
@@ -2627,7 +2627,7 @@ describe('E2E: All MCP Tools Validation', () => {
               },
             },
             {
-              entity_type: 'solution',
+              entityType: 'solution',
               payload: {
                 tempId: '$1',
                 title: 'All Types Solution',
@@ -2643,7 +2643,7 @@ describe('E2E: All MCP Tools Validation', () => {
               },
             },
             {
-              entity_type: 'decision',
+              entityType: 'decision',
               payload: {
                 tempId: '$2',
                 title: 'All Types Decision',
@@ -2655,7 +2655,7 @@ describe('E2E: All MCP Tools Validation', () => {
               },
             },
             {
-              entity_type: 'phase',
+              entityType: 'phase',
               payload: {
                 tempId: '$3',
                 title: 'All Types Phase',
@@ -2666,7 +2666,7 @@ describe('E2E: All MCP Tools Validation', () => {
               },
             },
             {
-              entity_type: 'artifact',
+              entityType: 'artifact',
               payload: {
                 tempId: '$4',
                 title: 'All Types Artifact',
@@ -2682,7 +2682,7 @@ describe('E2E: All MCP Tools Validation', () => {
               },
             },
             {
-              entity_type: 'link',
+              entityType: 'link',
               payload: {
                 sourceId: '$1', // Solution
                 targetId: '$0', // Requirement
@@ -2750,7 +2750,7 @@ describe('E2E: All MCP Tools Validation', () => {
             planId,
             operations: [
               {
-                entity_type: 'requirement',
+                entityType: 'requirement',
                 payload: {
                   title: 'Valid Requirement',
                   description: 'Should be rolled back',
@@ -2761,7 +2761,7 @@ describe('E2E: All MCP Tools Validation', () => {
                 },
               },
               {
-                entity_type: 'solution',
+                entityType: 'solution',
                 payload: {
                   title: 'Invalid Solution',
                   description: 'Invalid evaluation format',
@@ -2782,7 +2782,7 @@ describe('E2E: All MCP Tools Validation', () => {
 
         // Should not reach here
         throw new Error('Expected batch to fail but it succeeded');
-      } catch (error: any) {
+      } catch {
         // Expected error - verify rollback
         const afterList = await client.callTool({
           name: 'requirement',

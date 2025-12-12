@@ -15,6 +15,10 @@ import type {
 import { validateTags, validateArtifactType, validateFileTable, validateTargets, validateCodeRefs } from './validators.js';
 import { filterArtifact } from '../utils/field-filter.js';
 
+// Constants
+const MAX_SLUG_LENGTH = 100;
+const DEFAULT_ARTIFACTS_PAGE_LIMIT = 50;
+
 /**
  * Converts a title string into a URL-friendly slug
  * @param title - The artifact title to slugify
@@ -33,12 +37,12 @@ function slugify(title: string, artifactId: string): string {
     .replace(/^-|-$/g, '');             // Trim leading/trailing dashes
 
   // Fallback for empty slugs: use artifact ID for guaranteed uniqueness
-  if (!slug) {
+  if (slug === '') {
     slug = `artifact-${artifactId}`;
   }
 
   // Enforce max length
-  return slug.substring(0, 100);
+  return slug.substring(0, MAX_SLUG_LENGTH);
 }
 
 // Input types
@@ -175,12 +179,12 @@ export class ArtifactService {
     }
   }
 
-  async addArtifact(input: AddArtifactInput): Promise<AddArtifactResult> {
+  public async addArtifact(input: AddArtifactInput): Promise<AddArtifactResult> {
     await this.ensurePlanExists(input.planId);
 
     // Validate inputs
     validateArtifactType(input.artifact.artifactType);
-    validateTags(input.artifact.tags || []);
+    validateTags(input.artifact.tags ?? []);
     if (input.artifact.fileTable) {
       validateFileTable(input.artifact.fileTable);
     }
@@ -188,13 +192,13 @@ export class ArtifactService {
       validateTargets(input.artifact.targets);
     }
     // Validate codeRefs format
-    validateCodeRefs(input.artifact.codeRefs || []);
+    validateCodeRefs(input.artifact.codeRefs ?? []);
 
     const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
     const artifacts = await repo.findAll();
 
     const artifactId = uuidv4();
-    const slug = input.artifact.slug || slugify(input.artifact.title, artifactId);
+    const slug = input.artifact.slug ?? slugify(input.artifact.title, artifactId);
 
     // Validate slug uniqueness
     this.validateSlugUniqueness(artifacts, slug);
@@ -209,7 +213,7 @@ export class ArtifactService {
       version: 1,
       metadata: {
         createdBy: 'claude-code',
-        tags: input.artifact.tags || [],
+        tags: input.artifact.tags ?? [],
         annotations: [],
       },
       title: input.artifact.title,
@@ -238,7 +242,7 @@ export class ArtifactService {
     return { artifactId };
   }
 
-  async getArtifact(input: GetArtifactInput): Promise<GetArtifactResult> {
+  public async getArtifact(input: GetArtifactInput): Promise<GetArtifactResult> {
     await this.ensurePlanExists(input.planId);
 
     const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
@@ -246,7 +250,7 @@ export class ArtifactService {
 
     // Auto-migrate fileTable to targets if needed
     // If artifact has fileTable but no targets, convert fileTable to targets
-    if (artifact.fileTable && !artifact.targets) {
+    if (artifact.fileTable !== undefined && artifact.targets === undefined) {
       artifact.targets = artifact.fileTable.map((entry) => ({
         path: entry.path,
         action: entry.action,
@@ -266,7 +270,7 @@ export class ArtifactService {
     return { artifact: filtered };
   }
 
-  async updateArtifact(input: UpdateArtifactInput): Promise<UpdateArtifactResult> {
+  public async updateArtifact(input: UpdateArtifactInput): Promise<UpdateArtifactResult> {
     await this.ensurePlanExists(input.planId);
 
     // Validate inputs if provided
@@ -326,7 +330,7 @@ export class ArtifactService {
     return { success: true, artifactId: input.artifactId };
   }
 
-  async listArtifacts(input: ListArtifactsInput): Promise<ListArtifactsResult> {
+  public async listArtifacts(input: ListArtifactsInput): Promise<ListArtifactsResult> {
     await this.ensurePlanExists(input.planId);
 
     const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
@@ -334,20 +338,21 @@ export class ArtifactService {
 
     // Apply filters
     if (input.filters) {
-      if (input.filters.artifactType) {
-        artifacts = artifacts.filter((a) => a.artifactType === input.filters!.artifactType);
+      const filters = input.filters;
+      if (filters.artifactType !== undefined) {
+        artifacts = artifacts.filter((a) => a.artifactType === filters.artifactType);
       }
-      if (input.filters.status) {
-        artifacts = artifacts.filter((a) => a.status === input.filters!.status);
+      if (filters.status !== undefined) {
+        artifacts = artifacts.filter((a) => a.status === filters.status);
       }
-      if (input.filters.relatedPhaseId) {
-        artifacts = artifacts.filter((a) => a.relatedPhaseId === input.filters!.relatedPhaseId);
+      if (filters.relatedPhaseId !== undefined && filters.relatedPhaseId !== '') {
+        artifacts = artifacts.filter((a) => a.relatedPhaseId === filters.relatedPhaseId);
       }
     }
 
     const total = artifacts.length;
-    const limit = input.limit || 50;
-    const offset = input.offset || 0;
+    const limit = input.limit ?? DEFAULT_ARTIFACTS_PAGE_LIMIT;
+    const offset = input.offset ?? 0;
 
     artifacts = artifacts.slice(offset, offset + limit);
 
@@ -369,7 +374,7 @@ export class ArtifactService {
     };
   }
 
-  async deleteArtifact(input: DeleteArtifactInput): Promise<DeleteArtifactResult> {
+  public async deleteArtifact(input: DeleteArtifactInput): Promise<DeleteArtifactResult> {
     await this.ensurePlanExists(input.planId);
 
     const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
@@ -386,7 +391,7 @@ export class ArtifactService {
    * Sprint 7: Get version history for an artifact
    * Note: Can retrieve history even for deleted artifacts
    */
-  async getHistory(input: { planId: string; artifactId: string; limit?: number; offset?: number }): Promise<VersionHistory<Artifact>> {
+  public async getHistory(input: { planId: string; artifactId: string; limit?: number; offset?: number }): Promise<VersionHistory<Artifact>> {
     if (!this.versionHistoryService) {
       throw new Error('Version history service not available');
     }
@@ -397,19 +402,20 @@ export class ArtifactService {
       throw new Error('Plan not found');
     }
 
-    return this.versionHistoryService.getHistory({
+    const history = await this.versionHistoryService.getHistory({
       planId: input.planId,
       entityId: input.artifactId,
       entityType: 'artifact',
       limit: input.limit,
       offset: input.offset,
     });
+    return history as VersionHistory<Artifact>;
   }
 
   /**
    * Sprint 7: Compare two versions of an artifact
    */
-  async diff(input: { planId: string; artifactId: string; version1: number; version2: number }): Promise<VersionDiff> {
+  public async diff(input: { planId: string; artifactId: string; version1: number; version2: number }): Promise<VersionDiff> {
     if (!this.versionHistoryService) {
       throw new Error('Version history service not available');
     }
@@ -435,5 +441,3 @@ export class ArtifactService {
     });
   }
 }
-
-export default ArtifactService;

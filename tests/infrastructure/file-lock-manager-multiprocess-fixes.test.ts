@@ -44,7 +44,7 @@ describe('FileLockManager Multi-Process Fixes', () => {
       await lockManager.initialize();
 
       // Acquire a lock
-      const release = await lockManager.acquire('resource');
+      const _release = await lockManager.acquire('resource');
       expect(lockManager.getActiveLocksCount()).toBe(1);
 
       // Dispose should release file lock first
@@ -194,7 +194,7 @@ describe('FileLockManager Multi-Process Fixes', () => {
     it('should warn when lock was externally released (stale detection)', async () => {
       const warnings: string[] = [];
       const logger = {
-        warn: (msg: string, ctx?: Record<string, unknown>) => {
+        warn: (msg: string, _ctx?: Record<string, unknown>) => {
           warnings.push(msg);
         },
         debug: () => {},

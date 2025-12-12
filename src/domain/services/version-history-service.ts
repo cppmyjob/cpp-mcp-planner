@@ -1,14 +1,9 @@
 import type { RepositoryFactory, PlanRepository } from '../repositories/interfaces.js';
 import type {
+  Entity,
   VersionHistory,
   VersionSnapshot,
   VersionDiff,
-  Requirement,
-  Solution,
-  Phase,
-  Decision,
-  Artifact,
-  PlanManifest,
 } from '../entities/types.js';
 
 export type EntityType = 'requirement' | 'solution' | 'decision' | 'phase' | 'artifact';
@@ -27,7 +22,7 @@ export interface DiffInput {
   entityType: EntityType;
   version1: number;
   version2: number;
-  currentEntityData?: any; // Optional: current entity data if version2 is the current version
+  currentEntityData?: Entity; // Optional: current entity data if version2 is the current version
   currentVersion?: number; // Optional: current version number
 }
 
@@ -41,7 +36,7 @@ export class VersionHistoryService {
   /**
    * Check if version history is enabled for the plan
    */
-  async isHistoryEnabled(planId: string): Promise<boolean> {
+  public async isHistoryEnabled(planId: string): Promise<boolean> {
     const manifest = await this.planRepo.loadManifest(planId);
     return manifest.enableHistory === true;
   }
@@ -49,7 +44,7 @@ export class VersionHistoryService {
   /**
    * Get the maximum history depth for the plan
    */
-  async getMaxHistoryDepth(planId: string): Promise<number> {
+  public async getMaxHistoryDepth(planId: string): Promise<number> {
     const manifest = await this.planRepo.loadManifest(planId);
     return manifest.maxHistoryDepth ?? 0; // 0 means unlimited
   }
@@ -57,7 +52,7 @@ export class VersionHistoryService {
   /**
    * Save a version snapshot
    */
-  async saveVersion<T>(
+  public async saveVersion<T extends Entity>(
     planId: string,
     entityId: string,
     entityType: EntityType,
@@ -102,7 +97,7 @@ export class VersionHistoryService {
    * Get version history for an entity
    * Note: Can retrieve existing history even if history is currently disabled
    */
-  async getHistory(input: GetHistoryInput): Promise<VersionHistory> {
+  public async getHistory(input: GetHistoryInput): Promise<VersionHistory> {
     // Validate offset
     const offset = input.offset ?? 0;
     if (offset < 0) {
@@ -135,7 +130,7 @@ export class VersionHistoryService {
    * Compare two versions and generate diff
    * Note: Can compare versions even if history is currently disabled
    */
-  async diff(input: DiffInput): Promise<VersionDiff> {
+  public async diff(input: DiffInput): Promise<VersionDiff> {
     const history = await this.loadHistory(
       input.planId,
       input.entityId,
@@ -146,7 +141,7 @@ export class VersionHistoryService {
     let v2 = history.versions.find((v) => v.version === input.version2);
 
     // If v1 not found in history and current entity data is provided
-    if (!v1 && input.currentEntityData && input.currentVersion === input.version1) {
+    if (v1 === undefined && input.currentEntityData !== undefined && input.currentEntityData !== null && input.currentVersion === input.version1) {
       v1 = {
         version: input.version1,
         data: input.currentEntityData,
@@ -155,7 +150,7 @@ export class VersionHistoryService {
     }
 
     // If v2 not found in history and current entity data is provided
-    if (!v2 && input.currentEntityData && input.currentVersion === input.version2) {
+    if (v2 === undefined && input.currentEntityData !== undefined && input.currentEntityData !== null && input.currentVersion === input.version2) {
       v2 = {
         version: input.version2,
         data: input.currentEntityData,
@@ -164,13 +159,13 @@ export class VersionHistoryService {
     }
 
     if (!v1) {
-      throw new Error(`Version ${input.version1} not found`);
+      throw new Error(`Version ${String(input.version1)} not found`);
     }
     if (!v2) {
-      throw new Error(`Version ${input.version2} not found`);
+      throw new Error(`Version ${String(input.version2)} not found`);
     }
 
-    const changes: Record<string, { from: any; to: any; changed: boolean }> = {};
+    const changes: Record<string, { from: unknown; to: unknown; changed: boolean }> = {};
 
     // Metadata fields to exclude from diff (these always change on updates)
     // Note: lockVersion removed as it only exists on PlanManifest, not on entities
@@ -188,8 +183,8 @@ export class VersionHistoryService {
         continue;
       }
 
-      const fromValue = (v1.data)[key];
-      const toValue = (v2.data)[key];
+      const fromValue = (v1.data as unknown as Record<string, unknown>)[key];
+      const toValue = (v2.data as unknown as Record<string, unknown>)[key];
 
       // Deep comparison for objects and arrays
       const changed = JSON.stringify(fromValue) !== JSON.stringify(toValue);
@@ -228,7 +223,7 @@ export class VersionHistoryService {
     entityType: EntityType
   ): Promise<VersionHistory> {
     const history = await this.planRepo.loadVersionHistory(planId, entityType, entityId);
-    if (history) {
+    if (history !== undefined && history !== null) {
       return history as VersionHistory;
     }
     // History file doesn't exist, return empty
@@ -256,7 +251,7 @@ export class VersionHistoryService {
   /**
    * Delete version history for an entity
    */
-  async deleteHistory(
+  public async deleteHistory(
     planId: string,
     entityId: string,
     entityType: EntityType
@@ -264,5 +259,3 @@ export class VersionHistoryService {
     await this.planRepo.deleteVersionHistory(planId, entityType, entityId);
   }
 }
-
-export default VersionHistoryService;

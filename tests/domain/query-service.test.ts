@@ -8,7 +8,7 @@ import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { LinkingService } from '../../src/domain/services/linking-service.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
-import type { Requirement, Solution, Phase, Artifact, Entity } from '../../src/domain/entities/types.js';
+import type { Requirement, Solution, Phase, Entity } from '../../src/domain/entities/types.js';
 
 // Helper functions for loading/saving entities via repository
 async function loadEntities<T extends Entity>(
@@ -1475,8 +1475,6 @@ describe('QueryService', () => {
     let phase1Id: string;
     let phase2Id: string;
     let phase3Id: string;
-    let artifact1Id: string;
-    let artifact2Id: string;
 
     beforeEach(async () => {
       // Create complex trace structure for testing
@@ -1593,7 +1591,7 @@ describe('QueryService', () => {
       await linkingService.linkEntities({ planId, sourceId: phase3Id, targetId: reqId, relationType: 'addresses' });
 
       // Create 2 artifacts
-      const a1 = await artifactService.addArtifact({
+      await artifactService.addArtifact({
         planId,
         artifact: {
           title: 'Artifact 1',
@@ -1603,9 +1601,8 @@ describe('QueryService', () => {
           relatedRequirementIds: [reqId],
         },
       });
-      artifact1Id = a1.artifactId;
 
-      const a2 = await artifactService.addArtifact({
+      await artifactService.addArtifact({
         planId,
         artifact: {
           title: 'Artifact 2',
@@ -1615,7 +1612,6 @@ describe('QueryService', () => {
           relatedRequirementIds: [reqId],
         },
       });
-      artifact2Id = a2.artifactId;
     });
 
     // ========================================================================

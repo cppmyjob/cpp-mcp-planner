@@ -78,29 +78,31 @@ export class FileUnitOfWork implements UnitOfWork {
   /**
    * Initialize Unit of Work
    */
-  async initialize(): Promise<void> {
+  public initialize(): Promise<void> {
     // FileLockManager should already be initialized by caller
     // Just verify it's ready (FIX M-1)
-    if (!this.fileLockManager) {
-      throw new Error('FileLockManager not provided');
+    if (this.fileLockManager === undefined) {
+      return Promise.reject(new Error('FileLockManager not provided'));
     }
 
     if (!this.fileLockManager.isInitialized()) {
-      throw new Error('FileLockManager must be initialized before use');
+      return Promise.reject(new Error('FileLockManager must be initialized before use'));
     }
+
+    return Promise.resolve();
   }
 
   // ============================================================================
   // Transaction Lifecycle
   // ============================================================================
 
-  async begin(options?: TransactionOptions): Promise<void> {
+  public begin(options?: TransactionOptions): Promise<void> {
     if (this.disposed) {
-      throw new Error('Cannot begin transaction: Unit of Work is disposed');
+      return Promise.reject(new Error('Cannot begin transaction: Unit of Work is disposed'));
     }
 
     if (this.state !== 'idle') {
-      throw new Error(`Cannot begin transaction: transaction already active`);
+      return Promise.reject(new Error(`Cannot begin transaction: transaction already active`));
     }
 
     this.state = 'active';
@@ -109,28 +111,32 @@ export class FileUnitOfWork implements UnitOfWork {
 
     // Note: File system does not support native isolation levels
     // We only track the option for compatibility
-    if (options?.isolationLevel) {
+    if (options?.isolationLevel !== undefined && options?.isolationLevel !== null) {
       this.emitLimitationWarning(
         `LIMITATION: File system does not support isolation level '${options.isolationLevel}'. ` +
           `All operations use file-level locking. Consider database backend for ACID guarantees.`
       );
     }
+
+    return Promise.resolve();
   }
 
-  async commit(): Promise<void> {
+  public commit(): Promise<void> {
     if (this.state !== 'active') {
-      throw new Error('Cannot commit: no active transaction');
+      return Promise.reject(new Error('Cannot commit: no active transaction'));
     }
 
     // File operations are already persisted, nothing to do
     // Reset to 'idle' for reuse (FIX M-3)
     this.state = 'idle';
     this.operationCount = 0;
+
+    return Promise.resolve();
   }
 
-  async rollback(): Promise<void> {
+  public rollback(): Promise<void> {
     if (this.state !== 'active') {
-      throw new Error('Cannot rollback: no active transaction');
+      return Promise.reject(new Error('Cannot rollback: no active transaction'));
     }
 
     // Emit LIMITATION warning (FIX C5)
@@ -145,13 +151,15 @@ export class FileUnitOfWork implements UnitOfWork {
 
     // Note: Actual rollback would require tracking all operations and reverting them
     // For file-based implementation, this is best-effort only
+
+    return Promise.resolve();
   }
 
-  isActive(): boolean {
+  public isActive(): boolean {
     return this.state === 'active';
   }
 
-  async execute<TResult>(fn: () => Promise<TResult>): Promise<TResult> {
+  public async execute<TResult>(fn: () => Promise<TResult>): Promise<TResult> {
     // Auto-begin if not active
     const shouldManageTransaction = this.state === 'idle';
 
@@ -182,7 +190,7 @@ export class FileUnitOfWork implements UnitOfWork {
   // Repository Access
   // ============================================================================
 
-  getRepository<T extends Entity>(entityType: EntityType): FileRepository<T> {
+  public getRepository<T extends Entity>(entityType: EntityType): FileRepository<T> {
     // Check cache
     if (this.repositories.has(entityType)) {
       return this.repositories.get(entityType) as FileRepository<T>;
@@ -202,18 +210,16 @@ export class FileUnitOfWork implements UnitOfWork {
     return repository;
   }
 
-  getLinkRepository(): FileLinkRepository {
-    if (!this.linkRepository) {
-      // Create with shared FileLockManager
-      this.linkRepository = new FileLinkRepository(
-        this.baseDir,
-        this.planId,
-        this.fileLockManager,
-        this.cacheOptions
-      );
+  public getLinkRepository(): FileLinkRepository {
+    // Create with shared FileLockManager
+    this.linkRepository ??= new FileLinkRepository(
+      this.baseDir,
+      this.planId,
+      this.fileLockManager,
+      this.cacheOptions
+    );
 
-      // Note: Repository initialization is lazy (called by user)
-    }
+    // Note: Repository initialization is lazy (called by user)
 
     return this.linkRepository;
   }
@@ -221,7 +227,7 @@ export class FileUnitOfWork implements UnitOfWork {
   /**
    * Get FileLockManager instance (for testing and repository sharing)
    */
-  getLockManager(): FileLockManager {
+  public getLockManager(): FileLockManager {
     return this.fileLockManager;
   }
 
@@ -232,7 +238,7 @@ export class FileUnitOfWork implements UnitOfWork {
   /**
    * Register warning callback
    */
-  onWarning(callback: WarningCallback): void {
+  public onWarning(callback: WarningCallback): void {
     this.warningCallbacks.push(callback);
   }
 
@@ -252,21 +258,21 @@ export class FileUnitOfWork implements UnitOfWork {
   /**
    * Get current operation count (for testing)
    */
-  getOperationCount(): number {
+  public getOperationCount(): number {
     return this.operationCount;
   }
 
   /**
    * Increment operation count (called by repositories)
    */
-  incrementOperationCount(): void {
+  public incrementOperationCount(): void {
     this.operationCount++;
   }
 
   /**
    * Get current transaction state (for testing)
    */
-  getState(): TransactionState {
+  public getState(): TransactionState {
     return this.state;
   }
 
@@ -277,7 +283,7 @@ export class FileUnitOfWork implements UnitOfWork {
   /**
    * Dispose Unit of Work and cleanup resources
    */
-  async dispose(): Promise<void> {
+  public async dispose(): Promise<void> {
     // Dispose all cached repositories BEFORE clearing (FIX H-1)
     for (const repo of this.repositories.values()) {
       if ('dispose' in repo && typeof repo.dispose === 'function') {
@@ -305,7 +311,7 @@ export class FileUnitOfWork implements UnitOfWork {
   /**
    * Check if Unit of Work is disposed (for testing)
    */
-  isDisposed(): boolean {
+  public isDisposed(): boolean {
     return this.disposed;
   }
 }

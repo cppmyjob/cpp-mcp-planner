@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { LockManager } from '../../src/infrastructure/repositories/file/lock-manager.js';
-import type { LockResult, LockLogger, LockManagerOptions } from '../../src/infrastructure/repositories/file/types.js';
+import type { LockResult, LockLogger } from '../../src/infrastructure/repositories/file/types.js';
 
 describe('LockManager', () => {
   let lockManager: LockManager;
@@ -279,7 +279,7 @@ describe('LockManager', () => {
 
     it('should release only specified lock', async () => {
       const { lockId: lock1 } = await lockManager.acquire('resource-1');
-      const { lockId: lock2 } = await lockManager.acquire('resource-2');
+      const { lockId: _lock2 } = await lockManager.acquire('resource-2');
 
       await lockManager.release(lock1!);
 
@@ -1128,7 +1128,7 @@ describe('LockManager', () => {
 
     it('should handle multiple waiters on dispose', async () => {
       // Acquire lock
-      const first = await lockManager.acquire('resource-1', {
+      const _first = await lockManager.acquire('resource-1', {
         holderId: 'holder-1',
         timeout: 0,
       });
@@ -1229,7 +1229,7 @@ describe('LockManager', () => {
   describe('FIX #5: acquireMutex - disposed check after await', () => {
     it('should return false if disposed during mutex wait', async () => {
       // Acquire lock to make next acquire wait on mutex/release
-      const first = await lockManager.acquire('resource-1', {
+      const _first = await lockManager.acquire('resource-1', {
         holderId: 'holder-1',
         timeout: 0,
       });
@@ -1254,7 +1254,7 @@ describe('LockManager', () => {
 
     it('should check disposed immediately after await returns', async () => {
       // This tests the fix: disposed check right after "await existingMutex.promise"
-      const first = await lockManager.acquire('resource-1', {
+      const _first = await lockManager.acquire('resource-1', {
         holderId: 'holder-1',
         timeout: 0,
       });
@@ -1348,7 +1348,7 @@ describe('LockManager', () => {
 
     it('should handle dispose during slow operation', async () => {
       // Acquire first lock
-      const first = await lockManager.acquire('resource-1', {
+      const _first = await lockManager.acquire('resource-1', {
         holderId: 'holder-1',
         timeout: 0,
       });
@@ -1402,13 +1402,13 @@ describe('LockManager', () => {
 
     it('withLock() should handle dispose before callback gracefully', async () => {
       // Edge case: dispose after acquire but immediately before callback starts
-      let callbackStarted = false;
+      let _callbackStarted = false;
 
       // Create a new lock manager for this test (previous was disposed)
       const lm = new LockManager();
 
       const withLockPromise = lm.withLock('resource-1', async () => {
-        callbackStarted = true;
+        _callbackStarted = true;
         await new Promise(r => setTimeout(r, 30));
         return 'success';
       });
@@ -1632,7 +1632,7 @@ describe('LockManager', () => {
       it('should use defaultAcquireTimeout from constructor', async () => {
         const lm = new LockManager({ defaultAcquireTimeout: 50 });
 
-        const first = await lm.acquire('resource-1', {
+        const _first = await lm.acquire('resource-1', {
           holderId: 'holder-1',
           acquireTimeout: 0,
           ttl: 0,
@@ -2126,7 +2126,7 @@ describe('LockManager', () => {
         const lm = new LockManager();
 
         // First holder
-        const first = await lm.acquire('resource-1', {
+        const _first = await lm.acquire('resource-1', {
           holderId: 'holder-1',
           acquireTimeout: 0,
           ttl: 0,
@@ -2231,7 +2231,7 @@ describe('LockManager', () => {
         const lm = new LockManager({ defaultAcquireTimeout: 100 });
 
         // Block resource
-        const { lockId } = await lm.acquire('resource-1', {
+        const { lockId: _lockId } = await lm.acquire('resource-1', {
           holderId: 'holder-1',
           acquireTimeout: 0,
           ttl: 0,

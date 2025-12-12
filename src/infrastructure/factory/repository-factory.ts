@@ -97,18 +97,18 @@ export interface StorageConfig {
  */
 export class RepositoryFactory {
   private readonly config: StorageConfig;
-  private readonly repositoryCache = new Map<string, Repository<any>>();
+  private readonly repositoryCache = new Map<string, Repository<Entity>>();
   private readonly linkRepositoryCache = new Map<string, LinkRepository>();
   private readonly uowCache = new Map<string, UnitOfWork>();
   private planRepository?: PlanRepository;
 
   constructor(config: StorageConfig) {
-    if (!config) {
+    if (config === undefined) {
       throw new Error('Storage config is required');
     }
 
     if (config.type !== 'file') {
-      throw new Error(`Unsupported storage type: ${config.type}. Only 'file' is currently supported.`);
+      throw new Error(`Unsupported storage type: ${String(config.type)}. Only 'file' is currently supported.`);
     }
 
     this.config = config;
@@ -131,12 +131,12 @@ export class RepositoryFactory {
    * const req = await reqRepo.create({...});
    * ```
    */
-  createRepository<T extends Entity>(entityType: EntityType, planId: string): Repository<T> {
+  public createRepository<T extends Entity>(entityType: EntityType, planId: string): Repository<T> {
     // Validate inputs
-    if (!entityType || typeof entityType !== 'string' || entityType.trim() === '') {
+    if (entityType === undefined || typeof entityType !== 'string' || entityType.trim() === '') {
       throw new Error('entityType is required and must be a non-empty string');
     }
-    if (!planId || typeof planId !== 'string' || planId.trim() === '') {
+    if (planId === undefined || typeof planId !== 'string' || planId.trim() === '') {
       throw new Error('planId is required and must be a non-empty string');
     }
 
@@ -177,15 +177,19 @@ export class RepositoryFactory {
    * const link = await linkRepo.createLink({...});
    * ```
    */
-  createLinkRepository(planId: string): LinkRepository {
+  public createLinkRepository(planId: string): LinkRepository {
     // Validate input
-    if (!planId || typeof planId !== 'string' || planId.trim() === '') {
+    if (planId === undefined || typeof planId !== 'string' || planId.trim() === '') {
       throw new Error('planId is required and must be a non-empty string');
     }
 
     // Check cache
     if (this.linkRepositoryCache.has(planId)) {
-      return this.linkRepositoryCache.get(planId)!;
+      const cached = this.linkRepositoryCache.get(planId);
+      if (!cached) {
+        throw new Error(`Link repository cache inconsistency for ${planId}`);
+      }
+      return cached;
     }
 
     // Create new link repository
@@ -221,8 +225,8 @@ export class RepositoryFactory {
    * const manifest = await planRepo.loadManifest('plan-123');
    * ```
    */
-  createPlanRepository(): PlanRepository {
-    if (this.planRepository) {
+  public createPlanRepository(): PlanRepository {
+    if (this.planRepository !== undefined) {
       return this.planRepository;
     }
 
@@ -252,15 +256,19 @@ export class RepositoryFactory {
    * });
    * ```
    */
-  createUnitOfWork(planId: string): UnitOfWork {
+  public createUnitOfWork(planId: string): UnitOfWork {
     // Validate input
-    if (!planId || typeof planId !== 'string' || planId.trim() === '') {
+    if (planId === undefined || typeof planId !== 'string' || planId.trim() === '') {
       throw new Error('planId is required and must be a non-empty string');
     }
 
     // Check cache
     if (this.uowCache.has(planId)) {
-      return this.uowCache.get(planId)!;
+      const cached = this.uowCache.get(planId);
+      if (!cached) {
+        throw new Error(`Unit of work cache inconsistency for ${planId}`);
+      }
+      return cached;
     }
 
     // Create new UoW
@@ -294,34 +302,36 @@ export class RepositoryFactory {
    * await lockManager.dispose(); // Caller disposes when done
    * ```
    */
-  async dispose(): Promise<void> {
+  public async dispose(): Promise<void> {
+    type Disposable = { dispose?: () => Promise<void> };
+
     // Dispose all cached repositories
     for (const repo of this.repositoryCache.values()) {
       if ('dispose' in repo && typeof repo.dispose === 'function') {
-        await (repo as any).dispose();
+        await (repo as Disposable).dispose?.();
       }
     }
     this.repositoryCache.clear();
 
     // Dispose all cached link repositories
     for (const linkRepo of this.linkRepositoryCache.values()) {
-      if ('dispose' in linkRepo && typeof (linkRepo as any).dispose === 'function') {
-        await (linkRepo as any).dispose();
+      if ('dispose' in linkRepo && typeof (linkRepo as Disposable).dispose === 'function') {
+        await (linkRepo as Disposable).dispose?.();
       }
     }
     this.linkRepositoryCache.clear();
 
     // Dispose all cached UoWs
     for (const uow of this.uowCache.values()) {
-      if ('dispose' in uow && typeof (uow as any).dispose === 'function') {
-        await (uow as any).dispose();
+      if ('dispose' in uow && typeof (uow as Disposable).dispose === 'function') {
+        await (uow as Disposable).dispose?.();
       }
     }
     this.uowCache.clear();
 
     // Dispose plan repository if exists
-    if (this.planRepository && 'dispose' in this.planRepository && typeof (this.planRepository as any).dispose === 'function') {
-      await (this.planRepository as any).dispose();
+    if (this.planRepository && 'dispose' in this.planRepository && typeof (this.planRepository as Disposable).dispose === 'function') {
+      await (this.planRepository as Disposable).dispose?.();
     }
     this.planRepository = undefined;
 
@@ -332,14 +342,14 @@ export class RepositoryFactory {
   /**
    * Get the storage backend type
    */
-  getBackend(): StorageBackend {
+  public getBackend(): StorageBackend {
     return this.config.type as StorageBackend;
   }
 
   /**
    * Close all connections and cleanup (alias for dispose)
    */
-  async close(): Promise<void> {
+  public async close(): Promise<void> {
     return this.dispose();
   }
 }

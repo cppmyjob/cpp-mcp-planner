@@ -2,7 +2,6 @@ import { v4 as uuidv4 } from 'uuid';
 import type { RepositoryFactory, PlanRepository } from '../repositories/interfaces.js';
 import type {
   PlanManifest,
-  Plan,
   PlanStatus,
   Requirement,
   Solution,
@@ -13,6 +12,12 @@ import type {
 } from '../entities/types.js';
 import type { UsageGuide } from '../entities/usage-guide.js';
 import { DEFAULT_USAGE_GUIDE } from '../constants/default-usage-guide.js';
+
+// Constants
+const MAX_HISTORY_DEPTH = 10;
+const DEFAULT_HISTORY_DEPTH = 5;
+const DEFAULT_PLANS_PAGE_LIMIT = 50;
+const PROGRESS_PERCENTAGE_MULTIPLIER = 100;
 
 // Input types
 export interface CreatePlanInput {
@@ -157,14 +162,14 @@ export class PlanService {
     this.planRepo = repositoryFactory.createPlanRepository();
   }
 
-  async createPlan(input: CreatePlanInput): Promise<CreatePlanResult> {
+  public async createPlan(input: CreatePlanInput): Promise<CreatePlanResult> {
     const planId = uuidv4();
     const now = new Date().toISOString();
 
     // Sprint 7: Validate history settings
     if (input.maxHistoryDepth !== undefined) {
-      if (input.maxHistoryDepth < 0 || input.maxHistoryDepth > 10) {
-        throw new Error('maxHistoryDepth must be between 0 and 10');
+      if (input.maxHistoryDepth < 0 || input.maxHistoryDepth > MAX_HISTORY_DEPTH) {
+        throw new Error(`maxHistoryDepth must be between 0 and ${MAX_HISTORY_DEPTH}`);
       }
       if (!Number.isInteger(input.maxHistoryDepth)) {
         throw new Error('maxHistoryDepth must be an integer');
@@ -176,7 +181,7 @@ export class PlanService {
       name: input.name,
       description: input.description,
       status: 'active',
-      author: input.author || 'claude-code',
+      author: input.author ?? 'claude-code',
       createdAt: now,
       updatedAt: now,
       version: 1,
@@ -198,7 +203,7 @@ export class PlanService {
 
       // If enableHistory is explicitly set and maxHistoryDepth is not provided, set defaults
       if (input.maxHistoryDepth === undefined) {
-        manifest.maxHistoryDepth = input.enableHistory ? 5 : 0; // Default: 5 when enabled, 0 when disabled
+        manifest.maxHistoryDepth = input.enableHistory ? DEFAULT_HISTORY_DEPTH : 0; // Default when enabled, 0 when disabled
       } else {
         manifest.maxHistoryDepth = input.maxHistoryDepth;
       }
@@ -220,7 +225,7 @@ export class PlanService {
     };
   }
 
-  async listPlans(input: ListPlansInput): Promise<ListPlansResult> {
+  public async listPlans(input: ListPlansInput): Promise<ListPlansResult> {
     const planIds = await this.planRepo.listPlans();
     const manifests: PlanManifest[] = [];
 
@@ -234,13 +239,13 @@ export class PlanService {
     }
 
     // Filter by status
-    const filtered = input.status
+    const filtered = (input.status !== undefined && input.status !== null)
       ? manifests.filter((m) => m.status === input.status)
       : manifests;
 
     // Sort
-    const sortBy = input.sortBy || 'updated_at';
-    const sortOrder = input.sortOrder || 'desc';
+    const sortBy = input.sortBy ?? 'updated_at';
+    const sortOrder = input.sortOrder ?? 'desc';
 
     filtered.sort((a, b) => {
       let valueA: string | number;
@@ -264,8 +269,8 @@ export class PlanService {
 
     // Pagination
     const total = filtered.length;
-    const offset = input.offset || 0;
-    const limit = input.limit || 50;
+    const offset = input.offset ?? 0;
+    const limit = input.limit ?? DEFAULT_PLANS_PAGE_LIMIT;
     const paginated = filtered.slice(offset, offset + limit);
 
     return {
@@ -283,7 +288,7 @@ export class PlanService {
     };
   }
 
-  async getPlan(input: GetPlanInput): Promise<GetPlanResult> {
+  public async getPlan(input: GetPlanInput): Promise<GetPlanResult> {
     const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
@@ -295,7 +300,7 @@ export class PlanService {
       plan: { manifest },
     };
 
-    if (input.includeEntities) {
+    if (input.includeEntities === true) {
       const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
       const solRepo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
       const decRepo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
@@ -325,7 +330,7 @@ export class PlanService {
     return result;
   }
 
-  async updatePlan(input: UpdatePlanInput): Promise<UpdatePlanResult> {
+  public async updatePlan(input: UpdatePlanInput): Promise<UpdatePlanResult> {
     const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
@@ -372,13 +377,13 @@ export class PlanService {
     };
   }
 
-  async archivePlan(input: ArchivePlanInput): Promise<ArchivePlanResult> {
+  public async archivePlan(input: ArchivePlanInput): Promise<ArchivePlanResult> {
     const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
-    if (input.permanent) {
+    if (input.permanent === true) {
       await this.planRepo.deletePlan(input.planId);
       return {
         success: true,
@@ -398,14 +403,14 @@ export class PlanService {
     };
   }
 
-  async setActivePlan(input: SetActivePlanInput): Promise<SetActivePlanResult> {
+  public async setActivePlan(input: SetActivePlanInput): Promise<SetActivePlanResult> {
     const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
     }
 
     const manifest = await this.planRepo.loadManifest(input.planId);
-    const workspacePath = input.workspacePath || process.cwd();
+    const workspacePath = input.workspacePath ?? process.cwd();
     const now = new Date().toISOString();
 
     const activePlans = await this.planRepo.loadActivePlans();
@@ -460,13 +465,13 @@ export class PlanService {
    * });
    * ```
    */
-  async getActivePlan(input: GetActivePlanInput): Promise<GetActivePlanResult> {
-    const workspacePath = input.workspacePath || process.cwd();
+  public async getActivePlan(input: GetActivePlanInput): Promise<GetActivePlanResult> {
+    const workspacePath = input.workspacePath ?? process.cwd();
     const includeGuide = input.includeGuide === true; // Default: false (Sprint 6 change)
     const activePlans = await this.planRepo.loadActivePlans();
 
     const mapping = activePlans[workspacePath];
-    if (!mapping) {
+    if (mapping === undefined || mapping === null) {
       return { activePlan: null };
     }
 
@@ -479,13 +484,9 @@ export class PlanService {
           planId: mapping.planId,
           plan: manifest,
           lastUpdated: mapping.lastUpdated,
+          ...(includeGuide ? { usageGuide: DEFAULT_USAGE_GUIDE } : {}),
         },
       };
-
-      // Add usage guide if requested
-      if (includeGuide) {
-        response.activePlan!.usageGuide = DEFAULT_USAGE_GUIDE;
-      }
 
       return response;
     } catch {
@@ -496,7 +497,7 @@ export class PlanService {
     }
   }
 
-  async getSummary(input: GetSummaryInput): Promise<GetSummaryResult> {
+  public async getSummary(input: GetSummaryInput): Promise<GetSummaryResult> {
     const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
@@ -509,8 +510,8 @@ export class PlanService {
     // Calculate child counts for each phase
     const childCounts = new Map<string, number>();
     for (const phase of phases) {
-      if (phase.parentId) {
-        childCounts.set(phase.parentId, (childCounts.get(phase.parentId) || 0) + 1);
+      if (phase.parentId !== undefined && phase.parentId !== null && phase.parentId !== '') {
+        childCounts.set(phase.parentId, (childCounts.get(phase.parentId) ?? 0) + 1);
       }
     }
 
@@ -521,7 +522,7 @@ export class PlanService {
       status: phase.status,
       progress: phase.progress,
       path: phase.path,
-      childCount: childCounts.get(phase.id) || 0,
+      childCount: childCounts.get(phase.id) ?? 0,
     }));
 
     return {
@@ -539,7 +540,7 @@ export class PlanService {
   }
 
   // Helper to update statistics
-  async updateStatistics(planId: string): Promise<void> {
+  public async updateStatistics(planId: string): Promise<void> {
     const manifest = await this.planRepo.loadManifest(planId);
 
     const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', planId);
@@ -576,5 +577,3 @@ export class PlanService {
     await this.planRepo.saveManifest(planId, manifest);
   }
 }
-
-export default PlanService;

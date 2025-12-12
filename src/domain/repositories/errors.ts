@@ -19,7 +19,7 @@ export class RepositoryError extends Error {
     Object.setPrototypeOf(this, RepositoryError.prototype);
   }
 
-  toJSON() {
+  public toJSON(): Record<string, unknown> {
     return {
       name: this.name,
       message: this.message,
@@ -228,7 +228,7 @@ export function isRepositoryError(error: unknown): error is RepositoryError {
  */
 export function isErrorType<T extends RepositoryError>(
   error: unknown,
-  ErrorClass: new (...args: any[]) => T
+  ErrorClass: new (...args: never[]) => T
 ): error is T {
   return error instanceof ErrorClass;
 }

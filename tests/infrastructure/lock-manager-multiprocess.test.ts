@@ -132,7 +132,7 @@ describe('LockManager Multi-Process Safety', () => {
         });
 
         // Race: extend and release
-        const results = await Promise.allSettled([
+        const _results = await Promise.allSettled([
           lm.extend(lockId!, 1000),
           lm.release(lockId!),
         ]);

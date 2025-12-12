@@ -304,7 +304,7 @@ export interface ActivePlanMapping {
 export type ActivePlansIndex = Record<string, ActivePlanMapping>;
 
 // Sprint 7: Version History types
-export interface VersionSnapshot<T = any> {
+export interface VersionSnapshot<T extends Entity = Entity> {
   version: number;
   data: T;
   timestamp: string;
@@ -312,7 +312,7 @@ export interface VersionSnapshot<T = any> {
   changeNote?: string;
 }
 
-export interface VersionHistory<T = any> {
+export interface VersionHistory<T extends Entity = Entity> {
   entityId: string;
   entityType: 'requirement' | 'solution' | 'decision' | 'phase' | 'artifact';
   currentVersion: number;
@@ -333,8 +333,8 @@ export interface VersionDiff {
     timestamp: string;
   };
   changes: Record<string, {
-    from: any;
-    to: any;
+    from: unknown;
+    to: unknown;
     changed: boolean;
   }>;
 }

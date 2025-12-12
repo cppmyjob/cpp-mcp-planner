@@ -251,7 +251,7 @@ describe('SolutionService', () => {
         },
       });
 
-      const result = await service.selectSolution({
+      const _result = await service.selectSolution({
         planId,
         solutionId: proposed.solutionId,
         reason: 'Best fit',
@@ -457,7 +457,7 @@ describe('SolutionService', () => {
 
     it('should include deselected solutions in alternativesConsidered', async () => {
       // Create three solutions for the same requirement
-      const sol1 = await service.proposeSolution({
+      const _sol1 = await service.proposeSolution({
         planId,
         solution: {
           title: 'REST API',
@@ -493,7 +493,7 @@ describe('SolutionService', () => {
         },
       });
 
-      const sol3 = await service.proposeSolution({
+      const _sol3 = await service.proposeSolution({
         planId,
         solution: {
           title: 'gRPC',

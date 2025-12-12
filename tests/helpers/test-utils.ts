@@ -40,11 +40,11 @@ export async function createTestRequirement(
   return ctx.services.requirementService.addRequirement({
     planId: ctx.planId,
     requirement: {
-      title: overrides.title || 'Test Requirement',
-      description: overrides.description || 'Test description',
+      title: overrides.title ?? 'Test Requirement',
+      description: overrides.description ?? 'Test description',
       source: { type: 'user-request' },
       acceptanceCriteria: ['Criterion 1'],
-      priority: overrides.priority || 'high',
+      priority: overrides.priority ?? 'high',
       category: 'functional',
     },
   });
@@ -58,8 +58,8 @@ export async function createTestSolution(
   return ctx.services.solutionService.proposeSolution({
     planId: ctx.planId,
     solution: {
-      title: overrides.title || 'Test Solution',
-      description: overrides.description || 'Test solution description',
+      title: overrides.title ?? 'Test Solution',
+      description: overrides.description ?? 'Test solution description',
       approach: 'Test approach',
       addressing,
       tradeoffs: [],
@@ -79,7 +79,7 @@ export async function createTestPhase(
   return ctx.services.phaseService.addPhase({
     planId: ctx.planId,
     phase: {
-      title: overrides.title || 'Test Phase',
+      title: overrides.title ?? 'Test Phase',
       description: 'Test phase description',
       objectives: ['Objective 1'],
       deliverables: ['Deliverable 1'],
@@ -96,8 +96,8 @@ export async function createTestDecision(
   return ctx.services.decisionService.recordDecision({
     planId: ctx.planId,
     decision: {
-      title: overrides.title || 'Test Decision',
-      question: overrides.question || 'What approach to use?',
+      title: overrides.title ?? 'Test Decision',
+      question: overrides.question ?? 'What approach to use?',
       context: 'Test context',
       decision: 'Use approach A',
       alternativesConsidered: [],
@@ -119,13 +119,13 @@ export async function createTestArtifact(
   return ctx.services.artifactService.addArtifact({
     planId: ctx.planId,
     artifact: {
-      title: overrides.title || 'Test Artifact',
-      description: overrides.description || 'Test artifact description',
-      artifactType: overrides.artifactType || 'code',
+      title: overrides.title ?? 'Test Artifact',
+      description: overrides.description ?? 'Test artifact description',
+      artifactType: overrides.artifactType ?? 'code',
       content: {
-        language: overrides.language || 'typescript',
-        sourceCode: overrides.sourceCode || 'export class TestService {}',
-        filename: overrides.filename || 'test-service.ts',
+        language: overrides.language ?? 'typescript',
+        sourceCode: overrides.sourceCode ?? 'export class TestService {}',
+        filename: overrides.filename ?? 'test-service.ts',
       },
     },
   });

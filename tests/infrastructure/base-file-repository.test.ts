@@ -25,7 +25,7 @@ class TestRepository extends BaseFileRepository {
   public testCache = new Map<string, string>();
   public initializeCallCount = 0;
 
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     this.initializeCallCount++;
     this.markInitialized();
   }

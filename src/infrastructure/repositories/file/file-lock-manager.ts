@@ -215,7 +215,7 @@ export class FileLockManager {
    * Must be called before using acquire(), withLock(), or isLocked().
    * Multiple calls are idempotent.
    */
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     if (this.initialized) {
       return; // Idempotent
     }
@@ -227,7 +227,7 @@ export class FileLockManager {
   /**
    * Check if manager has been initialized
    */
-  isInitialized(): boolean {
+  public isInitialized(): boolean {
     return this.initialized;
   }
 
@@ -248,7 +248,7 @@ export class FileLockManager {
    *          false if lock was externally released (stale detection).
    * @throws Error if not initialized, disposed, or timeout
    */
-  async acquire(resource: string): Promise<() => Promise<boolean>> {
+  public async acquire(resource: string): Promise<() => Promise<boolean>> {
     // Delegate to acquireWithOptions with default options
     return this.acquireWithOptions(resource, undefined);
   }
@@ -311,7 +311,7 @@ export class FileLockManager {
    * @returns true if lock was released cleanly, false if lock was externally
    *          released (stale detection) - indicating potential critical section compromise
    */
-  async release(resource: string): Promise<boolean> {
+  public async release(resource: string): Promise<boolean> {
     // If disposed, return silently - dispose() already cleaned up
     if (this.disposed) {
       this.log('debug', 'Release called on disposed manager', { resource });
@@ -328,14 +328,15 @@ export class FileLockManager {
       await activeLock.release();
       this.log('debug', 'File lock released', { resource, heldFor: Date.now() - activeLock.acquiredAt });
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check for "lock already released" errors (stale detection, external release)
-      const isAlreadyReleased =
-        error.code === 'ENOTACQUIRED' ||
-        error.message?.includes('already released') ||
-        error.message?.includes('not acquired');
+      const errorObj = error as { code?: string; message?: string };
+      const codeMatch = errorObj.code === 'ENOTACQUIRED';
+      const releasedMatch = errorObj.message !== undefined && errorObj.message !== null && typeof errorObj.message === 'string' && errorObj.message.includes('already released');
+      const notAcquiredMatch = errorObj.message !== undefined && errorObj.message !== null && typeof errorObj.message === 'string' && errorObj.message.includes('not acquired');
+      const isAlreadyReleased = codeMatch === true || releasedMatch === true || notAcquiredMatch === true;
 
-      if (isAlreadyReleased) {
+      if (isAlreadyReleased === true) {
         const heldFor = Date.now() - activeLock.acquiredAt;
 
         // Log warning - this indicates the lock was externally released
@@ -343,7 +344,7 @@ export class FileLockManager {
         this.log('warn', 'Lock was externally released (stale detection or external process)', {
           resource,
           heldFor,
-          error: error.message,
+          error: errorObj.message ?? 'Unknown error',
         });
 
         // Invoke callback for monitoring/alerting
@@ -367,7 +368,7 @@ export class FileLockManager {
   /**
    * Execute callback with file lock held
    */
-  async withLock<T>(
+  public async withLock<T>(
     resource: string,
     callback: () => Promise<T>,
     options?: WithLockOptions
@@ -464,15 +465,16 @@ export class FileLockManager {
       return async (): Promise<boolean> => {
         return this.release(resource);
       };
-    } catch (error: any) {
-      if (error.code === 'ELOCKED') {
+    } catch (error: unknown) {
+      const errorObj = error as { code?: string };
+      if (errorObj.code === 'ELOCKED') {
         this.log('warn', 'File lock acquisition timeout', { resource, timeout: acquireTimeout });
-        throw new Error(`Timeout acquiring file lock on '${resource}' after ${acquireTimeout}ms`);
+        throw new Error(`Timeout acquiring file lock on '${resource}' after ${String(acquireTimeout)}ms`);
       }
-      if (error.code === 'ENOENT') {
+      if (errorObj.code === 'ENOENT') {
         throw new Error(`Lock file was deleted during operation for '${resource}'`);
       }
-      if (error.code === 'EACCES' || error.code === 'EPERM') {
+      if (errorObj.code === 'EACCES' || errorObj.code === 'EPERM') {
         throw new Error(`Permission denied for lock file: ${lockPath}`);
       }
       throw error;
@@ -486,7 +488,7 @@ export class FileLockManager {
    *
    * @throws Error if not initialized
    */
-  async isLocked(resource: string): Promise<boolean> {
+  public async isLocked(resource: string): Promise<boolean> {
     this.ensureInitialized();
 
     // Check disposed BEFORE creating any files
@@ -508,7 +510,7 @@ export class FileLockManager {
   /**
    * Check if this process holds the lock
    */
-  isHeldByUs(resource: string): boolean {
+  public isHeldByUs(resource: string): boolean {
     return this.activeLocks.has(resource);
   }
 
@@ -524,7 +526,7 @@ export class FileLockManager {
    * - They will see disposed=true and exit gracefully
    * - File locks are already released, so other processes can acquire
    */
-  async dispose(): Promise<void> {
+  public async dispose(): Promise<void> {
     if (this.disposed) {
       return;
     }
@@ -536,10 +538,11 @@ export class FileLockManager {
     const releases = Array.from(this.activeLocks.values()).map(async (activeLock) => {
       try {
         await activeLock.release();
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
         this.log('warn', 'Error releasing lock during dispose', {
           resource: activeLock.resource,
-          error: error.message,
+          error: message,
         });
       }
     });
@@ -577,14 +580,14 @@ export class FileLockManager {
   /**
    * Check if disposed
    */
-  isDisposed(): boolean {
+  public isDisposed(): boolean {
     return this.disposed;
   }
 
   /**
    * Get number of active locks
    */
-  getActiveLocksCount(): number {
+  public getActiveLocksCount(): number {
     return this.activeLocks.size;
   }
 
@@ -615,9 +618,10 @@ export class FileLockManager {
     try {
       // Use 'wx' flag: create only if not exists (atomic)
       await fs.writeFile(lockPath, '', { flag: 'wx' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // EEXIST is OK - file already exists
-      if (error.code !== 'EEXIST') {
+      const errorObj = error as { code?: string };
+      if (errorObj.code !== 'EEXIST') {
         throw error;
       }
     }

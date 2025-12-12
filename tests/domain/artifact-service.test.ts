@@ -164,7 +164,7 @@ describe('ArtifactService', () => {
         },
       });
 
-      const result = await service.updateArtifact({
+      const _result = await service.updateArtifact({
         planId,
         artifactId: added.artifactId,
         updates: {

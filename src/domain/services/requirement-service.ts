@@ -14,8 +14,11 @@ import type {
 } from '../entities/types.js';
 import { NotFoundError } from '../repositories/errors.js';
 import { validateTags } from './validators.js';
-import { filterEntity, filterEntities } from '../utils/field-filter.js';
-import { bulkUpdateEntities } from '../utils/bulk-operations.js';
+import { filterEntities, filterEntity } from '../utils/field-filter.js';
+
+// Constants
+const MAX_REQUIREMENTS_BATCH_SIZE = 100;
+const DEFAULT_REQUIREMENTS_PAGE_LIMIT = 50;
 
 // Input types
 export interface AddRequirementInput {
@@ -264,7 +267,7 @@ export class RequirementService {
     private readonly versionHistoryService?: VersionHistoryService // Sprint 7: Optional for backward compatibility
   ) {}
 
-  async addRequirement(input: AddRequirementInput): Promise<AddRequirementResult> {
+  public async addRequirement(input: AddRequirementInput): Promise<AddRequirementResult> {
     const planRepo = this.repositoryFactory.createPlanRepository();
     const exists = await planRepo.planExists(input.planId);
     if (!exists) {
@@ -272,15 +275,15 @@ export class RequirementService {
     }
 
     // Validate required fields
-    if (!input.requirement.title || input.requirement.title.trim() === '') {
+    if (input.requirement.title === undefined || input.requirement.title === null || input.requirement.title === '' || input.requirement.title.trim() === '') {
       throw new Error('Title is required');
     }
-    if (!input.requirement.description || input.requirement.description.trim() === '') {
+    if (input.requirement.description === undefined || input.requirement.description === null || input.requirement.description === '' || input.requirement.description.trim() === '') {
       throw new Error('Description is required');
     }
 
     // Validate tags format
-    validateTags(input.requirement.tags || []);
+    validateTags(input.requirement.tags ?? []);
 
     const requirementId = uuidv4();
     const now = new Date().toISOString();
@@ -293,7 +296,7 @@ export class RequirementService {
       version: 1,
       metadata: {
         createdBy: 'claude-code',
-        tags: input.requirement.tags || [],
+        tags: input.requirement.tags ?? [],
         annotations: [],
       },
       title: input.requirement.title,
@@ -320,7 +323,7 @@ export class RequirementService {
     };
   }
 
-  async getRequirement(input: GetRequirementInput): Promise<GetRequirementResult> {
+  public async getRequirement(input: GetRequirementInput): Promise<GetRequirementResult> {
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
     const requirement = await repo.findById(input.requirementId);
 
@@ -335,7 +338,7 @@ export class RequirementService {
 
     const result: GetRequirementResult = { requirement: filtered };
 
-    if (input.includeTraceability) {
+    if (input.includeTraceability === true) {
       // TODO: Implement traceability when linking is done
       result.traceability = {
         solutions: [],
@@ -349,10 +352,10 @@ export class RequirementService {
     return result;
   }
 
-  async getRequirements(input: GetRequirementsInput): Promise<GetRequirementsResult> {
+  public async getRequirements(input: GetRequirementsInput): Promise<GetRequirementsResult> {
     // Enforce max limit
-    if (input.requirementIds.length > 100) {
-      throw new Error('Cannot fetch more than 100 requirements at once');
+    if (input.requirementIds.length > MAX_REQUIREMENTS_BATCH_SIZE) {
+      throw new Error(`Cannot fetch more than ${MAX_REQUIREMENTS_BATCH_SIZE} requirements at once`);
     }
 
     // Handle empty array
@@ -377,9 +380,9 @@ export class RequirementService {
           false
         ) as Requirement;
         foundRequirements.push(filtered);
-      } catch (error: any) {
+      } catch (error: unknown) {
         // FIX M-1: Only treat NotFoundError as "not found", re-throw other errors
-        if (error instanceof NotFoundError || error.constructor.name === 'NotFoundError') {
+        if (error instanceof NotFoundError || (error instanceof Error && error.constructor.name === 'NotFoundError')) {
           notFound.push(id);
         } else {
           // Preserve error context and re-throw
@@ -391,7 +394,7 @@ export class RequirementService {
     return { requirements: foundRequirements, notFound };
   }
 
-  async updateRequirement(
+  public async updateRequirement(
     input: UpdateRequirementInput
   ): Promise<UpdateRequirementResult> {
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
@@ -450,40 +453,42 @@ export class RequirementService {
     };
   }
 
-  async listRequirements(
+  public async listRequirements(
     input: ListRequirementsInput
   ): Promise<ListRequirementsResult> {
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
 
     // Build query options
-    const queryOptions: any = {
-      limit: input.limit || 50,
-      offset: input.offset || 0,
+    const _queryOptions: { limit: number; offset: number } = {
+      limit: input.limit ?? DEFAULT_REQUIREMENTS_PAGE_LIMIT,
+      offset: input.offset ?? 0,
     };
 
     // Build filter (Note: Repository pattern may not support complex tag filtering - fallback to in-memory)
     let requirements = await repo.findAll();
 
     // Apply filters in-memory (TODO: move to repository layer for performance)
-    if (input.filters) {
-      if (input.filters.priority) {
+    if (input.filters !== undefined && input.filters !== null) {
+      const filters = input.filters;
+      if (filters.priority !== undefined && filters.priority !== null) {
         requirements = requirements.filter(
-          (r) => r.priority === input.filters!.priority
+          (r) => r.priority === filters.priority
         );
       }
-      if (input.filters.category) {
+      if (filters.category !== undefined && filters.category !== null) {
         requirements = requirements.filter(
-          (r) => r.category === input.filters!.category
+          (r) => r.category === filters.category
         );
       }
-      if (input.filters.status) {
+      if (filters.status !== undefined && filters.status !== null) {
         requirements = requirements.filter(
-          (r) => r.status === input.filters!.status
+          (r) => r.status === filters.status
         );
       }
-      if (input.filters.tags && input.filters.tags.length > 0) {
+      if (filters.tags && filters.tags.length > 0) {
+        const filterTags = filters.tags;
         requirements = requirements.filter((r) =>
-          input.filters!.tags!.some((filterTag) =>
+          filterTags.some((filterTag) =>
             r.metadata.tags.some(
               (t) => t.key === filterTag.key && t.value === filterTag.value
             )
@@ -494,8 +499,8 @@ export class RequirementService {
 
     // Pagination
     const total = requirements.length;
-    const offset = input.offset || 0;
-    const limit = input.limit || 50;
+    const offset = input.offset ?? 0;
+    const limit = input.limit ?? DEFAULT_REQUIREMENTS_PAGE_LIMIT;
     const paginated = requirements.slice(offset, offset + limit);
 
     // Apply field filtering
@@ -514,7 +519,7 @@ export class RequirementService {
     };
   }
 
-  async deleteRequirement(
+  public async deleteRequirement(
     input: DeleteRequirementInput
   ): Promise<DeleteRequirementResult> {
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
@@ -535,16 +540,14 @@ export class RequirementService {
     };
   }
 
-  async voteForRequirement(
+  public async voteForRequirement(
     input: VoteForRequirementInput
   ): Promise<VoteForRequirementResult> {
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
     const requirement = await repo.findById(input.requirementId);
 
     // Initialize votes if undefined (backward compatibility)
-    if (requirement.votes === undefined || requirement.votes === null) {
-      requirement.votes = 0;
-    }
+    requirement.votes ??= 0;
 
     // Increment votes
     requirement.votes += 1;
@@ -557,16 +560,14 @@ export class RequirementService {
     };
   }
 
-  async unvoteRequirement(
+  public async unvoteRequirement(
     input: UnvoteRequirementInput
   ): Promise<UnvoteRequirementResult> {
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
     const requirement = await repo.findById(input.requirementId);
 
     // Initialize votes if undefined (backward compatibility)
-    if (requirement.votes === undefined || requirement.votes === null) {
-      requirement.votes = 0;
-    }
+    requirement.votes ??= 0;
 
     // Validate: cannot go below 0
     if (requirement.votes <= 0) {
@@ -618,7 +619,7 @@ export class RequirementService {
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', planId);
     const requirement = await repo.findById(requirementId);
 
-    const currentArray = requirement[field] || [];
+    const currentArray = requirement[field] ?? [];
     const newArray = operation(currentArray);
 
     requirement[field] = newArray;
@@ -635,7 +636,7 @@ export class RequirementService {
   /**
    * Append item to end of array field
    */
-  async arrayAppend(input: ArrayAppendInput): Promise<ArrayOperationResult> {
+  public async arrayAppend(input: ArrayAppendInput): Promise<ArrayOperationResult> {
     this.validateArrayField(input.field);
     return this.executeArrayOperation(
       input.planId,
@@ -648,7 +649,7 @@ export class RequirementService {
   /**
    * Prepend item to beginning of array field
    */
-  async arrayPrepend(input: ArrayPrependInput): Promise<ArrayOperationResult> {
+  public async arrayPrepend(input: ArrayPrependInput): Promise<ArrayOperationResult> {
     this.validateArrayField(input.field);
     return this.executeArrayOperation(
       input.planId,
@@ -661,7 +662,7 @@ export class RequirementService {
   /**
    * Insert item at specific index in array field
    */
-  async arrayInsertAt(input: ArrayInsertAtInput): Promise<ArrayOperationResult> {
+  public async arrayInsertAt(input: ArrayInsertAtInput): Promise<ArrayOperationResult> {
     this.validateArrayField(input.field);
     return this.executeArrayOperation(
       input.planId,
@@ -669,7 +670,7 @@ export class RequirementService {
       input.field,
       (currentArray) => {
         if (input.index < 0 || input.index > currentArray.length) {
-          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+          throw new Error(`Index ${String(input.index)} is out of bounds for array of length ${String(currentArray.length)}`);
         }
         const newArray = [...currentArray];
         newArray.splice(input.index, 0, input.value);
@@ -681,7 +682,7 @@ export class RequirementService {
   /**
    * Update item at specific index in array field
    */
-  async arrayUpdateAt(input: ArrayUpdateAtInput): Promise<ArrayOperationResult> {
+  public async arrayUpdateAt(input: ArrayUpdateAtInput): Promise<ArrayOperationResult> {
     this.validateArrayField(input.field);
     return this.executeArrayOperation(
       input.planId,
@@ -689,7 +690,7 @@ export class RequirementService {
       input.field,
       (currentArray) => {
         if (input.index < 0 || input.index >= currentArray.length) {
-          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+          throw new Error(`Index ${String(input.index)} is out of bounds for array of length ${String(currentArray.length)}`);
         }
         const newArray = [...currentArray];
         newArray[input.index] = input.value;
@@ -701,7 +702,7 @@ export class RequirementService {
   /**
    * Remove item at specific index in array field
    */
-  async arrayRemoveAt(input: ArrayRemoveAtInput): Promise<ArrayOperationResult> {
+  public async arrayRemoveAt(input: ArrayRemoveAtInput): Promise<ArrayOperationResult> {
     this.validateArrayField(input.field);
     return this.executeArrayOperation(
       input.planId,
@@ -709,7 +710,7 @@ export class RequirementService {
       input.field,
       (currentArray) => {
         if (input.index < 0 || input.index >= currentArray.length) {
-          throw new Error(`Index ${input.index} is out of bounds for array of length ${currentArray.length}`);
+          throw new Error(`Index ${String(input.index)} is out of bounds for array of length ${String(currentArray.length)}`);
         }
         const newArray = [...currentArray];
         newArray.splice(input.index, 1);
@@ -722,7 +723,7 @@ export class RequirementService {
    * Sprint 7: Get version history for a requirement
    * Note: Can retrieve history even for deleted requirements
    */
-  async getHistory(input: GetRequirementHistoryInput): Promise<VersionHistory<Requirement>> {
+  public async getHistory(input: GetRequirementHistoryInput): Promise<VersionHistory<Requirement>> {
     if (!this.versionHistoryService) {
       throw new Error('Version history service not available');
     }
@@ -733,19 +734,20 @@ export class RequirementService {
       throw new Error('Plan not found');
     }
 
-    return this.versionHistoryService.getHistory({
+    const history = await this.versionHistoryService.getHistory({
       planId: input.planId,
       entityId: input.requirementId,
       entityType: 'requirement',
       limit: input.limit,
       offset: input.offset,
     });
+    return history as VersionHistory<Requirement>;
   }
 
   /**
    * Sprint 7: Compare two versions of a requirement
    */
-  async diff(input: DiffRequirementInput): Promise<VersionDiff> {
+  public async diff(input: DiffRequirementInput): Promise<VersionDiff> {
     if (!this.versionHistoryService) {
       throw new Error('Version history service not available');
     }
@@ -775,12 +777,12 @@ export class RequirementService {
    * Sprint 9: Bulk update multiple requirements in one call
    * REFACTORED: Uses common bulkUpdateEntities utility
    */
-  async bulkUpdateRequirements(
+  public async bulkUpdateRequirements(
     input: BulkUpdateRequirementsInput
   ): Promise<BulkUpdateRequirementsResult> {
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
 
-    if (input.atomic) {
+    if (input.atomic === true) {
       // ATOMIC MODE: All-or-nothing with true rollback
       // Phase 1: Load all entities and validate
       const toUpdate: Requirement[] = [];
@@ -825,9 +827,10 @@ export class RequirementService {
 
           toUpdate.push(requirement);
           results.push({ requirementId: update.requirementId, success: true });
-        } catch (error: any) {
+        } catch (error: unknown) {
           // In atomic mode, any error causes full rejection (no partial updates)
-          throw new Error(`Atomic bulk update failed: ${error.message}`);
+          const message = error instanceof Error ? error.message : String(error);
+          throw new Error(`Atomic bulk update failed: ${message}`);
         }
       }
 
@@ -857,11 +860,12 @@ export class RequirementService {
             success: true,
           });
           updated++;
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
           results.push({
             requirementId: update.requirementId,
             success: false,
-            error: error.message,
+            error: message,
           });
           failed++;
         }
@@ -875,7 +879,7 @@ export class RequirementService {
     }
   }
 
-  async resetAllVotes(
+  public async resetAllVotes(
     input: ResetAllVotesInput
   ): Promise<ResetAllVotesResult> {
     const planRepo = this.repositoryFactory.createPlanRepository();
@@ -910,5 +914,3 @@ export class RequirementService {
     };
   }
 }
-
-export default RequirementService;

@@ -10,8 +10,8 @@ import type {
   Decision,
   Phase,
   Artifact,
-  Link,
   Tag,
+  PlanManifest,
 } from '../entities/types.js';
 
 // ============================================================================
@@ -144,13 +144,16 @@ export class QueryService {
     this.planRepo = repositoryFactory.createPlanRepository();
   }
 
-  async searchEntities(input: SearchEntitiesInput): Promise<SearchEntitiesResult> {
+  public async searchEntities(input: SearchEntitiesInput): Promise<SearchEntitiesResult> {
     const planData = await this.planService.getPlan({
       planId: input.planId,
       includeEntities: true,
     });
 
-    const entities = planData.plan.entities!;
+    const entities = planData.plan.entities;
+    if (!entities) {
+      throw new Error('Plan entities not loaded');
+    }
     const allEntities: Entity[] = [
       ...entities.requirements,
       ...entities.solutions,
@@ -196,8 +199,8 @@ export class QueryService {
 
     // Pagination
     const total = results.length;
-    const offset = input.offset || 0;
-    const limit = input.limit || 50;
+    const offset = input.offset ?? 0;
+    const limit = input.limit ?? 50;
     const paginated = results.slice(offset, offset + limit);
 
     return {
@@ -207,7 +210,7 @@ export class QueryService {
     };
   }
 
-  async traceRequirement(input: TraceRequirementInput): Promise<TraceRequirementResult> {
+  public async traceRequirement(input: TraceRequirementInput): Promise<TraceRequirementResult> {
     // ========================================================================
     // Sprint 8: Parameter Validation
     // ========================================================================
@@ -221,7 +224,7 @@ export class QueryService {
         throw new Error('depth must be an integer');
       }
       if (input.depth < TRACE_DEPTH.MIN || input.depth > TRACE_DEPTH.MAX) {
-        throw new Error(`depth must be between ${TRACE_DEPTH.MIN} and ${TRACE_DEPTH.MAX}`);
+        throw new Error(`depth must be between ${String(TRACE_DEPTH.MIN)} and ${String(TRACE_DEPTH.MAX)}`);
       }
     }
 
@@ -257,8 +260,11 @@ export class QueryService {
       includeEntities: true,
     });
 
-    const entities = planData.plan.entities!;
-    const links = planData.plan.links!;
+    const entities = planData.plan.entities;
+    const links = planData.plan.links;
+    if (!entities || !links) {
+      throw new Error('Plan entities and links not loaded');
+    }
 
     const requirement = entities.requirements.find((r) => r.id === input.requirementId);
     if (!requirement) {
@@ -271,9 +277,7 @@ export class QueryService {
 
     const depth = input.depth ?? TRACE_DEPTH.DEFAULT;
     const includePhases = input.includePhases ?? true;
-    const includeArtifacts = (input.includeArtifacts !== undefined && input.includeArtifacts !== null)
-      ? input.includeArtifacts
-      : true;
+    const includeArtifacts = input.includeArtifacts ?? true;
     const { limit, excludeMetadata } = input;
 
     // ========================================================================
@@ -295,7 +299,7 @@ export class QueryService {
     // Apply filters (limit, fields, excludeMetadata) only to alternatives
     const filteredAlternatives = this.applyEntityFilters(rawAlternatives, {
       limit,
-      fields: input.solutionFields || input.fields,
+      fields: input.solutionFields ?? input.fields,
       excludeMetadata,
     });
 
@@ -303,10 +307,10 @@ export class QueryService {
     let selectedSolution: Solution | null = null;
     if (rawSelected) {
       const filtered = this.applyEntityFilters([rawSelected], {
-        fields: input.solutionFields || input.fields,
+        fields: input.solutionFields ?? input.fields,
         excludeMetadata,
       });
-      selectedSolution = filtered[0] || null;
+      selectedSolution = filtered[0] ?? null;
     }
 
     const alternativeSolutions = filteredAlternatives;
@@ -341,7 +345,7 @@ export class QueryService {
         // Apply filters (limit, fields, excludeMetadata)
         implementingPhases = this.applyEntityFilters(rawPhases, {
           limit,
-          fields: input.phaseFields || input.fields,
+          fields: input.phaseFields ?? input.fields,
           excludeMetadata,
         });
       }
@@ -362,11 +366,11 @@ export class QueryService {
       // Find artifacts related to this requirement or ANY of its phases (before limit)
       const rawArtifacts = entities.artifacts.filter((a) => {
         // Artifact directly related to requirement
-        if (a.relatedRequirementIds?.includes(input.requirementId)) {
+        if (a.relatedRequirementIds?.includes(input.requirementId) === true) {
           return true;
         }
         // Artifact related to ANY phase addressing the requirement (O(1) lookup)
-        if (a.relatedPhaseId && allPhaseIds.has(a.relatedPhaseId)) {
+        if (a.relatedPhaseId !== undefined && a.relatedPhaseId !== null && a.relatedPhaseId !== '' && allPhaseIds.has(a.relatedPhaseId)) {
           return true;
         }
         return false;
@@ -411,7 +415,7 @@ export class QueryService {
     // Build Result (conditionally include fields based on depth and flags)
     // ========================================================================
 
-    const trace: any = {
+    const trace: TraceRequirementResult['trace'] = {
       // BUGFIX: proposedSolutions should include ALL solutions (selected + alternatives)
       // for backward compatibility and correct API semantics
       proposedSolutions: allSolutions,
@@ -445,18 +449,21 @@ export class QueryService {
    */
   private calculateAverageProgress(phases: Phase[]): number {
     if (phases.length === 0) return 0;
-    const totalProgress = phases.reduce((sum, p) => sum + (p.progress || 0), 0);
+    const totalProgress = phases.reduce((sum, p) => sum + (p.progress ?? 0), 0);
     return Math.round(totalProgress / phases.length);
   }
 
-  async validatePlan(input: ValidatePlanInput): Promise<ValidatePlanResult> {
+  public async validatePlan(input: ValidatePlanInput): Promise<ValidatePlanResult> {
     const planData = await this.planService.getPlan({
       planId: input.planId,
       includeEntities: true,
     });
 
-    const entities = planData.plan.entities!;
-    const links = planData.plan.links!;
+    const entities = planData.plan.entities;
+    const links = planData.plan.links;
+    if (!entities || !links) {
+      throw new Error('Plan entities and links not loaded');
+    }
     const issues: ValidationIssue[] = [];
     const checksPerformed: string[] = [];
 
@@ -504,7 +511,10 @@ export class QueryService {
         if (!reqsWithMultipleSolutions.has(reqId)) {
           reqsWithMultipleSolutions.set(reqId, []);
         }
-        reqsWithMultipleSolutions.get(reqId)!.push(sol);
+        const solutions = reqsWithMultipleSolutions.get(reqId);
+        if (solutions) {
+          solutions.push(sol);
+        }
       }
     }
     for (const [reqId, solutions] of reqsWithMultipleSolutions) {
@@ -554,7 +564,7 @@ export class QueryService {
     const phaseMap = new Map(entities.phases.map((p) => [p.id, p]));
     for (const phase of entities.phases) {
       // Check child-parent status consistency
-      if (phase.parentId) {
+      if (phase.parentId !== undefined && phase.parentId !== null && phase.parentId !== '') {
         const parent = phaseMap.get(phase.parentId);
         if (parent?.status === 'planned') {
           if (phase.status === 'completed') {
@@ -673,7 +683,7 @@ export class QueryService {
     };
   }
 
-  async exportPlan(input: ExportPlanInput): Promise<ExportPlanResult> {
+  public async exportPlan(input: ExportPlanInput): Promise<ExportPlanResult> {
     const planData = await this.planService.getPlan({
       planId: input.planId,
       includeEntities: true,
@@ -684,7 +694,11 @@ export class QueryService {
     if (input.format === 'json') {
       content = JSON.stringify(planData.plan, null, 2);
     } else {
-      content = this.generateMarkdown(planData.plan.manifest, planData.plan.entities!);
+      const entities = planData.plan.entities;
+      if (!entities) {
+        throw new Error('Plan entities not loaded');
+      }
+      content = this.generateMarkdown(planData.plan.manifest, entities);
     }
 
     const sizeBytes = Buffer.byteLength(content, 'utf-8');
@@ -715,7 +729,7 @@ export class QueryService {
           ...base,
           title: req.title,
           description: req.description,
-          rationale: req.rationale || '',
+          rationale: req.rationale ?? '',
           acceptanceCriteria: (req.acceptanceCriteria ?? []).join(' '),
         };
       }
@@ -754,8 +768,8 @@ export class QueryService {
           ...base,
           title: art.title,
           description: art.description,
-          content: art.content.sourceCode || '',
-          filename: art.content.filename || '',
+          content: art.content.sourceCode ?? '',
+          filename: art.content.filename ?? '',
         };
       }
       default:
@@ -764,7 +778,7 @@ export class QueryService {
   }
 
   private generateMarkdown(
-    manifest: any,
+    manifest: PlanManifest,
     entities: {
       requirements: Requirement[];
       solutions: Solution[];
@@ -775,12 +789,12 @@ export class QueryService {
   ): string {
     const lines: string[] = [];
 
-    lines.push(`# ${manifest.name}`);
+    lines.push(`# ${String(manifest.name)}`);
     lines.push('');
-    lines.push(manifest.description);
+    lines.push(String(manifest.description));
     lines.push('');
-    lines.push(`**Status**: ${manifest.status}`);
-    lines.push(`**Progress**: ${manifest.statistics.completionPercentage}%`);
+    lines.push(`**Status**: ${String(manifest.status)}`);
+    lines.push(`**Progress**: ${String(manifest.statistics.completionPercentage)}%`);
     lines.push('');
 
     // Requirements
@@ -815,7 +829,7 @@ export class QueryService {
         lines.push('');
         lines.push(sol.description);
         lines.push('');
-        const tradeoffs = sol.tradeoffs || [];
+        const tradeoffs = sol.tradeoffs ?? [];
         if (tradeoffs.length > 0) {
           lines.push('**Trade-offs**:');
           for (const t of tradeoffs) {
@@ -840,7 +854,7 @@ export class QueryService {
         const status = phase.status === 'completed' ? ' [DONE]' : '';
         lines.push(`${indent}- **${phase.path}. ${phase.title}**${status}`);
         if (phase.progress > 0 && phase.progress < 100) {
-          lines.push(`${indent}  Progress: ${phase.progress}%`);
+          lines.push(`${indent}  Progress: ${String(phase.progress)}%`);
         }
       }
       lines.push('');
@@ -857,31 +871,31 @@ export class QueryService {
         lines.push(artifact.description);
         lines.push('');
         lines.push(`**Type**: ${artifact.artifactType}`);
-        if (artifact.content.language) {
+        if (artifact.content.language !== undefined && artifact.content.language !== null && artifact.content.language !== '') {
           lines.push(` | **Language**: ${artifact.content.language}`);
         }
-        if (artifact.content.filename) {
+        if (artifact.content.filename !== undefined && artifact.content.filename !== null && artifact.content.filename !== '') {
           lines.push(` | **File**: ${artifact.content.filename}`);
         }
         lines.push('');
 
         // File table
-        if (artifact.fileTable && artifact.fileTable.length > 0) {
+        if (artifact.fileTable !== undefined && artifact.fileTable !== null && artifact.fileTable.length > 0) {
           lines.push('**Files**:');
           for (const file of artifact.fileTable) {
-            const desc = file.description ? ` - ${file.description}` : '';
+            const desc = file.description !== undefined && file.description !== null && file.description !== '' ? ` - ${file.description}` : '';
             lines.push(`- \`${file.path}\` [${file.action}]${desc}`);
           }
           lines.push('');
         }
 
         // Source code (truncated if too long)
-        if (artifact.content.sourceCode) {
+        if (artifact.content.sourceCode !== undefined && artifact.content.sourceCode !== null && artifact.content.sourceCode !== '') {
           const maxLength = 500;
           const code = artifact.content.sourceCode.length > maxLength
             ? artifact.content.sourceCode.substring(0, maxLength) + '\n... (truncated)'
             : artifact.content.sourceCode;
-          lines.push('```' + (artifact.content.language || ''));
+          lines.push('```' + (artifact.content.language ?? ''));
           lines.push(code);
           lines.push('```');
           lines.push('');
@@ -919,12 +933,12 @@ export class QueryService {
     }
 
     // Apply fields filtering
-    if (options.fields && options.fields.length > 0) {
+    if (options.fields !== undefined && options.fields !== null && options.fields.length > 0) {
       result = result.map((e) => this.filterFields(e, options.fields));
     }
 
     // Apply excludeMetadata
-    if (options.excludeMetadata) {
+    if (options.excludeMetadata === true) {
       result = result.map((e) => this.removeMetadataFields(e));
     }
 
@@ -942,10 +956,10 @@ export class QueryService {
       return entity; // No filtering, return all fields
     }
 
-    const filtered: any = {};
+    const filtered: Partial<T> = {};
     for (const field of fields) {
       if (field in entity) {
-        filtered[field] = (entity as any)[field];
+        (filtered as Record<string, unknown>)[field] = (entity as Record<string, unknown>)[field];
       }
       // Silently ignore non-existent fields
     }
@@ -960,9 +974,7 @@ export class QueryService {
    * @returns Entity without metadata fields
    */
   private removeMetadataFields<T extends Entity>(entity: T): T {
-    const { metadata, createdAt, updatedAt, version, type, ...rest } = entity as any;
-    return rest as T;
+    const { metadata: _metadata, createdAt: _createdAt, updatedAt: _updatedAt, version: _version, type: _type, ...rest } = entity as Record<string, unknown>;
+    return rest as unknown as T;
   }
 }
-
-export default QueryService;

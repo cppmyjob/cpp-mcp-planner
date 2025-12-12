@@ -11,7 +11,7 @@
  * - Statistics updates
  */
 
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { BatchService } from '../../src/domain/services/batch-service.js';
 import { RequirementService } from '../../src/domain/services/requirement-service.js';
 import { SolutionService } from '../../src/domain/services/solution-service.js';
@@ -137,7 +137,7 @@ describe('BatchService - Unit Tests', () => {
       planId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Test Requirement',
             description: 'Test description',
@@ -169,7 +169,7 @@ describe('BatchService - Unit Tests', () => {
       planId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Req 1',
             description: 'First',
@@ -180,7 +180,7 @@ describe('BatchService - Unit Tests', () => {
           }
         },
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Req 2',
             description: 'Second',
@@ -191,7 +191,7 @@ describe('BatchService - Unit Tests', () => {
           }
         },
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Req 3',
             description: 'Third',
@@ -223,7 +223,7 @@ describe('BatchService - Unit Tests', () => {
       planId,
       operations: [
         {
-          entity_type: 'phase',
+          entityType: 'phase',
           payload: {
             tempId: '$0',
             title: 'Parent Phase',
@@ -231,7 +231,7 @@ describe('BatchService - Unit Tests', () => {
           }
         },
         {
-          entity_type: 'phase',
+          entityType: 'phase',
           payload: {
             title: 'Child Phase',
             description: 'Child of $0',
@@ -263,7 +263,7 @@ describe('BatchService - Unit Tests', () => {
       planId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Requirement 1',
@@ -275,7 +275,7 @@ describe('BatchService - Unit Tests', () => {
           }
         },
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$1',
             title: 'Requirement 2',
@@ -287,7 +287,7 @@ describe('BatchService - Unit Tests', () => {
           }
         },
         {
-          entity_type: 'link',
+          entityType: 'link',
           payload: {
             sourceId: '$0',
             targetId: '$1',
@@ -318,7 +318,7 @@ describe('BatchService - Unit Tests', () => {
         planId,
         operations: [
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               title: 'Req 1',
               description: 'First',
@@ -329,7 +329,7 @@ describe('BatchService - Unit Tests', () => {
             }
           },
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               title: 'Req 2',
               description: 'Second',
@@ -340,7 +340,7 @@ describe('BatchService - Unit Tests', () => {
             }
           },
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               // Missing title - will cause error
               description: 'Third',
@@ -364,13 +364,13 @@ describe('BatchService - Unit Tests', () => {
    * RED → GREEN → REFACTOR
    */
   it('Test 7: executeBatch validates operations before execution', async () => {
-    // Test invalid entity_type
+    // Test invalid entityType
     await expect(
       batchService.executeBatch({
         planId,
         operations: [
           {
-            entity_type: 'invalid' as any,
+            entityType: 'invalid' as any,
             payload: {}
           }
         ]
@@ -403,7 +403,7 @@ describe('BatchService - Unit Tests', () => {
       planId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Req 1',
@@ -415,7 +415,7 @@ describe('BatchService - Unit Tests', () => {
           }
         },
         {
-          entity_type: 'phase',
+          entityType: 'phase',
           payload: {
             tempId: '$1',
             title: 'Phase 1',
@@ -441,7 +441,7 @@ describe('BatchService - Unit Tests', () => {
       planId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Req 1',
@@ -453,7 +453,7 @@ describe('BatchService - Unit Tests', () => {
           }
         },
         {
-          entity_type: 'solution',
+          entityType: 'solution',
           payload: {
             title: 'Sol 1',
             description: 'Solution',
@@ -462,7 +462,7 @@ describe('BatchService - Unit Tests', () => {
           }
         },
         {
-          entity_type: 'phase',
+          entityType: 'phase',
           payload: {
             title: 'Phase 1',
             description: 'Implementation phase'
@@ -486,16 +486,16 @@ describe('BatchService - Unit Tests', () => {
   });
 
   /**
-   * Test 10: executeBatch проверяет тип операции (entity_type)
+   * Test 10: executeBatch проверяет тип операции (entityType)
    * RED → GREEN → REFACTOR
    */
-  it('Test 10: executeBatch validates entity_type', async () => {
+  it('Test 10: executeBatch validates entityType', async () => {
     await expect(
       batchService.executeBatch({
         planId,
         operations: [
           {
-            entity_type: 'unknown_type' as any,
+            entityType: 'unknown_type' as any,
             payload: {}
           }
         ]
@@ -514,7 +514,7 @@ describe('BatchService - Unit Tests', () => {
         planId,
         operations: [
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               description: 'Missing title',
               source: { type: 'user-request' },
@@ -554,7 +554,7 @@ describe('BatchService - Unit Tests', () => {
       planId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Req 1',
@@ -566,7 +566,7 @@ describe('BatchService - Unit Tests', () => {
           }
         },
         {
-          entity_type: 'solution',
+          entityType: 'solution',
           payload: {
             title: 'Solution 1',
             description: 'Addresses $0',
@@ -591,7 +591,7 @@ describe('BatchService - Unit Tests', () => {
       planId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Requirement with $0 in title',
@@ -618,11 +618,11 @@ describe('BatchService - Unit Tests', () => {
    * RED → GREEN → REFACTOR
    */
   it('Test 15: executeBatch maintains operation execution order', async () => {
-    const result = await batchService.executeBatch({
+    const _result = await batchService.executeBatch({
       planId,
       operations: [
         {
-          entity_type: 'phase',
+          entityType: 'phase',
           payload: {
             tempId: '$0',
             title: 'Phase 1',
@@ -630,7 +630,7 @@ describe('BatchService - Unit Tests', () => {
           }
         },
         {
-          entity_type: 'phase',
+          entityType: 'phase',
           payload: {
             tempId: '$1',
             title: 'Phase 2',
@@ -639,7 +639,7 @@ describe('BatchService - Unit Tests', () => {
           }
         },
         {
-          entity_type: 'phase',
+          entityType: 'phase',
           payload: {
             tempId: '$2',
             title: 'Phase 3',
@@ -675,7 +675,7 @@ describe('BatchService - Unit Tests', () => {
         planId,
         operations: [
           {
-            entity_type: 'phase',
+            entityType: 'phase',
             payload: {
               tempId: '$0',
               title: 'Phase A',
@@ -683,7 +683,7 @@ describe('BatchService - Unit Tests', () => {
             }
           },
           {
-            entity_type: 'phase',
+            entityType: 'phase',
             payload: {
               tempId: '$1',
               title: 'Phase B',
@@ -691,7 +691,7 @@ describe('BatchService - Unit Tests', () => {
             }
           },
           {
-            entity_type: 'link',
+            entityType: 'link',
             payload: {
               sourceId: '$0',
               targetId: '$1',
@@ -699,7 +699,7 @@ describe('BatchService - Unit Tests', () => {
             }
           },
           {
-            entity_type: 'link',
+            entityType: 'link',
             payload: {
               sourceId: '$1',
               targetId: '$0',
@@ -728,7 +728,7 @@ describe('BatchService - Unit Tests', () => {
         planId,
         operations: [
           {
-            entity_type: 'phase',
+            entityType: 'phase',
             payload: {
               title: 'Child Phase',
               description: 'Has non-existent parent',
@@ -767,7 +767,7 @@ describe('BatchService - Unit Tests', () => {
         planId,
         operations: [
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               action: 'update',
               id: req.requirementId,
@@ -824,7 +824,7 @@ describe('BatchService - Unit Tests', () => {
         planId,
         operations: [
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               action: 'update',
               id: req1.requirementId,
@@ -832,7 +832,7 @@ describe('BatchService - Unit Tests', () => {
             },
           },
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               action: 'update',
               id: req2.requirementId,
@@ -873,7 +873,7 @@ describe('BatchService - Unit Tests', () => {
         planId,
         operations: [
           {
-            entity_type: 'phase',
+            entityType: 'phase',
             payload: {
               action: 'update',
               id: phase.phaseId,
@@ -927,7 +927,7 @@ describe('BatchService - Unit Tests', () => {
           planId,
           operations: [
             {
-              entity_type: 'requirement',
+              entityType: 'requirement',
               payload: {
                 action: 'update',
                 id: req1.requirementId,
@@ -935,7 +935,7 @@ describe('BatchService - Unit Tests', () => {
               },
             },
             {
-              entity_type: 'requirement',
+              entityType: 'requirement',
               payload: {
                 action: 'update',
                 id: 'non-existent-id',
@@ -943,7 +943,7 @@ describe('BatchService - Unit Tests', () => {
               },
             },
             {
-              entity_type: 'requirement',
+              entityType: 'requirement',
               payload: {
                 action: 'update',
                 id: req2.requirementId,
@@ -985,7 +985,7 @@ describe('BatchService - Unit Tests', () => {
         planId,
         operations: [
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               action: 'update',
               id: existingReq.requirementId,
@@ -993,7 +993,7 @@ describe('BatchService - Unit Tests', () => {
             },
           },
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               title: 'New Req',
               description: 'Newly created',
@@ -1027,7 +1027,7 @@ describe('BatchService - Unit Tests', () => {
         planId,
         operations: [
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               tempId: '$0',
               title: 'New Req',
@@ -1039,7 +1039,7 @@ describe('BatchService - Unit Tests', () => {
             },
           },
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               action: 'update',
               id: '$0',
@@ -1088,7 +1088,7 @@ describe('BatchService - Unit Tests', () => {
         planId,
         operations: [
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               action: 'update',
               id: req.requirementId,
@@ -1139,7 +1139,7 @@ describe('BatchService - Unit Tests', () => {
         planId,
         operations: [
           {
-            entity_type: 'solution',
+            entityType: 'solution',
             payload: {
               action: 'update',
               id: sol.solutionId,

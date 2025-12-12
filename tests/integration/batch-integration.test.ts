@@ -134,7 +134,7 @@ describe('BatchService - Integration Tests', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Req 1',
             description: 'First requirement',
@@ -145,7 +145,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Req 2',
             description: 'Second requirement',
@@ -176,7 +176,7 @@ describe('BatchService - Integration Tests', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Batch 1 Req',
             description: 'From first batch',
@@ -194,7 +194,7 @@ describe('BatchService - Integration Tests', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Batch 2 Req',
             description: 'From second batch',
@@ -220,7 +220,7 @@ describe('BatchService - Integration Tests', () => {
         planId: testPlanId,
         operations: [
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               title: 'Valid Req',
               description: 'This should work',
@@ -231,7 +231,7 @@ describe('BatchService - Integration Tests', () => {
             },
           },
           {
-            entity_type: 'requirement',
+            entityType: 'requirement',
             payload: {
               // Missing required fields
               title: '',
@@ -259,7 +259,7 @@ describe('BatchService - Integration Tests', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Req 1',
             description: 'First',
@@ -270,7 +270,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Req 2',
             description: 'Second',
@@ -281,7 +281,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             title: 'Req 3',
             description: 'Third',
@@ -304,7 +304,7 @@ describe('BatchService - Integration Tests', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Parent Req',
@@ -316,7 +316,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'solution',
+          entityType: 'solution',
           payload: {
             tempId: '$1',
             title: 'Solution',
@@ -326,7 +326,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'link',
+          entityType: 'link',
           payload: {
             sourceId: '$1',
             targetId: '$0',
@@ -348,7 +348,7 @@ describe('BatchService - Integration Tests', () => {
     const operations = [];
     for (let i = 0; i < 50; i++) {
       operations.push({
-        entity_type: 'requirement' as const,
+        entityType: 'requirement' as const,
         payload: {
           title: `Requirement ${i}`,
           description: `Description ${i}`,
@@ -379,7 +379,7 @@ describe('BatchService - Integration Tests', () => {
       operations: [
         // Requirements
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Main Requirement',
@@ -392,7 +392,7 @@ describe('BatchService - Integration Tests', () => {
         },
         // Solution
         {
-          entity_type: 'solution',
+          entityType: 'solution',
           payload: {
             tempId: '$1',
             title: 'Implementation Solution',
@@ -403,7 +403,7 @@ describe('BatchService - Integration Tests', () => {
         },
         // Phases
         {
-          entity_type: 'phase',
+          entityType: 'phase',
           payload: {
             tempId: '$2',
             title: 'Phase 1',
@@ -413,7 +413,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'phase',
+          entityType: 'phase',
           payload: {
             tempId: '$3',
             title: 'Phase 1.1',
@@ -425,7 +425,7 @@ describe('BatchService - Integration Tests', () => {
         },
         // Links
         {
-          entity_type: 'link',
+          entityType: 'link',
           payload: {
             sourceId: '$1',
             targetId: '$0',
@@ -433,7 +433,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'link',
+          entityType: 'link',
           payload: {
             sourceId: '$2',
             targetId: '$0',
@@ -471,7 +471,7 @@ describe('BatchService - Integration Tests', () => {
       planId: testPlanId,
       operations: [
         {
-          entity_type: 'requirement',
+          entityType: 'requirement',
           payload: {
             tempId: '$0',
             title: 'Requirement',
@@ -483,7 +483,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'solution',
+          entityType: 'solution',
           payload: {
             tempId: '$1',
             title: 'Solution',
@@ -493,7 +493,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'phase',
+          entityType: 'phase',
           payload: {
             tempId: '$2',
             title: 'Phase',
@@ -503,7 +503,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'decision',
+          entityType: 'decision',
           payload: {
             tempId: '$3',
             title: 'Decision',
@@ -514,7 +514,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'artifact',
+          entityType: 'artifact',
           payload: {
             tempId: '$4',
             title: 'Artifact',
@@ -524,7 +524,7 @@ describe('BatchService - Integration Tests', () => {
           },
         },
         {
-          entity_type: 'link',
+          entityType: 'link',
           payload: {
             sourceId: '$1',
             targetId: '$0',
