@@ -88,14 +88,14 @@ export function filterEntity<T>(
   entity: T,
   fields: string[] | undefined,
   entityType: EntityType,
-  excludeMetadata: boolean = false,
-  excludeComputed: boolean = false
+  excludeMetadata = false,
+  excludeComputed = false
 ): T | Partial<T> {
   // Determine which fields to include
   let filtered: Partial<T>;
   const entityObj = entity as Record<string, unknown>;
 
-  if (fields && fields.includes('*')) {
+  if (fields?.includes('*')) {
     // Full mode: include all fields
     filtered = { ...entity };
   } else {
@@ -153,9 +153,9 @@ export function filterEntities<T>(
   entities: T[],
   fields: string[] | undefined,
   entityType: EntityType,
-  excludeMetadata: boolean = false,
-  excludeComputed: boolean = false
-): Array<T | Partial<T>> {
+  excludeMetadata = false,
+  excludeComputed = false
+): (T | Partial<T>)[] {
   return entities.map((entity) =>
     filterEntity(entity, fields, entityType, excludeMetadata, excludeComputed)
   );
@@ -177,8 +177,8 @@ export function filterArtifact<T>(
   artifact: T,
   fields: string[] | undefined,
   isListOperation: boolean,
-  excludeMetadata: boolean = false,
-  includeContent: boolean = false
+  excludeMetadata = false,
+  includeContent = false
 ): T | Partial<T> {
   const filtered = filterEntity(artifact, fields, 'artifact', excludeMetadata, false);
   const filteredObj = filtered as Record<string, unknown>;
@@ -215,8 +215,8 @@ export function filterArtifact<T>(
 export function filterPhase<T>(
   phase: T,
   fields: string[] | undefined,
-  excludeMetadata: boolean = false,
-  excludeComputed: boolean = false
+  excludeMetadata = false,
+  excludeComputed = false
 ): T | Partial<T> {
   const filtered = filterEntity(phase, fields, 'phase', excludeMetadata, excludeComputed);
   const filteredObj = filtered as Record<string, unknown>;

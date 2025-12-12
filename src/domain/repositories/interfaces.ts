@@ -194,7 +194,7 @@ export interface BulkRepository<T extends Entity> {
    * Update multiple entities
    * @throws BulkOperationError if any operation fails
    */
-  updateMany(updates: Array<{ id: string; data: Partial<T> }>): Promise<T[]>;
+  updateMany(updates: { id: string; data: Partial<T> }[]): Promise<T[]>;
 
   /**
    * Bulk upsert (insert or update)

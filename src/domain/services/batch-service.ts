@@ -30,7 +30,7 @@ export interface BatchOperation {
 }
 
 export interface BatchResult {
-  results: Array<{ success: boolean; id?: string; error?: string }>;
+  results: { success: boolean; id?: string; error?: string }[];
   tempIdMapping: Record<string, string>;
 }
 
@@ -57,8 +57,8 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
 
   constructor(
     entityType: EntityType,
-    private planId: string,
-    private entitiesMap: Map<string, Entity[]>
+    private readonly planId: string,
+    private readonly entitiesMap: Map<string, Entity[]>
   ) {
     this.entityType = entityType;
   }
@@ -190,7 +190,7 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
     return created;
   }
 
-  async updateMany(updates: Array<{ id: string; data: Partial<T> }>): Promise<T[]> {
+  async updateMany(updates: { id: string; data: Partial<T> }[]): Promise<T[]> {
     const updated: T[] = [];
     for (const { id, data } of updates) {
       updated.push(await this.update(id, data));
@@ -222,8 +222,8 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
  */
 class InMemoryLinkRepository implements LinkRepository {
   constructor(
-    private planId: string,
-    private linksMap: Map<string, Link[]>
+    private readonly planId: string,
+    private readonly linksMap: Map<string, Link[]>
   ) {}
 
   private async findAll(): Promise<Link[]> {
@@ -330,7 +330,7 @@ class InMemoryLinkRepository implements LinkRepository {
  * @internal
  */
 class InMemoryPlanRepository {
-  constructor(private validPlanId: string) {}
+  constructor(private readonly validPlanId: string) {}
 
   async initialize(): Promise<void> {
     // No-op
@@ -382,18 +382,18 @@ class InMemoryPlanRepository {
  * @internal
  */
 class InMemoryRepositoryFactory implements RepositoryFactory {
-  private repositoryCache = new Map<string, Repository<any>>();
-  private linkRepo: InMemoryLinkRepository;
-  private planRepo: InMemoryPlanRepository;
+  private readonly repositoryCache = new Map<string, Repository<any>>();
+  private readonly linkRepo: InMemoryLinkRepository;
+  private readonly planRepo: InMemoryPlanRepository;
 
   constructor(
-    private planId: string,
-    private requirementsMap: Map<string, Requirement[]>,
-    private solutionsMap: Map<string, Solution[]>,
-    private phasesMap: Map<string, Phase[]>,
-    private decisionsMap: Map<string, Decision[]>,
-    private artifactsMap: Map<string, Artifact[]>,
-    private linksMap: Map<string, Link[]>
+    private readonly planId: string,
+    private readonly requirementsMap: Map<string, Requirement[]>,
+    private readonly solutionsMap: Map<string, Solution[]>,
+    private readonly phasesMap: Map<string, Phase[]>,
+    private readonly decisionsMap: Map<string, Decision[]>,
+    private readonly artifactsMap: Map<string, Artifact[]>,
+    private readonly linksMap: Map<string, Link[]>
   ) {
     this.linkRepo = new InMemoryLinkRepository(planId, linksMap);
     this.planRepo = new InMemoryPlanRepository(planId);
@@ -465,18 +465,18 @@ class InMemoryRepositoryFactory implements RepositoryFactory {
  */
 class InMemoryStorage {
   // In-memory entity stores (public for InMemoryRepositoryFactory access)
-  public requirementsMap: Map<string, Requirement[]> = new Map();
-  public solutionsMap: Map<string, Solution[]> = new Map();
-  public phasesMap: Map<string, Phase[]> = new Map();
-  public decisionsMap: Map<string, Decision[]> = new Map();
-  public artifactsMap: Map<string, Artifact[]> = new Map();
-  public linksMap: Map<string, Link[]> = new Map();
-  private manifestsMap: Map<string, PlanManifest> = new Map();
-  private planRepo: PlanRepository;
+  public requirementsMap = new Map<string, Requirement[]>();
+  public solutionsMap = new Map<string, Solution[]>();
+  public phasesMap = new Map<string, Phase[]>();
+  public decisionsMap = new Map<string, Decision[]>();
+  public artifactsMap = new Map<string, Artifact[]>();
+  public linksMap = new Map<string, Link[]>();
+  private readonly manifestsMap = new Map<string, PlanManifest>();
+  private readonly planRepo: PlanRepository;
 
   constructor(
-    private repositoryFactory: RepositoryFactory,
-    private planId: string
+    private readonly repositoryFactory: RepositoryFactory,
+    private readonly planId: string
   ) {
     this.planRepo = repositoryFactory.createPlanRepository();
   }
@@ -638,17 +638,17 @@ class InMemoryStorage {
  * All operations execute in memory, then flush atomically to disk.
  */
 export class BatchService {
-  private planRepo: PlanRepository;
+  private readonly planRepo: PlanRepository;
 
   constructor(
-    private repositoryFactory: RepositoryFactory,
-    private planService: PlanService,
-    private requirementService: RequirementService,
-    private solutionService: SolutionService,
-    private phaseService: PhaseService,
-    private linkingService: LinkingService,
-    private decisionService: DecisionService,
-    private artifactService: ArtifactService
+    private readonly repositoryFactory: RepositoryFactory,
+    private readonly planService: PlanService,
+    private readonly requirementService: RequirementService,
+    private readonly solutionService: SolutionService,
+    private readonly phaseService: PhaseService,
+    private readonly linkingService: LinkingService,
+    private readonly decisionService: DecisionService,
+    private readonly artifactService: ArtifactService
   ) {
     this.planRepo = repositoryFactory.createPlanRepository();
   }
@@ -700,7 +700,7 @@ export class BatchService {
       this.planService
     );
 
-    const results: Array<{ success: boolean; id?: string; error?: string }> = [];
+    const results: { success: boolean; id?: string; error?: string }[] = [];
     const tempIdMapping: Record<string, string> = {};
 
     try {

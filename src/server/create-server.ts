@@ -35,7 +35,7 @@ export function createMcpServer(services: Services): McpServer {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     try {
-      return await handleToolCall(name, args as Record<string, unknown>, services);
+      return await handleToolCall(name, args!, services);
     } catch (error) {
       // IMPORTANT: Do NOT throw McpError here! The SDK will wrap any error automatically.
       // Throwing McpError causes double-wrapping: "MCP error -32603: MCP error -32603: message"

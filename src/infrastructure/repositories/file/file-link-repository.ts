@@ -27,7 +27,7 @@ import {
   ValidationError,
 } from '../../../domain/repositories/errors.js';
 import { IndexManager } from './index-manager.js';
-import { FileLockManager } from './file-lock-manager.js';
+import { type FileLockManager } from './file-lock-manager.js';
 import { BaseFileRepository } from './base-file-repository.js';
 import type { LinkIndexMetadata, CacheOptions } from './types.js';
 
@@ -40,11 +40,11 @@ export class FileLinkRepository
   extends BaseFileRepository
   implements LinkRepository
 {
-  private planId: string;
-  private linksDir: string;
-  private indexManager: IndexManager<LinkIndexMetadata>;
-  private fileLockManager: FileLockManager;
-  private linkCache: Map<string, Link> = new Map();
+  private readonly planId: string;
+  private readonly linksDir: string;
+  private readonly indexManager: IndexManager<LinkIndexMetadata>;
+  private readonly fileLockManager: FileLockManager;
+  private readonly linkCache = new Map<string, Link>();
 
   constructor(
     baseDir: string,
@@ -288,7 +288,7 @@ export class FileLinkRepository
   // ============================================================================
 
   async createMany(
-    links: Array<Omit<Link, 'id' | 'createdAt' | 'createdBy'>>
+    links: Omit<Link, 'id' | 'createdAt' | 'createdBy'>[]
   ): Promise<Link[]> {
     const created: Link[] = [];
     const createdIds: string[] = [];
@@ -354,7 +354,7 @@ export class FileLinkRepository
   ];
 
   private validateLinkData(link: Partial<Link>): void {
-    const errors: Array<{ field: string; message: string; value?: unknown }> = [];
+    const errors: { field: string; message: string; value?: unknown }[] = [];
 
     if (!link.sourceId || link.sourceId.trim() === '') {
       errors.push({ field: 'sourceId', message: 'sourceId is required', value: link.sourceId });

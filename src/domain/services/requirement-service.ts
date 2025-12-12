@@ -105,7 +105,7 @@ export interface ResetAllVotesInput {
 
 export interface BulkUpdateRequirementsInput {
   planId: string;
-  updates: Array<{
+  updates: {
     requirementId: string;
     updates: Partial<{
       title: string;
@@ -122,7 +122,7 @@ export interface BulkUpdateRequirementsInput {
       };
       tags: Tag[];
     }>;
-  }>;
+  }[];
   atomic?: boolean; // Default: false (non-atomic mode)
 }
 
@@ -179,11 +179,11 @@ export interface VoteForRequirementResult {
 export interface BulkUpdateRequirementsResult {
   updated: number;
   failed: number;
-  results: Array<{
+  results: {
     requirementId: string;
     success: boolean;
     error?: string;
-  }>;
+  }[];
 }
 
 export interface UnvoteRequirementResult {
@@ -259,9 +259,9 @@ export interface ResetAllVotesResult {
 
 export class RequirementService {
   constructor(
-    private repositoryFactory: RepositoryFactory,
-    private planService: PlanService,
-    private versionHistoryService?: VersionHistoryService // Sprint 7: Optional for backward compatibility
+    private readonly repositoryFactory: RepositoryFactory,
+    private readonly planService: PlanService,
+    private readonly versionHistoryService?: VersionHistoryService // Sprint 7: Optional for backward compatibility
   ) {}
 
   async addRequirement(input: AddRequirementInput): Promise<AddRequirementResult> {
@@ -784,7 +784,7 @@ export class RequirementService {
       // ATOMIC MODE: All-or-nothing with true rollback
       // Phase 1: Load all entities and validate
       const toUpdate: Requirement[] = [];
-      const results: Array<{ requirementId: string; success: boolean; error?: string }> = [];
+      const results: { requirementId: string; success: boolean; error?: string }[] = [];
 
       for (const update of input.updates) {
         try {
@@ -841,7 +841,7 @@ export class RequirementService {
       };
     } else {
       // NON-ATOMIC MODE: Continue on errors (partial success allowed)
-      const results: Array<{ requirementId: string; success: boolean; error?: string }> = [];
+      const results: { requirementId: string; success: boolean; error?: string }[] = [];
       let updated = 0;
       let failed = 0;
 

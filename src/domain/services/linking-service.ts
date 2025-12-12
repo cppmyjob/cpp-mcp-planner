@@ -44,7 +44,7 @@ export interface UnlinkEntitiesResult {
 }
 
 export class LinkingService {
-  constructor(private repositoryFactory: RepositoryFactory) {}
+  constructor(private readonly repositoryFactory: RepositoryFactory) {}
 
   async linkEntities(input: LinkEntitiesInput): Promise<LinkEntitiesResult> {
     const linkRepo = this.repositoryFactory.createLinkRepository(input.planId);

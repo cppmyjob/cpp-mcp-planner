@@ -134,12 +134,12 @@ export interface ExportPlanResult {
 }
 
 export class QueryService {
-  private planRepo: PlanRepository;
+  private readonly planRepo: PlanRepository;
 
   constructor(
-    private repositoryFactory: RepositoryFactory,
-    private planService: PlanService,
-    private linkingService: LinkingService
+    private readonly repositoryFactory: RepositoryFactory,
+    private readonly planService: PlanService,
+    private readonly linkingService: LinkingService
   ) {
     this.planRepo = repositoryFactory.createPlanRepository();
   }
@@ -160,7 +160,7 @@ export class QueryService {
     ];
 
     const query = input.query.toLowerCase();
-    let results: SearchResult[] = [];
+    const results: SearchResult[] = [];
 
     for (const entity of allEntities) {
       // Filter by entity type
@@ -319,7 +319,7 @@ export class QueryService {
     // ========================================================================
 
     let implementingPhases: Phase[] = [];
-    let allPhaseIds: Set<string> = new Set(); // For artifact discovery (before limit)
+    let allPhaseIds = new Set<string>(); // For artifact discovery (before limit)
     let phasesForCompletion: Phase[] = []; // For completion calculation (unfiltered)
 
     // BUGFIX: Compute allPhaseIds if depth >= PHASES, regardless of includePhases flag
@@ -556,7 +556,7 @@ export class QueryService {
       // Check child-parent status consistency
       if (phase.parentId) {
         const parent = phaseMap.get(phase.parentId);
-        if (parent && parent.status === 'planned') {
+        if (parent?.status === 'planned') {
           if (phase.status === 'completed') {
             issues.push({
               severity: 'error',

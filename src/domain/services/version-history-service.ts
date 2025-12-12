@@ -32,9 +32,9 @@ export interface DiffInput {
 }
 
 export class VersionHistoryService {
-  private planRepo: PlanRepository;
+  private readonly planRepo: PlanRepository;
 
-  constructor(private repositoryFactory: RepositoryFactory) {
+  constructor(private readonly repositoryFactory: RepositoryFactory) {
     this.planRepo = repositoryFactory.createPlanRepository();
   }
 
@@ -188,8 +188,8 @@ export class VersionHistoryService {
         continue;
       }
 
-      const fromValue = (v1.data as any)[key];
-      const toValue = (v2.data as any)[key];
+      const fromValue = (v1.data)[key];
+      const toValue = (v2.data)[key];
 
       // Deep comparison for objects and arrays
       const changed = JSON.stringify(fromValue) !== JSON.stringify(toValue);

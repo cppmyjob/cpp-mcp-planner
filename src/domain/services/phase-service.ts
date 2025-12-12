@@ -216,7 +216,7 @@ export interface ArrayRemoveAtInput {
 
 export interface BulkUpdatePhasesInput {
   planId: string;
-  updates: Array<{
+  updates: {
     phaseId: string;
     updates: Partial<{
       title: string;
@@ -237,25 +237,25 @@ export interface BulkUpdatePhasesInput {
       schedule: {
         startDate: string;
         endDate: string;
-        milestones: Array<{ date: string; description: string }>;
+        milestones: { date: string; description: string }[];
       };
       status: string;
       progress: number;
       priority: 'critical' | 'high' | 'medium' | 'low';
-      blockers: Array<{ description: string; severity: 'high' | 'medium' | 'low' }>;
+      blockers: { description: string; severity: 'high' | 'medium' | 'low' }[];
     }>;
-  }>;
+  }[];
   atomic?: boolean;
 }
 
 export interface BulkUpdatePhasesResult {
   updated: number;
   failed: number;
-  results: Array<{
+  results: {
     phaseId: string;
     success: boolean;
     error?: string;
-  }>;
+  }[];
 }
 
 export interface ArrayOperationResult {
@@ -316,9 +316,9 @@ export interface UpdatePhaseStatusResult {
 
 export class PhaseService {
   constructor(
-    private repositoryFactory: RepositoryFactory,
-    private planService: PlanService,
-    private versionHistoryService?: VersionHistoryService
+    private readonly repositoryFactory: RepositoryFactory,
+    private readonly planService: PlanService,
+    private readonly versionHistoryService?: VersionHistoryService
   ) {}
 
   private async ensurePlanExists(planId: string): Promise<void> {

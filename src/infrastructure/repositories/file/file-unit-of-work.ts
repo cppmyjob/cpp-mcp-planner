@@ -26,7 +26,7 @@ import type {
 import type { Entity, EntityType } from '../../../domain/entities/types.js';
 import { FileRepository } from './file-repository.js';
 import { FileLinkRepository } from './file-link-repository.js';
-import { FileLockManager } from './file-lock-manager.js';
+import { type FileLockManager } from './file-lock-manager.js';
 import type { CacheOptions } from './types.js';
 
 /**
@@ -45,19 +45,19 @@ export type WarningCallback = (message: string) => void;
  * File Unit of Work Implementation
  */
 export class FileUnitOfWork implements UnitOfWork {
-  private baseDir: string;
-  private planId: string;
-  private fileLockManager: FileLockManager;
-  private cacheOptions?: Partial<CacheOptions>;
+  private readonly baseDir: string;
+  private readonly planId: string;
+  private readonly fileLockManager: FileLockManager;
+  private readonly cacheOptions?: Partial<CacheOptions>;
 
   // Transaction state
   private state: TransactionState = 'idle';
   private options?: TransactionOptions;
-  private operationCount: number = 0;
-  private disposed: boolean = false;
+  private operationCount = 0;
+  private disposed = false;
 
   // Repository cache (lazy creation)
-  private repositories: Map<EntityType, Repository<Entity>> = new Map();
+  private readonly repositories = new Map<EntityType, Repository<Entity>>();
   private linkRepository?: FileLinkRepository;
 
   // Warning system (FIX C5)

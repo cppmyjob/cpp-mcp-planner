@@ -214,7 +214,7 @@ export function validateTargets(targets: unknown[]): void {
         );
       }
 
-      if (target.lineEnd < (target.lineNumber as number)) {
+      if (target.lineEnd < (target.lineNumber)) {
         throw new Error(
           `Invalid target at index ${i}: lineEnd must be >= lineNumber`
         );

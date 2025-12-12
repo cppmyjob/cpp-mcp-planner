@@ -125,15 +125,15 @@ interface MutexEntry {
  * Cross-process file locking for multi-process MCP server safety
  */
 export class FileLockManager {
-  private baseDir: string;
-  private lockDir: string;
-  private acquireTimeout: number;
-  private retryInterval: number;
-  private staleThreshold: number;
-  private disposeTimeout: number;
-  private logger?: LockLogger;
-  private logLevel: LogLevel;
-  private onLockCompromised?: (resource: string, heldForMs: number) => void;
+  private readonly baseDir: string;
+  private readonly lockDir: string;
+  private readonly acquireTimeout: number;
+  private readonly retryInterval: number;
+  private readonly staleThreshold: number;
+  private readonly disposeTimeout: number;
+  private readonly logger?: LockLogger;
+  private readonly logLevel: LogLevel;
+  private readonly onLockCompromised?: (resource: string, heldForMs: number) => void;
 
   /**
    * Platform-aware default stale threshold.
@@ -145,7 +145,7 @@ export class FileLockManager {
   /**
    * Active locks held by this process
    */
-  private activeLocks: Map<string, ActiveLock> = new Map();
+  private readonly activeLocks = new Map<string, ActiveLock>();
 
   /**
    * In-process mutex for serializing acquire operations per resource.
@@ -164,17 +164,17 @@ export class FileLockManager {
    * rely solely on proper-lockfile. The mutex is released in finally{} immediately
    * after acquiring the file lock anyway, so it only serializes the acquire phase.
    */
-  private acquireMutexes: Map<string, MutexEntry> = new Map();
+  private readonly acquireMutexes = new Map<string, MutexEntry>();
 
   /**
    * Flag indicating if manager is disposed
    */
-  private disposed: boolean = false;
+  private disposed = false;
 
   /**
    * Flag indicating if manager has been initialized
    */
-  private initialized: boolean = false;
+  private initialized = false;
 
   constructor(baseDir: string, options?: FileLockManagerOptions) {
     this.baseDir = baseDir;

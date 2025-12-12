@@ -118,9 +118,9 @@ export interface ListDecisionsResult {
 
 export class DecisionService {
   constructor(
-    private repositoryFactory: RepositoryFactory,
-    private planService: PlanService,
-    private versionHistoryService?: VersionHistoryService
+    private readonly repositoryFactory: RepositoryFactory,
+    private readonly planService: PlanService,
+    private readonly versionHistoryService?: VersionHistoryService
   ) {}
 
   async getDecision(input: GetDecisionInput): Promise<GetDecisionResult> {

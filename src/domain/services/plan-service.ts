@@ -73,7 +73,7 @@ export interface CreatePlanResult {
 }
 
 export interface ListPlansResult {
-  plans: Array<{
+  plans: {
     id: string;
     name: string;
     description: string;
@@ -81,7 +81,7 @@ export interface ListPlansResult {
     createdAt: string;
     updatedAt: string;
     statistics: PlanManifest['statistics'];
-  }>;
+  }[];
   total: number;
   hasMore: boolean;
 }
@@ -151,9 +151,9 @@ export interface GetSummaryResult {
 }
 
 export class PlanService {
-  private planRepo: PlanRepository;
+  private readonly planRepo: PlanRepository;
 
-  constructor(private repositoryFactory: RepositoryFactory) {
+  constructor(private readonly repositoryFactory: RepositoryFactory) {
     this.planRepo = repositoryFactory.createPlanRepository();
   }
 
@@ -234,7 +234,7 @@ export class PlanService {
     }
 
     // Filter by status
-    let filtered = input.status
+    const filtered = input.status
       ? manifests.filter((m) => m.status === input.status)
       : manifests;
 

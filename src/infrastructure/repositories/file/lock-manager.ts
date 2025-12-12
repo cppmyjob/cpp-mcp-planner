@@ -97,51 +97,51 @@ const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
  * Manages locks for resources with support for reentrant locks
  */
 export class LockManager {
-  private locks: Map<string, LockHolder> = new Map();
-  private locksByResource: Map<string, string> = new Map(); // resource -> lockId
-  private defaultAcquireTimeout: number;
-  private defaultTtl: number;
+  private readonly locks = new Map<string, LockHolder>();
+  private readonly locksByResource = new Map<string, string>(); // resource -> lockId
+  private readonly defaultAcquireTimeout: number;
+  private readonly defaultTtl: number;
 
   /**
    * Per-resource mutex for serializing acquire operations
    * Ensures only one acquire() runs at a time per resource
    */
-  private acquireMutexes: Map<string, MutexEntry> = new Map();
+  private readonly acquireMutexes = new Map<string, MutexEntry>();
 
   /**
    * Event emitter for lock release notifications (no polling)
    */
-  private lockEvents: EventEmitter = new EventEmitter();
+  private readonly lockEvents: EventEmitter = new EventEmitter();
 
   /**
    * Flag indicating if LockManager has been disposed
    */
-  private disposed: boolean = false;
+  private disposed = false;
 
   /**
    * Counter for in-flight operations (for graceful shutdown)
    */
-  private inFlightOps: number = 0;
+  private inFlightOps = 0;
 
   /**
    * Optional logger for debugging
    */
-  private logger?: LockLogger;
+  private readonly logger?: LockLogger;
 
   /**
    * Minimum log level
    */
-  private logLevel: LogLevel;
+  private readonly logLevel: LogLevel;
 
   /**
    * Maximum retry attempts in doAcquire() loop (0 = no limit)
    */
-  private maxRetries: number;
+  private readonly maxRetries: number;
 
   /**
    * Timeout for dispose() to wait for in-flight operations (ms)
    */
-  private disposeTimeout: number;
+  private readonly disposeTimeout: number;
 
   constructor(options?: LockManagerOptions | number) {
     // Backwards compatibility: accept number as defaultAcquireTimeout
@@ -357,7 +357,7 @@ export class LockManager {
         const existingLock = this.locks.get(existingLockId);
 
         // Handle reentrant case (same holder)
-        if (reentrant && existingLock && existingLock.holderId === holderId) {
+        if (reentrant && existingLock?.holderId === holderId) {
           return this.handleReentrantAcquire(existingLock, existingLockId, ttl);
         }
 

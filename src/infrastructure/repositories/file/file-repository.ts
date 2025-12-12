@@ -45,12 +45,12 @@ export class FileRepository<T extends Entity>
 {
   readonly entityType: EntityType;
 
-  private planId: string;
-  private entitiesDir: string;
-  private indexManager: IndexManager<IndexMetadata>;
-  private fileLockManager: FileLockManager;
-  private entityCache: Map<string, T> = new Map();
-  private ownsLockManager: boolean;
+  private readonly planId: string;
+  private readonly entitiesDir: string;
+  private readonly indexManager: IndexManager;
+  private readonly fileLockManager: FileLockManager;
+  private readonly entityCache = new Map<string, T>();
+  private readonly ownsLockManager: boolean;
 
   constructor(
     baseDir: string,
@@ -337,7 +337,7 @@ export class FileRepository<T extends Entity>
     const lockResource = `${this.entityType}:${id}`;
 
     // Cross-process file lock for concurrent access control
-    return await this.fileLockManager.withLock(lockResource, async () => {
+    await this.fileLockManager.withLock(lockResource, async () => {
       // Check if exists
       if (!(await this.exists(id))) {
         throw new NotFoundError(this.entityType, id);
@@ -383,7 +383,7 @@ export class FileRepository<T extends Entity>
     }
   }
 
-  async updateMany(updates: Array<{ id: string; data: Partial<T> }>): Promise<T[]> {
+  async updateMany(updates: { id: string; data: Partial<T> }[]): Promise<T[]> {
     const results: T[] = [];
 
     for (const { id, data } of updates) {
@@ -464,7 +464,7 @@ export class FileRepository<T extends Entity>
    * Validate entity
    */
   private validateEntity(entity: T): void {
-    const errors: Array<{ field: string; message: string; value?: unknown }> = [];
+    const errors: { field: string; message: string; value?: unknown }[] = [];
 
     if (!entity.id || entity.id.trim() === '') {
       errors.push({

@@ -52,8 +52,8 @@ export class FilePlanRepository
   extends BaseFileRepository
   implements PlanRepository
 {
-  private plansDir: string;
-  private activePlansPath: string;
+  private readonly plansDir: string;
+  private readonly activePlansPath: string;
 
   constructor(baseDir: string) {
     super(baseDir);

@@ -31,7 +31,7 @@ export function resolveTempId(
   }
 
   // Validate format
-  const match = value.match(TEMP_ID_REGEX);
+  const match = TEMP_ID_REGEX.exec(value);
   if (!match) {
     throw new Error(`Invalid temp ID format: ${value}`);
   }

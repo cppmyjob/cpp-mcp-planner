@@ -96,10 +96,10 @@ export interface StorageConfig {
  * ```
  */
 export class RepositoryFactory {
-  private config: StorageConfig;
-  private repositoryCache: Map<string, Repository<any>> = new Map();
-  private linkRepositoryCache: Map<string, LinkRepository> = new Map();
-  private uowCache: Map<string, UnitOfWork> = new Map();
+  private readonly config: StorageConfig;
+  private readonly repositoryCache = new Map<string, Repository<any>>();
+  private readonly linkRepositoryCache = new Map<string, LinkRepository>();
+  private readonly uowCache = new Map<string, UnitOfWork>();
   private planRepository?: PlanRepository;
 
   constructor(config: StorageConfig) {

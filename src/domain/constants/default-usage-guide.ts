@@ -1,4 +1,4 @@
-import { UsageGuide } from '../entities/usage-guide.js';
+import { type UsageGuide } from '../entities/usage-guide.js';
 
 export const DEFAULT_USAGE_GUIDE: UsageGuide = {
   quickStart: "Use 'phase get_tree' for overview, then drill down with 'phase get' for details. Check plan health with 'query validate'.",

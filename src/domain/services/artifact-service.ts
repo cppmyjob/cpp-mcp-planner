@@ -141,9 +141,9 @@ export interface DeleteArtifactResult {
 
 export class ArtifactService {
   constructor(
-    private repositoryFactory: RepositoryFactory,
-    private planService: PlanService,
-    private versionHistoryService?: VersionHistoryService
+    private readonly repositoryFactory: RepositoryFactory,
+    private readonly planService: PlanService,
+    private readonly versionHistoryService?: VersionHistoryService
   ) {}
 
   private async ensurePlanExists(planId: string): Promise<void> {

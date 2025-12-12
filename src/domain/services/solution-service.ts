@@ -103,7 +103,7 @@ export interface GetSolutionsInput {
 
 export interface BulkUpdateSolutionsInput {
   planId: string;
-  updates: Array<{
+  updates: {
     solutionId: string;
     updates: Partial<{
       title: string;
@@ -111,12 +111,12 @@ export interface BulkUpdateSolutionsInput {
       approach: string;
       addressing: string[];
       implementationNotes: string;
-      tradeoffs: Array<{
+      tradeoffs: {
         aspect: string;
         pros: string[];
         cons: string[];
         score?: number;
-      }>;
+      }[];
       evaluation: {
         technicalFeasibility: 'high' | 'medium' | 'low';
         effortEstimate: {
@@ -128,18 +128,18 @@ export interface BulkUpdateSolutionsInput {
       };
       status: 'proposed' | 'selected' | 'rejected';
     }>;
-  }>;
+  }[];
   atomic?: boolean;
 }
 
 export interface BulkUpdateSolutionsResult {
   updated: number;
   failed: number;
-  results: Array<{
+  results: {
     solutionId: string;
     success: boolean;
     error?: string;
-  }>;
+  }[];
 }
 
 export interface GetSolutionsResult {
@@ -155,17 +155,17 @@ export interface ProposeSolutionResult {
 export interface CompareSolutionsResult {
   comparison: {
     solutions: Solution[];
-    matrix: Array<{
+    matrix: {
       aspect: string;
-      solutions: Array<{
+      solutions: {
         solutionId: string;
         solutionTitle: string;
         pros: string[];
         cons: string[];
         score?: number;
-      }>;
+      }[];
       winner?: string;
-    }>;
+    }[];
     summary: {
       bestOverall?: string;
       recommendations: string[];
@@ -206,10 +206,10 @@ export interface DeleteSolutionResult {
 
 export class SolutionService {
   constructor(
-    private repositoryFactory: RepositoryFactory,
-    private planService: PlanService,
-    private versionHistoryService?: VersionHistoryService,
-    private decisionService?: DecisionService // TDD Sprint: Optional DecisionService for auto-creating Decision records
+    private readonly repositoryFactory: RepositoryFactory,
+    private readonly planService: PlanService,
+    private readonly versionHistoryService?: VersionHistoryService,
+    private readonly decisionService?: DecisionService // TDD Sprint: Optional DecisionService for auto-creating Decision records
   ) {}
 
   async getSolution(input: GetSolutionInput): Promise<GetSolutionResult> {
@@ -323,7 +323,7 @@ export class SolutionService {
 
     // Collect all aspects
     const aspectsSet = new Set<string>();
-    solutions.forEach((s) => s.tradeoffs.forEach((t) => aspectsSet.add(t.aspect)));
+    solutions.forEach((s) => { s.tradeoffs.forEach((t) => aspectsSet.add(t.aspect)); });
 
     let aspects = Array.from(aspectsSet);
     if (input.aspects && input.aspects.length > 0) {
@@ -640,7 +640,7 @@ export class SolutionService {
       // ATOMIC MODE: All-or-nothing with true rollback
       // Phase 1: Load all entities and validate
       const toUpdate: Solution[] = [];
-      const results: Array<{ solutionId: string; success: boolean; error?: string }> = [];
+      const results: { solutionId: string; success: boolean; error?: string }[] = [];
 
       for (const update of input.updates) {
         try {
@@ -704,7 +704,7 @@ export class SolutionService {
       };
     } else {
       // NON-ATOMIC MODE: Continue on errors (partial success allowed)
-      const results: Array<{ solutionId: string; success: boolean; error?: string }> = [];
+      const results: { solutionId: string; success: boolean; error?: string }[] = [];
       let updated = 0;
       let failed = 0;
 

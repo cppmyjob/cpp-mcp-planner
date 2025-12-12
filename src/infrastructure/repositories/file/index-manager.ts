@@ -23,11 +23,11 @@ import { atomicWriteJSON, loadJSON } from './file-utils.js';
  * Generic index manager for storing and querying entity metadata
  */
 export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
-  private indexPath: string;
-  private cache: Map<string, CacheEntry<TMetadata>> = new Map();
-  private cacheOptions: CacheOptions;
-  private inMemoryIndex: Map<string, TMetadata> = new Map();
-  private isDirty: boolean = false;
+  private readonly indexPath: string;
+  private readonly cache = new Map<string, CacheEntry<TMetadata>>();
+  private readonly cacheOptions: CacheOptions;
+  private readonly inMemoryIndex = new Map<string, TMetadata>();
+  private isDirty = false;
   private writeQueue: Promise<void> = Promise.resolve();
 
   constructor(

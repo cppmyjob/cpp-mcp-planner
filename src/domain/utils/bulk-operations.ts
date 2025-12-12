@@ -8,7 +8,7 @@ export interface BulkUpdateConfig<TIdField extends string> {
   entityIdField: TIdField;
   updateFn: (entityId: string, updates: any) => Promise<void>;
   planId: string;
-  updates: Array<Record<TIdField, string> & { updates: any }>;
+  updates: (Record<TIdField, string> & { updates: any })[];
   atomic?: boolean;
   storage?: {
     // BUGFIX: loadEntities must return full entities (not just { id }), so snapshot/rollback
@@ -21,10 +21,10 @@ export interface BulkUpdateConfig<TIdField extends string> {
 export interface BulkUpdateResult<TIdField extends string> {
   updated: number;
   failed: number;
-  results: Array<Record<TIdField, string> & {
+  results: (Record<TIdField, string> & {
     success: boolean;
     error?: string;
-  }>;
+  })[];
 }
 
 /**
@@ -66,7 +66,7 @@ export async function bulkUpdateEntities<TIdField extends string>(
     throw new Error('storage is required for atomic mode (needed for snapshot/rollback)');
   }
 
-  const results: Array<Record<TIdField, string> & { success: boolean; error?: string }> = [];
+  const results: (Record<TIdField, string> & { success: boolean; error?: string })[] = [];
   let updated = 0;
   let failed = 0;
 
