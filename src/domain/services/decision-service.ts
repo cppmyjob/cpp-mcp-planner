@@ -146,7 +146,7 @@ export class DecisionService {
   public async getDecisions(input: GetDecisionsInput): Promise<GetDecisionsResult> {
     // Enforce max limit
     if (input.decisionIds.length > MAX_DECISIONS_BATCH_SIZE) {
-      throw new Error(`Cannot fetch more than ${MAX_DECISIONS_BATCH_SIZE} decisions at once`);
+      throw new Error(`Cannot fetch more than ${String(MAX_DECISIONS_BATCH_SIZE)} decisions at once`);
     }
 
     // Handle empty array
@@ -281,7 +281,7 @@ export class DecisionService {
     let decisions = await repo.findAll();
 
     if (input.filters) {
-      if (input.filters.search !== undefined && input.filters.search !== null && input.filters.search !== '') {
+      if (input.filters.search !== undefined && input.filters.search !== '') {
         const search = input.filters.search.toLowerCase();
         decisions = decisions.filter(
           (d) =>
@@ -323,7 +323,7 @@ export class DecisionService {
 
     // Sprint 7: Save current version to history BEFORE updating
     if (this.versionHistoryService) {
-      const currentSnapshot = JSON.parse(JSON.stringify(decision));
+      const currentSnapshot = JSON.parse(JSON.stringify(decision)) as Decision;
       await this.versionHistoryService.saveVersion(
         input.planId,
         input.decisionId,
@@ -413,7 +413,7 @@ export class DecisionService {
 
     if (input.filters) {
       const filters = input.filters;
-      if (filters.status !== undefined && filters.status !== null) {
+      if (filters.status !== undefined) {
         decisions = decisions.filter((d) => d.status === filters.status);
       }
       if (input.filters.tags && input.filters.tags.length > 0) {

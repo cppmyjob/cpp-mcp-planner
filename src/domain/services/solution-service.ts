@@ -234,7 +234,7 @@ export class SolutionService {
   public async getSolutions(input: GetSolutionsInput): Promise<GetSolutionsResult> {
     // Enforce max limit
     if (input.solutionIds.length > MAX_SOLUTIONS_BATCH_SIZE) {
-      throw new Error(`Cannot fetch more than ${MAX_SOLUTIONS_BATCH_SIZE} solutions at once`);
+      throw new Error(`Cannot fetch more than ${String(MAX_SOLUTIONS_BATCH_SIZE)} solutions at once`);
     }
 
     // Handle empty array
@@ -271,8 +271,11 @@ export class SolutionService {
   public async proposeSolution(input: ProposeSolutionInput): Promise<ProposeSolutionResult> {
     // Validate tradeoffs format
     this.validateTradeoffs(input.solution.tradeoffs);
-    // Validate effortEstimate format
-    validateEffortEstimate(input.solution.evaluation?.effortEstimate);
+    // Validate effortEstimate format (only if evaluation is provided)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, @typescript-eslint/prefer-optional-chain
+    if (input.solution.evaluation !== undefined && input.solution.evaluation.effortEstimate !== undefined) {
+      validateEffortEstimate(input.solution.evaluation.effortEstimate);
+    }
     // Validate tags format
     validateTags(input.solution.tags ?? []);
 
@@ -309,6 +312,7 @@ export class SolutionService {
 
   public async compareSolutions(input: CompareSolutionsInput): Promise<CompareSolutionsResult> {
     // Validate solutionIds parameter
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (input.solutionIds === undefined || input.solutionIds === null || !Array.isArray(input.solutionIds) || input.solutionIds.length === 0) {
       throw new Error('solutionIds must be a non-empty array');
     }
@@ -392,7 +396,7 @@ export class SolutionService {
         summary: {
           bestOverall,
           recommendations: bestOverall !== undefined && bestOverall !== ''
-            ? [`${String(solutions.find((s) => s.id === bestOverall)?.title)} has the highest average score`]
+            ? [`${solutions.find((s) => s.id === bestOverall)?.title ?? ''} has the highest average score`]
             : [],
         },
       },
@@ -466,7 +470,7 @@ export class SolutionService {
 
     // Sprint 7: Save current version to history BEFORE updating
     if (this.versionHistoryService) {
-      const currentSnapshot = JSON.parse(JSON.stringify(solution));
+      const currentSnapshot = JSON.parse(JSON.stringify(solution)) as Solution;
       await this.versionHistoryService.saveVersion(
         input.planId,
         input.solutionId,
@@ -508,12 +512,12 @@ export class SolutionService {
     const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
     let solutions = await repo.findAll();
 
-    if (input.filters !== undefined && input.filters !== null) {
+    if (input.filters !== undefined) {
       const filters = input.filters;
-      if (filters.status !== undefined && filters.status !== null) {
+      if (filters.status !== undefined) {
         solutions = solutions.filter((s) => s.status === filters.status);
       }
-      if (filters.addressingRequirement !== undefined && filters.addressingRequirement !== null && filters.addressingRequirement !== '') {
+      if (filters.addressingRequirement !== undefined && filters.addressingRequirement !== '') {
         const reqId = filters.addressingRequirement;
         solutions = solutions.filter((s) =>
           s.addressing.includes(reqId)
@@ -770,7 +774,7 @@ export class SolutionService {
     selectedSolution: Solution,
     allSolutions: Solution[]
   ): Promise<string | undefined> {
-    if (input.createDecisionRecord !== true || this.decisionService === undefined || this.decisionService === null) {
+    if (input.createDecisionRecord !== true || this.decisionService === undefined) {
       return undefined;
     }
 
@@ -784,7 +788,7 @@ export class SolutionService {
       .filter((s) => s.id !== input.solutionId)
       .map((altSolution) => ({
         option: altSolution.title,
-        reasoning: (altSolution.description !== undefined && altSolution.description !== null && altSolution.description !== '') ? altSolution.description : altSolution.approach,
+        reasoning: (altSolution.description !== '') ? altSolution.description : altSolution.approach,
         whyNotChosen:
           altSolution.status === 'rejected'
             ? `Rejected in favor of ${selectedSolution.title}`
@@ -798,13 +802,13 @@ export class SolutionService {
         title: `Solution Selection: ${selectedSolution.title}`,
         question: `Which solution should be selected for requirements ${selectedSolution.addressing.join(', ')}?`,
         context: `${selectedSolution.description}\n\nApproach: ${selectedSolution.approach}${
-          selectedSolution.implementationNotes !== undefined && selectedSolution.implementationNotes !== null && selectedSolution.implementationNotes !== ''
+          selectedSolution.implementationNotes !== undefined && selectedSolution.implementationNotes !== ''
             ? `\n\nImplementation Notes: ${selectedSolution.implementationNotes}`
             : ''
         }`,
-        decision: `Selected: ${selectedSolution.title}${input.reason !== undefined && input.reason !== null && input.reason !== '' ? ` - ${input.reason}` : ''}`,
+        decision: `Selected: ${selectedSolution.title}${input.reason !== undefined && input.reason !== '' ? ` - ${input.reason}` : ''}`,
         alternativesConsidered,
-        consequences: (selectedSolution.evaluation?.riskAssessment !== undefined && selectedSolution.evaluation?.riskAssessment !== null && selectedSolution.evaluation?.riskAssessment !== '') ? selectedSolution.evaluation.riskAssessment : 'To be determined',
+        consequences: (selectedSolution.evaluation.riskAssessment !== '') ? selectedSolution.evaluation.riskAssessment : 'To be determined',
         impactScope: selectedSolution.addressing,
       },
     };

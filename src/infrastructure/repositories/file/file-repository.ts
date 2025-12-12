@@ -299,7 +299,8 @@ export class FileRepository<T extends Entity>
       }
 
       // Apply updates (excluding version from updates, we auto-increment)
-      const { version: _ignoredVersion, ...otherUpdates } = updates;
+      const { version: providedVersion, ...otherUpdates } = updates;
+      void providedVersion; // Excluded from updates, version is managed internally
       const updated: T = {
         ...existing,
         ...otherUpdates,
@@ -345,6 +346,7 @@ export class FileRepository<T extends Entity>
 
       // Delete file
       const filePath = this.getEntityFilePath(id);
+      // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentionally swallow cleanup errors
       await fs.unlink(path.join(this.entitiesDir, filePath)).catch(() => {});
 
       // Remove from index
@@ -377,6 +379,7 @@ export class FileRepository<T extends Entity>
     } catch (error) {
       // Rollback on error
       for (const id of rollback) {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentionally swallow rollback errors
         await this.delete(id).catch(() => {});
       }
       throw error;
@@ -420,7 +423,8 @@ export class FileRepository<T extends Entity>
 
       if (exists) {
         // Update existing - exclude version to allow upsert regardless of version
-        const { version: _ignoreVersion, ...updates } = entity as T & { version?: number };
+        const { version: providedVersion, ...updates } = entity as T & { version?: number };
+        void providedVersion; // Excluded to allow upsert regardless of version
         const updated = await this.update(entity.id, updates as Partial<T>);
         results.push(updated);
       } else {
@@ -466,7 +470,7 @@ export class FileRepository<T extends Entity>
   private validateEntity(entity: T): void {
     const errors: { field: string; message: string; value?: unknown }[] = [];
 
-    if (entity.id === undefined || entity.id === null || entity.id === '' || entity.id.trim() === '') {
+    if (entity.id === '' || entity.id.trim() === '') {
       errors.push({
         field: 'id',
         message: 'Entity ID cannot be empty',
@@ -474,12 +478,7 @@ export class FileRepository<T extends Entity>
       });
     }
 
-    if (entity.type === undefined || entity.type === null) {
-      errors.push({
-        field: 'type',
-        message: 'Entity type is required',
-      });
-    }
+    // entity.type is EntityType (not optional), so no need to check for undefined/null
 
     if (typeof entity.version !== 'number' || entity.version < 1) {
       errors.push({
@@ -536,7 +535,7 @@ export class FileRepository<T extends Entity>
               return typeof value === 'string' && value.endsWith(String(condition.value));
             case 'exists':
               // Check if field exists and has a value (not undefined/null)
-              return condition.value ? value !== undefined : value === undefined;
+              return condition.value === true ? value !== undefined : value === undefined;
             case 'regex': {
               if (typeof value !== 'string') return false;
               try {

@@ -81,10 +81,6 @@ export class FileUnitOfWork implements UnitOfWork {
   public initialize(): Promise<void> {
     // FileLockManager should already be initialized by caller
     // Just verify it's ready (FIX M-1)
-    if (this.fileLockManager === undefined) {
-      return Promise.reject(new Error('FileLockManager not provided'));
-    }
-
     if (!this.fileLockManager.isInitialized()) {
       return Promise.reject(new Error('FileLockManager must be initialized before use'));
     }
@@ -111,7 +107,7 @@ export class FileUnitOfWork implements UnitOfWork {
 
     // Note: File system does not support native isolation levels
     // We only track the option for compatibility
-    if (options?.isolationLevel !== undefined && options?.isolationLevel !== null) {
+    if (options?.isolationLevel !== undefined) {
       this.emitLimitationWarning(
         `LIMITATION: File system does not support isolation level '${options.isolationLevel}'. ` +
           `All operations use file-level locking. Consider database backend for ACID guarantees.`
@@ -287,7 +283,7 @@ export class FileUnitOfWork implements UnitOfWork {
     // Dispose all cached repositories BEFORE clearing (FIX H-1)
     for (const repo of this.repositories.values()) {
       if ('dispose' in repo && typeof repo.dispose === 'function') {
-        await (repo as any).dispose();
+        await (repo as { dispose: () => Promise<void> }).dispose();
       }
     }
     this.repositories.clear();

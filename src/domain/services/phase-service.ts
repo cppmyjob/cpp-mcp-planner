@@ -365,7 +365,7 @@ export class PhaseService {
 
     // Enforce max limit
     if (input.phaseIds.length > MAX_PHASES_BATCH_SIZE) {
-      throw new Error(`Cannot fetch more than ${MAX_PHASES_BATCH_SIZE} phases at once`);
+      throw new Error(`Cannot fetch more than ${String(MAX_PHASES_BATCH_SIZE)} phases at once`);
     }
 
     // Handle empty array
@@ -479,7 +479,7 @@ export class PhaseService {
 
     // Sprint 7: Save current version to history BEFORE updating
     if (this.versionHistoryService) {
-      const currentSnapshot = JSON.parse(JSON.stringify(phase));
+      const currentSnapshot = JSON.parse(JSON.stringify(phase)) as Phase;
       await this.versionHistoryService.saveVersion(
         input.planId,
         input.phaseId,
@@ -552,7 +552,7 @@ export class PhaseService {
     }
 
     // Recalculate path
-    if (phase.parentId !== undefined && phase.parentId !== null && phase.parentId !== '') {
+    if (phase.parentId !== null && phase.parentId !== '') {
       const parent = phases.find((p) => p.id === phase.parentId);
       if (!parent) {
         throw new Error(`Parent phase not found: ${phase.parentId}`);
@@ -563,7 +563,7 @@ export class PhaseService {
     }
 
     // Update children paths recursively
-    const collectAffectedChildren = (parentId: string, parentPath: string) => {
+    const collectAffectedChildren = (parentId: string, parentPath: string): void => {
       const children = phases.filter((p) => p.parentId === parentId);
       for (const child of children) {
         child.path = `${parentPath}.${String(child.order)}`;
@@ -656,7 +656,7 @@ export class PhaseService {
     const phases = await repo.findAll();
     const deletedIds: string[] = [];
 
-    const collectChildren = (parentId: string) => {
+    const collectChildren = (parentId: string): void => {
       const children = phases.filter((p) => p.parentId === parentId);
       for (const child of children) {
         deletedIds.push(child.id);
@@ -712,7 +712,7 @@ export class PhaseService {
       autoUpdated.completedAt = now;
     }
 
-    if (input.status === 'blocked' && (input.notes === undefined || input.notes === null || input.notes === '')) {
+    if (input.status === 'blocked' && (input.notes === undefined || input.notes === '')) {
       throw new Error('Notes required when setting status to blocked');
     }
 
@@ -726,7 +726,7 @@ export class PhaseService {
       phase.schedule.actualEffort = input.actualEffort;
     }
 
-    if (input.notes !== undefined && input.notes !== null && input.notes !== '') {
+    if (input.notes !== undefined && input.notes !== '') {
       phase.metadata.annotations.push({
         id: uuidv4(),
         text: input.notes,
@@ -813,7 +813,7 @@ export class PhaseService {
     const readyToStart = planned
       .filter((p) => {
         // A phase is ready if it has no parent or parent is completed
-        if (p.parentId === undefined || p.parentId === null || p.parentId === '') return true;
+        if (p.parentId === null || p.parentId === '') return true;
         const parent = phases.find((x) => x.id === p.parentId);
         return !parent || parent.status === 'completed' || parent.status === 'in_progress';
       })
@@ -880,7 +880,7 @@ export class PhaseService {
       currentPhase.schedule.actualEffort = input.actualEffort;
     }
 
-    if (input.notes !== undefined && input.notes !== null && input.notes !== '') {
+    if (input.notes !== undefined && input.notes !== '') {
       currentPhase.metadata.annotations.push({
         id: uuidv4(),
         text: input.notes,
@@ -940,7 +940,7 @@ export class PhaseService {
     }
 
     // 3. Move up to parent and recursively find its next sibling
-    if (currentPhase.parentId !== undefined && currentPhase.parentId !== null && currentPhase.parentId !== '') {
+    if (currentPhase.parentId !== null && currentPhase.parentId !== '') {
       const parent = allPhases.find((p) => p.id === currentPhase.parentId);
       if (parent) {
         return this.findNextPlannedPhase(parent, allPhases);
@@ -985,7 +985,7 @@ export class PhaseService {
       throw new Error('Phase not found');
     }
 
-    const currentArray = phase[field] ?? [];
+    const currentArray = phase[field];
     const newArray = operation(currentArray);
 
     phase[field] = newArray;
@@ -1147,8 +1147,8 @@ export class PhaseService {
 
     // Create storage adapter for bulkUpdateEntities utility
     const storageAdapter = {
-      loadEntities: async (_planId: string, _entityType: string): Promise<Record<string, unknown>[]> => {
-        return repo.findAll() as unknown as Record<string, unknown>[];
+      loadEntities: (_planId: string, _entityType: string): Promise<Record<string, unknown>[]> => {
+        return repo.findAll() as unknown as Promise<Record<string, unknown>[]>;
       },
       saveEntities: async (_planId: string, _entityType: string, entities: Record<string, unknown>[]): Promise<void> => {
         const phases = entities as unknown as Phase[];
@@ -1181,6 +1181,7 @@ export class PhaseService {
       entityType: 'phases',
       entityIdField: 'phaseId',
       updateFn: (phaseId, updates) =>
+        // eslint-disable-next-line @typescript-eslint/no-empty-function -- return void from updateFn
         this.updatePhase({ planId: input.planId, phaseId, updates }).then(() => {}),
       planId: input.planId,
       updates: input.updates,

@@ -243,7 +243,9 @@ export class ArtifactService {
 
     // Auto-migrate fileTable to targets if needed
     // If artifact has fileTable but no targets, convert fileTable to targets
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     if (artifact.fileTable !== undefined && artifact.targets === undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-deprecated
       artifact.targets = artifact.fileTable.map((entry) => ({
         path: entry.path,
         action: entry.action,
@@ -282,7 +284,7 @@ export class ArtifactService {
 
     // Sprint 7: Save current version to history BEFORE updating
     if (this.versionHistoryService) {
-      const currentSnapshot = JSON.parse(JSON.stringify(artifact));
+      const currentSnapshot = JSON.parse(JSON.stringify(artifact)) as Artifact;
       await this.versionHistoryService.saveVersion(
         input.planId,
         input.artifactId,

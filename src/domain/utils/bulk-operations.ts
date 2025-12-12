@@ -74,7 +74,7 @@ export async function bulkUpdateEntities<TIdField extends string>(
   if (atomic && storage) {
     // BUGFIX: Create snapshot BEFORE any modifications for atomic rollback
     const currentEntities = await storage.loadEntities(planId, entityType);
-    const snapshot = JSON.parse(JSON.stringify(currentEntities));
+    const snapshot = JSON.parse(JSON.stringify(currentEntities)) as Record<string, unknown>[];
     const entityMap = new Map(currentEntities.map((e) => [e.id, e]));
 
     // Pre-validate: check all entities exist

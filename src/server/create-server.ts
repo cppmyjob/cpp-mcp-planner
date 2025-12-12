@@ -9,11 +9,13 @@ import { handleToolCall, ToolError } from './tool-handlers.js';
 import type { Services } from './services.js';
 
 export interface McpServer {
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- Using low-level Server API intentionally
   server: Server;
   services: Services;
 }
 
 export function createMcpServer(services: Services): McpServer {
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- Using low-level Server API for advanced configuration
   const server = new Server(
     {
       name: 'mcp-planning-server',

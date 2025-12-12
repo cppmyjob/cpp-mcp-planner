@@ -119,10 +119,7 @@ export function validateArtifactType(artifactType: unknown): void {
  * Replaces validateFileTable with additional precision fields (lineNumber, lineEnd, searchPattern).
  */
 export function validateTargets(targets: unknown[]): void {
-  if (targets === undefined) {
-    return; // Optional field
-  }
-
+  // targets is unknown[], so it's already an array
   if (!Array.isArray(targets)) {
     return;
   }

@@ -228,9 +228,9 @@ export function isRepositoryError(error: unknown): error is RepositoryError {
  */
 export function isErrorType<T extends RepositoryError>(
   error: unknown,
-  ErrorClass: new (...args: never[]) => T
+  errorConstructor: new (...args: never[]) => T
 ): error is T {
-  return error instanceof ErrorClass;
+  return error instanceof errorConstructor;
 }
 
 /**

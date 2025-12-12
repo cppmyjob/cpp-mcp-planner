@@ -247,6 +247,7 @@ export class QueryService {
     }
 
     // Validate includeArtifacts parameter (null is allowed and treated as default true)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (input.includeArtifacts !== undefined && input.includeArtifacts !== null && typeof input.includeArtifacts !== 'boolean') {
       throw new Error('includeArtifacts must be a boolean');
     }
@@ -370,7 +371,7 @@ export class QueryService {
           return true;
         }
         // Artifact related to ANY phase addressing the requirement (O(1) lookup)
-        if (a.relatedPhaseId !== undefined && a.relatedPhaseId !== null && a.relatedPhaseId !== '' && allPhaseIds.has(a.relatedPhaseId)) {
+        if (a.relatedPhaseId !== undefined && a.relatedPhaseId !== '' && allPhaseIds.has(a.relatedPhaseId)) {
           return true;
         }
         return false;
@@ -449,6 +450,7 @@ export class QueryService {
    */
   private calculateAverageProgress(phases: Phase[]): number {
     if (phases.length === 0) return 0;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const totalProgress = phases.reduce((sum, p) => sum + (p.progress ?? 0), 0);
     return Math.round(totalProgress / phases.length);
   }
@@ -564,7 +566,7 @@ export class QueryService {
     const phaseMap = new Map(entities.phases.map((p) => [p.id, p]));
     for (const phase of entities.phases) {
       // Check child-parent status consistency
-      if (phase.parentId !== undefined && phase.parentId !== null && phase.parentId !== '') {
+      if (phase.parentId !== null && phase.parentId !== '') {
         const parent = phaseMap.get(phase.parentId);
         if (parent?.status === 'planned') {
           if (phase.status === 'completed') {
@@ -730,7 +732,7 @@ export class QueryService {
           title: req.title,
           description: req.description,
           rationale: req.rationale ?? '',
-          acceptanceCriteria: (req.acceptanceCriteria ?? []).join(' '),
+          acceptanceCriteria: req.acceptanceCriteria.join(' '),
         };
       }
       case 'solution': {
@@ -758,7 +760,9 @@ export class QueryService {
           ...base,
           title: phase.title,
           description: phase.description,
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           objectives: (phase.objectives ?? []).join(' '),
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           deliverables: (phase.deliverables ?? []).join(' '),
         };
       }
@@ -789,11 +793,11 @@ export class QueryService {
   ): string {
     const lines: string[] = [];
 
-    lines.push(`# ${String(manifest.name)}`);
+    lines.push(`# ${manifest.name}`);
     lines.push('');
-    lines.push(String(manifest.description));
+    lines.push(manifest.description);
     lines.push('');
-    lines.push(`**Status**: ${String(manifest.status)}`);
+    lines.push(`**Status**: ${manifest.status}`);
     lines.push(`**Progress**: ${String(manifest.statistics.completionPercentage)}%`);
     lines.push('');
 
@@ -807,6 +811,7 @@ export class QueryService {
         lines.push(req.description);
         lines.push('');
         lines.push(`**Priority**: ${req.priority} | **Category**: ${req.category}`);
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         const acceptanceCriteria = req.acceptanceCriteria ?? [];
         if (acceptanceCriteria.length > 0) {
           lines.push('');
@@ -829,11 +834,14 @@ export class QueryService {
         lines.push('');
         lines.push(sol.description);
         lines.push('');
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         const tradeoffs = sol.tradeoffs ?? [];
         if (tradeoffs.length > 0) {
           lines.push('**Trade-offs**:');
           for (const t of tradeoffs) {
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             const pros = (t.pros ?? []).join(', ');
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             const cons = (t.cons ?? []).join(', ');
             lines.push(`- **${t.aspect}**: +${pros} / -${cons}`);
           }
@@ -871,26 +879,26 @@ export class QueryService {
         lines.push(artifact.description);
         lines.push('');
         lines.push(`**Type**: ${artifact.artifactType}`);
-        if (artifact.content.language !== undefined && artifact.content.language !== null && artifact.content.language !== '') {
+        if (artifact.content.language !== undefined && artifact.content.language !== '') {
           lines.push(` | **Language**: ${artifact.content.language}`);
         }
-        if (artifact.content.filename !== undefined && artifact.content.filename !== null && artifact.content.filename !== '') {
+        if (artifact.content.filename !== undefined && artifact.content.filename !== '') {
           lines.push(` | **File**: ${artifact.content.filename}`);
         }
         lines.push('');
 
         // File targets
-        if (artifact.targets !== undefined && artifact.targets !== null && artifact.targets.length > 0) {
+        if (artifact.targets !== undefined && artifact.targets.length > 0) {
           lines.push('**Files**:');
           for (const file of artifact.targets) {
-            const desc = file.description !== undefined && file.description !== null && file.description !== '' ? ` - ${file.description}` : '';
+            const desc = file.description !== undefined && file.description !== '' ? ` - ${file.description}` : '';
             lines.push(`- \`${file.path}\` [${file.action}]${desc}`);
           }
           lines.push('');
         }
 
         // Source code (truncated if too long)
-        if (artifact.content.sourceCode !== undefined && artifact.content.sourceCode !== null && artifact.content.sourceCode !== '') {
+        if (artifact.content.sourceCode !== undefined && artifact.content.sourceCode !== '') {
           const maxLength = 500;
           const code = artifact.content.sourceCode.length > maxLength
             ? artifact.content.sourceCode.substring(0, maxLength) + '\n... (truncated)'
@@ -933,7 +941,7 @@ export class QueryService {
     }
 
     // Apply fields filtering
-    if (options.fields !== undefined && options.fields !== null && options.fields.length > 0) {
+    if (options.fields !== undefined && options.fields.length > 0) {
       result = result.map((e) => this.filterFields(e, options.fields));
     }
 
@@ -974,7 +982,12 @@ export class QueryService {
    * @returns Entity without metadata fields
    */
   private removeMetadataFields<T extends Entity>(entity: T): T {
-    const { metadata: _metadata, createdAt: _createdAt, updatedAt: _updatedAt, version: _version, type: _type, ...rest } = entity as Record<string, unknown>;
+    const { metadata: excludedMetadata, createdAt: excludedCreatedAt, updatedAt: excludedUpdatedAt, version: excludedVersion, type: excludedType, ...rest } = entity as Record<string, unknown>;
+    void excludedMetadata;
+    void excludedCreatedAt;
+    void excludedUpdatedAt;
+    void excludedVersion;
+    void excludedType;
     return rest as unknown as T;
   }
 }

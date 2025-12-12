@@ -139,8 +139,8 @@ export class FileLockManager {
    * Platform-aware default stale threshold.
    * Windows needs longer due to graceful-fs retries (up to 60s).
    */
-  private static readonly DEFAULT_STALE_THRESHOLD_WINDOWS = 120000; // 2 minutes
-  private static readonly DEFAULT_STALE_THRESHOLD_OTHER = 30000; // 30 seconds
+  private static readonly defaultStaleThresholdWindows = 120000; // 2 minutes
+  private static readonly defaultStaleThresholdOther = 30000; // 30 seconds
 
   /**
    * Active locks held by this process
@@ -184,8 +184,8 @@ export class FileLockManager {
     this.staleThreshold =
       options?.staleThreshold ??
       (process.platform === 'win32'
-        ? FileLockManager.DEFAULT_STALE_THRESHOLD_WINDOWS
-        : FileLockManager.DEFAULT_STALE_THRESHOLD_OTHER);
+        ? FileLockManager.defaultStaleThresholdWindows
+        : FileLockManager.defaultStaleThresholdOther);
     this.disposeTimeout = options?.disposeTimeout ?? 5000;
     this.logger = options?.logger;
     this.logLevel = options?.logLevel ?? 'warn';
@@ -265,6 +265,7 @@ export class FileLockManager {
     });
     const ourMutex: MutexEntry = { promise, release: releaseFunc };
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       // Check disposed first
       if (this.disposed) {
@@ -283,7 +284,8 @@ export class FileLockManager {
         await existingMutex.promise;
       }
 
-      // Check disposed after await
+      // Check disposed after await - TypeScript flow analysis doesn't track that disposed can change during await
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (this.disposed) {
         return false;
       }
@@ -332,11 +334,11 @@ export class FileLockManager {
       // Check for "lock already released" errors (stale detection, external release)
       const errorObj = error as { code?: string; message?: string };
       const codeMatch = errorObj.code === 'ENOTACQUIRED';
-      const releasedMatch = errorObj.message !== undefined && errorObj.message !== null && typeof errorObj.message === 'string' && errorObj.message.includes('already released');
-      const notAcquiredMatch = errorObj.message !== undefined && errorObj.message !== null && typeof errorObj.message === 'string' && errorObj.message.includes('not acquired');
-      const isAlreadyReleased = codeMatch === true || releasedMatch === true || notAcquiredMatch === true;
+      const releasedMatch = typeof errorObj.message === 'string' && errorObj.message.includes('already released');
+      const notAcquiredMatch = typeof errorObj.message === 'string' && errorObj.message.includes('not acquired');
+      const isAlreadyReleased = codeMatch || releasedMatch || notAcquiredMatch;
 
-      if (isAlreadyReleased === true) {
+      if (isAlreadyReleased) {
         const heldFor = Date.now() - activeLock.acquiredAt;
 
         // Log warning - this indicates the lock was externally released
@@ -406,6 +408,7 @@ export class FileLockManager {
 
     try {
       // Check disposed again after mutex (may have changed while waiting)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (this.disposed) {
         throw new Error('FileLockManager has been disposed');
       }
@@ -425,6 +428,7 @@ export class FileLockManager {
       });
 
       // Check disposed BEFORE storing in activeLocks
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (this.disposed) {
         try {
           await release();
@@ -449,6 +453,7 @@ export class FileLockManager {
       // However, if dispose() ran BEFORE our check but AFTER lockfile.lock(),
       // the lock would be in the map after dispose() cleared it.
       // This second check ensures we clean up in that edge case.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (this.disposed) {
         // Lock was added after dispose started - clean it up
         this.activeLocks.delete(resource);
@@ -571,7 +576,7 @@ export class FileLockManager {
 
     // Step 2: Release all in-process mutexes LAST (unblock waiters)
     // Waiters will wake up and see disposed=true, then exit gracefully
-    for (const [_resource, mutex] of this.acquireMutexes) {
+    for (const [, mutex] of this.acquireMutexes) {
       mutex.release();
     }
     this.acquireMutexes.clear();

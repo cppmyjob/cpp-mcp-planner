@@ -264,7 +264,7 @@ export class FilePlanRepository
     await this.ensureInitialized();
     const historyPath = path.join(this.plansDir, planId, 'history', entityType, `${entityId}.json`);
     try {
-      return await this.loadJSON(historyPath) as VersionHistory;
+      return await this.loadJSON<VersionHistory>(historyPath);
     } catch {
       return null;
     }

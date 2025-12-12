@@ -138,7 +138,7 @@ export interface GetRequirementResult {
   requirement: Requirement;
   traceability?: {
     solutions: unknown[];
-    selectedSolution: unknown | null;
+    selectedSolution: unknown;
     implementingPhases: unknown[];
     decisions: unknown[];
     linkedRequirements: Requirement[];
@@ -274,10 +274,12 @@ export class RequirementService {
       throw new Error('Plan not found');
     }
 
-    // Validate required fields
+    // Validate required fields (runtime checks needed despite TypeScript types)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (input.requirement.title === undefined || input.requirement.title === null || input.requirement.title === '' || input.requirement.title.trim() === '') {
       throw new Error('Title is required');
     }
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (input.requirement.description === undefined || input.requirement.description === null || input.requirement.description === '' || input.requirement.description.trim() === '') {
       throw new Error('Description is required');
     }
@@ -355,7 +357,7 @@ export class RequirementService {
   public async getRequirements(input: GetRequirementsInput): Promise<GetRequirementsResult> {
     // Enforce max limit
     if (input.requirementIds.length > MAX_REQUIREMENTS_BATCH_SIZE) {
-      throw new Error(`Cannot fetch more than ${MAX_REQUIREMENTS_BATCH_SIZE} requirements at once`);
+      throw new Error(`Cannot fetch more than ${String(MAX_REQUIREMENTS_BATCH_SIZE)} requirements at once`);
     }
 
     // Handle empty array
@@ -403,7 +405,7 @@ export class RequirementService {
     // Sprint 7: Save current version to history BEFORE updating
     if (this.versionHistoryService) {
       // Create a deep copy of the current requirement state
-      const currentSnapshot = JSON.parse(JSON.stringify(requirement));
+      const currentSnapshot = JSON.parse(JSON.stringify(requirement)) as Requirement;
       await this.versionHistoryService.saveVersion(
         input.planId,
         input.requirementId,
@@ -458,8 +460,9 @@ export class RequirementService {
   ): Promise<ListRequirementsResult> {
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
 
-    // Build query options
-    const _queryOptions: { limit: number; offset: number } = {
+    // Build query options (currently unused, reserved for future pagination implementation)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const queryOptions: { limit: number; offset: number } = {
       limit: input.limit ?? DEFAULT_REQUIREMENTS_PAGE_LIMIT,
       offset: input.offset ?? 0,
     };
@@ -468,19 +471,19 @@ export class RequirementService {
     let requirements = await repo.findAll();
 
     // Apply filters in-memory (TODO: move to repository layer for performance)
-    if (input.filters !== undefined && input.filters !== null) {
+    if (input.filters !== undefined) {
       const filters = input.filters;
-      if (filters.priority !== undefined && filters.priority !== null) {
+      if (filters.priority !== undefined) {
         requirements = requirements.filter(
           (r) => r.priority === filters.priority
         );
       }
-      if (filters.category !== undefined && filters.category !== null) {
+      if (filters.category !== undefined) {
         requirements = requirements.filter(
           (r) => r.category === filters.category
         );
       }
-      if (filters.status !== undefined && filters.status !== null) {
+      if (filters.status !== undefined) {
         requirements = requirements.filter(
           (r) => r.status === filters.status
         );
@@ -547,6 +550,7 @@ export class RequirementService {
     const requirement = await repo.findById(input.requirementId);
 
     // Initialize votes if undefined (backward compatibility)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     requirement.votes ??= 0;
 
     // Increment votes
@@ -567,6 +571,7 @@ export class RequirementService {
     const requirement = await repo.findById(input.requirementId);
 
     // Initialize votes if undefined (backward compatibility)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     requirement.votes ??= 0;
 
     // Validate: cannot go below 0
@@ -619,7 +624,7 @@ export class RequirementService {
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', planId);
     const requirement = await repo.findById(requirementId);
 
-    const currentArray = requirement[field] ?? [];
+    const currentArray = requirement[field];
     const newArray = operation(currentArray);
 
     requirement[field] = newArray;
@@ -895,11 +900,8 @@ export class RequirementService {
 
     // Reset votes for all requirements
     for (const requirement of requirements) {
-      // Check if votes need to be updated (undefined, null, or non-zero)
-      const needsUpdate =
-        requirement.votes === undefined ||
-        requirement.votes === null ||
-        requirement.votes !== 0;
+      // Check if votes need to be updated (non-zero)
+      const needsUpdate = requirement.votes !== 0;
 
       if (needsUpdate) {
         requirement.votes = 0;

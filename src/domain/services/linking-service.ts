@@ -102,7 +102,7 @@ export class LinkingService {
 
     const deletedIds: string[] = [];
 
-    if (input.linkId !== undefined && input.linkId !== null && input.linkId !== '') {
+    if (input.linkId !== undefined && input.linkId !== '') {
       // Delete by linkId
       await linkRepo.deleteLink(input.linkId);
       deletedIds.push(input.linkId);
@@ -111,8 +111,8 @@ export class LinkingService {
       const allLinks = await linkRepo.findAllLinks(input.relationType);
 
       for (const link of allLinks) {
-        const matchSource = (input.sourceId !== undefined && input.sourceId !== null && input.sourceId !== '') ? link.sourceId === input.sourceId : true;
-        const matchTarget = (input.targetId !== undefined && input.targetId !== null && input.targetId !== '') ? link.targetId === input.targetId : true;
+        const matchSource = (input.sourceId !== undefined && input.sourceId !== '') ? link.sourceId === input.sourceId : true;
+        const matchTarget = (input.targetId !== undefined && input.targetId !== '') ? link.targetId === input.targetId : true;
 
         if (matchSource && matchTarget) {
           await linkRepo.deleteLink(link.id);

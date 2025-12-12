@@ -47,6 +47,7 @@ export async function atomicWriteJSON(filePath: string, data: unknown): Promise<
     await gracefulRename(tmpPath, filePath);
   } catch (error) {
     // Cleanup temp file on error
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentionally swallow cleanup errors
     await fs.unlink(tmpPath).catch(() => {});
     throw error;
   }

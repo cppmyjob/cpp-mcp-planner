@@ -225,6 +225,7 @@ export interface Artifact extends Entity {
   /**
    * @deprecated Use targets instead. This field is kept for reading legacy data only.
    */
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   fileTable?: FileEntry[];         // DEPRECATED: auto-migrated to targets on read
 
   // Context - what this artifact relates to

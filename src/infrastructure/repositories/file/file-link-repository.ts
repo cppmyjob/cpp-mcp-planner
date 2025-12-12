@@ -200,14 +200,14 @@ export class FileLinkRepository
   public async findLinksBySource(sourceId: string, relationType?: string): Promise<Link[]> {
     await this.ensureInitialized();
     return this.findLinksByPredicate(
-      (m: LinkIndexMetadata) => m.sourceId === sourceId && (relationType === undefined || relationType === null || relationType === '' || m.relationType === relationType)
+      (m: LinkIndexMetadata) => m.sourceId === sourceId && (relationType === undefined || relationType === '' || m.relationType === relationType)
     );
   }
 
   public async findLinksByTarget(targetId: string, relationType?: string): Promise<Link[]> {
     await this.ensureInitialized();
     return this.findLinksByPredicate(
-      (m: LinkIndexMetadata) => m.targetId === targetId && (relationType === undefined || relationType === null || relationType === '' || m.relationType === relationType)
+      (m: LinkIndexMetadata) => m.targetId === targetId && (relationType === undefined || relationType === '' || m.relationType === relationType)
     );
   }
 
@@ -348,7 +348,7 @@ export class FileLinkRepository
   /**
    * Valid RelationType values per CLAUDE.md
    */
-  private static readonly VALID_RELATION_TYPES: readonly string[] = [
+  private static readonly validRelationTypes: readonly string[] = [
     'implements', 'addresses', 'depends_on', 'blocks',
     'alternative_to', 'supersedes', 'references', 'derived_from', 'has_artifact'
   ];
@@ -356,24 +356,24 @@ export class FileLinkRepository
   private validateLinkData(link: Partial<Link>): void {
     const errors: { field: string; message: string; value?: unknown }[] = [];
 
-    if (link.sourceId === undefined || link.sourceId === null || link.sourceId === '' || link.sourceId.trim() === '') {
+    if (link.sourceId === undefined || link.sourceId === '' || link.sourceId.trim() === '') {
       errors.push({ field: 'sourceId', message: 'sourceId is required', value: link.sourceId });
     }
 
-    if (link.targetId === undefined || link.targetId === null || link.targetId === '' || link.targetId.trim() === '') {
+    if (link.targetId === undefined || link.targetId === '' || link.targetId.trim() === '') {
       errors.push({ field: 'targetId', message: 'targetId is required', value: link.targetId });
     }
 
-    if (link.relationType === undefined || link.relationType === null) {
+    if (link.relationType === undefined) {
       errors.push({
         field: 'relationType',
         message: 'relationType is required',
         value: link.relationType,
       });
-    } else if (!FileLinkRepository.VALID_RELATION_TYPES.includes(link.relationType)) {
+    } else if (!FileLinkRepository.validRelationTypes.includes(link.relationType)) {
       errors.push({
         field: 'relationType',
-        message: `relationType must be one of: ${FileLinkRepository.VALID_RELATION_TYPES.join(', ')}`,
+        message: `relationType must be one of: ${FileLinkRepository.validRelationTypes.join(', ')}`,
         value: link.relationType,
       });
     }
@@ -424,9 +424,9 @@ export class FileLinkRepository
   private async findLinksByFilter(filter: LinkFilter): Promise<Link[]> {
     await this.ensureInitialized(); // FIX M-1: Defensive consistency
     return this.findLinksByPredicate((m: LinkIndexMetadata) => {
-      if (filter.sourceId !== undefined && filter.sourceId !== null && filter.sourceId !== '' && m.sourceId !== filter.sourceId) return false;
-      if (filter.targetId !== undefined && filter.targetId !== null && filter.targetId !== '' && m.targetId !== filter.targetId) return false;
-      if (filter.relationType !== undefined && filter.relationType !== null && m.relationType !== filter.relationType) return false;
+      if (filter.sourceId !== undefined && filter.sourceId !== '' && m.sourceId !== filter.sourceId) return false;
+      if (filter.targetId !== undefined && filter.targetId !== '' && m.targetId !== filter.targetId) return false;
+      if (filter.relationType !== undefined && m.relationType !== filter.relationType) return false;
       return true;
     });
   }

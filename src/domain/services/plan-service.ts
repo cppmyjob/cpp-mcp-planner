@@ -17,7 +17,6 @@ import { DEFAULT_USAGE_GUIDE } from '../constants/default-usage-guide.js';
 const MAX_HISTORY_DEPTH = 10;
 const DEFAULT_HISTORY_DEPTH = 5;
 const DEFAULT_PLANS_PAGE_LIMIT = 50;
-const PROGRESS_PERCENTAGE_MULTIPLIER = 100;
 
 // Input types
 export interface CreatePlanInput {
@@ -169,7 +168,7 @@ export class PlanService {
     // Sprint 7: Validate history settings
     if (input.maxHistoryDepth !== undefined) {
       if (input.maxHistoryDepth < 0 || input.maxHistoryDepth > MAX_HISTORY_DEPTH) {
-        throw new Error(`maxHistoryDepth must be between 0 and ${MAX_HISTORY_DEPTH}`);
+        throw new Error(`maxHistoryDepth must be between 0 and ${String(MAX_HISTORY_DEPTH)}`);
       }
       if (!Number.isInteger(input.maxHistoryDepth)) {
         throw new Error('maxHistoryDepth must be an integer');
@@ -239,7 +238,7 @@ export class PlanService {
     }
 
     // Filter by status
-    const filtered = (input.status !== undefined && input.status !== null)
+    const filtered = input.status !== undefined
       ? manifests.filter((m) => m.status === input.status)
       : manifests;
 
@@ -470,10 +469,10 @@ export class PlanService {
     const includeGuide = input.includeGuide === true; // Default: false (Sprint 6 change)
     const activePlans = await this.planRepo.loadActivePlans();
 
-    const mapping = activePlans[workspacePath];
-    if (mapping === undefined || mapping === null) {
+    if (!(workspacePath in activePlans)) {
       return { activePlan: null };
     }
+    const mapping = activePlans[workspacePath];
 
     try {
       const manifest = await this.planRepo.loadManifest(mapping.planId);
@@ -491,6 +490,7 @@ export class PlanService {
       return response;
     } catch {
       // Plan was deleted, clear mapping
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- removing from runtime mapping object
       delete activePlans[workspacePath];
       await this.planRepo.saveActivePlans(activePlans);
       return { activePlan: null };
@@ -510,7 +510,7 @@ export class PlanService {
     // Calculate child counts for each phase
     const childCounts = new Map<string, number>();
     for (const phase of phases) {
-      if (phase.parentId !== undefined && phase.parentId !== null && phase.parentId !== '') {
+      if (phase.parentId !== null && phase.parentId !== '') {
         childCounts.set(phase.parentId, (childCounts.get(phase.parentId) ?? 0) + 1);
       }
     }

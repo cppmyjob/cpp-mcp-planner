@@ -161,7 +161,8 @@ export class LockManager {
     }
 
     // Prevent memory leak warning for many listeners
-    this.lockEvents.setMaxListeners(1000);
+    const MAX_EVENT_LISTENERS = 1000;
+    this.lockEvents.setMaxListeners(MAX_EVENT_LISTENERS);
   }
 
   // ============================================================================
@@ -201,11 +202,12 @@ export class LockManager {
     }
 
     // Validate resource name
-    if (resource === undefined || resource === null || resource === '' || resource.trim() === '') {
+    if (resource === '' || resource.trim() === '') {
       throw new Error('resource name cannot be empty');
     }
 
     // Resolve acquireTimeout: new param > deprecated timeout > default
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     const acquireTimeout = options?.acquireTimeout ?? options?.timeout ?? this.defaultAcquireTimeout;
     if (acquireTimeout < 0) {
       throw new Error('acquireTimeout must be non-negative (0 for no wait, >0 for wait duration)');
@@ -213,7 +215,8 @@ export class LockManager {
 
     // Resolve TTL: new param > deprecated timeout > default
     // For backwards compatibility: if only timeout is specified, use it for TTL too
-    const ttl = options?.ttl ?? (options?.timeout !== undefined && options?.acquireTimeout === undefined ? options.timeout : this.defaultTtl);
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    const ttl = options?.ttl ?? (options?.timeout !== undefined && options.acquireTimeout === undefined ? options.timeout : this.defaultTtl);
 
     const holderId = options?.holderId ?? `pid-${String(process.pid)}`;
     const reentrant = options?.reentrant ?? false;
@@ -232,6 +235,7 @@ export class LockManager {
       // If mutex wasn't acquired (timeout or disposed), return immediately
       if (!mutexAcquired) {
         // Check if disposed to return appropriate message
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (this.disposed) {
           this.log('debug', 'acquire rejected - disposed during mutex wait', { resource });
           return {
@@ -281,6 +285,7 @@ export class LockManager {
     const ourMutex: MutexEntry = { promise, release };
 
     // Atomic check-and-set loop
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       // ATOMIC SECTION: Check disposed AND mutex in same sync block
       // This prevents race where dispose() happens between checks
@@ -311,6 +316,7 @@ export class LockManager {
       }
 
       // Check disposed IMMEDIATELY after await (dispose may have been called during wait)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (this.disposed) {
         return false;
       }
@@ -349,11 +355,12 @@ export class LockManager {
     startTime: number
   ): Promise<LockResult> {
     // Retry loop - handles case where lock is grabbed by another holder after release
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       // Check if resource is already locked
       const existingLockId = this.locksByResource.get(resource);
 
-      if (existingLockId !== undefined && existingLockId !== '') {
+      if (existingLockId !== undefined) {
         const existingLock = this.locks.get(existingLockId);
 
         // Handle reentrant case (same holder)
@@ -432,12 +439,12 @@ export class LockManager {
       const newExpiration = now + ttl;
 
       // Only extend if new expiration is later than current (prevents timer drift)
-      if (existingLock.expiresAt === undefined || existingLock.expiresAt === null || newExpiration > existingLock.expiresAt) {
+      if (existingLock.expiresAt === undefined || newExpiration > existingLock.expiresAt) {
         const timeUntilExpiration = newExpiration - now;
         existingLock.expiresAt = newExpiration;
 
         // Clear old timer FIRST, then create new one (prevents timer leak)
-        if (existingLock.timer !== undefined && existingLock.timer !== null) {
+        if (existingLock.timer !== undefined) {
           clearTimeout(existingLock.timer);
         }
         existingLock.timer = setTimeout(() => {
@@ -474,7 +481,7 @@ export class LockManager {
     };
 
     // Store timer reference for cleanup
-    if (lock.expiresAt !== undefined && lock.expiresAt !== null) {
+    if (lock.expiresAt !== undefined) {
       lock.timer = setTimeout(() => {
         this.autoRelease(lockId);
       }, ttl);
@@ -593,7 +600,7 @@ export class LockManager {
       let resolved = false; // Prevents double-resolution
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-      const cleanup = () => {
+      const cleanup = (): void => {
         if (timeoutId) {
           clearTimeout(timeoutId);
           timeoutId = undefined;
@@ -601,7 +608,7 @@ export class LockManager {
         this.lockEvents.removeListener(eventName, onRelease);
       };
 
-      const onRelease = () => {
+      const onRelease = (): void => {
         if (resolved) return; // Already resolved, ignore
         resolved = true;
         cleanup();
@@ -635,7 +642,7 @@ export class LockManager {
     }
 
     const lockId = this.locksByResource.get(resource);
-    if (lockId === undefined || lockId === null || lockId === '') {
+    if (lockId === undefined || lockId === '') {
       return Promise.resolve(false);
     }
 
@@ -654,7 +661,7 @@ export class LockManager {
     }
 
     const lockId = this.locksByResource.get(resource);
-    if (lockId === undefined || lockId === null || lockId === '') {
+    if (lockId === undefined || lockId === '') {
       return Promise.resolve(undefined);
     }
 
@@ -667,7 +674,7 @@ export class LockManager {
   public releaseAll(): Promise<void> {
     // Clear all timers first
     for (const lock of this.locks.values()) {
-      if (lock.timer !== undefined && lock.timer !== null) {
+      if (lock.timer !== undefined) {
         clearTimeout(lock.timer);
       }
     }
@@ -679,7 +686,7 @@ export class LockManager {
     this.locksByResource.clear();
 
     // Release all pending mutexes (unblock waiters)
-    for (const [_resource, mutex] of this.acquireMutexes) {
+    for (const [, mutex] of this.acquireMutexes) {
       mutex.release();
     }
     this.acquireMutexes.clear();
@@ -715,9 +722,10 @@ export class LockManager {
     await this.releaseAll();
 
     // 3. Give in-flight operations a chance to complete
+    const POLL_INTERVAL_MS = 10;
     const startWait = Date.now();
     while (this.inFlightOps > 0 && Date.now() - startWait < this.disposeTimeout) {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
     // 4. Remove all listeners LAST (after events have been processed)
@@ -770,7 +778,7 @@ export class LockManager {
     try {
       return await callback();
     } finally {
-      if (result.lockId !== undefined && result.lockId !== null && result.lockId !== '') {
+      if (result.lockId !== undefined && result.lockId !== '') {
         await this.release(result.lockId);
       }
     }
@@ -786,6 +794,7 @@ export class LockManager {
    * @param ttl - New TTL in milliseconds (must be > 0)
    * @returns ExtendResult with extended=true and newExpiresAt on success
    */
+  // eslint-disable-next-line @typescript-eslint/require-await
   public async extend(lockId: string, ttl: number): Promise<ExtendResult> {
     // Check if disposed
     if (this.disposed) {
@@ -875,7 +884,7 @@ export class LockManager {
     }
 
     // Check if lock has expired
-    if (lock.expiresAt !== undefined && lock.expiresAt !== null && Date.now() >= lock.expiresAt) {
+    if (lock.expiresAt !== undefined && Date.now() >= lock.expiresAt) {
       // For reentrant locks, only auto-release if refCount is 1
       if (lock.refCount > 1) {
         return;

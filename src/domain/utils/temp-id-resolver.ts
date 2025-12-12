@@ -37,7 +37,7 @@ export function resolveTempId(
   }
 
   // Look up in mapping
-  if (mapping[value] !== undefined && mapping[value] !== '') {
+  if (value in mapping) {
     return mapping[value];
   }
 
@@ -57,7 +57,7 @@ export function resolveFieldTempIds(
   fieldMap: Record<string, boolean>,
   mapping: Record<string, string>
 ): Record<string, unknown> | null | undefined {
-  if (obj === undefined || obj === null || typeof obj !== 'object' || Object.keys(fieldMap).length === 0) {
+  if (obj === undefined || obj === null || Object.keys(fieldMap).length === 0) {
     return obj;
   }
 
@@ -84,7 +84,7 @@ export function resolveFieldTempIds(
               return item;
             }
           }
-          return item;
+          return item as unknown;
         });
       } else {
         resolved[key] = value;

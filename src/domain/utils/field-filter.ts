@@ -95,7 +95,7 @@ export function filterEntity<T>(
   let filtered: Partial<T>;
   const entityObj = entity as Record<string, unknown>;
 
-  if (fields?.includes('*')) {
+  if (fields?.includes('*') === true) {
     // Full mode: include all fields
     filtered = { ...entity };
   } else {
@@ -125,6 +125,7 @@ export function filterEntity<T>(
   // Exclude metadata fields if requested
   if (excludeMetadata) {
     for (const metadataField of METADATA_FIELDS) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- removing fields from runtime object
       delete filteredObj[metadataField];
     }
   }
@@ -132,6 +133,7 @@ export function filterEntity<T>(
   // Exclude computed fields if requested (only for phases)
   if (excludeComputed && entityType === 'phase') {
     for (const computedField of COMPUTED_FIELDS) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- removing fields from runtime object
       delete filteredObj[computedField];
     }
   }
@@ -191,10 +193,11 @@ export function filterArtifact<T>(
   // For list operations, ALWAYS remove sourceCode (security: even with includeContent=true)
   const shouldRemoveSourceCode = isListOperation || !includeContent;
 
-  if (shouldRemoveSourceCode && filteredObj.content) {
+  if (shouldRemoveSourceCode && filteredObj.content !== undefined && filteredObj.content !== null) {
     const content = filteredObj.content as Record<string, unknown>;
     if ('sourceCode' in content) {
-      const { sourceCode: _sourceCode, ...restContent } = content;
+      const { sourceCode: excludedSourceCode, ...restContent } = content;
+      void excludedSourceCode; // Excluded for security/performance
       filteredObj.content = restContent;
     }
   }
@@ -225,6 +228,7 @@ export function filterPhase<T>(
   // This handles legacy data that may contain deprecated fields
   for (const key of Object.keys(filteredObj)) {
     if (!VALID_PHASE_FIELDS.has(key)) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- removing invalid fields from runtime object
       delete filteredObj[key];
     }
   }

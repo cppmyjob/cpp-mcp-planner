@@ -103,10 +103,13 @@ export class RepositoryFactory {
   private planRepository?: PlanRepository;
 
   constructor(config: StorageConfig) {
-    if (config === undefined) {
+    // Runtime validation for config parameter (TypeScript types don't prevent null/undefined at runtime)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (config === undefined || config === null) {
       throw new Error('Storage config is required');
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (config.type !== 'file') {
       throw new Error(`Unsupported storage type: ${String(config.type)}. Only 'file' is currently supported.`);
     }
@@ -132,11 +135,13 @@ export class RepositoryFactory {
    * ```
    */
   public createRepository<T extends Entity>(entityType: EntityType, planId: string): Repository<T> {
-    // Validate inputs
-    if (entityType === undefined || typeof entityType !== 'string' || entityType.trim() === '') {
+    // Validate inputs (runtime checks for null/undefined/type)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (entityType === undefined || entityType === null || typeof entityType !== 'string' || entityType.trim() === '') {
       throw new Error('entityType is required and must be a non-empty string');
     }
-    if (planId === undefined || typeof planId !== 'string' || planId.trim() === '') {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (planId === undefined || planId === null || typeof planId !== 'string' || planId.trim() === '') {
       throw new Error('planId is required and must be a non-empty string');
     }
 
@@ -178,8 +183,9 @@ export class RepositoryFactory {
    * ```
    */
   public createLinkRepository(planId: string): LinkRepository {
-    // Validate input
-    if (planId === undefined || typeof planId !== 'string' || planId.trim() === '') {
+    // Validate input (runtime checks for null/undefined/type)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (planId === undefined || planId === null || typeof planId !== 'string' || planId.trim() === '') {
       throw new Error('planId is required and must be a non-empty string');
     }
 
@@ -257,8 +263,9 @@ export class RepositoryFactory {
    * ```
    */
   public createUnitOfWork(planId: string): UnitOfWork {
-    // Validate input
-    if (planId === undefined || typeof planId !== 'string' || planId.trim() === '') {
+    // Validate input (runtime checks for null/undefined/type)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (planId === undefined || planId === null || typeof planId !== 'string' || planId.trim() === '') {
       throw new Error('planId is required and must be a non-empty string');
     }
 
@@ -303,7 +310,7 @@ export class RepositoryFactory {
    * ```
    */
   public async dispose(): Promise<void> {
-    type Disposable = { dispose?: () => Promise<void> };
+    interface Disposable { dispose?: () => Promise<void> }
 
     // Dispose all cached repositories
     for (const repo of this.repositoryCache.values()) {

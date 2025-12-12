@@ -24,6 +24,60 @@ import { resolveFieldTempIds } from '../utils/temp-id-resolver.js';
 // Batch operation types
 export type BatchEntityType = 'requirement' | 'solution' | 'phase' | 'link' | 'decision' | 'artifact';
 
+// Payload types for batch operations
+export interface RequirementPayload {
+  tempId?: string;
+  title: string;
+  description: string;
+  priority?: string;
+  source?: {
+    type: string;
+    parentId?: string;
+  };
+  [key: string]: unknown;
+}
+
+export interface SolutionPayload {
+  tempId?: string;
+  title: string;
+  description: string;
+  addressing?: string[];
+  [key: string]: unknown;
+}
+
+export interface PhasePayload {
+  tempId?: string;
+  title: string;
+  description?: string;
+  parentId?: string;
+  [key: string]: unknown;
+}
+
+export interface LinkPayload {
+  sourceId: string;
+  targetId: string;
+  relationType: string;
+  [key: string]: unknown;
+}
+
+export interface DecisionPayload {
+  tempId?: string;
+  title: string;
+  description: string;
+  [key: string]: unknown;
+}
+
+export interface ArtifactPayload {
+  tempId?: string;
+  title: string;
+  description: string;
+  artifactType: string;
+  relatedPhaseId?: string;
+  relatedSolutionId?: string;
+  relatedRequirementIds?: string[];
+  [key: string]: unknown;
+}
+
 export interface BatchOperation {
   entityType: BatchEntityType;
   payload: Record<string, unknown>;
@@ -144,7 +198,8 @@ class InMemoryRepository<T extends Entity> implements Repository<T> {
     }
 
     // Remove version from updates to prevent overwrite, manage it internally
-    const { version: _, ...updatesWithoutVersion } = updates;
+    const { version: providedVersion, ...updatesWithoutVersion } = updates;
+    void providedVersion; // Excluded from updates, version is managed internally
 
     const updated: T = {
       ...existing,
@@ -267,7 +322,7 @@ class InMemoryLinkRepository implements LinkRepository {
     const links = await this.findAll();
     return links.filter(l =>
       l.sourceId === sourceId &&
-      (relationType === undefined || relationType === null || relationType === '' || l.relationType === relationType)
+      (relationType === undefined || relationType === '' || l.relationType === relationType)
     );
   }
 
@@ -275,7 +330,7 @@ class InMemoryLinkRepository implements LinkRepository {
     const links = await this.findAll();
     return links.filter(l =>
       l.targetId === targetId &&
-      (relationType === undefined || relationType === null || relationType === '' || l.relationType === relationType)
+      (relationType === undefined || relationType === '' || l.relationType === relationType)
     );
   }
 
@@ -294,7 +349,7 @@ class InMemoryLinkRepository implements LinkRepository {
 
   public async findAllLinks(relationType?: string): Promise<Link[]> {
     const links = await this.findAll();
-    if (relationType === undefined || relationType === null || relationType === '') {
+    if (relationType === undefined || relationType === '') {
       return links;
     }
     return links.filter(l => l.relationType === relationType);
@@ -603,10 +658,10 @@ class InMemoryStorage {
     }
   }
 
-  public saveEntities<T extends Entity>(
+  public saveEntities(
     planId: string,
     entityType: string,
-    entities: T[]
+    entities: Entity[]
   ): Promise<void> {
     // Save to in-memory map (NOT to disk)
     switch (entityType) {
@@ -730,9 +785,10 @@ export class BatchService {
     const results: { success: boolean; id?: string; error?: string }[] = [];
     const tempIdMapping: Record<string, string> = {};
 
-    try {
-      // 3. Execute operations sequentially in memory
-      for (const op of input.operations) {
+    // 3. Execute operations sequentially in memory
+    // Note: If any operation fails, the error bubbles up and flushToDisk() is never called,
+    // so changes remain in memory only and are rolled back through garbage collection
+    for (const op of input.operations) {
         let result: { id?: string; requirementId?: string; solutionId?: string; phaseId?: string; linkId?: string; decisionId?: string; artifactId?: string } | undefined;
 
         // Resolve temp IDs in payload
@@ -746,7 +802,7 @@ export class BatchService {
             if (isUpdate) {
               // Resolve temp ID in id field if needed
               const payloadWithId = resolvedPayload as { id: string; updates: Record<string, unknown> };
-              const requirementId = (tempIdMapping[payloadWithId.id] !== undefined && tempIdMapping[payloadWithId.id] !== null && tempIdMapping[payloadWithId.id] !== '') ? tempIdMapping[payloadWithId.id] : payloadWithId.id;
+              const requirementId = tempIdMapping[payloadWithId.id] ?? payloadWithId.id;
               result = await memReqService.updateRequirement({
                 planId: input.planId,
                 requirementId,
@@ -754,11 +810,10 @@ export class BatchService {
               });
               results.push({ success: true, id: requirementId });
             } else {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
               result = await memReqService.addRequirement({
                 planId: input.planId,
-                requirement: resolvedPayload as any
-              });
+                requirement: resolvedPayload as unknown as RequirementPayload
+              } as unknown as Parameters<typeof memReqService.addRequirement>[0]);
               results.push({ success: true, id: result.requirementId });
 
               // Track temp ID mapping
@@ -773,7 +828,7 @@ export class BatchService {
           case 'solution':
             if (isUpdate) {
               const payloadWithId = resolvedPayload as { id: string; updates: Record<string, unknown> };
-              const solutionId = (tempIdMapping[payloadWithId.id] !== undefined && tempIdMapping[payloadWithId.id] !== null && tempIdMapping[payloadWithId.id] !== '') ? tempIdMapping[payloadWithId.id] : payloadWithId.id;
+              const solutionId = tempIdMapping[payloadWithId.id] ?? payloadWithId.id;
               result = await memSolService.updateSolution({
                 planId: input.planId,
                 solutionId,
@@ -781,11 +836,10 @@ export class BatchService {
               });
               results.push({ success: true, id: solutionId });
             } else {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
               result = await memSolService.proposeSolution({
                 planId: input.planId,
-                solution: resolvedPayload as any
-              });
+                solution: resolvedPayload as unknown as SolutionPayload
+              } as unknown as Parameters<typeof memSolService.proposeSolution>[0]);
               results.push({ success: true, id: result.solutionId });
 
               const payloadWithTempId = resolvedPayload as { tempId?: string };
@@ -799,7 +853,7 @@ export class BatchService {
           case 'phase':
             if (isUpdate) {
               const payloadWithId = resolvedPayload as { id: string; updates: Record<string, unknown> };
-              const phaseId = (tempIdMapping[payloadWithId.id] !== undefined && tempIdMapping[payloadWithId.id] !== null && tempIdMapping[payloadWithId.id] !== '') ? tempIdMapping[payloadWithId.id] : payloadWithId.id;
+              const phaseId = tempIdMapping[payloadWithId.id] ?? payloadWithId.id;
               result = await memPhaseService.updatePhase({
                 planId: input.planId,
                 phaseId,
@@ -807,11 +861,10 @@ export class BatchService {
               });
               results.push({ success: true, id: phaseId });
             } else {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
               result = await memPhaseService.addPhase({
                 planId: input.planId,
-                phase: resolvedPayload as any
-              });
+                phase: resolvedPayload as unknown as PhasePayload
+              } as unknown as Parameters<typeof memPhaseService.addPhase>[0]);
               results.push({ success: true, id: result.phaseId });
 
               const payloadWithTempId = resolvedPayload as { tempId?: string };
@@ -823,18 +876,17 @@ export class BatchService {
             break;
 
           case 'link':
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
             result = await memLinkService.linkEntities({
               planId: input.planId,
-              ...(resolvedPayload as any)
-            });
+              ...(resolvedPayload as unknown as LinkPayload)
+            } as unknown as Parameters<typeof memLinkService.linkEntities>[0]);
             results.push({ success: true, id: result.linkId });
             break;
 
           case 'decision':
             if (isUpdate) {
               const payloadWithId = resolvedPayload as { id: string; updates: Record<string, unknown> };
-              const decisionId = (tempIdMapping[payloadWithId.id] !== undefined && tempIdMapping[payloadWithId.id] !== null && tempIdMapping[payloadWithId.id] !== '') ? tempIdMapping[payloadWithId.id] : payloadWithId.id;
+              const decisionId = tempIdMapping[payloadWithId.id] ?? payloadWithId.id;
               result = await memDecService.updateDecision({
                 planId: input.planId,
                 decisionId,
@@ -842,11 +894,10 @@ export class BatchService {
               });
               results.push({ success: true, id: decisionId });
             } else {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
               result = await memDecService.recordDecision({
                 planId: input.planId,
-                decision: resolvedPayload as any
-              });
+                decision: resolvedPayload as unknown as DecisionPayload
+              } as unknown as Parameters<typeof memDecService.recordDecision>[0]);
               results.push({ success: true, id: result.decisionId });
 
               const payloadWithTempId = resolvedPayload as { tempId?: string };
@@ -860,7 +911,7 @@ export class BatchService {
           case 'artifact':
             if (isUpdate) {
               const payloadWithId = resolvedPayload as { id: string; updates: Record<string, unknown> };
-              const artifactId = (tempIdMapping[payloadWithId.id] !== undefined && tempIdMapping[payloadWithId.id] !== null && tempIdMapping[payloadWithId.id] !== '') ? tempIdMapping[payloadWithId.id] : payloadWithId.id;
+              const artifactId = tempIdMapping[payloadWithId.id] ?? payloadWithId.id;
               result = await memArtService.updateArtifact({
                 planId: input.planId,
                 artifactId,
@@ -868,11 +919,10 @@ export class BatchService {
               });
               results.push({ success: true, id: artifactId });
             } else {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
               result = await memArtService.addArtifact({
                 planId: input.planId,
-                artifact: resolvedPayload as any
-              });
+                artifact: resolvedPayload as unknown as ArtifactPayload
+              } as unknown as Parameters<typeof memArtService.addArtifact>[0]);
               results.push({ success: true, id: result.artifactId });
 
               const payloadWithTempId = resolvedPayload as { tempId?: string };
@@ -888,19 +938,13 @@ export class BatchService {
         }
       }
 
-      // 4. All operations succeeded - flush to disk atomically
-      await memoryStorage.flushToDisk();
+    // 4. All operations succeeded - flush to disk atomically
+    await memoryStorage.flushToDisk();
 
-      // 5. Update statistics (only once after all operations)
-      await this.planService.updateStatistics(input.planId);
+    // 5. Update statistics (only once after all operations)
+    await this.planService.updateStatistics(input.planId);
 
-      return { results, tempIdMapping };
-
-    } catch (error) {
-      // Rollback: simply don't write to disk
-      // Memory will be garbage collected
-      throw error;
-    }
+    return { results, tempIdMapping };
   }
 
   /**
@@ -914,9 +958,7 @@ export class BatchService {
    * - link: sourceId, targetId
    */
   private resolveTempIds(payload: Record<string, unknown>, mapping: Record<string, string>, entityType?: string): Record<string, unknown> {
-    if (payload === null || payload === undefined || typeof payload !== 'object') {
-      return payload;
-    }
+    // payload is Record<string, unknown>, so it cannot be null or undefined
 
     // Define ID fields per entity type
     const ID_FIELDS: Record<string, Record<string, boolean>> = {
@@ -934,6 +976,7 @@ export class BatchService {
 
     const fieldMap = (entityType !== undefined && entityType !== '') ? (ID_FIELDS[entityType] ?? {}) : {};
 
-    return resolveFieldTempIds(payload, fieldMap, mapping) as Record<string, unknown>;
+    const resolved = resolveFieldTempIds(payload, fieldMap, mapping);
+    return resolved ?? payload;
   }
 }

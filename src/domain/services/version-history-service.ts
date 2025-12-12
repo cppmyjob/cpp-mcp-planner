@@ -52,11 +52,11 @@ export class VersionHistoryService {
   /**
    * Save a version snapshot
    */
-  public async saveVersion<T extends Entity>(
+  public async saveVersion(
     planId: string,
     entityId: string,
     entityType: EntityType,
-    data: T,
+    data: Entity,
     version: number,
     author?: string,
     changeNote?: string
@@ -69,7 +69,7 @@ export class VersionHistoryService {
     const maxDepth = await this.getMaxHistoryDepth(planId);
     const history = await this.loadHistory(planId, entityId, entityType);
 
-    const snapshot: VersionSnapshot<T> = {
+    const snapshot: VersionSnapshot = {
       version,
       data,
       timestamp: new Date().toISOString(),
@@ -141,7 +141,7 @@ export class VersionHistoryService {
     let v2 = history.versions.find((v) => v.version === input.version2);
 
     // If v1 not found in history and current entity data is provided
-    if (v1 === undefined && input.currentEntityData !== undefined && input.currentEntityData !== null && input.currentVersion === input.version1) {
+    if (v1 === undefined && input.currentEntityData !== undefined && input.currentVersion === input.version1) {
       v1 = {
         version: input.version1,
         data: input.currentEntityData,
@@ -150,7 +150,7 @@ export class VersionHistoryService {
     }
 
     // If v2 not found in history and current entity data is provided
-    if (v2 === undefined && input.currentEntityData !== undefined && input.currentEntityData !== null && input.currentVersion === input.version2) {
+    if (v2 === undefined && input.currentEntityData !== undefined && input.currentVersion === input.version2) {
       v2 = {
         version: input.version2,
         data: input.currentEntityData,
@@ -223,8 +223,8 @@ export class VersionHistoryService {
     entityType: EntityType
   ): Promise<VersionHistory> {
     const history = await this.planRepo.loadVersionHistory(planId, entityType, entityId);
-    if (history !== undefined && history !== null) {
-      return history as VersionHistory;
+    if (history !== null) {
+      return history;
     }
     // History file doesn't exist, return empty
     return {

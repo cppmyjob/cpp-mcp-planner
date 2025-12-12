@@ -4,7 +4,7 @@ import { createMcpServer, createServices } from './server/index.js';
 
 const storagePath = process.env.MCP_PLANNING_STORAGE_PATH ?? './.mcp-plans';
 
-async function main() {
+async function main(): Promise<void> {
   const services = await createServices(storagePath);
   const { server } = createMcpServer(services);
 

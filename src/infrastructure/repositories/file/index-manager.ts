@@ -55,9 +55,10 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
       for (const entry of indexFile.entries) {
         this.inMemoryIndex.set(entry.id, entry);
       }
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        // Index doesn't exist, create empty one
+    } catch (error) {
+      // Handle file not found - create empty index
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'ENOENT') {
         await this.saveIndexFile();
       } else {
         throw error;
