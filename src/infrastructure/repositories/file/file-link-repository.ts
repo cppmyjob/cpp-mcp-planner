@@ -172,9 +172,9 @@ export class FileLinkRepository
 
   private async getLinkByIdOrNull(id: string): Promise<Link | null> {
     // Note: ensureInitialized() called by public methods
-    // Check cache
+    // Check cache (delegates to base class)
     if (this.cacheOptions.enabled) {
-      const cached = this.linkCache.get(id);
+      const cached = this.cacheGet(this.linkCache, id);
       if (cached) {
         return cached;
       }

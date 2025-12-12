@@ -16,20 +16,10 @@ import * as fs from 'fs/promises';
 import * as crypto from 'crypto';
 import * as util from 'util';
 import gracefulFs from 'graceful-fs';
-import type { CacheOptions } from './types.js';
+import { DEFAULT_CACHE_OPTIONS, type CacheOptions } from './types.js';
 
 // graceful-fs provides retry logic for Windows file locking issues (EPERM/EBUSY/EACCES)
 const gracefulRename = util.promisify(gracefulFs.rename);
-
-/**
- * Default cache options used when none specified
- */
-const DEFAULT_CACHE_OPTIONS: Required<CacheOptions> = {
-  enabled: true,
-  ttl: 5000,
-  maxSize: 100,
-  invalidation: 'version',
-};
 
 /**
  * Abstract base class for file-based repositories
@@ -45,10 +35,11 @@ export abstract class BaseFileRepository {
     protected readonly baseDir: string,
     cacheOptions?: Partial<CacheOptions>
   ) {
+    // DEFAULT_CACHE_OPTIONS from types.ts provides all required fields
     this.cacheOptions = {
       ...DEFAULT_CACHE_OPTIONS,
       ...cacheOptions,
-    };
+    } as Required<CacheOptions>;
   }
 
   // ============================================================================

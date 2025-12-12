@@ -17,8 +17,8 @@ import type {
   IndexFile,
   CacheEntry,
   CacheOptions,
-  DEFAULT_CACHE_OPTIONS,
 } from './types.js';
+import { DEFAULT_CACHE_OPTIONS } from './types.js';
 
 const gracefulRename = util.promisify(gracefulFs.rename);
 
@@ -40,11 +40,10 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
     cacheOptions?: Partial<CacheOptions>
   ) {
     this.indexPath = indexPath;
+    // Use DEFAULT_CACHE_OPTIONS from types.ts as single source of truth
     this.cacheOptions = {
-      enabled: cacheOptions?.enabled ?? true,
-      ttl: cacheOptions?.ttl ?? 5000,
-      maxSize: cacheOptions?.maxSize ?? 100,
-      invalidation: cacheOptions?.invalidation ?? 'version',
+      ...DEFAULT_CACHE_OPTIONS,
+      ...cacheOptions,
     };
   }
 

@@ -120,9 +120,9 @@ export class FileRepository<T extends Entity>
 
   async findByIdOrNull(id: string): Promise<T | null> {
     await this.ensureInitialized(); // FIX H-2
-    // Check cache first
+    // Check cache first (delegates to base class)
     if (this.cacheOptions.enabled) {
-      const cached = this.entityCache.get(id);
+      const cached = this.cacheGet(this.entityCache, id);
       if (cached) {
         return cached;
       }

@@ -90,6 +90,7 @@ export class FilePlanRepository
    * @param planId - Plan ID
    */
   async createPlan(planId: string): Promise<void> {
+    await this.ensureInitialized();
     const planDir = path.join(this.plansDir, planId);
 
     // Create main directories
@@ -116,6 +117,7 @@ export class FilePlanRepository
    * @param planId - Plan ID
    */
   async deletePlan(planId: string): Promise<void> {
+    await this.ensureInitialized();
     const planDir = path.join(this.plansDir, planId);
     await fs.rm(planDir, { recursive: true, force: true });
   }
@@ -129,6 +131,7 @@ export class FilePlanRepository
    * @returns Array of plan IDs
    */
   async listPlans(): Promise<string[]> {
+    await this.ensureInitialized();
     try {
       const entries = await fs.readdir(this.plansDir, { withFileTypes: true });
       return entries
@@ -146,6 +149,7 @@ export class FilePlanRepository
    * @returns true if plan directory exists
    */
   async planExists(planId: string): Promise<boolean> {
+    await this.ensureInitialized();
     try {
       const planDir = path.join(this.plansDir, planId);
       await fs.access(planDir);
@@ -164,6 +168,7 @@ export class FilePlanRepository
    * @param manifest - Plan manifest object
    */
   async saveManifest(planId: string, manifest: PlanManifest): Promise<void> {
+    await this.ensureInitialized();
     const manifestPath = path.join(this.plansDir, planId, 'manifest.json');
     await this.atomicWriteJSON(manifestPath, manifest);
   }
@@ -178,6 +183,7 @@ export class FilePlanRepository
    * @throws If manifest file doesn't exist or is invalid JSON
    */
   async loadManifest(planId: string): Promise<PlanManifest> {
+    await this.ensureInitialized();
     const manifestPath = path.join(this.plansDir, planId, 'manifest.json');
     return this.loadJSON<PlanManifest>(manifestPath);
   }
@@ -191,6 +197,7 @@ export class FilePlanRepository
    * @param index - Active plans index object
    */
   async saveActivePlans(index: ActivePlansIndex): Promise<void> {
+    await this.ensureInitialized();
     await this.atomicWriteJSON(this.activePlansPath, index);
   }
 
@@ -202,9 +209,9 @@ export class FilePlanRepository
    * @returns Active plans index object
    */
   async loadActivePlans(): Promise<ActivePlansIndex> {
+    await this.ensureInitialized();
     try {
-      const content = await fs.readFile(this.activePlansPath, 'utf-8');
-      return JSON.parse(content) as ActivePlansIndex;
+      return await this.loadJSON<ActivePlansIndex>(this.activePlansPath);
     } catch {
       return {};
     }
@@ -221,6 +228,7 @@ export class FilePlanRepository
    * @returns Full path to saved file
    */
   async saveExport(planId: string, filename: string, content: string): Promise<string> {
+    await this.ensureInitialized();
     const exportPath = path.join(this.plansDir, planId, 'exports', filename);
     await fs.writeFile(exportPath, content, 'utf-8');
     return exportPath;
@@ -237,6 +245,7 @@ export class FilePlanRepository
    * @param history - Version history data
    */
   async saveVersionHistory(planId: string, entityType: string, entityId: string, history: any): Promise<void> {
+    await this.ensureInitialized();
     const historyPath = path.join(this.plansDir, planId, 'history', entityType, `${entityId}.json`);
     await this.atomicWriteJSON(historyPath, history);
   }
@@ -252,6 +261,7 @@ export class FilePlanRepository
    * @returns Version history data, or null if not found
    */
   async loadVersionHistory(planId: string, entityType: string, entityId: string): Promise<any | null> {
+    await this.ensureInitialized();
     const historyPath = path.join(this.plansDir, planId, 'history', entityType, `${entityId}.json`);
     try {
       return await this.loadJSON(historyPath);
@@ -268,6 +278,7 @@ export class FilePlanRepository
    * @param entityId - Entity ID
    */
   async deleteVersionHistory(planId: string, entityType: string, entityId: string): Promise<void> {
+    await this.ensureInitialized();
     const historyPath = path.join(this.plansDir, planId, 'history', entityType, `${entityId}.json`);
     try {
       await fs.unlink(historyPath);
