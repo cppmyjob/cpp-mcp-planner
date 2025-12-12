@@ -73,7 +73,7 @@ describe('ArtifactService', () => {
       expect(artifact.status).toBe('draft');
     });
 
-    it('should add artifact with fileTable', async () => {
+    it('should add artifact with targets', async () => {
       const result = await service.addArtifact({
         planId,
         artifact: {
@@ -84,7 +84,7 @@ describe('ArtifactService', () => {
             language: 'sql',
             sourceCode: 'CREATE TABLE users (id INT PRIMARY KEY);',
           },
-          fileTable: [
+          targets: [
             { path: 'migrations/001_users.sql', action: 'create', description: 'User table migration' },
             { path: 'src/models/user.ts', action: 'create', description: 'User model' },
           ],
@@ -93,8 +93,8 @@ describe('ArtifactService', () => {
 
       // Verify via getArtifact
       const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
-      expect(artifact.fileTable).toHaveLength(2);
-      expect(artifact.fileTable![0].action).toBe('create');
+      expect(artifact.targets).toHaveLength(2);
+      expect(artifact.targets![0].action).toBe('create');
     });
 
     it('should add artifact with related entities', async () => {
@@ -335,14 +335,14 @@ describe('ArtifactService', () => {
   });
 
   describe('edge cases', () => {
-    it('should add artifact without content field (documentation with fileTable only)', async () => {
+    it('should add artifact without content field (documentation with targets only)', async () => {
       const result = await service.addArtifact({
         planId,
         artifact: {
           title: 'Critical Files to Read',
           description: 'Key files for implementation',
           artifactType: 'documentation',
-          fileTable: [
+          targets: [
             { path: 'src/services/user.ts', action: 'modify', description: 'User service' },
             { path: 'src/models/user.ts', action: 'modify', description: 'User model' },
           ],
@@ -355,7 +355,7 @@ describe('ArtifactService', () => {
       const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
       expect(artifact.title).toBe('Critical Files to Read');
       expect(artifact.artifactType).toBe('documentation');
-      expect(artifact.fileTable).toHaveLength(2);
+      expect(artifact.targets).toHaveLength(2);
       expect(artifact.content).toEqual({});
     });
 
@@ -423,7 +423,7 @@ describe('ArtifactService', () => {
       ).rejects.toThrow(/artifactType/i);
     });
 
-    it('should throw for invalid fileTable action', async () => {
+    it('should throw for invalid targets action', async () => {
       await expect(
         service.addArtifact({
           planId,
@@ -432,7 +432,7 @@ describe('ArtifactService', () => {
             description: 'Test',
             artifactType: 'code',
             content: { language: 'ts', sourceCode: '' },
-            fileTable: [{ path: 'file.ts', action: 'invalid' as any }],
+            targets: [{ path: 'file.ts', action: 'invalid' as any }],
           },
         })
       ).rejects.toThrow(/action/i);

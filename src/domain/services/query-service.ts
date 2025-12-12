@@ -608,8 +608,8 @@ export class QueryService {
     // Check: File existence
     checksPerformed.push('file_existence');
     for (const artifact of entities.artifacts) {
-      if (artifact.fileTable && artifact.fileTable.length > 0) {
-        for (const file of artifact.fileTable) {
+      if (artifact.targets && artifact.targets.length > 0) {
+        for (const file of artifact.targets) {
           // Skip files that are being created
           if (file.action === 'create') {
             continue;
@@ -879,10 +879,10 @@ export class QueryService {
         }
         lines.push('');
 
-        // File table
-        if (artifact.fileTable !== undefined && artifact.fileTable !== null && artifact.fileTable.length > 0) {
+        // File targets
+        if (artifact.targets !== undefined && artifact.targets !== null && artifact.targets.length > 0) {
           lines.push('**Files**:');
-          for (const file of artifact.fileTable) {
+          for (const file of artifact.targets) {
             const desc = file.description !== undefined && file.description !== null && file.description !== '' ? ` - ${file.description}` : '';
             lines.push(`- \`${file.path}\` [${file.action}]${desc}`);
           }

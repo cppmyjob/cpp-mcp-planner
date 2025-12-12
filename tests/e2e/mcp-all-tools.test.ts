@@ -2077,13 +2077,6 @@ describe('E2E: All MCP Tools Validation', () => {
 }`,
               filename: 'auth-service.ts',
             },
-            fileTable: [
-              {
-                path: 'src/services/auth-service.ts',
-                action: 'create',
-                description: 'Create new auth service',
-              },
-            ],
             targets: [
               {
                 path: 'src/services/auth-service.ts',

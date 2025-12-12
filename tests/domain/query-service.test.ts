@@ -554,8 +554,8 @@ describe('QueryService', () => {
       expect(issue!.message).toContain('Parent Phase');
     });
 
-    // RED TEST 6: File existence - detect missing file in artifact.fileTable
-    it('should detect missing file in artifact.fileTable', async () => {
+    // RED TEST 6: File existence - detect missing file in artifact.targets
+    it('should detect missing file in artifact.targets', async () => {
       const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(repositoryFactory, planService);
 
       await artifactService.addArtifact({
@@ -564,7 +564,7 @@ describe('QueryService', () => {
           title: 'Code Artifact',
           description: 'Implementation',
           artifactType: 'code',
-          fileTable: [
+          targets: [
             { path: '/absolute/nonexistent.ts', action: 'modify', description: 'Nonexistent file' },
           ],
         },
@@ -590,7 +590,7 @@ describe('QueryService', () => {
           title: 'New Code',
           description: 'New implementation',
           artifactType: 'code',
-          fileTable: [
+          targets: [
             { path: '/new-file.ts', action: 'create', description: 'Will be created' },
           ],
         },
@@ -622,7 +622,7 @@ describe('QueryService', () => {
             title: 'Modify Existing',
             description: 'Modify existing file',
             artifactType: 'code',
-            fileTable: [
+            targets: [
               { path: tmpFile, action: 'modify', description: 'Existing file' },
             ],
           },
@@ -637,15 +637,15 @@ describe('QueryService', () => {
       }
     });
 
-    // GREEN TEST 9: File existence - skip check if artifact.fileTable is undefined
-    it('should skip file check if artifact.fileTable is undefined', async () => {
+    // GREEN TEST 9: File existence - skip check if artifact.targets is undefined
+    it('should skip file check if artifact.targets is undefined', async () => {
       const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(repositoryFactory, planService);
 
       await artifactService.addArtifact({
         planId,
         artifact: {
           title: 'No File Table',
-          description: 'Artifact without fileTable',
+          description: 'Artifact without targets',
           artifactType: 'documentation',
         },
       });
@@ -1077,7 +1077,7 @@ describe('QueryService', () => {
             sourceCode: 'export class UserService { }',
             filename: 'user-service.ts',
           },
-          fileTable: [
+          targets: [
             { path: 'src/services/user-service.ts', action: 'create', description: 'Main service file' },
           ],
         },
@@ -1094,7 +1094,7 @@ describe('QueryService', () => {
       expect(result.content).toContain('user-service.ts');
     });
 
-    it('should include artifact file table in markdown', async () => {
+    it('should include artifact file targets in markdown', async () => {
       await artifactService.addArtifact({
         planId,
         artifact: {
@@ -1105,7 +1105,7 @@ describe('QueryService', () => {
             language: 'sql',
             sourceCode: 'CREATE TABLE users (id INT PRIMARY KEY);',
           },
-          fileTable: [
+          targets: [
             { path: 'migrations/001_users.sql', action: 'create', description: 'User table migration' },
             { path: 'src/models/user.ts', action: 'create', description: 'User model' },
             { path: 'src/types.ts', action: 'modify', description: 'Add user type' },

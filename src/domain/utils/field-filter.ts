@@ -46,7 +46,7 @@ export const SUMMARY_FIELDS: Record<EntityType, string[]> = {
   solution: ['id', 'title', 'description', 'status', 'addressing'],
   decision: ['id', 'title', 'question', 'decision', 'context', 'consequences', 'status'],
   phase: ['id', 'title', 'status', 'progress', 'path', 'priority', 'parentId', 'order', 'depth', 'childCount', 'startedAt', 'completedAt', 'blockingReason'],
-  artifact: ['id', 'title', 'slug', 'artifactType', 'status', 'description', 'content', 'fileTable', 'targets', 'relatedPhaseId', 'relatedSolutionId', 'relatedRequirementIds', 'codeRefs'],
+  artifact: ['id', 'title', 'slug', 'artifactType', 'status', 'description', 'content', 'targets', 'relatedPhaseId', 'relatedSolutionId', 'relatedRequirementIds', 'codeRefs'],
 };
 
 /**

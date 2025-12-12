@@ -379,18 +379,6 @@ export const tools = [
                 filename: { type: 'string' },
               },
             },
-            fileTable: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  path: { type: 'string' },
-                  action: { type: 'string', enum: ['create', 'modify', 'delete'] },
-                  description: { type: 'string' },
-                },
-                required: ['path', 'action'],
-              },
-            },
             targets: {
               type: 'array',
               items: {
@@ -424,7 +412,6 @@ export const tools = [
             slug: { type: 'string', description: 'Update slug (must be unique within plan)' },
             status: { type: 'string' },
             content: { type: 'object' },
-            fileTable: { type: 'array' },
             targets: { type: 'array' },
             relatedPhaseId: { type: 'string' },
             relatedSolutionId: { type: 'string' },
@@ -447,7 +434,7 @@ export const tools = [
         fields: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Fields to include. Default returns summary (id, title, slug, artifactType, status). Available fields: "description", "content" (excluding sourceCode unless fields=["*"]), "fileTable", "targets", "relatedPhaseId", "relatedSolutionId", "relatedRequirementIds", "codeRefs", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields including sourceCode (WARNING: sourceCode can be 5-50KB, returns large output, may pollute context).',
+          description: 'Fields to include. Default returns summary (id, title, slug, artifactType, status). Available fields: "description", "content" (excluding sourceCode unless fields=["*"]), "targets", "relatedPhaseId", "relatedSolutionId", "relatedRequirementIds", "codeRefs", "metadata", "createdAt", "updatedAt", "version". Use ["*"] for ALL fields including sourceCode (WARNING: sourceCode can be 5-50KB, returns large output, may pollute context).',
         },
         excludeMetadata: {
           type: 'boolean',

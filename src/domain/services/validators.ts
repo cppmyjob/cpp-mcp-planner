@@ -114,28 +114,6 @@ export function validateArtifactType(artifactType: unknown): void {
   }
 }
 
-export function validateFileTable(fileTable: unknown[]): void {
-  if (!Array.isArray(fileTable)) {
-    return;
-  }
-
-  for (let i = 0; i < fileTable.length; i++) {
-    const entry = fileTable[i] as Record<string, unknown>;
-
-    if (typeof entry.path !== 'string' || entry.path === '') {
-      throw new Error(
-        `Invalid fileTable entry at index ${String(i)}: 'path' must be a non-empty string`
-      );
-    }
-
-    if (!VALID_FILE_ACTIONS.includes(entry.action as typeof VALID_FILE_ACTIONS[number])) {
-      throw new Error(
-        `Invalid fileTable entry at index ${String(i)}: 'action' must be one of: ${VALID_FILE_ACTIONS.join(', ')}`
-      );
-    }
-  }
-}
-
 /**
  * Validates ArtifactTarget array.
  * Replaces validateFileTable with additional precision fields (lineNumber, lineEnd, searchPattern).

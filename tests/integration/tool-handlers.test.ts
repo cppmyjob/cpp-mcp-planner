@@ -1405,7 +1405,7 @@ describe('Tool Handlers Integration', () => {
       expect(getParsed.artifact.status).toBe('draft');
     });
 
-    it('artifact add should accept valid fileTable', async () => {
+    it('artifact add should accept valid targets', async () => {
       const result = await handleToolCall(
         'artifact',
         {
@@ -1419,7 +1419,7 @@ describe('Tool Handlers Integration', () => {
               language: 'sql',
               sourceCode: 'CREATE TABLE users (id INT PRIMARY KEY);',
             },
-            fileTable: [
+            targets: [
               { path: 'migrations/001_users.sql', action: 'create', description: 'User table migration' },
               { path: 'src/models/user.ts', action: 'create' },
             ],
@@ -1438,8 +1438,8 @@ describe('Tool Handlers Integration', () => {
         ctx.services
       );
       const getParsed = JSON.parse(getResult.content[0].text);
-      expect(getParsed.artifact.fileTable).toHaveLength(2);
-      expect(getParsed.artifact.fileTable[0].action).toBe('create');
+      expect(getParsed.artifact.targets).toHaveLength(2);
+      expect(getParsed.artifact.targets[0].action).toBe('create');
     });
 
     it('artifact add should reject invalid artifactType', async () => {
@@ -1461,7 +1461,7 @@ describe('Tool Handlers Integration', () => {
       ).rejects.toThrow(/artifactType/i);
     });
 
-    it('artifact add should reject invalid fileTable action', async () => {
+    it('artifact add should reject invalid targets action', async () => {
       await expect(
         handleToolCall(
           'artifact',
@@ -1473,7 +1473,7 @@ describe('Tool Handlers Integration', () => {
               description: 'Test',
               artifactType: 'code',
               content: { language: 'ts', sourceCode: '' },
-              fileTable: [{ path: 'file.ts', action: 'invalid-action' }],
+              targets: [{ path: 'file.ts', action: 'invalid-action' }],
             },
           },
           ctx.services
@@ -1526,7 +1526,7 @@ describe('Tool Handlers Integration', () => {
       expect(getParsed.artifact.version).toBe(2);
     });
 
-    it('artifact update should reject invalid fileTable', async () => {
+    it('artifact update should reject invalid targets', async () => {
       const artifact = await createTestArtifact(ctx);
 
       await expect(
@@ -1537,7 +1537,7 @@ describe('Tool Handlers Integration', () => {
             planId: ctx.planId,
             artifactId: artifact.artifactId,
             updates: {
-              fileTable: [{ path: '', action: 'create' }], // Empty path
+              targets: [{ path: '', action: 'create' }], // Empty path
             },
           },
           ctx.services

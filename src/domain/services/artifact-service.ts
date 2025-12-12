@@ -6,13 +6,12 @@ import type {
   Artifact,
   ArtifactType,
   ArtifactStatus,
-  FileEntry,
   ArtifactTarget,
   Tag,
   VersionHistory,
   VersionDiff,
 } from '../entities/types.js';
-import { validateTags, validateArtifactType, validateFileTable, validateTargets, validateCodeRefs } from './validators.js';
+import { validateTags, validateArtifactType, validateTargets, validateCodeRefs } from './validators.js';
 import { filterArtifact } from '../utils/field-filter.js';
 
 // Constants
@@ -58,7 +57,6 @@ export interface AddArtifactInput {
       sourceCode?: string;
       filename?: string;
     };
-    fileTable?: FileEntry[];
     targets?: ArtifactTarget[];
     relatedPhaseId?: string;
     relatedSolutionId?: string;
@@ -89,7 +87,6 @@ export interface UpdateArtifactInput {
       sourceCode?: string;
       filename?: string;
     };
-    fileTable: FileEntry[];
     targets: ArtifactTarget[];
     relatedPhaseId: string;
     relatedSolutionId: string;
@@ -185,9 +182,6 @@ export class ArtifactService {
     // Validate inputs
     validateArtifactType(input.artifact.artifactType);
     validateTags(input.artifact.tags ?? []);
-    if (input.artifact.fileTable) {
-      validateFileTable(input.artifact.fileTable);
-    }
     if (input.artifact.targets) {
       validateTargets(input.artifact.targets);
     }
@@ -228,7 +222,6 @@ export class ArtifactService {
             filename: input.artifact.content.filename,
           }
         : {},
-      fileTable: input.artifact.fileTable,
       targets: input.artifact.targets,
       relatedPhaseId: input.artifact.relatedPhaseId,
       relatedSolutionId: input.artifact.relatedSolutionId,
@@ -277,9 +270,6 @@ export class ArtifactService {
     if (input.updates.tags !== undefined) {
       validateTags(input.updates.tags);
     }
-    if (input.updates.fileTable !== undefined) {
-      validateFileTable(input.updates.fileTable);
-    }
     if (input.updates.targets !== undefined) {
       validateTargets(input.updates.targets);
     }
@@ -316,7 +306,6 @@ export class ArtifactService {
     if (input.updates.content !== undefined) {
       artifact.content = { ...artifact.content, ...input.updates.content };
     }
-    if (input.updates.fileTable !== undefined) artifact.fileTable = input.updates.fileTable;
     if (input.updates.targets !== undefined) artifact.targets = input.updates.targets;
     if (input.updates.relatedPhaseId !== undefined) artifact.relatedPhaseId = input.updates.relatedPhaseId;
     if (input.updates.relatedSolutionId !== undefined) artifact.relatedSolutionId = input.updates.relatedSolutionId;
