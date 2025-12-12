@@ -3,15 +3,11 @@
  *
  * Manages index metadata for file-based storage:
  * - In-memory caching with TTL
- * - Atomic writes using graceful-fs
+ * - Atomic writes using shared file-utils.ts
  * - Query operations (find, findOne, etc.)
  * - Cache invalidation strategies
  */
 
-import * as fs from 'fs/promises';
-import * as crypto from 'crypto';
-import * as util from 'util';
-import gracefulFs from 'graceful-fs';
 import type {
   IndexMetadata,
   IndexFile,
@@ -19,8 +15,7 @@ import type {
   CacheOptions,
 } from './types.js';
 import { DEFAULT_CACHE_OPTIONS } from './types.js';
-
-const gracefulRename = util.promisify(gracefulFs.rename);
+import { atomicWriteJSON, loadJSON } from './file-utils.js';
 
 /**
  * IndexManager<TMetadata>
@@ -49,11 +44,12 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
 
   /**
    * Initialize index from disk or create new one
+   *
+   * Uses shared loadJSON from file-utils.ts.
    */
   async initialize(): Promise<void> {
     try {
-      const content = await fs.readFile(this.indexPath, 'utf-8');
-      const indexFile: IndexFile<TMetadata> = JSON.parse(content);
+      const indexFile = await loadJSON<IndexFile<TMetadata>>(this.indexPath);
 
       // Load entries into memory
       for (const entry of indexFile.entries) {
@@ -209,9 +205,11 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
 
   /**
    * Save index file to disk atomically (with queue to prevent concurrent writes)
+   *
+   * Delegates to shared atomicWriteJSON from file-utils.ts for Windows compatibility.
    */
   private async saveIndexFile(): Promise<void> {
-    // Queue writes to prevent concurrent atomicWrite calls
+    // Queue writes to prevent concurrent atomicWriteJSON calls
     this.writeQueue = this.writeQueue.then(async () => {
       const indexFile: IndexFile<TMetadata> = {
         version: 1,
@@ -224,34 +222,11 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
         },
       };
 
-      await this.atomicWrite(this.indexPath, indexFile);
+      await atomicWriteJSON(this.indexPath, indexFile);
       this.isDirty = false;
     });
 
     await this.writeQueue;
-  }
-
-  /**
-   * Atomic write to prevent data corruption (from file-storage.ts)
-   */
-  private async atomicWrite(filePath: string, data: unknown): Promise<void> {
-    const tmpPath = `${filePath}.tmp.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`;
-
-    try {
-      // Write to temp file
-      await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
-
-      // Verify JSON is valid before committing
-      const written = await fs.readFile(tmpPath, 'utf-8');
-      JSON.parse(written);
-
-      // Atomic rename using graceful-fs
-      await gracefulRename(tmpPath, filePath);
-    } catch (error) {
-      // Cleanup temp file on error
-      await fs.unlink(tmpPath).catch(() => {});
-      throw error;
-    }
   }
 
   /**

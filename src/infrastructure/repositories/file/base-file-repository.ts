@@ -12,14 +12,8 @@
  * gracefulRename for Windows compatibility).
  */
 
-import * as fs from 'fs/promises';
-import * as crypto from 'crypto';
-import * as util from 'util';
-import gracefulFs from 'graceful-fs';
 import { DEFAULT_CACHE_OPTIONS, type CacheOptions } from './types.js';
-
-// graceful-fs provides retry logic for Windows file locking issues (EPERM/EBUSY/EACCES)
-const gracefulRename = util.promisify(gracefulFs.rename);
+import { atomicWriteJSON as sharedAtomicWriteJSON, loadJSON as sharedLoadJSON } from './file-utils.js';
 
 /**
  * Abstract base class for file-based repositories
@@ -35,11 +29,12 @@ export abstract class BaseFileRepository {
     protected readonly baseDir: string,
     cacheOptions?: Partial<CacheOptions>
   ) {
-    // DEFAULT_CACHE_OPTIONS from types.ts provides all required fields
+    // DEFAULT_CACHE_OPTIONS provides all required fields, spread order ensures
+    // user options override defaults while maintaining complete Required<CacheOptions>
     this.cacheOptions = {
       ...DEFAULT_CACHE_OPTIONS,
       ...cacheOptions,
-    } as Required<CacheOptions>;
+    };
   }
 
   // ============================================================================
@@ -82,58 +77,35 @@ export abstract class BaseFileRepository {
   }
 
   // ============================================================================
-  // Atomic File Operations
+  // Atomic File Operations (delegates to shared file-utils.ts)
   // ============================================================================
 
   /**
    * Write JSON data to file atomically
    *
-   * Uses temp file + rename pattern for crash safety:
-   * 1. Write to temp file
-   * 2. Verify JSON is valid
-   * 3. Atomic rename to target (using graceful-fs for Windows compatibility)
-   *
-   * WINDOWS EPERM ISSUE:
-   * On Windows, fs.rename() often fails with "EPERM: operation not permitted" when:
-   * - Windows Defender is scanning the file
-   * - Windows Search Indexer has the file open
-   * - IDE (VS Code, etc.) holds file handles
-   *
-   * We use graceful-fs which provides retry logic (up to 60s) for these errors.
+   * Delegates to shared utility in file-utils.ts which handles:
+   * - Temp file + rename pattern for crash safety
+   * - JSON validation before commit
+   * - Windows EPERM/EBUSY handling via graceful-fs
    *
    * @param filePath - Target file path
    * @param data - Data to write (will be JSON.stringify'd)
    */
   protected async atomicWriteJSON(filePath: string, data: unknown): Promise<void> {
-    const tmpPath = `${filePath}.tmp.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`;
-
-    try {
-      // Write to temp file
-      await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
-
-      // Verify JSON is valid before committing
-      const written = await fs.readFile(tmpPath, 'utf-8');
-      JSON.parse(written);
-
-      // Atomic rename using graceful-fs (retries on EPERM/EBUSY/EACCES)
-      await gracefulRename(tmpPath, filePath);
-    } catch (error) {
-      // Cleanup temp file on error
-      await fs.unlink(tmpPath).catch(() => {});
-      throw error;
-    }
+    return sharedAtomicWriteJSON(filePath, data);
   }
 
   /**
    * Load JSON data from file
+   *
+   * Delegates to shared utility in file-utils.ts.
    *
    * @param filePath - File path to read
    * @returns Parsed JSON data
    * @throws If file doesn't exist or JSON is invalid
    */
   protected async loadJSON<T>(filePath: string): Promise<T> {
-    const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content) as T;
+    return sharedLoadJSON<T>(filePath);
   }
 
   // ============================================================================
