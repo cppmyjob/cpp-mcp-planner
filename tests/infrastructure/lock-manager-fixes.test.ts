@@ -457,7 +457,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
                 }
               }
             }
-          }).catch(e => {
+          }).catch((e: unknown) => {
             if (!(e as Error).message.includes('disposed')) {
               errors.push(`Acquire error: ${(e as Error).message}`);
             }
@@ -481,7 +481,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
                 void error;
               }
             }
-          }).catch((error) => {
+          }).catch((error: unknown) => {
             // Ignore acquire failures
             void error;
           })

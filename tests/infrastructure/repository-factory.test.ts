@@ -34,9 +34,9 @@ describe('RED: RepositoryFactory', () => {
 
   afterEach(async () => {
     // Dispose factory first (doesn't own lockManager)
-    await factory?.dispose();
+    await factory.dispose();
     // Then dispose the shared lockManager (we own it in tests)
-    await lockManager?.dispose();
+    await lockManager.dispose();
     // Finally cleanup file system
     await fs.rm(testDir, { recursive: true, force: true });
   });

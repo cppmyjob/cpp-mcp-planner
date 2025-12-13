@@ -113,6 +113,10 @@ export default tseslint.config(
       // ═══════════════════════════════════════════════════════════════
       // SAFETY PATTERNS
       // ═══════════════════════════════════════════════════════════════
+      // Forbid non-null assertions (!) - они небезопасны
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      // Отключаем конфликтующее правило - разрешаем "as Type" для non-null assertions
+      '@typescript-eslint/non-nullable-type-assertion-style': 'off',
       // Prefer nullish coalescing (??) over logical OR (||)
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
       // Prefer optional chaining (?.)

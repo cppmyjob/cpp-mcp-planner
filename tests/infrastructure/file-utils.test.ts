@@ -151,9 +151,9 @@ describe('file-utils', () => {
 
     it('should handle concurrent writes to different files', async () => {
       // Concurrent writes to DIFFERENT files is the supported pattern
-      const writes = Array.from({ length: 10 }, (_, i) => {
+      const writes = Array.from({ length: 10 }, (_, i): Promise<void> => {
         const filePath = path.join(testDir, `concurrent-${i.toString()}.json`);
-        return atomicWriteJSON(filePath, { iteration: i });
+        return atomicWriteJSON(filePath, { iteration: i }) as Promise<void>;
       });
 
       await Promise.all(writes);

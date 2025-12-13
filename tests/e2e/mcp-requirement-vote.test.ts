@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 
 // Helper to parse MCP tool result
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 function parseResult<T>(result: unknown): T {
   const r = result as { content: { type: string; text: string }[] };
   return JSON.parse(r.content[0].text) as T;
@@ -23,7 +24,7 @@ describe('E2E: Requirement Voting via MCP Tool', () => {
   let planId: string;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-vote-' + Date.now() + '-' + crypto.randomUUID());
+    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-vote-' + String(Date.now()) + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
 
     const services = await createServices(storagePath);

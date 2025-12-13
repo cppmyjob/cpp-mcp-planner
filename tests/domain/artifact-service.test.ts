@@ -840,7 +840,7 @@ describe('ArtifactService', () => {
     describe('RED: fileTable to targets migration', () => {
       it('RED: should auto-migrate fileTable to targets on read', async () => {
         // Create artifact with old fileTable field by directly via repository
-        const artifactId = 'test-migration-' + Date.now();
+        const artifactId = 'test-migration-' + String(Date.now());
         const repo = repositoryFactory.createRepository('artifact', planId);
 
         const legacyArtifact = {
@@ -876,7 +876,7 @@ describe('ArtifactService', () => {
 
       it('RED: should preserve targets if both fileTable and targets exist', async () => {
         // Edge case: if both exist, targets takes precedence
-        const artifactId = 'test-both-' + Date.now();
+        const artifactId = 'test-both-' + String(Date.now());
         const repo = repositoryFactory.createRepository('artifact', planId);
 
         const artifact = {

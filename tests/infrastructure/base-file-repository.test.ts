@@ -15,7 +15,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { BaseFileRepository } from '../../src/infrastructure/repositories/file/base-file-repository';
-import { DEFAULT_CACHE_OPTIONS } from '../../src/infrastructure/repositories/file/types';
+import { DEFAULT_CACHE_OPTIONS, type CacheOptions } from '../../src/infrastructure/repositories/file/types';
 
 /**
  * Concrete test implementation of BaseFileRepository
@@ -61,7 +61,7 @@ class TestRepository extends BaseFileRepository {
     this.markInitialized();
   }
 
-  public getCacheOptions() {
+  public getCacheOptions(): Required<CacheOptions> {
     return this.cacheOptions;
   }
 

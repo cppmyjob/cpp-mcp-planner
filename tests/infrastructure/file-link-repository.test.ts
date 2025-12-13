@@ -282,7 +282,7 @@ describe('FileLinkRepository', () => {
         { sourceId: '', targetId: 'sol-2', relationType: 'implements' as RelationType }, // Invalid
       ];
 
-      await expect(repository.createMany(links as Omit<Link, 'id' | 'createdAt' | 'createdBy'>[])).rejects.toThrow();
+      await expect(repository.createMany(links)).rejects.toThrow();
 
       // Verify rollback - no links should exist
       const allLinks = await repository.findLinksBySource('req-1');
@@ -535,7 +535,7 @@ describe('FileLinkRepository', () => {
       // Launch concurrent deletes on SAME link ID
       const concurrentDeletes = 10;
       const promises = Array.from({ length: concurrentDeletes }, () =>
-        repository.deleteLink(link.id).catch((e: Error) => e)
+        repository.deleteLink(link.id).catch((e: unknown) => e)
       );
 
       const results = await Promise.all(promises);
@@ -579,7 +579,7 @@ describe('FileLinkRepository', () => {
       // With the race condition bug, some may succeed when they shouldn't
       const concurrentAttempts = 20;
       const promises = Array.from({ length: concurrentAttempts }, () =>
-        repository.createLink(linkData).catch((e: Error) => e)
+        repository.createLink(linkData).catch((e: unknown) => e)
       );
 
       const results = await Promise.all(promises);

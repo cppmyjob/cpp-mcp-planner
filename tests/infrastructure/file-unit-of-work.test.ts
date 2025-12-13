@@ -257,7 +257,7 @@ describe('FileUnitOfWork', () => {
   describe('REVIEW: Rollback Limitations (FIX C5)', () => {
     it('should emit warning about rollback limitations in file storage', async () => {
       const warnings: string[] = [];
-      const warningSpy = (msg: string) => warnings.push(msg);
+      const warningSpy = (msg: string): void => { warnings.push(msg); };
 
       uow.onWarning(warningSpy);
 

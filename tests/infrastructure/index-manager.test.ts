@@ -51,7 +51,7 @@ describe('IndexManager', () => {
   });
 
   describe('RED: CRUD Operations', () => {
-    let manager: IndexManager<IndexMetadata>;
+    let manager: IndexManager;
 
     beforeEach(async () => {
       manager = new IndexManager<IndexMetadata>(indexPath);
@@ -157,7 +157,7 @@ describe('IndexManager', () => {
   });
 
   describe('RED: Query Operations', () => {
-    let manager: IndexManager<IndexMetadata>;
+    let manager: IndexManager;
 
     beforeEach(async () => {
       manager = new IndexManager<IndexMetadata>(indexPath);
@@ -260,7 +260,7 @@ describe('IndexManager', () => {
   });
 
   describe('RED: Atomic Operations', () => {
-    let manager: IndexManager<IndexMetadata>;
+    let manager: IndexManager;
 
     beforeEach(async () => {
       manager = new IndexManager<IndexMetadata>(indexPath);

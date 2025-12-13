@@ -1205,8 +1205,8 @@ describe('PhaseService', () => {
       // Summary should be smaller than full (includes metadata by default, still excludes heavy fields)
       expect(summarySize).toBeLessThan(fullSize);
 
-      console.log(`Summary size: ${summarySize} bytes`);
-      console.log(`Full size: ${fullSize} bytes`);
+      console.log(`Summary size: ${String(summarySize)} bytes`);
+      console.log(`Full size: ${String(fullSize)} bytes`);
       console.log(`Compression ratio: ${(fullSize / summarySize).toFixed(1)}x`);
     });
   });
@@ -1475,7 +1475,7 @@ describe('PhaseService', () => {
         for (let i = 0; i < 15; i++) {
           const result = await service.addPhase({
             planId,
-            phase: { title: `Phase ${i}`, description: '', objectives: [], deliverables: [], successCriteria: [] },
+            phase: { title: `Phase ${String(i)}`, description: '', objectives: [], deliverables: [], successCriteria: [] },
           });
           phaseIds.push(result.phaseId);
         }

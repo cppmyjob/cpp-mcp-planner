@@ -248,8 +248,10 @@ describe('LockManager', () => {
       const { lockId } = await lockManager.acquire('resource-1');
 
       // Release after 100ms
-      setTimeout(async () => {
-        if (lockId !== undefined) await lockManager.release(lockId);
+      setTimeout(() => {
+        void (async () => {
+          if (lockId !== undefined) await lockManager.release(lockId);
+        })();
       }, 100);
 
       // Try to acquire with 500ms timeout
@@ -597,7 +599,7 @@ describe('LockManager', () => {
       const r2 = await lockManager.acquire('resource-2');
       const r3 = await lockManager.acquire('resource-3');
 
-      expect(r1.acquired === true && r2.acquired === true && r3.acquired === true).toBe(true);
+      expect(r1.acquired && r2.acquired && r3.acquired).toBe(true);
     });
   });
 
@@ -1288,7 +1290,7 @@ describe('LockManager', () => {
 
       // All should have failed (disposed)
       for (const result of results) {
-        if (result.acquired === false) {
+        if (!result.acquired) {
           expect(result.reason).toContain('disposed');
         }
       }
@@ -1315,8 +1317,8 @@ describe('LockManager', () => {
 
     it('should track in-flight operations correctly', async () => {
       // Access private counter for testing
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-      const getInFlightOps = () => (lockManager as any).inFlightOps;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+      const getInFlightOps = (): number => (lockManager as any).inFlightOps as number;
 
       expect(getInFlightOps()).toBe(0);
 
@@ -1337,8 +1339,8 @@ describe('LockManager', () => {
     });
 
     it('should decrement in-flight counter even on failure', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-      const getInFlightOps = () => (lockManager as any).inFlightOps;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+      const getInFlightOps = (): number => (lockManager as any).inFlightOps as number;
 
       // First acquire succeeds
       const first = await lockManager.acquire('resource-1', {
@@ -1415,13 +1417,11 @@ describe('LockManager', () => {
 
     it('withLock() should handle dispose before callback gracefully', async () => {
       // Edge case: dispose after acquire but immediately before callback starts
-      let callbackStarted = false;
 
       // Create a new lock manager for this test (previous was disposed)
       const lm = new LockManager();
 
       const withLockPromise = lm.withLock('resource-1', async () => {
-        callbackStarted = true;
         await new Promise(r => setTimeout(r, 30));
         return 'success';
       });
@@ -1698,7 +1698,7 @@ describe('LockManager', () => {
 
       await lm.acquire('resource-1', { holderId: 'test-holder' });
 
-      expect(logs.some(l => l.level === 'debug' && l.message.includes('acquire') === true)).toBe(true);
+      expect(logs.some(l => l.level === 'debug' && l.message.includes('acquire'))).toBe(true);
       expect(logs.some(l => l.context?.resource === 'resource-1')).toBe(true);
 
       await lm.dispose();
@@ -1777,7 +1777,7 @@ describe('LockManager', () => {
       await lm.acquire('resource-1', { holderId: 'holder-1', acquireTimeout: 0, ttl: 0 });
       await lm.acquire('resource-1', { holderId: 'holder-2', acquireTimeout: 50 });
 
-      expect(logs.some(l => l.level === 'warn' && l.message.includes('timeout') === true)).toBe(true);
+      expect(logs.some(l => l.level === 'warn' && l.message.includes('timeout'))).toBe(true);
 
       await lm.dispose();
     });
@@ -2011,12 +2011,12 @@ describe('LockManager', () => {
         // Timer and expiresAt should be consistent
         // (timer should fire around expiresAt time)
         const now = Date.now();
-        if (holder === undefined || holder.expiresAt === undefined) throw new Error('Holder and expiresAt should be defined');
+        if (holder?.expiresAt === undefined) throw new Error('Holder and expiresAt should be defined');
         expect(holder.expiresAt).toBeGreaterThan(now);
 
         // Cleanup
-        if (lockId !== undefined) await lockManager.release(lockId);
-        if (lockId !== undefined) await lockManager.release(lockId);
+        await lockManager.release(lockId);
+        await lockManager.release(lockId);
       });
 
       it('should serialize extend() operations on same resource', async () => {
@@ -2042,7 +2042,7 @@ describe('LockManager', () => {
         expect(holder).toBeDefined();
         expect(holder?.timer).toBeDefined();
 
-        if (lockId !== undefined) await lockManager.release(lockId);
+        await lockManager.release(lockId);
       });
     });
 

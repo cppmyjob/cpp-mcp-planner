@@ -22,12 +22,13 @@ import { PhaseService } from '../../src/domain/services/phase-service.js';
 import { DecisionService } from '../../src/domain/services/decision-service.js';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { VersionHistoryService } from '../../src/domain/services/version-history-service.js';
+import type { PlanManifest } from '../../src/domain/entities/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
 // Helper function to load manifest via repository
-async function loadManifest(repositoryFactory: RepositoryFactory, planId: string) {
+async function loadManifest(repositoryFactory: RepositoryFactory, planId: string): Promise<PlanManifest> {
   const planRepo = repositoryFactory.createPlanRepository();
   return planRepo.loadManifest(planId);
 }
@@ -76,7 +77,14 @@ describe('Version History Service (Sprint 7)', () => {
   });
 
   // Helper function to create a valid requirement object
-  const createRequirement = (title: string, additionalFields: Record<string, unknown> = {}) => {
+  const createRequirement = (title: string, additionalFields: Record<string, unknown> = {}): {
+    title: string;
+    description: string;
+    priority: 'high' | 'medium' | 'low' | 'critical';
+    category: 'functional' | 'non-functional' | 'technical';
+    source: { type: 'user-request'; context?: string };
+    acceptanceCriteria: string[];
+  } & Record<string, unknown> => {
     const { description, priority, category, source, acceptanceCriteria, ...rest } = additionalFields;
     return {
       title,

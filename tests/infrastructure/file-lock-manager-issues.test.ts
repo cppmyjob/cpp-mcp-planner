@@ -55,8 +55,8 @@ describe('FileLockManager Issues', () => {
           events.push('acquire2-got-lock');
           return release;
         },
-        (error) => {
-          events.push(`acquire2-error: ${error.message}`);
+        (error: unknown) => {
+          events.push(`acquire2-error: ${(error as Error).message}`);
           throw error;
         }
       );
@@ -245,7 +245,7 @@ describe('FileLockManager Issues', () => {
       const release1 = await lockManager.acquire('resource-1');
 
       // Start another acquire that will wait on mutex
-      const acquire2Promise = lockManager.acquire('resource-1').catch((e) => e);
+      const acquire2Promise = lockManager.acquire('resource-1').catch((e: unknown) => e);
 
       // Give time for acquire2 to start waiting on mutex
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -316,7 +316,7 @@ describe('FileLockManager Issues', () => {
           await release();
         } catch (error) {
           if ((error as Error).message.includes('Timeout')) {
-            fail(`Round ${round}: Dangling lock detected after dispose`);
+            fail(`Round ${String(round)}: Dangling lock detected after dispose`);
           }
         }
 

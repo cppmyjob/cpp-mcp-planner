@@ -2,6 +2,11 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
 import { createServices, type Services } from '../../src/server/services.js';
+import type { AddRequirementResult } from '../../src/domain/services/requirement-service.js';
+import type { ProposeSolutionResult } from '../../src/domain/services/solution-service.js';
+import type { AddPhaseResult } from '../../src/domain/services/phase-service.js';
+import type { RecordDecisionResult } from '../../src/domain/services/decision-service.js';
+import type { AddArtifactResult } from '../../src/domain/services/artifact-service.js';
 
 export interface TestContext {
   services: Services;
@@ -10,7 +15,7 @@ export interface TestContext {
 }
 
 export async function createTestContext(prefix = 'mcp-test'): Promise<TestContext> {
-  const testDir = path.join(os.tmpdir(), `${prefix}-${Date.now()}`);
+  const testDir = path.join(os.tmpdir(), `${prefix}-${String(Date.now())}`);
   const services = await createServices(testDir);
 
   const plan = await services.planService.createPlan({
@@ -36,7 +41,7 @@ export async function createTestRequirement(
     description: string;
     priority: 'critical' | 'high' | 'medium' | 'low';
   }> = {}
-) {
+): Promise<AddRequirementResult> {
   return ctx.services.requirementService.addRequirement({
     planId: ctx.planId,
     requirement: {
@@ -54,7 +59,7 @@ export async function createTestSolution(
   ctx: TestContext,
   addressing: string[] = [],
   overrides: Partial<{ title: string; description: string }> = {}
-) {
+): Promise<ProposeSolutionResult> {
   return ctx.services.solutionService.proposeSolution({
     planId: ctx.planId,
     solution: {
@@ -75,7 +80,7 @@ export async function createTestSolution(
 export async function createTestPhase(
   ctx: TestContext,
   overrides: Partial<{ title: string; parentId: string }> = {}
-) {
+): Promise<AddPhaseResult> {
   return ctx.services.phaseService.addPhase({
     planId: ctx.planId,
     phase: {
@@ -92,7 +97,7 @@ export async function createTestPhase(
 export async function createTestDecision(
   ctx: TestContext,
   overrides: Partial<{ title: string; question: string }> = {}
-) {
+): Promise<RecordDecisionResult> {
   return ctx.services.decisionService.recordDecision({
     planId: ctx.planId,
     decision: {
@@ -115,7 +120,7 @@ export async function createTestArtifact(
     sourceCode: string;
     filename: string;
   }> = {}
-) {
+): Promise<AddArtifactResult> {
   return ctx.services.artifactService.addArtifact({
     planId: ctx.planId,
     artifact: {

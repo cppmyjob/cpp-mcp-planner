@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { QueryService } from '../../src/domain/services/query-service.js';
+import type { ValidatePlanInput } from '../../src/domain/services/query-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
 import { RequirementService } from '../../src/domain/services/requirement-service.js';
 import { SolutionService } from '../../src/domain/services/solution-service.js';
@@ -27,11 +28,11 @@ async function loadEntities<T extends Entity>(
   return repo.findAll();
 }
 
-async function saveEntities<T extends Entity>(
+async function saveEntities(
   repositoryFactory: RepositoryFactory,
   planId: string,
   entityType: 'requirements' | 'solutions' | 'phases' | 'artifacts',
-  entities: T[]
+  entities: Entity[]
 ): Promise<void> {
   const typeMap: Record<string, EntityType> = {
     requirements: 'requirement',
@@ -40,7 +41,7 @@ async function saveEntities<T extends Entity>(
     artifacts: 'artifact'
   };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-  const repo = repositoryFactory.createRepository<T>(typeMap[entityType], planId);
+  const repo = repositoryFactory.createRepository<Entity>(typeMap[entityType], planId);
   for (const entity of entities) {
     await repo.update(entity.id, entity);
   }
@@ -63,7 +64,7 @@ describe('QueryService', () => {
   let planId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `mcp-query-test-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-query-test-${String(Date.now())}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -530,8 +531,8 @@ describe('QueryService', () => {
         const { phaseId } = await phaseService.addPhase({
           planId,
           phase: {
-            title: `Child Phase ${i}`,
-            description: `Child ${i}`,
+            title: `Child Phase ${String(i)}`,
+            description: `Child ${String(i)}`,
             parentId,
             objectives: [],
             deliverables: [],
@@ -616,7 +617,7 @@ describe('QueryService', () => {
       const os = await import('os');
 
       // Create a real temp file
-      const tmpDir = path.join(os.tmpdir(), `mcp-test-${Date.now()}`);
+      const tmpDir = path.join(os.tmpdir(), `mcp-test-${String(Date.now())}`);
       await fs.mkdir(tmpDir, { recursive: true });
       const tmpFile = path.join(tmpDir, 'existing.ts');
       await fs.writeFile(tmpFile, 'content');
@@ -816,7 +817,7 @@ describe('QueryService', () => {
     // RED TEST 14: Validation level - ValidatePlanInput accepts validationLevel
     it('should accept validationLevel parameter in ValidatePlanInput', () => {
       // This test verifies TypeScript compilation
-      const input: import('../../src/domain/services/query-service.js').ValidatePlanInput = {
+      const input: ValidatePlanInput = {
         planId,
         validationLevel: 'strict',
       };

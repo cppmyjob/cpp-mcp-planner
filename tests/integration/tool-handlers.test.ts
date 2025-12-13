@@ -90,7 +90,7 @@ describe('Tool Handlers Integration', () => {
     });
 
     it('plan set_active and get_active should work', async () => {
-      const workspacePath = '/test-workspace-' + Date.now();
+      const workspacePath = '/test-workspace-' + String(Date.now());
 
       await handleToolCall(
         'plan',
@@ -1063,7 +1063,7 @@ describe('Tool Handlers Integration', () => {
         const allPaths = new Set<string>();
         const collectPaths = (
           nodes: { phase: { path: string }; children?: { phase: { path: string } }[] }[]
-        ) => {
+        ): void => {
           for (const node of nodes) {
             expect(allPaths.has(node.phase.path)).toBe(false); // Should not have duplicates
             allPaths.add(node.phase.path);

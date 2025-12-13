@@ -64,10 +64,10 @@ describe('FileLockManager', () => {
 
       const lm = new FileLockManager(testDir, {
         logger: {
-          debug: (msg) => logs.push({ level: 'debug', message: msg }),
-          info: (msg) => logs.push({ level: 'info', message: msg }),
-          warn: (msg) => logs.push({ level: 'warn', message: msg }),
-          error: (msg) => logs.push({ level: 'error', message: msg }),
+          debug: (msg): void => { logs.push({ level: 'debug', message: msg }); },
+          info: (msg): void => { logs.push({ level: 'info', message: msg }); },
+          warn: (msg): void => { logs.push({ level: 'warn', message: msg }); },
+          error: (msg): void => { logs.push({ level: 'error', message: msg }); },
         },
         // Not specifying logLevel - should default to 'warn'
       });

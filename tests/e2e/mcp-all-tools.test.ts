@@ -40,6 +40,7 @@ async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<vo
 }
 
 // Helper to parse MCP tool result
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 function parseResult<T>(result: unknown): T {
   const r = result as { content: { type: string; text: string }[] };
   return JSON.parse(r.content[0].text) as T;
@@ -61,7 +62,7 @@ describe('E2E: All MCP Tools Validation', () => {
   let linkId: string;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-temp', 'all-tools-' + Date.now() + '-' + crypto.randomUUID());
+    storagePath = path.join(process.cwd(), '.test-temp', 'all-tools-' + String(Date.now()) + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
 
     const services = await createServices(storagePath);
@@ -1782,7 +1783,7 @@ describe('E2E: All MCP Tools Validation', () => {
         const allPaths = new Set<string>();
         const collectPaths = (
           nodes: { phase: { path: string }; children?: { phase: { path: string } }[] }[]
-        ) => {
+        ): void => {
           for (const node of nodes) {
             expect(allPaths.has(node.phase.path)).toBe(false);
             allPaths.add(node.phase.path);

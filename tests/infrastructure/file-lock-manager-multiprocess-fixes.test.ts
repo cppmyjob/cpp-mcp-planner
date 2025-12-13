@@ -105,7 +105,7 @@ describe('FileLockManager Multi-Process Fixes', () => {
             results.push('acquired');
             return release();
           },
-          (err) => {
+          (err: unknown) => {
             if (!(err as Error).message.includes('disposed')) {
               errors.push((err as Error).message);
             }

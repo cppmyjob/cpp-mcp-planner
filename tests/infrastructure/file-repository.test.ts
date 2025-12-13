@@ -328,7 +328,7 @@ describe('FileRepository', () => {
         createTestRequirement('req-3', 'Req 3'),
       ];
 
-      await expect(repository.createMany(requirements as Requirement[])).rejects.toThrow();
+      await expect(repository.createMany(requirements)).rejects.toThrow();
       expect(await repository.count()).toBe(0);
     });
 

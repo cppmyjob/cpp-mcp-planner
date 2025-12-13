@@ -115,7 +115,7 @@ describe('LockManager Multi-Process Safety', () => {
         if (acquireResult.acquired && holder !== undefined) {
           // If acquire succeeded, refCount should be valid
           if (holder.refCount < 1) {
-            errors.push(`Invalid refCount: ${holder.refCount}`);
+            errors.push(`Invalid refCount: ${String(holder.refCount)}`);
           }
         }
 
@@ -151,7 +151,7 @@ describe('LockManager Multi-Process Safety', () => {
         if (holder) {
           // If lock exists, it should be valid
           if (holder.refCount < 1) {
-            errors.push(`Invalid refCount after race: ${holder.refCount}`);
+            errors.push(`Invalid refCount after race: ${String(holder.refCount)}`);
           }
           // Clean up
           await lm.release(holder.lockId);
@@ -216,7 +216,7 @@ describe('LockManager Multi-Process Safety', () => {
 
       // Should have stopped due to maxRetries, not timeout
       // With maxRetries=3, should fail relatively quickly
-      if (result.acquired === false) {
+      if (!result.acquired) {
         expect(result.reason).toContain('max retries');
         expect(elapsed).toBeLessThan(5000); // Much less than 10s timeout
       }
@@ -239,18 +239,20 @@ describe('LockManager Multi-Process Safety', () => {
 
       // Start churning to trigger retries
       let releases = 0;
-      const releaseInterval = setInterval(async () => {
-        try {
-          // Release and re-acquire to trigger retry
-          await lm.releaseAll();
-          await lm.acquire('blocked', {
-            holderId: 'blocker',
-            acquireTimeout: 0,
-          });
-          releases++;
-        } catch {
-          // Ignore
-        }
+      const releaseInterval = setInterval(() => {
+        void (async () => {
+          try {
+            // Release and re-acquire to trigger retry
+            await lm.releaseAll();
+            await lm.acquire('blocked', {
+              holderId: 'blocker',
+              acquireTimeout: 0,
+            });
+            releases++;
+          } catch {
+            // Ignore
+          }
+        })();
       }, 50);
 
       const result = await lm.acquire('blocked', {

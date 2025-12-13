@@ -21,7 +21,7 @@ describe('E2E: MCP Server Discovery & Errors', () => {
   let cleanup: () => Promise<void>;
 
   beforeAll(async () => {
-    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-server-' + Date.now() + '-' + crypto.randomUUID());
+    storagePath = path.join(process.cwd(), '.test-temp', 'mcp-server-' + String(Date.now()) + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
 
     const services = await createServices(storagePath);
@@ -95,7 +95,7 @@ describe('E2E: MCP Server Discovery & Errors', () => {
         // Skip tools without actions (like batch)
         if (!(tool.name in expectedActions)) continue;
 
-        const toolName = tool.name as keyof typeof expectedActions;
+        const toolName = tool.name;
         const actionProp = tool.inputSchema.properties?.action as { enum?: string[] } | undefined;
         expect(actionProp?.enum?.sort()).toEqual(expectedActions[toolName].sort());
       }
