@@ -36,46 +36,31 @@ argument-hint: "[--auto-sprint]"
 
 ---
 
-## ESLint Check
+## ESLint Check (Inline)
 
-**MANDATORY STEP - Launch ESLint Agent:**
+**MANDATORY STEP - Execute directly (no separate agent):**
 
-Before analyzing code manually, launch a separate agent to handle ESLint:
-
-```typescript
-Task({
-  subagent_type: "general-purpose",
-  description: "Fix ESLint violations",
-  prompt: `
-# ESLint Auto-Fix and Manual Correction
-
-## Your Task:
-1. Run \`npm run lint:fix\` to auto-fix what's possible
-2. Run \`npm run lint\` again to see remaining errors
-3. If no remaining errors then exit from agent
-4. For EACH remaining error:
-   - Read the file with the error
+1. **Auto-fix:** Run `npm run lint:fix` to auto-fix what's possible
+2. **Check remaining:** Run `npm run lint` to see remaining errors
+3. **If no errors:** Proceed to next code review
+4. **If errors remain:** For EACH error:
+   - Read the file with the error (use Read tool)
    - Manually fix the violation according to eslint.config.js rules
    - Ensure the fix follows CLAUDE.md best practices
-5. Run \`npm run lint\` one final time to verify all errors are fixed
-6. Report summary: how many auto-fixed, how many manually fixed
+5. **Verify:** Run `npm run lint` one final time - must be 0 errors
+6. **Report:** Note how many auto-fixed, how many manually fixed
 
-## Important:
+**Important:**
 - Fix ALL errors, not just some
-- Follow eslint.config.js strictly
-- Reference CLAUDE.md for context on each rule
+- Follow eslint.config.js strictly (see CLAUDE.md for rule explanations)
 - Do NOT skip any violations
-  `
-})
-```
-
-**Wait for the ESLint agent to complete before continuing with manual code review.**
+- **ZERO TOLERANCE** - proceed to code review only when lint passes
 
 ---
 
 ## Your Task
 
-After ESLint agent completes, analyze unpushed commits for compliance with project standards (see CLAUDE.md).
+After ESLint check passes (0 errors), analyze unpushed commits for compliance with project standards (see CLAUDE.md).
 
 **Arguments:**
 - `--auto-sprint`: Auto-create sprint for CRITICAL/HIGH issues (skip confirmation)
