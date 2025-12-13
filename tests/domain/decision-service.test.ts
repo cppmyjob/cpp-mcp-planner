@@ -48,6 +48,125 @@ describe('DecisionService', () => {
   });
 
   describe('record_decision', () => {
+    // RED: Validation tests for REQUIRED fields
+    describe('title validation (REQUIRED field)', () => {
+      it('RED: should reject missing title (undefined)', async () => {
+        await expect(service.recordDecision({
+          planId,
+          decision: {
+            // @ts-expect-error - Testing invalid input
+            title: undefined,
+            question: 'Which database?',
+            context: 'Need ACID',
+            decision: 'PostgreSQL',
+          },
+        })).rejects.toThrow('title is required');
+      });
+
+      it('RED: should reject empty title', async () => {
+        await expect(service.recordDecision({
+          planId,
+          decision: {
+            title: '',
+            question: 'Which database?',
+            context: 'Need ACID',
+            decision: 'PostgreSQL',
+          },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('RED: should reject whitespace-only title', async () => {
+        await expect(service.recordDecision({
+          planId,
+          decision: {
+            title: '   ',
+            question: 'Which database?',
+            context: 'Need ACID',
+            decision: 'PostgreSQL',
+          },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+    });
+
+    describe('question validation (REQUIRED field)', () => {
+      it('RED: should reject missing question (undefined)', async () => {
+        await expect(service.recordDecision({
+          planId,
+          decision: {
+            title: 'Database Choice',
+            // @ts-expect-error - Testing invalid input
+            question: undefined,
+            context: 'Need ACID',
+            decision: 'PostgreSQL',
+          },
+        })).rejects.toThrow('question is required');
+      });
+
+      it('RED: should reject empty question', async () => {
+        await expect(service.recordDecision({
+          planId,
+          decision: {
+            title: 'Database Choice',
+            question: '',
+            context: 'Need ACID',
+            decision: 'PostgreSQL',
+          },
+        })).rejects.toThrow('question must be a non-empty string');
+      });
+    });
+
+    describe('decision validation (REQUIRED field)', () => {
+      it('RED: should reject missing decision (undefined)', async () => {
+        await expect(service.recordDecision({
+          planId,
+          decision: {
+            title: 'Database Choice',
+            question: 'Which database?',
+            context: 'Need ACID',
+            // @ts-expect-error - Testing invalid input
+            decision: undefined,
+          },
+        })).rejects.toThrow('decision is required');
+      });
+
+      it('RED: should reject empty decision', async () => {
+        await expect(service.recordDecision({
+          planId,
+          decision: {
+            title: 'Database Choice',
+            question: 'Which database?',
+            context: 'Need ACID',
+            decision: '',
+          },
+        })).rejects.toThrow('decision must be a non-empty string');
+      });
+    });
+
+    // GREEN: Tests for minimal decision with defaults
+    describe('minimal decision with defaults', () => {
+      it('GREEN: should accept minimal decision (title + question + decision only)', async () => {
+        const result = await service.recordDecision({
+          planId,
+          decision: {
+            title: 'Tech Stack',
+            question: 'Which framework?',
+            decision: 'TypeScript + Express',
+          },
+        });
+
+        expect(result.decisionId).toBeDefined();
+
+        // Verify defaults were applied
+        const { decision } = await service.getDecision({ planId, decisionId: result.decisionId, fields: ['*'] });
+        expect(decision.title).toBe('Tech Stack');
+        expect(decision.question).toBe('Which framework?');
+        expect(decision.decision).toBe('TypeScript + Express');
+        expect(decision.context).toBe('');  // default
+        expect(decision.alternativesConsidered).toEqual([]);  // default
+        expect(decision.status).toBe('active');
+      });
+    });
+
     it('should record a new decision', async () => {
       const result = await service.recordDecision({
         planId,

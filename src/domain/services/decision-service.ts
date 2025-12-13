@@ -4,7 +4,7 @@ import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { Decision, DecisionStatus, AlternativeConsidered, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
 import { NotFoundError } from '../repositories/errors.js';
-import { validateAlternativesConsidered, validateTags } from './validators.js';
+import { validateAlternativesConsidered, validateTags, validateRequiredString } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
 // Constants
@@ -15,14 +15,14 @@ const DEFAULT_DECISIONS_PAGE_LIMIT = 50;
 export interface RecordDecisionInput {
   planId: string;
   decision: {
-    title: string;
-    question: string;
-    context: string;
-    decision: string;
-    alternativesConsidered: AlternativeConsidered[];
-    consequences?: string;
-    impactScope?: string[];
-    tags?: Tag[];
+    title: string;  // REQUIRED
+    question: string;  // REQUIRED
+    decision: string;  // REQUIRED
+    context?: string;  // Optional - default: ''
+    alternativesConsidered?: AlternativeConsidered[];  // Optional - default: []
+    consequences?: string;  // undefined OK
+    impactScope?: string[];  // undefined OK
+    tags?: Tag[];  // Optional - default: []
   };
 }
 
@@ -214,8 +214,11 @@ export class DecisionService {
       question: oldDecision.question,
       context: input.newDecision.context ?? oldDecision.context,
       decision: input.newDecision.decision,
-      // GREEN: BUG #8 Fix - Handle missing or undefined alternativesConsidered field
+      // LEGACY SUPPORT: Keep defensive guard for backward compatibility with old data
+      // TODO Sprint 3: Remove after data migration applies defaults to all existing entities
+      // New decisions created with recordDecision() will always have alternativesConsidered=[]
       alternativesConsidered: [
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         ...(oldDecision.alternativesConsidered ?? []),
         {
           option: oldDecision.decision,
@@ -241,8 +244,13 @@ export class DecisionService {
   }
 
   public async recordDecision(input: RecordDecisionInput): Promise<RecordDecisionResult> {
+    // Validate REQUIRED fields
+    validateRequiredString(input.decision.title, 'title');
+    validateRequiredString(input.decision.question, 'question');
+    validateRequiredString(input.decision.decision, 'decision');
+
     // Validate alternativesConsidered format
-    validateAlternativesConsidered(input.decision.alternativesConsidered);
+    validateAlternativesConsidered(input.decision.alternativesConsidered ?? []);
     // Validate tags format
     validateTags(input.decision.tags ?? []);
 
@@ -260,13 +268,13 @@ export class DecisionService {
         tags: input.decision.tags ?? [],
         annotations: [],
       },
-      title: input.decision.title,
-      question: input.decision.question,
-      context: input.decision.context,
-      decision: input.decision.decision,
-      alternativesConsidered: input.decision.alternativesConsidered,
-      consequences: input.decision.consequences,
-      impactScope: input.decision.impactScope,
+      title: input.decision.title,  // REQUIRED
+      question: input.decision.question,  // REQUIRED
+      decision: input.decision.decision,  // REQUIRED
+      context: input.decision.context ?? '',  // DEFAULT: empty string
+      alternativesConsidered: input.decision.alternativesConsidered ?? [],  // DEFAULT: empty array (BUG #8 fix)
+      consequences: input.decision.consequences,  // undefined OK
+      impactScope: input.decision.impactScope,  // undefined OK
       status: 'active',
     };
 

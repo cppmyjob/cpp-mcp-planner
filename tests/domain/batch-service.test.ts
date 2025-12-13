@@ -354,7 +354,7 @@ describe('BatchService - Unit Tests', () => {
           }
         ]
       })
-    ).rejects.toThrow('Title is required');
+    ).rejects.toThrow('title is required');
 
     // Verify rollback - storage should be empty
     const requirements = await loadEntities<Requirement>(repositoryFactory, planId, 'requirements');
@@ -527,7 +527,7 @@ describe('BatchService - Unit Tests', () => {
           }
         ]
       })
-    ).rejects.toThrow('Title is required');
+    ).rejects.toThrow('title is required');
 
     // Verify rollback
     const requirements = await loadEntities<Requirement>(repositoryFactory, planId, 'requirements');

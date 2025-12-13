@@ -50,6 +50,122 @@ describe('RequirementService', () => {
   });
 
   describe('add_requirement', () => {
+    // RED: Validation tests for REQUIRED fields
+    describe('title validation (REQUIRED field)', () => {
+      it('RED: should reject missing title (undefined)', async () => {
+        await expect(service.addRequirement({
+          planId,
+          requirement: {
+            // @ts-expect-error - Testing invalid input
+            title: undefined,
+            description: 'Test',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        })).rejects.toThrow('title is required');
+      });
+
+      it('RED: should reject empty title', async () => {
+        await expect(service.addRequirement({
+          planId,
+          requirement: {
+            title: '',
+            description: 'Test',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('RED: should reject whitespace-only title', async () => {
+        await expect(service.addRequirement({
+          planId,
+          requirement: {
+            title: '   ',
+            description: 'Test',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+    });
+
+    describe('source.type validation (REQUIRED field)', () => {
+      it('RED: should reject missing source', async () => {
+        await expect(service.addRequirement({
+          planId,
+          requirement: {
+            title: 'Test',
+            description: 'Test',
+            source: undefined,
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        })).rejects.toThrow('source is required');
+      });
+
+      it('RED: should reject missing source.type', async () => {
+        await expect(service.addRequirement({
+          planId,
+          requirement: {
+            title: 'Test',
+            description: 'Test',
+            // @ts-expect-error - Testing invalid input
+            source: {},
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        })).rejects.toThrow('source.type is required');
+      });
+
+      it('RED: should reject invalid source.type', async () => {
+        await expect(service.addRequirement({
+          planId,
+          requirement: {
+            title: 'Test',
+            description: 'Test',
+            // @ts-expect-error - Testing invalid input
+            source: { type: 'invalid-type' },
+            acceptanceCriteria: [],
+            priority: 'high',
+            category: 'functional',
+          },
+        })).rejects.toThrow('source.type must be one of: user-request, discovered, derived');
+      });
+    });
+
+    // GREEN: Tests for minimal requirement with defaults
+    describe('minimal requirement with defaults', () => {
+      it('GREEN: should accept minimal requirement (title + source.type only)', async () => {
+        const result = await service.addRequirement({
+          planId,
+          requirement: {
+            title: 'User Authentication',
+            source: { type: 'user-request' },
+          },
+        });
+
+        expect(result.requirementId).toBeDefined();
+
+        // Verify defaults were applied
+        const { requirement } = await service.getRequirement({ planId, requirementId: result.requirementId });
+        expect(requirement.title).toBe('User Authentication');
+        expect(requirement.description).toBe('');  // default
+        expect(requirement.acceptanceCriteria).toEqual([]);  // default
+        expect(requirement.priority).toBe('medium');  // default
+        expect(requirement.category).toBe('functional');  // default
+        expect(requirement.status).toBe('draft');
+      });
+    });
+
     it('should add a new requirement', async () => {
       const result = await service.addRequirement({
         planId,

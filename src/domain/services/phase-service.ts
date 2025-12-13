@@ -3,7 +3,7 @@ import type { RepositoryFactory } from '../../infrastructure/factory/repository-
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
-import { validateEffortEstimate, validateTags, validatePriority } from './validators.js';
+import { validateEffortEstimate, validateTags, validatePriority, validateRequiredString } from './validators.js';
 import { filterPhase } from '../utils/field-filter.js';
 import { bulkUpdateEntities } from '../utils/bulk-operations.js';
 
@@ -50,20 +50,20 @@ function calculateNextOrder(siblings: Phase[], explicitOrder?: number): number {
 export interface AddPhaseInput {
   planId: string;
   phase: {
-    title: string;
-    description: string;
-    objectives: string[];
-    deliverables: string[];
-    successCriteria: string[];
-    parentId?: string | null;
+    title: string;  // REQUIRED
+    description?: string;  // Optional - default: ''
+    objectives?: string[];  // Optional - default: []
+    deliverables?: string[];  // Optional - default: []
+    successCriteria?: string[];  // Optional - default: []
+    parentId?: string | null;  // Optional - default: null (root phase)
     order?: number;
-    estimatedEffort?: EffortEstimate; // Direct field for API convenience
+    estimatedEffort?: EffortEstimate;  // Optional - default: {value:0, unit:'hours', confidence:'low'}
     schedule?: {
       estimatedEffort: EffortEstimate;
     };
-    tags?: Tag[];
-    implementationNotes?: string;
-    priority?: PhasePriority;
+    tags?: Tag[];  // Optional - default: []
+    implementationNotes?: string;  // undefined OK
+    priority?: PhasePriority;  // Optional - default: 'medium'
   };
 }
 
@@ -400,6 +400,9 @@ export class PhaseService {
   }
 
   public async addPhase(input: AddPhaseInput): Promise<AddPhaseResult> {
+    // Validate REQUIRED fields
+    validateRequiredString(input.phase.title, 'title');
+
     // Validate estimatedEffort format (support both direct and schedule.estimatedEffort)
     const effort = input.phase.estimatedEffort ?? input.phase.schedule?.estimatedEffort;
     validateEffortEstimate(effort, 'estimatedEffort');
@@ -443,15 +446,15 @@ export class PhaseService {
         tags: input.phase.tags ?? [],
         annotations: [],
       },
-      title: input.phase.title,
-      description: input.phase.description,
+      title: input.phase.title,  // REQUIRED
+      description: input.phase.description ?? '',  // DEFAULT: empty string
       parentId,
       order,
       depth,
       path,
-      objectives: input.phase.objectives,
-      deliverables: input.phase.deliverables,
-      successCriteria: input.phase.successCriteria,
+      objectives: input.phase.objectives ?? [],  // DEFAULT: empty array
+      deliverables: input.phase.deliverables ?? [],  // DEFAULT: empty array
+      successCriteria: input.phase.successCriteria ?? [],  // DEFAULT: empty array
       schedule: {
         estimatedEffort: effort ?? { value: 0, unit: 'hours', confidence: 'low' },
       },

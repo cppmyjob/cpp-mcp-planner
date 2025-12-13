@@ -13,7 +13,7 @@ import type {
   VersionDiff,
 } from '../entities/types.js';
 import { NotFoundError } from '../repositories/errors.js';
-import { validateTags } from './validators.js';
+import { validateTags, validateRequiredString, validateRequiredEnum } from './validators.js';
 import { filterEntities, filterEntity } from '../utils/field-filter.js';
 
 // Constants
@@ -24,17 +24,17 @@ const DEFAULT_REQUIREMENTS_PAGE_LIMIT = 50;
 export interface AddRequirementInput {
   planId: string;
   requirement: {
-    title: string;
-    description: string;
+    title: string;  // REQUIRED
+    description?: string;  // Optional - default: ''
     rationale?: string;
-    source: {
-      type: RequirementSource;
+    source?: {  // Optional object, but source.type is REQUIRED if source provided
+      type: RequirementSource;  // REQUIRED
       context?: string;
       parentId?: string;
     };
-    acceptanceCriteria: string[];
-    priority: RequirementPriority;
-    category: RequirementCategory;
+    acceptanceCriteria?: string[];  // Optional - default: []
+    priority?: RequirementPriority;  // Optional - default: 'medium'
+    category?: RequirementCategory;  // Optional - default: 'functional'
     impact?: {
       scope: string[];
       complexityEstimate: number;
@@ -274,15 +274,18 @@ export class RequirementService {
       throw new Error('Plan not found');
     }
 
-    // Validate required fields (runtime checks needed despite TypeScript types)
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (input.requirement.title === undefined || input.requirement.title === null || input.requirement.title === '' || input.requirement.title.trim() === '') {
-      throw new Error('Title is required');
+    // Validate REQUIRED fields
+    validateRequiredString(input.requirement.title, 'title');
+
+    // Validate source.type is provided
+    if (input.requirement.source === undefined) {
+      throw new Error('source is required');
     }
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (input.requirement.description === undefined || input.requirement.description === null || input.requirement.description === '' || input.requirement.description.trim() === '') {
-      throw new Error('Description is required');
-    }
+    validateRequiredEnum(
+      input.requirement.source.type,
+      'source.type',
+      ['user-request', 'discovered', 'derived']
+    );
 
     // Validate tags format
     validateTags(input.requirement.tags ?? []);
@@ -301,16 +304,16 @@ export class RequirementService {
         tags: input.requirement.tags ?? [],
         annotations: [],
       },
-      title: input.requirement.title,
-      description: input.requirement.description,
-      rationale: input.requirement.rationale,
-      source: input.requirement.source,
-      acceptanceCriteria: input.requirement.acceptanceCriteria,
-      priority: input.requirement.priority,
-      category: input.requirement.category,
+      title: input.requirement.title,  // REQUIRED
+      description: input.requirement.description ?? '',  // DEFAULT: empty string
+      rationale: input.requirement.rationale,  // undefined OK
+      source: input.requirement.source,  // source.type is REQUIRED and validated above
+      acceptanceCriteria: input.requirement.acceptanceCriteria ?? [],  // DEFAULT: empty array
+      priority: input.requirement.priority ?? 'medium',  // DEFAULT: medium
+      category: input.requirement.category ?? 'functional',  // DEFAULT: functional
       status: 'draft',
       votes: 0,
-      impact: input.requirement.impact,
+      impact: input.requirement.impact,  // undefined OK
     };
 
     // Create requirement via repository

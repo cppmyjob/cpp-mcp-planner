@@ -11,7 +11,7 @@ import type {
   VersionHistory,
   VersionDiff,
 } from '../entities/types.js';
-import { validateTags, validateArtifactType, validateTargets, validateCodeRefs } from './validators.js';
+import { validateTags, validateTargets, validateCodeRefs, validateRequiredString, validateRequiredEnum } from './validators.js';
 import { filterArtifact } from '../utils/field-filter.js';
 
 // Constants
@@ -48,21 +48,21 @@ function slugify(title: string, artifactId: string): string {
 export interface AddArtifactInput {
   planId: string;
   artifact: {
-    title: string;
-    description: string;
-    slug?: string;
-    artifactType: ArtifactType;
-    content?: {
+    title: string;  // REQUIRED
+    artifactType: ArtifactType;  // REQUIRED
+    description?: string;  // Optional - default: ''
+    slug?: string;  // Optional - auto-generated from title
+    content?: {  // Optional - default: undefined
       language?: string;
       sourceCode?: string;
       filename?: string;
     };
-    targets?: ArtifactTarget[];
-    relatedPhaseId?: string;
-    relatedSolutionId?: string;
-    relatedRequirementIds?: string[];
-    codeRefs?: string[];
-    tags?: Tag[];
+    targets?: ArtifactTarget[];  // Optional - undefined OK
+    relatedPhaseId?: string;  // Optional - undefined OK
+    relatedSolutionId?: string;  // Optional - undefined OK
+    relatedRequirementIds?: string[];  // Optional - undefined OK
+    codeRefs?: string[];  // Optional - undefined OK
+    tags?: Tag[];  // Optional - default: []
   };
 }
 
@@ -179,8 +179,15 @@ export class ArtifactService {
   public async addArtifact(input: AddArtifactInput): Promise<AddArtifactResult> {
     await this.ensurePlanExists(input.planId);
 
-    // Validate inputs
-    validateArtifactType(input.artifact.artifactType);
+    // Validate REQUIRED fields
+    validateRequiredString(input.artifact.title, 'title');
+    validateRequiredEnum(
+      input.artifact.artifactType,
+      'artifactType',
+      ['code', 'config', 'migration', 'documentation', 'test', 'script', 'other']
+    );
+
+    // Validate optional fields
     validateTags(input.artifact.tags ?? []);
     if (input.artifact.targets) {
       validateTargets(input.artifact.targets);
@@ -210,10 +217,10 @@ export class ArtifactService {
         tags: input.artifact.tags ?? [],
         annotations: [],
       },
-      title: input.artifact.title,
-      description: input.artifact.description,
+      title: input.artifact.title,  // REQUIRED
+      description: input.artifact.description ?? '',  // DEFAULT: empty string
       slug,
-      artifactType: input.artifact.artifactType,
+      artifactType: input.artifact.artifactType,  // REQUIRED
       status: 'draft',
       content: input.artifact.content
         ? {

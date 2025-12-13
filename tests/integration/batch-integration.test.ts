@@ -247,7 +247,7 @@ describe('BatchService - Integration Tests', () => {
       });
       throw new Error('Should have thrown validation error');
     } catch (error: unknown) {
-      expect((error as Error).message).toContain('Title is required');
+      expect((error as Error).message).toContain('title must be a non-empty string');
     }
 
     // Verify nothing was written to disk

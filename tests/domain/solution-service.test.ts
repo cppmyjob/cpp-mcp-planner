@@ -54,6 +54,87 @@ describe('SolutionService', () => {
   });
 
   describe('propose_solution', () => {
+    // RED: Validation tests for REQUIRED fields
+    describe('title validation (REQUIRED field)', () => {
+      it('RED: should reject missing title (undefined)', async () => {
+        await expect(service.proposeSolution({
+          planId,
+          solution: {
+            // @ts-expect-error - Testing invalid input
+            title: undefined,
+            description: 'Test',
+            approach: 'Test',
+            tradeoffs: [],
+            addressing: [],
+            evaluation: {
+              effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        })).rejects.toThrow('title is required');
+      });
+
+      it('RED: should reject empty title', async () => {
+        await expect(service.proposeSolution({
+          planId,
+          solution: {
+            title: '',
+            description: 'Test',
+            approach: 'Test',
+            tradeoffs: [],
+            addressing: [],
+            evaluation: {
+              effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('RED: should reject whitespace-only title', async () => {
+        await expect(service.proposeSolution({
+          planId,
+          solution: {
+            title: '   ',
+            description: 'Test',
+            approach: 'Test',
+            tradeoffs: [],
+            addressing: [],
+            evaluation: {
+              effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
+              technicalFeasibility: 'high',
+              riskAssessment: 'Low',
+            },
+          },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+    });
+
+    // GREEN: Tests for minimal solution with defaults
+    describe('minimal solution with defaults', () => {
+      it('GREEN: should accept minimal solution (title only)', async () => {
+        const result = await service.proposeSolution({
+          planId,
+          solution: {
+            title: 'My Solution',
+          },
+        });
+
+        expect(result.solutionId).toBeDefined();
+
+        // Verify defaults were applied
+        const { solution } = await service.getSolution({ planId, solutionId: result.solutionId, fields: ['*'] });
+        expect(solution.title).toBe('My Solution');
+        expect(solution.description).toBe('');  // default
+        expect(solution.approach).toBe('');     // default
+        expect(solution.tradeoffs).toEqual([]); // default
+        expect(solution.addressing).toEqual([]);// default
+        expect(solution.status).toBe('proposed');
+      });
+    });
+
     it('should add a new solution', async () => {
       const result = await service.proposeSolution({
         planId,

@@ -91,6 +91,70 @@ describe('PhaseService', () => {
   });
 
   describe('add_phase', () => {
+    // RED: Validation tests for REQUIRED fields
+    describe('title validation (REQUIRED field)', () => {
+      it('RED: should reject missing title (undefined)', async () => {
+        await expect(service.addPhase({
+          planId,
+          phase: {
+            // @ts-expect-error - Testing invalid input
+            title: undefined,
+            description: 'Test phase',
+            objectives: [],
+            deliverables: [],
+          },
+        })).rejects.toThrow('title is required');
+      });
+
+      it('RED: should reject empty title', async () => {
+        await expect(service.addPhase({
+          planId,
+          phase: {
+            title: '',
+            description: 'Test phase',
+            objectives: [],
+            deliverables: [],
+          },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('RED: should reject whitespace-only title', async () => {
+        await expect(service.addPhase({
+          planId,
+          phase: {
+            title: '   ',
+            description: 'Test phase',
+            objectives: [],
+            deliverables: [],
+          },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+    });
+
+    // GREEN: Tests for minimal phase with defaults
+    describe('minimal phase with defaults', () => {
+      it('GREEN: should accept minimal phase (title only)', async () => {
+        const result = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Implementation Phase',
+          },
+        });
+
+        expect(result.phaseId).toBeDefined();
+
+        // Verify defaults were applied
+        const { phase } = await service.getPhase({ planId, phaseId: result.phaseId, fields: ['*'] });
+        expect(phase.title).toBe('Implementation Phase');
+        expect(phase.description).toBe('');  // default
+        expect(phase.objectives).toEqual([]);  // default
+        expect(phase.deliverables).toEqual([]);  // default
+        expect(phase.successCriteria).toEqual([]);  // default
+        expect(phase.priority).toBe('medium');  // default
+        expect(phase.status).toBe('planned');
+      });
+    });
+
     it('should add a root phase', async () => {
       const result = await service.addPhase({
         planId,

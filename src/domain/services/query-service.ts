@@ -742,8 +742,12 @@ export class QueryService {
         return {
           ...base,
           title: sol.title,
-          // GREEN: BUG #15 Fix - Handle undefined optional fields
+          // LEGACY SUPPORT: Keep defensive guards for backward compatibility with old data
+          // TODO Sprint 3: Remove after data migration applies defaults to all existing entities
+          // New solutions created with proposeSolution() will always have description='' and approach=''
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           description: sol.description ?? '',
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           approach: sol.approach ?? '',
         };
       }
@@ -754,7 +758,10 @@ export class QueryService {
           title: dec.title,
           question: dec.question,
           decision: dec.decision,
-          // GREEN: BUG #15 Fix - Handle undefined optional fields
+          // LEGACY SUPPORT: Keep defensive guard for backward compatibility with old data
+          // TODO Sprint 3: Remove after data migration applies defaults to all existing entities
+          // New decisions created with recordDecision() will always have context=''
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           context: dec.context ?? '',
         };
       }
@@ -763,7 +770,10 @@ export class QueryService {
         return {
           ...base,
           title: phase.title,
-          // GREEN: BUG #15 Fix - Handle undefined optional fields
+          // LEGACY SUPPORT: Keep defensive guards for backward compatibility with old data
+          // TODO Sprint 3: Remove after data migration applies defaults to all existing entities
+          // New phases created with addPhase() will always have description='', objectives=[], deliverables=[]
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           description: phase.description ?? '',
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           objectives: (phase.objectives ?? []).join(' '),

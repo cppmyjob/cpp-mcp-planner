@@ -48,6 +48,92 @@ describe('ArtifactService', () => {
   });
 
   describe('addArtifact', () => {
+    // RED: Validation tests for REQUIRED fields
+    describe('title validation (REQUIRED field)', () => {
+      it('RED: should reject missing title (undefined)', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            // @ts-expect-error - Testing invalid input
+            title: undefined,
+            artifactType: 'code',
+            description: 'Test artifact',
+          },
+        })).rejects.toThrow('title is required');
+      });
+
+      it('RED: should reject empty title', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: '',
+            artifactType: 'code',
+            description: 'Test artifact',
+          },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('RED: should reject whitespace-only title', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: '   ',
+            artifactType: 'code',
+            description: 'Test artifact',
+          },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+    });
+
+    describe('artifactType validation (REQUIRED field)', () => {
+      it('RED: should reject missing artifactType (undefined)', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test Artifact',
+            // @ts-expect-error - Testing invalid input
+            artifactType: undefined,
+            description: 'Test artifact',
+          },
+        })).rejects.toThrow('artifactType is required');
+      });
+
+      it('RED: should reject invalid artifactType', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test Artifact',
+            // @ts-expect-error - Testing invalid input
+            artifactType: 'invalid-type',
+            description: 'Test artifact',
+          },
+        })).rejects.toThrow('artifactType must be one of: code, config, migration, documentation, test, script, other');
+      });
+    });
+
+    // GREEN: Tests for minimal artifact with defaults
+    describe('minimal artifact with defaults', () => {
+      it('GREEN: should accept minimal artifact (title + artifactType only)', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'User Model',
+            artifactType: 'code',
+          },
+        });
+
+        expect(result.artifactId).toBeDefined();
+
+        // Verify defaults were applied
+        const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId, fields: ['*'] });
+        expect(artifact.title).toBe('User Model');
+        expect(artifact.artifactType).toBe('code');
+        expect(artifact.description).toBe('');  // default
+        expect(artifact.slug).toBeDefined();  // auto-generated
+        expect(artifact.status).toBe('draft');
+      });
+    });
+
     it('should add a code artifact', async () => {
       const result = await service.addArtifact({
         planId,

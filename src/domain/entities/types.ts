@@ -35,11 +35,11 @@ export type RequirementStatus = 'draft' | 'approved' | 'implemented' | 'deferred
 
 export interface Requirement extends Entity {
   type: 'requirement';
-  title: string;
+  title: string;  // REQUIRED: Validated in addRequirement
   description: string;
   rationale?: string;
   source: {
-    type: RequirementSource;
+    type: RequirementSource;  // REQUIRED: Validated in addRequirement
     context?: string;
     parentId?: string;
   };
@@ -73,7 +73,7 @@ export interface EffortEstimate {
 
 export interface Solution extends Entity {
   type: 'solution';
-  title: string;
+  title: string;  // REQUIRED: Validated in proposeSolution
   description: string;
   approach: string;
   implementationNotes?: string;
@@ -101,10 +101,10 @@ export interface AlternativeConsidered {
 
 export interface Decision extends Entity {
   type: 'decision';
-  title: string;
-  question: string;
+  title: string;  // REQUIRED: Validated in recordDecision
+  question: string;  // REQUIRED: Validated in recordDecision
   context: string;
-  decision: string;
+  decision: string;  // REQUIRED: Validated in recordDecision
   alternativesConsidered: AlternativeConsidered[];
   consequences?: string;
   impactScope?: string[];
@@ -132,7 +132,7 @@ export interface Blocker {
 
 export interface Phase extends Entity {
   type: 'phase';
-  title: string;
+  title: string;  // REQUIRED: Validated in addPhase
   description: string;
 
   // Hierarchy
@@ -206,10 +206,10 @@ export interface FileEntry {
 
 export interface Artifact extends Entity {
   type: 'artifact';
-  title: string;
+  title: string;  // REQUIRED: Validated in addArtifact
   description: string;
   slug?: string;                 // URL-friendly identifier (auto-generated from title if not provided)
-  artifactType: ArtifactType;
+  artifactType: ArtifactType;  // REQUIRED: Validated in addArtifact
   status: ArtifactStatus;
 
   // Content - structured storage for generated content
@@ -264,7 +264,7 @@ export type PlanStatus = 'active' | 'archived' | 'completed';
 
 export interface PlanManifest {
   id: string;
-  name: string;
+  name: string;  // REQUIRED: Validated in createPlan
   description: string;
   status: PlanStatus;
   author: string;

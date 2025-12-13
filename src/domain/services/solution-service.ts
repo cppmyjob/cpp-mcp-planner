@@ -4,7 +4,7 @@ import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { DecisionService } from './decision-service.js';
 import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
-import { validateEffortEstimate, validateTags } from './validators.js';
+import { validateEffortEstimate, validateTags, validateRequiredString } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
 // Constants
@@ -15,13 +15,13 @@ const DEFAULT_SOLUTIONS_PAGE_LIMIT = 50;
 export interface ProposeSolutionInput {
   planId: string;
   solution: {
-    title: string;
-    description: string;
-    approach: string;
+    title: string;  // REQUIRED
+    description?: string;  // Optional - default: ''
+    approach?: string;     // Optional - default: ''
     implementationNotes?: string;
-    tradeoffs: Tradeoff[];
-    addressing: string[];
-    evaluation: {
+    tradeoffs?: Tradeoff[];  // Optional - default: []
+    addressing?: string[];   // Optional - default: []
+    evaluation?: {           // Optional - default: { effortEstimate: {value:0, unit:'hours', confidence:'low'}, technicalFeasibility:'medium', riskAssessment:'' }
       effortEstimate: EffortEstimate;
       technicalFeasibility: 'high' | 'medium' | 'low';
       riskAssessment: string;
@@ -269,8 +269,11 @@ export class SolutionService {
   }
 
   public async proposeSolution(input: ProposeSolutionInput): Promise<ProposeSolutionResult> {
+    // Validate REQUIRED fields
+    validateRequiredString(input.solution.title, 'title');
+
     // Validate tradeoffs format
-    this.validateTradeoffs(input.solution.tradeoffs);
+    this.validateTradeoffs(input.solution.tradeoffs ?? []);
     // Validate effortEstimate format (only if evaluation is provided)
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, @typescript-eslint/prefer-optional-chain
     if (input.solution.evaluation !== undefined && input.solution.evaluation.effortEstimate !== undefined) {
@@ -293,13 +296,17 @@ export class SolutionService {
         tags: input.solution.tags ?? [],
         annotations: [],
       },
-      title: input.solution.title,
-      description: input.solution.description,
-      approach: input.solution.approach,
-      implementationNotes: input.solution.implementationNotes,
-      tradeoffs: input.solution.tradeoffs,
-      addressing: input.solution.addressing,
-      evaluation: input.solution.evaluation,
+      title: input.solution.title,  // REQUIRED
+      description: input.solution.description ?? '',  // DEFAULT: empty string
+      approach: input.solution.approach ?? '',        // DEFAULT: empty string
+      implementationNotes: input.solution.implementationNotes,  // undefined OK
+      tradeoffs: input.solution.tradeoffs ?? [],      // DEFAULT: empty array (BUG #6 fix)
+      addressing: input.solution.addressing ?? [],    // DEFAULT: empty array
+      evaluation: input.solution.evaluation ?? {      // DEFAULT: default evaluation
+        effortEstimate: { value: 0, unit: 'hours', confidence: 'low' },
+        technicalFeasibility: 'medium',
+        riskAssessment: '',
+      },
       status: 'proposed',
     };
 
@@ -331,7 +338,9 @@ export class SolutionService {
     // Collect all aspects
     const aspectsSet = new Set<string>();
     solutions.forEach((s) => {
-      // GREEN: BUG #6 Fix - Handle missing or undefined tradeoffs field
+      // LEGACY SUPPORT: Keep defensive guard for backward compatibility with old data
+      // TODO Sprint 3: Remove after data migration applies defaults to all existing entities
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (s.tradeoffs !== undefined && s.tradeoffs !== null) {
         s.tradeoffs.forEach((t) => aspectsSet.add(t.aspect));
       }
@@ -346,7 +355,10 @@ export class SolutionService {
     // Build comparison matrix
     const matrix = aspects.map((aspect) => {
       const solutionData = solutions.map((s) => {
-        // GREEN: BUG #6 Fix - Handle missing or undefined tradeoffs field
+        // LEGACY SUPPORT: Keep defensive guard for backward compatibility with old data
+        // TODO Sprint 3: Remove after data migration applies defaults to all existing entities
+        // New solutions created with proposeSolution() will always have tradeoffs=[]
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         const tradeoff = (s.tradeoffs !== undefined && s.tradeoffs !== null)
           ? s.tradeoffs.find((t) => t.aspect === aspect)
           : undefined;
@@ -375,7 +387,10 @@ export class SolutionService {
     // Calculate overall best
     const scores: Record<string, number[]> = {};
     solutions.forEach((s) => {
-      // GREEN: BUG #6 Fix - Handle missing or undefined tradeoffs field
+      // LEGACY SUPPORT: Keep defensive guard for backward compatibility with old data
+      // TODO Sprint 3: Remove after data migration applies defaults to all existing entities
+      // New solutions created with proposeSolution() will always have tradeoffs=[]
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (s.tradeoffs !== undefined && s.tradeoffs !== null) {
         scores[s.id] = s.tradeoffs
           .filter((t) => t.score !== undefined)

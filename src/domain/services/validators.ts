@@ -293,3 +293,44 @@ export function validatePriority(priority: unknown): void {
     );
   }
 }
+
+/**
+ * Validates that a value is a non-empty string (for REQUIRED fields)
+ * @param value - The value to validate
+ * @param fieldName - The name of the field for error messages
+ * @throws Error if value is undefined, null, not a string, or empty/whitespace-only
+ */
+export function validateRequiredString(value: unknown, fieldName: string): void {
+  if (value === undefined || value === null) {
+    throw new Error(`${fieldName} is required`);
+  }
+  if (typeof value !== 'string') {
+    throw new Error(`${fieldName} must be a string`);
+  }
+  if (value.trim() === '') {
+    throw new Error(`${fieldName} must be a non-empty string`);
+  }
+}
+
+/**
+ * Validates that a value is one of the valid enum values (for REQUIRED enum fields)
+ * @param value - The value to validate
+ * @param fieldName - The name of the field for error messages
+ * @param validValues - Array of valid enum values
+ * @throws Error if value is undefined, null, not a string, or not in validValues
+ */
+export function validateRequiredEnum(
+  value: unknown,
+  fieldName: string,
+  validValues: readonly string[]
+): void {
+  if (value === undefined || value === null) {
+    throw new Error(`${fieldName} is required`);
+  }
+  if (typeof value !== 'string') {
+    throw new Error(`${fieldName} must be a string`);
+  }
+  if (!validValues.includes(value)) {
+    throw new Error(`${fieldName} must be one of: ${validValues.join(', ')}`);
+  }
+}
