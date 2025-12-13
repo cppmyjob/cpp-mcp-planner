@@ -855,6 +855,53 @@ describe('SolutionService', () => {
       });
     });
 
+    describe('BUG #18: Title validation in updateSolution (TDD - RED phase)', () => {
+      let solutionId: string;
+
+      beforeEach(async () => {
+        const result = await service.proposeSolution({
+          planId,
+          solution: {
+            title: 'Original Title',
+            description: 'D',
+            approach: 'A',
+          },
+        });
+        solutionId = result.solutionId;
+      });
+
+      it('RED: should reject empty title', async () => {
+        await expect(service.updateSolution({
+          planId,
+          solutionId,
+          updates: { title: '' },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('RED: should reject whitespace-only title', async () => {
+        await expect(service.updateSolution({
+          planId,
+          solutionId,
+          updates: { title: '   ' },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('GREEN: should allow valid title update', async () => {
+        const result = await service.updateSolution({
+          planId,
+          solutionId,
+          updates: { title: 'New Valid Title' },
+        });
+        expect(result.success).toBe(true);
+
+        const updated = await service.getSolution({
+          planId,
+          solutionId,
+        });
+        expect(updated.solution.title).toBe('New Valid Title');
+      });
+    });
+
     describe('selectSolution should return only success and IDs', () => {
       it('should not include full solution objects in result', async () => {
         const sol = await service.proposeSolution({

@@ -429,6 +429,97 @@ describe('DecisionService', () => {
       });
     });
 
+    describe('BUG #18: REQUIRED fields validation in updateDecision (TDD - RED phase)', () => {
+      let decisionId: string;
+
+      beforeEach(async () => {
+        const result = await service.recordDecision({
+          planId,
+          decision: {
+            title: 'Original Title',
+            question: 'Original Question',
+            decision: 'Original Decision',
+          },
+        });
+        decisionId = result.decisionId;
+      });
+
+      describe('title validation', () => {
+        it('RED: should reject empty title', async () => {
+          await expect(service.updateDecision({
+            planId,
+            decisionId,
+            updates: { title: '' },
+          })).rejects.toThrow('title must be a non-empty string');
+        });
+
+        it('RED: should reject whitespace-only title', async () => {
+          await expect(service.updateDecision({
+            planId,
+            decisionId,
+            updates: { title: '   ' },
+          })).rejects.toThrow('title must be a non-empty string');
+        });
+      });
+
+      describe('question validation', () => {
+        it('RED: should reject empty question', async () => {
+          await expect(service.updateDecision({
+            planId,
+            decisionId,
+            updates: { question: '' },
+          })).rejects.toThrow('question must be a non-empty string');
+        });
+
+        it('RED: should reject whitespace-only question', async () => {
+          await expect(service.updateDecision({
+            planId,
+            decisionId,
+            updates: { question: '   ' },
+          })).rejects.toThrow('question must be a non-empty string');
+        });
+      });
+
+      describe('decision validation', () => {
+        it('RED: should reject empty decision', async () => {
+          await expect(service.updateDecision({
+            planId,
+            decisionId,
+            updates: { decision: '' },
+          })).rejects.toThrow('decision must be a non-empty string');
+        });
+
+        it('RED: should reject whitespace-only decision', async () => {
+          await expect(service.updateDecision({
+            planId,
+            decisionId,
+            updates: { decision: '   ' },
+          })).rejects.toThrow('decision must be a non-empty string');
+        });
+      });
+
+      it('GREEN: should allow valid updates', async () => {
+        const result = await service.updateDecision({
+          planId,
+          decisionId,
+          updates: {
+            title: 'New Title',
+            question: 'New Question',
+            decision: 'New Decision',
+          },
+        });
+        expect(result.success).toBe(true);
+
+        const updated = await service.getDecision({
+          planId,
+          decisionId,
+        });
+        expect(updated.decision.title).toBe('New Title');
+        expect(updated.decision.question).toBe('New Question');
+        expect(updated.decision.decision).toBe('New Decision');
+      });
+    });
+
     describe('supersedeDecision should return only success and IDs', () => {
       it('should not include full decision objects in result', async () => {
         const original = await service.recordDecision({

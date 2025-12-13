@@ -1051,6 +1051,52 @@ describe('ArtifactService', () => {
         expect(result).not.toHaveProperty('artifact');
       });
     });
+
+    describe('BUG #18: Title validation in updateArtifact (TDD - RED phase)', () => {
+      let artifactId: string;
+
+      beforeEach(async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Original Title',
+            artifactType: 'code',
+          },
+        });
+        artifactId = result.artifactId;
+      });
+
+      it('RED: should reject empty title', async () => {
+        await expect(service.updateArtifact({
+          planId,
+          artifactId,
+          updates: { title: '' },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('RED: should reject whitespace-only title', async () => {
+        await expect(service.updateArtifact({
+          planId,
+          artifactId,
+          updates: { title: '   ' },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('GREEN: should allow valid title update', async () => {
+        const result = await service.updateArtifact({
+          planId,
+          artifactId,
+          updates: { title: 'New Valid Title' },
+        });
+        expect(result.success).toBe(true);
+
+        const updated = await service.getArtifact({
+          planId,
+          artifactId,
+        });
+        expect(updated.artifact.title).toBe('New Valid Title');
+      });
+    });
   });
 
   describe('fields parameter support', () => {

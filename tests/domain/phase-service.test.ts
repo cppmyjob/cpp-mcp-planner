@@ -1628,6 +1628,150 @@ describe('PhaseService', () => {
       });
     });
 
+    describe('BUG #18: Title validation in updatePhase (TDD - RED phase)', () => {
+      let phaseId: string;
+
+      beforeEach(async () => {
+        const result = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Original Title',
+          },
+        });
+        phaseId = result.phaseId;
+      });
+
+      it('RED: should reject empty title', async () => {
+        await expect(service.updatePhase({
+          planId,
+          phaseId,
+          updates: { title: '' },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('RED: should reject whitespace-only title', async () => {
+        await expect(service.updatePhase({
+          planId,
+          phaseId,
+          updates: { title: '   ' },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('GREEN: should allow valid title update', async () => {
+        const result = await service.updatePhase({
+          planId,
+          phaseId,
+          updates: { title: 'New Valid Title' },
+        });
+        expect(result.success).toBe(true);
+
+        const updated = await service.getPhase({
+          planId,
+          phaseId,
+        });
+        expect(updated.phase.title).toBe('New Valid Title');
+      });
+    });
+
+    describe('BUGS #16, #17, #19: Status validation in phase.update (TDD)', () => {
+      let phaseId: string;
+
+      beforeEach(async () => {
+        const result = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Phase for Status Test',
+          },
+        });
+        phaseId = result.phaseId;
+      });
+
+      it('RED: should reject invalid status in updatePhase', async () => {
+        await expect(service.updatePhase({
+          planId,
+          phaseId,
+          updates: { status: 'invalid_status' as unknown as 'planned' },
+        })).rejects.toThrow('status must be one of: planned, in_progress, completed, blocked, skipped');
+      });
+
+      it('GREEN: should allow valid status in updatePhase', async () => {
+        const result = await service.updatePhase({
+          planId,
+          phaseId,
+          updates: { status: 'in_progress' },
+        });
+        expect(result.success).toBe(true);
+
+        const updated = await service.getPhase({ planId, phaseId });
+        expect(updated.phase.status).toBe('in_progress');
+      });
+    });
+
+    describe('BUGS #16, #17, #19: Status validation in updatePhaseStatus (TDD)', () => {
+      let phaseId: string;
+
+      beforeEach(async () => {
+        const result = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Phase for Status Test',
+          },
+        });
+        phaseId = result.phaseId;
+      });
+
+      it('RED: should reject invalid status in updatePhaseStatus', async () => {
+        await expect(service.updatePhaseStatus({
+          planId,
+          phaseId,
+          status: 'super_status' as unknown as 'planned',
+        })).rejects.toThrow('status must be one of: planned, in_progress, completed, blocked, skipped');
+      });
+
+      it('GREEN: should allow valid status in updatePhaseStatus', async () => {
+        const result = await service.updatePhaseStatus({
+          planId,
+          phaseId,
+          status: 'completed',
+        });
+        expect(result.success).toBe(true);
+
+        const updated = await service.getPhase({ planId, phaseId });
+        expect(updated.phase.status).toBe('completed');
+      });
+
+      it('GREEN: should accept all valid status values', async () => {
+        const validStatuses: ('planned' | 'in_progress' | 'completed' | 'blocked' | 'skipped')[] =
+          ['planned', 'in_progress', 'completed', 'blocked', 'skipped'];
+
+        for (const status of validStatuses) {
+          const { phaseId: testPhaseId } = await service.addPhase({
+            planId,
+            phase: { title: `Test ${status}` },
+          });
+
+          // blocked requires notes
+          if (status === 'blocked') {
+            await service.updatePhaseStatus({
+              planId,
+              phaseId: testPhaseId,
+              status,
+              notes: 'Blocked reason',
+            });
+          } else {
+            await service.updatePhaseStatus({
+              planId,
+              phaseId: testPhaseId,
+              status,
+            });
+          }
+
+          const updated = await service.getPhase({ planId, phaseId: testPhaseId });
+          expect(updated.phase.status).toBe(status);
+        }
+      });
+    });
+
     describe('updatePhaseStatus should return only success and phaseId', () => {
       it('should not include full phase object in result', async () => {
         const added = await service.addPhase({

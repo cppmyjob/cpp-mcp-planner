@@ -510,9 +510,11 @@ export class SolutionService {
       );
     }
 
-
-    // Apply updates
-    if (input.updates.title !== undefined) solution.title = input.updates.title;
+    // BUG #18: Validate title if provided in updates
+    if (input.updates.title !== undefined) {
+      validateRequiredString(input.updates.title, 'title');
+      solution.title = input.updates.title;
+    }
     if (input.updates.description !== undefined) solution.description = input.updates.description;
     if (input.updates.approach !== undefined) solution.approach = input.updates.approach;
     if (input.updates.implementationNotes !== undefined)

@@ -303,7 +303,11 @@ export class ArtifactService {
       );
     }
 
-    if (input.updates.title !== undefined) artifact.title = input.updates.title;
+    // BUG #18: Validate title if provided in updates
+    if (input.updates.title !== undefined) {
+      validateRequiredString(input.updates.title, 'title');
+      artifact.title = input.updates.title;
+    }
     if (input.updates.description !== undefined) artifact.description = input.updates.description;
     if (input.updates.slug !== undefined) {
       // Validate slug uniqueness (exclude current artifact) - need all artifacts for this

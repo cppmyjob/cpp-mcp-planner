@@ -3,7 +3,7 @@ import type { RepositoryFactory } from '../../infrastructure/factory/repository-
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
-import { validateEffortEstimate, validateTags, validatePriority, validateRequiredString } from './validators.js';
+import { validateEffortEstimate, validateTags, validatePriority, validateRequiredString, validateRequiredEnum } from './validators.js';
 import { filterPhase } from '../utils/field-filter.js';
 import { bulkUpdateEntities } from '../utils/bulk-operations.js';
 
@@ -495,14 +495,25 @@ export class PhaseService {
       );
     }
 
-
-    if (input.updates.title !== undefined) phase.title = input.updates.title;
+    // BUG #18: Validate title if provided in updates
+    if (input.updates.title !== undefined) {
+      validateRequiredString(input.updates.title, 'title');
+      phase.title = input.updates.title;
+    }
     if (input.updates.description !== undefined) phase.description = input.updates.description;
     if (input.updates.objectives !== undefined) phase.objectives = input.updates.objectives;
     if (input.updates.deliverables !== undefined) phase.deliverables = input.updates.deliverables;
     if (input.updates.successCriteria !== undefined)
       phase.successCriteria = input.updates.successCriteria;
-    if (input.updates.status !== undefined) phase.status = input.updates.status;
+    // BUGS #16, #17, #19: Validate status if provided in updates
+    if (input.updates.status !== undefined) {
+      validateRequiredEnum(
+        input.updates.status,
+        'status',
+        ['planned', 'in_progress', 'completed', 'blocked', 'skipped']
+      );
+      phase.status = input.updates.status;
+    }
     if (input.updates.progress !== undefined) phase.progress = input.updates.progress;
     if (input.updates.schedule !== undefined) {
       phase.schedule = { ...phase.schedule, ...input.updates.schedule };
@@ -715,6 +726,13 @@ export class PhaseService {
       phase.progress = PROGRESS_COMPLETE;
       autoUpdated.completedAt = now;
     }
+
+    // BUGS #16, #17, #19: Validate status
+    validateRequiredEnum(
+      input.status,
+      'status',
+      ['planned', 'in_progress', 'completed', 'blocked', 'skipped']
+    );
 
     if (input.status === 'blocked' && (input.notes === undefined || input.notes === '')) {
       throw new Error('Notes required when setting status to blocked');

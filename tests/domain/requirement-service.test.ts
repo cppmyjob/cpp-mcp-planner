@@ -166,6 +166,68 @@ describe('RequirementService', () => {
       });
     });
 
+    describe('BUGS #2, #3: priority and category enum validation (TDD - RED phase)', () => {
+      describe('priority validation', () => {
+        it('RED: should reject invalid priority', async () => {
+          await expect(service.addRequirement({
+            planId,
+            requirement: {
+              title: 'Test',
+              source: { type: 'user-request' },
+              // @ts-expect-error - Testing invalid input
+              priority: 'super-high',
+            },
+          })).rejects.toThrow('priority must be one of: critical, high, medium, low');
+        });
+
+        it('GREEN: should accept valid priority values', async () => {
+          const priorities = ['critical', 'high', 'medium', 'low'] as const;
+
+          for (const priority of priorities) {
+            const result = await service.addRequirement({
+              planId,
+              requirement: {
+                title: `Test ${priority}`,
+                source: { type: 'user-request' },
+                priority,
+              },
+            });
+            expect(result.requirementId).toBeDefined();
+          }
+        });
+      });
+
+      describe('category validation', () => {
+        it('RED: should reject invalid category', async () => {
+          await expect(service.addRequirement({
+            planId,
+            requirement: {
+              title: 'Test',
+              source: { type: 'user-request' },
+              // @ts-expect-error - Testing invalid input
+              category: 'super-functional',
+            },
+          })).rejects.toThrow('category must be one of: functional, non-functional, technical, business');
+        });
+
+        it('GREEN: should accept valid category values', async () => {
+          const categories = ['functional', 'non-functional', 'technical', 'business'] as const;
+
+          for (const category of categories) {
+            const result = await service.addRequirement({
+              planId,
+              requirement: {
+                title: `Test ${category}`,
+                source: { type: 'user-request' },
+                category,
+              },
+            });
+            expect(result.requirementId).toBeDefined();
+          }
+        });
+      });
+    });
+
     it('should add a new requirement', async () => {
       const result = await service.addRequirement({
         planId,
@@ -506,6 +568,115 @@ describe('RequirementService', () => {
 
         expect(result.success).toBe(true);
         expect(result).not.toHaveProperty('requirement');
+      });
+    });
+
+    describe('BUG #18: Title validation in updateRequirement (TDD - RED phase)', () => {
+      let requirementId: string;
+
+      beforeEach(async () => {
+        const result = await service.addRequirement({
+          planId,
+          requirement: {
+            title: 'Original Title',
+            source: { type: 'user-request' },
+          },
+        });
+        requirementId = result.requirementId;
+      });
+
+      it('RED: should reject empty title', async () => {
+        await expect(service.updateRequirement({
+          planId,
+          requirementId,
+          updates: { title: '' },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('RED: should reject whitespace-only title', async () => {
+        await expect(service.updateRequirement({
+          planId,
+          requirementId,
+          updates: { title: '   ' },
+        })).rejects.toThrow('title must be a non-empty string');
+      });
+
+      it('GREEN: should allow valid title update', async () => {
+        const result = await service.updateRequirement({
+          planId,
+          requirementId,
+          updates: { title: 'New Valid Title' },
+        });
+        expect(result.success).toBe(true);
+
+        const updated = await service.getRequirement({
+          planId,
+          requirementId,
+        });
+        expect(updated.requirement.title).toBe('New Valid Title');
+      });
+    });
+
+    describe('BUG #10: priority and category enum validation in updateRequirement (TDD - RED phase)', () => {
+      let requirementId: string;
+
+      beforeEach(async () => {
+        const result = await service.addRequirement({
+          planId,
+          requirement: {
+            title: 'Test Requirement',
+            source: { type: 'user-request' },
+          },
+        });
+        requirementId = result.requirementId;
+      });
+
+      describe('priority validation', () => {
+        it('RED: should reject invalid priority', async () => {
+          await expect(service.updateRequirement({
+            planId,
+            requirementId,
+            // @ts-expect-error - Testing invalid input
+            updates: { priority: 'super-high' },
+          })).rejects.toThrow('priority must be one of: critical, high, medium, low');
+        });
+
+        it('GREEN: should accept valid priority values', async () => {
+          const priorities = ['critical', 'high', 'medium', 'low'] as const;
+
+          for (const priority of priorities) {
+            const result = await service.updateRequirement({
+              planId,
+              requirementId,
+              updates: { priority },
+            });
+            expect(result.success).toBe(true);
+          }
+        });
+      });
+
+      describe('category validation', () => {
+        it('RED: should reject invalid category', async () => {
+          await expect(service.updateRequirement({
+            planId,
+            requirementId,
+            // @ts-expect-error - Testing invalid input
+            updates: { category: 'super-functional' },
+          })).rejects.toThrow('category must be one of: functional, non-functional, technical, business');
+        });
+
+        it('GREEN: should accept valid category values', async () => {
+          const categories = ['functional', 'non-functional', 'technical', 'business'] as const;
+
+          for (const category of categories) {
+            const result = await service.updateRequirement({
+              planId,
+              requirementId,
+              updates: { category },
+            });
+            expect(result.success).toBe(true);
+          }
+        });
       });
     });
   });

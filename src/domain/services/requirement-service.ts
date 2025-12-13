@@ -287,6 +287,22 @@ export class RequirementService {
       ['user-request', 'discovered', 'derived']
     );
 
+    // BUGS #2, #3: Validate priority and category if provided
+    if (input.requirement.priority !== undefined) {
+      validateRequiredEnum(
+        input.requirement.priority,
+        'priority',
+        ['critical', 'high', 'medium', 'low']
+      );
+    }
+    if (input.requirement.category !== undefined) {
+      validateRequiredEnum(
+        input.requirement.category,
+        'category',
+        ['functional', 'non-functional', 'technical', 'business']
+      );
+    }
+
     // Validate tags format
     validateTags(input.requirement.tags ?? []);
 
@@ -420,8 +436,9 @@ export class RequirementService {
       );
     }
 
-    // Apply updates
+    // BUG #18: Validate title if provided in updates
     if (input.updates.title !== undefined) {
+      validateRequiredString(input.updates.title, 'title');
       requirement.title = input.updates.title;
     }
     if (input.updates.description !== undefined) {
@@ -433,10 +450,21 @@ export class RequirementService {
     if (input.updates.acceptanceCriteria !== undefined) {
       requirement.acceptanceCriteria = input.updates.acceptanceCriteria;
     }
+    // BUG #10: Validate priority and category if provided in updates
     if (input.updates.priority !== undefined) {
+      validateRequiredEnum(
+        input.updates.priority,
+        'priority',
+        ['critical', 'high', 'medium', 'low']
+      );
       requirement.priority = input.updates.priority;
     }
     if (input.updates.category !== undefined) {
+      validateRequiredEnum(
+        input.updates.category,
+        'category',
+        ['functional', 'non-functional', 'technical', 'business']
+      );
       requirement.category = input.updates.category;
     }
     if (input.updates.status !== undefined) {

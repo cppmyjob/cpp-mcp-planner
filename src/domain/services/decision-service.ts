@@ -393,10 +393,20 @@ export class DecisionService {
 
     // Regular update
     if (input.updates) {
-      if (input.updates.title !== undefined) decision.title = input.updates.title;
-      if (input.updates.question !== undefined) decision.question = input.updates.question;
+      // BUG #18: Validate REQUIRED fields if provided in updates
+      if (input.updates.title !== undefined) {
+        validateRequiredString(input.updates.title, 'title');
+        decision.title = input.updates.title;
+      }
+      if (input.updates.question !== undefined) {
+        validateRequiredString(input.updates.question, 'question');
+        decision.question = input.updates.question;
+      }
       if (input.updates.context !== undefined) decision.context = input.updates.context;
-      if (input.updates.decision !== undefined) decision.decision = input.updates.decision;
+      if (input.updates.decision !== undefined) {
+        validateRequiredString(input.updates.decision, 'decision');
+        decision.decision = input.updates.decision;
+      }
       if (input.updates.alternativesConsidered !== undefined) {
         validateAlternativesConsidered(input.updates.alternativesConsidered);
         decision.alternativesConsidered = input.updates.alternativesConsidered;
