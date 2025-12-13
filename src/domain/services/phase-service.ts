@@ -10,6 +10,7 @@ import { bulkUpdateEntities } from '../utils/bulk-operations.js';
 // Constants
 const MAX_PHASES_BATCH_SIZE = 100;
 const PROGRESS_COMPLETE = 100;
+const PROGRESS_NEAR_COMPLETE = 80; // 80% progress threshold for "almost done"
 const DEFAULT_NEXT_ACTIONS_LIMIT = 5;
 const PRIORITY_CRITICAL = 0;
 const PRIORITY_HIGH = 1;
@@ -788,7 +789,7 @@ export class PhaseService {
       return this.comparePriority(a, b);
     })) {
       if (actions.length >= limit) break;
-      if (phase.progress >= 80) {
+      if (phase.progress >= PROGRESS_NEAR_COMPLETE) {
         actions.push({
           phaseId: phase.id,
           phaseTitle: phase.title,

@@ -30,6 +30,13 @@ const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
 };
 
 /**
+ * Default timeout constants
+ */
+const DEFAULT_ACQUIRE_TIMEOUT_MS = 10000; // 10 seconds
+const DEFAULT_DISPOSE_TIMEOUT_MS = 5000; // 5 seconds
+const LOCK_FILE_HASH_LENGTH = 32; // 128 bits for unique lock file names
+
+/**
  * FileLockManager options
  */
 export interface FileLockManagerOptions {
@@ -179,14 +186,14 @@ export class FileLockManager {
   constructor(baseDir: string, options?: FileLockManagerOptions) {
     this.baseDir = baseDir;
     this.lockDir = options?.lockDir ?? path.join(baseDir, '.locks');
-    this.acquireTimeout = options?.acquireTimeout ?? 10000;
+    this.acquireTimeout = options?.acquireTimeout ?? DEFAULT_ACQUIRE_TIMEOUT_MS;
     this.retryInterval = options?.retryInterval ?? 100;
     this.staleThreshold =
       options?.staleThreshold ??
       (process.platform === 'win32'
         ? FileLockManager.defaultStaleThresholdWindows
         : FileLockManager.defaultStaleThresholdOther);
-    this.disposeTimeout = options?.disposeTimeout ?? 5000;
+    this.disposeTimeout = options?.disposeTimeout ?? DEFAULT_DISPOSE_TIMEOUT_MS;
     this.logger = options?.logger;
     this.logLevel = options?.logLevel ?? 'warn';
     this.onLockCompromised = options?.onLockCompromised;
@@ -610,7 +617,7 @@ export class FileLockManager {
   private getLockPath(resource: string): string {
     // Use SHA256 hash for unique, safe filenames
     // Take first 32 chars (128 bits) which is plenty for uniqueness
-    const hash = createHash('sha256').update(resource).digest('hex').slice(0, 32);
+    const hash = createHash('sha256').update(resource).digest('hex').slice(0, LOCK_FILE_HASH_LENGTH);
     return path.join(this.lockDir, `${hash}.lock`);
   }
 

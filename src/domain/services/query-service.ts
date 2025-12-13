@@ -24,6 +24,8 @@ import type {
  * - PHASES (2): requirement → solutions → phases
  * - ARTIFACTS (3): requirement → solutions → phases → artifacts (full trace)
  */
+const DEFAULT_SEARCH_RESULTS_LIMIT = 50;
+
 const TRACE_DEPTH = {
   SOLUTIONS: 1,
   PHASES: 2,
@@ -200,7 +202,7 @@ export class QueryService {
     // Pagination
     const total = results.length;
     const offset = input.offset ?? 0;
-    const limit = input.limit ?? 50;
+    const limit = input.limit ?? DEFAULT_SEARCH_RESULTS_LIMIT;
     const paginated = results.slice(offset, offset + limit);
 
     return {

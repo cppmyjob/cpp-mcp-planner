@@ -148,7 +148,7 @@ export default tseslint.config(
       ],
       // No magic numbers (except common ones)
       '@typescript-eslint/no-magic-numbers': [
-        'warn',
+        'error',
         {
           ignore: [-1, 0, 1, 2, 100],
           ignoreArrayIndexes: true,

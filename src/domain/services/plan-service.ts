@@ -355,8 +355,8 @@ export class PlanService {
     }
     if (input.updates.maxHistoryDepth !== undefined) {
       // Validate maxHistoryDepth
-      if (input.updates.maxHistoryDepth < 0 || input.updates.maxHistoryDepth > 10) {
-        throw new Error('maxHistoryDepth must be between 0 and 10');
+      if (input.updates.maxHistoryDepth < 0 || input.updates.maxHistoryDepth > MAX_HISTORY_DEPTH) {
+        throw new Error(`maxHistoryDepth must be between 0 and ${String(MAX_HISTORY_DEPTH)}`);
       }
       if (!Number.isInteger(input.updates.maxHistoryDepth)) {
         throw new Error('maxHistoryDepth must be an integer');

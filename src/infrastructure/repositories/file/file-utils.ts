@@ -10,6 +10,11 @@ import * as crypto from 'crypto';
 import * as util from 'util';
 import gracefulFs from 'graceful-fs';
 
+/**
+ * Number of random bytes for temp file name uniqueness
+ */
+const TEMP_FILE_RANDOM_BYTES = 4; // 8 hex chars = 32 bits of randomness
+
 // graceful-fs provides retry logic for Windows file locking issues (EPERM/EBUSY/EACCES)
 const gracefulRename = util.promisify(gracefulFs.rename);
 
@@ -33,7 +38,7 @@ const gracefulRename = util.promisify(gracefulFs.rename);
  * @param data - Data to write (will be JSON.stringify'd)
  */
 export async function atomicWriteJSON(filePath: string, data: unknown): Promise<void> {
-  const tmpPath = `${filePath}.tmp.${String(Date.now())}.${crypto.randomBytes(4).toString('hex')}`;
+  const tmpPath = `${filePath}.tmp.${String(Date.now())}.${crypto.randomBytes(TEMP_FILE_RANDOM_BYTES).toString('hex')}`;
 
   try {
     // Write to temp file
