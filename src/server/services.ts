@@ -13,6 +13,7 @@ import { VersionHistoryService } from '../domain/services/version-history-servic
 
 export interface Services {
   repositoryFactory: RepositoryFactory;
+  lockManager: FileLockManager;
   storagePath: string;
   planService: PlanService;
   requirementService: RequirementService;
@@ -65,6 +66,7 @@ export async function createServices(storagePath: string): Promise<Services> {
 
   return {
     repositoryFactory,
+    lockManager,
     storagePath,
     planService,
     requirementService,

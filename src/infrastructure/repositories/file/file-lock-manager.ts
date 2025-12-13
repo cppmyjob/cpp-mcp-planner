@@ -221,12 +221,17 @@ export class FileLockManager {
    * Initialize the lock directory.
    * Must be called before using acquire(), withLock(), or isLocked().
    * Multiple calls are idempotent.
+   * Cleans up orphaned lock files from previous crashed processes.
    */
   public async initialize(): Promise<void> {
     if (this.initialized) {
       return; // Idempotent
     }
     await fs.mkdir(this.lockDir, { recursive: true });
+
+    // Clean up orphaned lock files from crashed processes
+    await this.cleanupOrphanedLocks();
+
     this.initialized = true;
     this.log('debug', 'FileLockManager initialized', { lockDir: this.lockDir });
   }
@@ -587,6 +592,9 @@ export class FileLockManager {
       mutex.release();
     }
     this.acquireMutexes.clear();
+
+    // Step 3: Clean up orphaned lock files
+    await this.cleanupOrphanedLocks();
   }
 
   /**
@@ -625,16 +633,87 @@ export class FileLockManager {
    * Ensure lock file exists (proper-lockfile requires it)
    *
    * Uses exclusive create (wx flag) to avoid TOCTOU race condition.
+   * If .locks directory is missing (ENOENT), creates it defensively and retries.
    */
   private async ensureLockFile(lockPath: string): Promise<void> {
     try {
       // Use 'wx' flag: create only if not exists (atomic)
       await fs.writeFile(lockPath, '', { flag: 'wx' });
     } catch (error: unknown) {
-      // EEXIST is OK - file already exists
       const errorObj = error as { code?: string };
-      if (errorObj.code !== 'EEXIST') {
-        throw error;
+
+      // EEXIST is OK - file already exists
+      if (errorObj.code === 'EEXIST') {
+        return;
+      }
+
+      // ENOENT means directory doesn't exist - create it defensively and retry
+      if (errorObj.code === 'ENOENT') {
+        await fs.mkdir(this.lockDir, { recursive: true });
+        // Retry file creation after directory is created
+        try {
+          await fs.writeFile(lockPath, '', { flag: 'wx' });
+        } catch (retryError: unknown) {
+          const retryErrorObj = retryError as { code?: string };
+          // EEXIST on retry is OK (another process created it)
+          if (retryErrorObj.code !== 'EEXIST') {
+            throw retryError;
+          }
+        }
+        return;
+      }
+
+      // Other errors are thrown
+      throw error;
+    }
+  }
+
+  /**
+   * Clean up orphaned lock files (stale locks from crashed processes)
+   *
+   * Uses proper-lockfile.check() to determine if a lock is stale.
+   * Called during initialize() and dispose() for cleanup.
+   */
+  public async cleanupOrphanedLocks(): Promise<void> {
+    try {
+      const files = await fs.readdir(this.lockDir);
+
+      for (const file of files) {
+        // Only process .lock files (not .lock.lock metadata files)
+        if (file.endsWith('.lock') && !file.includes('.lock.lock')) {
+          const lockPath = path.join(this.lockDir, file);
+
+          try {
+            // Check if lock is stale using proper-lockfile
+            const isLocked = await lockfile.check(lockPath, {
+              stale: this.staleThreshold,
+            });
+
+            if (!isLocked) {
+              // Lock is not held - safe to remove orphaned file
+              await fs.unlink(lockPath);
+              this.log('debug', 'Cleaned up orphaned lock file', { lockPath });
+            }
+          } catch (checkError: unknown) {
+            // Ignore errors for individual files - best effort cleanup
+            // This handles cases where file was deleted between readdir and check
+            const checkErrorObj = checkError as { code?: string };
+            if (checkErrorObj.code !== 'ENOENT') {
+              this.log('debug', 'Error checking lock file during cleanup', {
+                lockPath,
+                error: checkError instanceof Error ? checkError.message : String(checkError),
+              });
+            }
+          }
+        }
+      }
+    } catch (error: unknown) {
+      // Directory might not exist yet - ignore
+      const errorObj = error as { code?: string };
+      if (errorObj.code !== 'ENOENT') {
+        this.log('debug', 'Error during orphaned lock cleanup', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   }
