@@ -158,15 +158,14 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
     await server.connect(serverTransport);
     await client.connect(clientTransport);
 
-    await expect(
-      client.callTool({
-        name: 'plan',
-        arguments: {
-          action: 'set_active',
-          planId: 'non-existent-plan-id',
-        },
-      })
-    ).rejects.toThrow(/plan not found/i);
+    const result = await client.callTool({
+      name: 'plan',
+      arguments: {
+        action: 'set_active',
+        planId: 'non-existent-plan-id',
+      },
+    });
+    expect(result.isError).toBe(true);
 
     await client.close();
     await server.close();

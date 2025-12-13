@@ -104,35 +104,32 @@ describe('E2E: MCP Server Discovery & Errors', () => {
 
   describe('Error Handling via MCP', () => {
     it('should return error for unknown action', async () => {
-      await expect(
-        client.callTool({
-          name: 'plan',
-          arguments: {
-            action: 'unknown_action',
-          },
-        })
-      ).rejects.toThrow();
+      const result = await client.callTool({
+        name: 'plan',
+        arguments: {
+          action: 'unknown_action',
+        },
+      });
+      expect(result.isError).toBe(true);
     });
 
     it('should return error for non-existent plan', async () => {
-      await expect(
-        client.callTool({
-          name: 'plan',
-          arguments: {
-            action: 'get',
-            planId: 'non-existent-id',
-          },
-        })
-      ).rejects.toThrow();
+      const result = await client.callTool({
+        name: 'plan',
+        arguments: {
+          action: 'get',
+          planId: 'non-existent-id',
+        },
+      });
+      expect(result.isError).toBe(true);
     });
 
     it('should return error for unknown tool', async () => {
-      await expect(
-        client.callTool({
-          name: 'unknown_tool',
-          arguments: {},
-        })
-      ).rejects.toThrow();
+      const result = await client.callTool({
+        name: 'unknown_tool',
+        arguments: {},
+      });
+      expect(result.isError).toBe(true);
     });
   });
 });
