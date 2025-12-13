@@ -3,7 +3,7 @@ import type { RepositoryFactory } from '../../infrastructure/factory/repository-
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
-import { validateEffortEstimate, validateTags, validatePriority, validateRequiredString, validateRequiredEnum } from './validators.js';
+import { validateEffortEstimate, validateTags, validatePriority, validateRequiredString, validateRequiredEnum, validateProgress } from './validators.js';
 import { filterPhase } from '../utils/field-filter.js';
 import { bulkUpdateEntities } from '../utils/bulk-operations.js';
 
@@ -64,6 +64,7 @@ export interface AddPhaseInput {
     tags?: Tag[];  // Optional - default: []
     implementationNotes?: string;  // undefined OK
     priority?: PhasePriority;  // Optional - default: 'medium'
+    status?: PhaseStatus;  // Sprint 4: Optional - default: 'planned'
   };
 }
 
@@ -317,6 +318,7 @@ export interface DeletePhaseResult {
   success: boolean;
   message: string;
   deletedPhaseIds: string[];
+  reparentedPhaseIds?: string[];  // Sprint 8: Bug #17 - IDs of phases that were re-parented
 }
 
 export interface UpdatePhaseStatusResult {
@@ -412,6 +414,14 @@ export class PhaseService {
     if (input.phase.priority !== undefined) {
       validatePriority(input.phase.priority);
     }
+    // Sprint 4: Validate status if provided (BUG #7)
+    if (input.phase.status !== undefined) {
+      validateRequiredEnum(
+        input.phase.status,
+        'status',
+        ['planned', 'in_progress', 'completed', 'blocked', 'skipped']
+      );
+    }
 
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     const phases = await repo.findAll();
@@ -458,7 +468,7 @@ export class PhaseService {
       schedule: {
         estimatedEffort: effort ?? { value: 0, unit: 'hours', confidence: 'low' },
       },
-      status: 'planned',
+      status: input.phase.status ?? 'planned',  // Sprint 4: Use input status or default to 'planned'
       progress: 0,
       implementationNotes: input.phase.implementationNotes,
       priority: input.phase.priority ?? 'medium',
@@ -514,7 +524,11 @@ export class PhaseService {
       );
       phase.status = input.updates.status;
     }
-    if (input.updates.progress !== undefined) phase.progress = input.updates.progress;
+    // Sprint 2: Validate progress before assignment
+    if (input.updates.progress !== undefined) {
+      validateProgress(input.updates.progress);
+      phase.progress = input.updates.progress;
+    }
     if (input.updates.schedule !== undefined) {
       phase.schedule = { ...phase.schedule, ...input.updates.schedule };
     }
@@ -670,6 +684,7 @@ export class PhaseService {
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     const phases = await repo.findAll();
     const deletedIds: string[] = [];
+    const reparentedIds: string[] = [];
 
     const collectChildren = (parentId: string): void => {
       const children = phases.filter((p) => p.parentId === parentId);
@@ -688,6 +703,49 @@ export class PhaseService {
 
     if (input.deleteChildren === true) {
       collectChildren(input.phaseId);
+    } else {
+      // Sprint 8: Bug #17 - Re-parent children to deleted phase's parent
+      const directChildren = phases.filter((p) => p.parentId === input.phaseId);
+
+      if (directChildren.length > 0) {
+        // New parent is the deleted phase's parent (null for root)
+        const newParentId = phase.parentId;
+
+        // Find new parent phase to calculate new depth and path
+        const newParent = newParentId !== null ? phases.find((p) => p.id === newParentId) : null;
+        const newParentDepth = newParent?.depth ?? -1;
+        const newParentPath = newParent?.path ?? '';
+
+        // Calculate next order for siblings at new parent level
+        const existingSiblings = phases.filter((p) => p.parentId === newParentId && p.id !== input.phaseId);
+        let nextOrder = existingSiblings.length > 0 ? Math.max(...existingSiblings.map((s) => s.order)) + 1 : 1;
+
+        // Re-parent each direct child
+        for (const child of directChildren) {
+          child.parentId = newParentId;
+          child.depth = newParentDepth + 1;
+          child.order = nextOrder;
+          nextOrder++;
+
+          // Calculate new path
+          if (newParentPath !== '') {
+            child.path = `${newParentPath}.${String(child.order)}`;
+          } else {
+            child.path = String(child.order);
+          }
+
+          reparentedIds.push(child.id);
+
+          // Recursively update all descendants' paths
+          this.updateDescendantPaths(child, phases);
+        }
+
+        // Save all re-parented phases and their descendants
+        const affectedPhases = this.collectAllDescendants(directChildren, phases);
+        for (const affectedPhase of [...directChildren, ...affectedPhases]) {
+          await repo.update(affectedPhase.id, affectedPhase);
+        }
+      }
     }
 
     // Delete all collected phases
@@ -696,11 +754,47 @@ export class PhaseService {
     }
     await this.planService.updateStatistics(input.planId);
 
-    return {
+    const result: DeletePhaseResult = {
       success: true,
       message: `Deleted ${String(deletedIds.length)} phase(s)`,
       deletedPhaseIds: deletedIds,
     };
+
+    if (reparentedIds.length > 0) {
+      result.reparentedPhaseIds = reparentedIds;
+    }
+
+    return result;
+  }
+
+  /**
+   * Sprint 8: Recursively update paths of all descendants after re-parenting
+   */
+  private updateDescendantPaths(parent: Phase, allPhases: Phase[]): void {
+    const children = allPhases.filter((p) => p.parentId === parent.id);
+    for (const child of children) {
+      child.depth = parent.depth + 1;
+      child.path = `${parent.path}.${String(child.order)}`;
+      this.updateDescendantPaths(child, allPhases);
+    }
+  }
+
+  /**
+   * Sprint 8: Collect all descendants of given phases (for batch update)
+   */
+  private collectAllDescendants(parents: Phase[], allPhases: Phase[]): Phase[] {
+    const descendants: Phase[] = [];
+    const collectRecursive = (parentId: string): void => {
+      const children = allPhases.filter((p) => p.parentId === parentId);
+      for (const child of children) {
+        descendants.push(child);
+        collectRecursive(child.id);
+      }
+    };
+    for (const parent of parents) {
+      collectRecursive(parent.id);
+    }
+    return descendants;
   }
 
   public async updatePhaseStatus(input: UpdatePhaseStatusInput): Promise<UpdatePhaseStatusResult> {
@@ -740,7 +834,9 @@ export class PhaseService {
 
     phase.status = input.status;
 
+    // Sprint 2: Validate progress before assignment
     if (input.progress !== undefined) {
+      validateProgress(input.progress);
       phase.progress = input.progress;
     }
 

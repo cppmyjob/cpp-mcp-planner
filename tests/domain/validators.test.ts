@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { validateTargets } from '../../src/domain/services/validators.js';
+import { validateTargets, validateSlug } from '../../src/domain/services/validators.js';
 
 describe('validateTargets', () => {
   describe('basic validation', () => {
@@ -182,6 +182,97 @@ describe('validateTargets', () => {
     it('RED: should accept empty description string', () => {
       // Empty string is different from undefined - both are valid
       expect(() => { validateTargets([{ path: 'file.ts', action: 'create', description: '' }]); }).not.toThrow();
+    });
+  });
+});
+
+describe('validateSlug', () => {
+  describe('valid slugs', () => {
+    it('RED: should accept valid lowercase alphanumeric slug with dashes', () => {
+      expect(() => { validateSlug('my-valid-slug-123'); }).not.toThrow();
+    });
+
+    it('RED: should accept simple lowercase slug', () => {
+      expect(() => { validateSlug('myslug'); }).not.toThrow();
+    });
+
+    it('RED: should accept slug with numbers only', () => {
+      expect(() => { validateSlug('123'); }).not.toThrow();
+    });
+
+    it('RED: should accept single character slug', () => {
+      expect(() => { validateSlug('a'); }).not.toThrow();
+    });
+
+    it('RED: should skip validation for undefined (optional field)', () => {
+      expect(() => { validateSlug(undefined); }).not.toThrow();
+    });
+  });
+
+  describe('invalid characters', () => {
+    it('RED: should reject spaces in slug', () => {
+      expect(() => { validateSlug('my slug'); })
+        .toThrow(/must be lowercase alphanumeric with dashes/i);
+    });
+
+    it('RED: should reject uppercase letters', () => {
+      expect(() => { validateSlug('MySlug'); })
+        .toThrow(/must be lowercase alphanumeric with dashes/i);
+    });
+
+    it('RED: should reject special characters @', () => {
+      expect(() => { validateSlug('my@slug'); })
+        .toThrow(/must be lowercase alphanumeric with dashes/i);
+    });
+
+    it('RED: should reject special characters !', () => {
+      expect(() => { validateSlug('my-slug!'); })
+        .toThrow(/must be lowercase alphanumeric with dashes/i);
+    });
+
+    it('RED: should reject underscores', () => {
+      expect(() => { validateSlug('my_slug'); })
+        .toThrow(/must be lowercase alphanumeric with dashes/i);
+    });
+  });
+
+  describe('dash position validation', () => {
+    it('RED: should reject leading dash', () => {
+      expect(() => { validateSlug('-myslug'); })
+        .toThrow(/cannot start or end with a dash/i);
+    });
+
+    it('RED: should reject trailing dash', () => {
+      expect(() => { validateSlug('myslug-'); })
+        .toThrow(/cannot start or end with a dash/i);
+    });
+
+    it('RED: should reject consecutive dashes', () => {
+      expect(() => { validateSlug('my--slug'); })
+        .toThrow(/cannot contain consecutive dashes/i);
+    });
+
+    it('RED: should reject multiple consecutive dashes', () => {
+      expect(() => { validateSlug('my---slug'); })
+        .toThrow(/cannot contain consecutive dashes/i);
+    });
+  });
+
+  describe('length validation', () => {
+    it('RED: should reject empty string', () => {
+      expect(() => { validateSlug(''); })
+        .toThrow(/must be a non-empty string/i);
+    });
+
+    it('RED: should reject slug exceeding max length (100)', () => {
+      const longSlug = 'a'.repeat(101);
+      expect(() => { validateSlug(longSlug); })
+        .toThrow(/must not exceed 100 characters/i);
+    });
+
+    it('RED: should accept slug at max length (100)', () => {
+      const maxSlug = 'a'.repeat(100);
+      expect(() => { validateSlug(maxSlug); }).not.toThrow();
     });
   });
 });

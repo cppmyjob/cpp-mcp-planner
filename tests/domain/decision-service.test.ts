@@ -355,6 +355,127 @@ describe('DecisionService', () => {
       expect(newDecision.alternativesConsidered).toHaveLength(1);
       expect(newDecision.alternativesConsidered[0].option).toBe('Option A');
     });
+
+    // Sprint 3: DecisionService.supersede() Fix (Bugs #5, #6, #14)
+    // RED phase - these tests should FAIL initially until bugs are fixed
+    describe('Sprint 3: supersede() bug fixes', () => {
+      it('RED: should throw error when decision not found', async () => {
+        await expect(service.supersedeDecision({
+          planId,
+          decisionId: 'non-existent-decision-id',
+          newDecision: { decision: 'New decision' },
+          reason: 'Testing non-existent',
+        })).rejects.toThrow(/decision.*not found/i);
+      });
+
+      it('RED: should validate newDecision.decision is required (empty string)', async () => {
+        const original = await service.recordDecision({
+          planId,
+          decision: {
+            title: 'Test Decision',
+            question: 'Test question?',
+            context: 'Context',
+            decision: 'Original decision',
+            alternativesConsidered: [],
+          },
+        });
+
+        // validateRequiredString throws "must be a non-empty string" for empty strings
+        await expect(service.supersedeDecision({
+          planId,
+          decisionId: original.decisionId,
+          newDecision: { decision: '' }, // Empty decision
+          reason: 'Testing empty decision',
+        })).rejects.toThrow('decision must be a non-empty string');
+      });
+
+      it('RED: should validate newDecision.decision is not whitespace-only', async () => {
+        const original = await service.recordDecision({
+          planId,
+          decision: {
+            title: 'Test Decision',
+            question: 'Test question?',
+            context: 'Context',
+            decision: 'Original decision',
+            alternativesConsidered: [],
+          },
+        });
+
+        await expect(service.supersedeDecision({
+          planId,
+          decisionId: original.decisionId,
+          newDecision: { decision: '   ' }, // Whitespace only
+          reason: 'Testing whitespace decision',
+        })).rejects.toThrow('decision must be a non-empty string');
+      });
+
+      it('RED: should not allow superseding already superseded decision', async () => {
+        const original = await service.recordDecision({
+          planId,
+          decision: {
+            title: 'Test Decision',
+            question: 'Test question?',
+            context: 'Context',
+            decision: 'Decision v1',
+            alternativesConsidered: [],
+          },
+        });
+
+        // First supersede
+        await service.supersedeDecision({
+          planId,
+          decisionId: original.decisionId,
+          newDecision: { decision: 'Decision v2' },
+          reason: 'First supersede',
+        });
+
+        // Try to supersede already superseded decision
+        await expect(service.supersedeDecision({
+          planId,
+          decisionId: original.decisionId, // This is now 'superseded'
+          newDecision: { decision: 'Decision v3' },
+          reason: 'Second supersede attempt',
+        })).rejects.toThrow('Cannot supersede a decision that is already superseded');
+      });
+
+      it('GREEN: successful supersede should maintain consistent state', async () => {
+        const original = await service.recordDecision({
+          planId,
+          decision: {
+            title: 'Consistent Test',
+            question: 'Test?',
+            context: 'Context',
+            decision: 'Original',
+            alternativesConsidered: [],
+          },
+        });
+
+        const result = await service.supersedeDecision({
+          planId,
+          decisionId: original.decisionId,
+          newDecision: { decision: 'New decision' },
+          reason: 'Upgrade',
+        });
+
+        // Verify old decision state
+        const { decision: oldDecision } = await service.getDecision({
+          planId,
+          decisionId: original.decisionId,
+          fields: ['*'],
+        });
+        expect(oldDecision.status).toBe('superseded');
+        expect(oldDecision.supersededBy).toBe(result.newDecisionId);
+
+        // Verify new decision state
+        const { decision: newDecision } = await service.getDecision({
+          planId,
+          decisionId: result.newDecisionId,
+          fields: ['*'],
+        });
+        expect(newDecision.status).toBe('active');
+        expect(newDecision.supersedes).toBe(original.decisionId);
+      });
+    });
   });
 
   describe('list_decisions', () => {

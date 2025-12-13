@@ -11,8 +11,10 @@ import type {
   VersionHistory,
   VersionDiff,
   Phase,
+  Requirement,
+  Solution,
 } from '../entities/types.js';
-import { validateTags, validateTargets, validateCodeRefs, validateRequiredString, validateRequiredEnum } from './validators.js';
+import { validateTags, validateTargets, validateCodeRefs, validateRequiredString, validateRequiredEnum, validateSlug } from './validators.js';
 import { filterArtifact } from '../utils/field-filter.js';
 
 // Constants
@@ -169,6 +171,35 @@ export class ArtifactService {
   }
 
   /**
+   * Sprint 5 BUG #11 FIX: Validate that relatedRequirementIds reference existing requirements
+   */
+  private async validateRequirementReferences(planId: string, requirementIds: string[]): Promise<void> {
+    if (requirementIds.length === 0) {
+      return; // Empty array is valid
+    }
+    const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', planId);
+    for (const reqId of requirementIds) {
+      try {
+        await reqRepo.findById(reqId);
+      } catch {
+        throw new Error(`Requirement '${reqId}' not found`);
+      }
+    }
+  }
+
+  /**
+   * Sprint 5 BUG #11 FIX: Validate that relatedSolutionId references an existing solution
+   */
+  private async validateSolutionReference(planId: string, solutionId: string): Promise<void> {
+    const solRepo = this.repositoryFactory.createRepository<Solution>('solution', planId);
+    try {
+      await solRepo.findById(solutionId);
+    } catch {
+      throw new Error(`Solution '${solutionId}' not found`);
+    }
+  }
+
+  /**
    * Validates that a slug is unique within the plan
    * @param artifacts - Existing artifacts in the plan
    * @param slug - The slug to validate
@@ -207,10 +238,22 @@ export class ArtifactService {
     }
     // Validate codeRefs format
     validateCodeRefs(input.artifact.codeRefs ?? []);
+    // Sprint 6 BUG #13: Validate slug format if provided
+    if (input.artifact.slug !== undefined) {
+      validateSlug(input.artifact.slug);
+    }
 
     // BUG #12 FIX: Validate relatedPhaseId reference exists
     if (input.artifact.relatedPhaseId !== undefined && input.artifact.relatedPhaseId !== '') {
       await this.validatePhaseReference(input.planId, input.artifact.relatedPhaseId);
+    }
+    // Sprint 5 BUG #11 FIX: Validate relatedRequirementIds references exist
+    if (input.artifact.relatedRequirementIds !== undefined && input.artifact.relatedRequirementIds.length > 0) {
+      await this.validateRequirementReferences(input.planId, input.artifact.relatedRequirementIds);
+    }
+    // Sprint 5 BUG #11 FIX: Validate relatedSolutionId reference exists
+    if (input.artifact.relatedSolutionId !== undefined && input.artifact.relatedSolutionId !== '') {
+      await this.validateSolutionReference(input.planId, input.artifact.relatedSolutionId);
     }
 
     const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
@@ -302,6 +345,14 @@ export class ArtifactService {
     }
     if (input.updates.codeRefs !== undefined) {
       validateCodeRefs(input.updates.codeRefs);
+    }
+    // Sprint 5 BUG #11 FIX: Validate relatedRequirementIds references exist on update
+    if (input.updates.relatedRequirementIds !== undefined && input.updates.relatedRequirementIds.length > 0) {
+      await this.validateRequirementReferences(input.planId, input.updates.relatedRequirementIds);
+    }
+    // Sprint 5 BUG #11 FIX: Validate relatedSolutionId reference exists on update
+    if (input.updates.relatedSolutionId !== undefined && input.updates.relatedSolutionId !== '') {
+      await this.validateSolutionReference(input.planId, input.updates.relatedSolutionId);
     }
 
     const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);

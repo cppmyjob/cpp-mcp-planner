@@ -753,6 +753,292 @@ describe('PhaseService', () => {
       const tree = await service.getPhaseTree({ planId });
       expect(tree.tree).toHaveLength(0);
     });
+
+    // Sprint 8: Bug #17 - Orphan Phases Fix
+    describe('orphan phases handling (Bug #17)', () => {
+      it('RED: should re-parent children to root when deleteChildren=false on root phase', async () => {
+        // Create parent (root) -> child hierarchy
+        const parent = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Parent',
+            description: 'Root parent phase',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+
+        const child = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child',
+            description: 'Child phase',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+          },
+        });
+
+        // Delete parent WITHOUT deleting children
+        const result = await service.deletePhase({
+          planId,
+          phaseId: parent.phaseId,
+          deleteChildren: false,
+        });
+
+        expect(result.deletedPhaseIds).toHaveLength(1);
+        expect(result.deletedPhaseIds).toContain(parent.phaseId);
+
+        // Child should be re-parented to root (parentId = null)
+        const { phase: childPhase } = await service.getPhase({
+          planId,
+          phaseId: child.phaseId,
+        });
+
+        expect(childPhase.parentId).toBeNull();
+        expect(childPhase.depth).toBe(0);
+        // Path should be recalculated as root level
+        expect(childPhase.path).not.toContain('.');
+      });
+
+      it('RED: should re-parent children to grandparent when deleteChildren=false on middle phase', async () => {
+        // Create grandparent -> parent -> child hierarchy
+        const grandparent = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Grandparent',
+            description: 'Top level',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+
+        const parent = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Parent',
+            description: 'Middle level',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: grandparent.phaseId,
+          },
+        });
+
+        const child = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child',
+            description: 'Bottom level',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+          },
+        });
+
+        // Delete parent (middle) WITHOUT deleting children
+        const result = await service.deletePhase({
+          planId,
+          phaseId: parent.phaseId,
+          deleteChildren: false,
+        });
+
+        expect(result.deletedPhaseIds).toHaveLength(1);
+        expect(result.deletedPhaseIds).toContain(parent.phaseId);
+
+        // Child should be re-parented to grandparent
+        const { phase: childPhase } = await service.getPhase({
+          planId,
+          phaseId: child.phaseId,
+        });
+
+        expect(childPhase.parentId).toBe(grandparent.phaseId);
+        expect(childPhase.depth).toBe(1);
+        // Path should be under grandparent
+        expect(childPhase.path).toMatch(/^1\.\d+$/);
+      });
+
+      it('RED: should update paths of all descendants recursively', async () => {
+        // Create: root -> parent -> child -> grandchild
+        const root = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Root',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+
+        const parent = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Parent',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: root.phaseId,
+          },
+        });
+
+        const child = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+          },
+        });
+
+        const grandchild = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Grandchild',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: child.phaseId,
+          },
+        });
+
+        // Delete parent, keeping children (child -> grandchild should be re-parented to root)
+        await service.deletePhase({
+          planId,
+          phaseId: parent.phaseId,
+          deleteChildren: false,
+        });
+
+        // Get updated phases
+        const { phase: childPhase } = await service.getPhase({ planId, phaseId: child.phaseId });
+        const { phase: grandchildPhase } = await service.getPhase({ planId, phaseId: grandchild.phaseId });
+
+        // Child should be under root
+        expect(childPhase.parentId).toBe(root.phaseId);
+        expect(childPhase.depth).toBe(1);
+
+        // Grandchild should be under child with updated path
+        expect(grandchildPhase.parentId).toBe(child.phaseId);
+        expect(grandchildPhase.depth).toBe(2);
+        // Grandchild path should reflect new hierarchy
+        expect(grandchildPhase.path.split('.').length).toBe(3);
+      });
+
+      it('RED: should handle multiple children when deleteChildren=false', async () => {
+        // Create parent with 3 children
+        const parent = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Parent',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+
+        const child1 = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child 1',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+          },
+        });
+
+        const child2 = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child 2',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+          },
+        });
+
+        const child3 = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child 3',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+          },
+        });
+
+        // Delete parent WITHOUT children
+        await service.deletePhase({
+          planId,
+          phaseId: parent.phaseId,
+          deleteChildren: false,
+        });
+
+        // All children should be re-parented to root
+        const { phase: c1 } = await service.getPhase({ planId, phaseId: child1.phaseId });
+        const { phase: c2 } = await service.getPhase({ planId, phaseId: child2.phaseId });
+        const { phase: c3 } = await service.getPhase({ planId, phaseId: child3.phaseId });
+
+        expect(c1.parentId).toBeNull();
+        expect(c2.parentId).toBeNull();
+        expect(c3.parentId).toBeNull();
+
+        expect(c1.depth).toBe(0);
+        expect(c2.depth).toBe(0);
+        expect(c3.depth).toBe(0);
+      });
+
+      it('RED: should return re-parented phase IDs in result', async () => {
+        const parent = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Parent',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+          },
+        });
+
+        const child = await service.addPhase({
+          planId,
+          phase: {
+            title: 'Child',
+            description: '',
+            objectives: [],
+            deliverables: [],
+            successCriteria: [],
+            parentId: parent.phaseId,
+          },
+        });
+
+        const result = await service.deletePhase({
+          planId,
+          phaseId: parent.phaseId,
+          deleteChildren: false,
+        });
+
+        // Result should indicate re-parented phases
+        expect(result.deletedPhaseIds).toHaveLength(1);
+        // Optionally check for reparentedPhaseIds if we add it to result
+        expect((result as { reparentedPhaseIds?: string[] }).reparentedPhaseIds).toContain(child.phaseId);
+      });
+    });
   });
 
   describe('move_phase', () => {
@@ -1769,6 +2055,157 @@ describe('PhaseService', () => {
           const updated = await service.getPhase({ planId, phaseId: testPhaseId });
           expect(updated.phase.status).toBe(status);
         }
+      });
+    });
+
+    // Sprint 2: Numeric Validation (Bugs #4, #8, #9, #10)
+    // RED phase - these tests should FAIL initially until validation is implemented
+    describe('Sprint 2: Numeric validation (effortEstimate.value and progress)', () => {
+      describe('effortEstimate.value validation', () => {
+        it('RED: should reject negative effortEstimate.value in addPhase', async () => {
+          await expect(service.addPhase({
+            planId,
+            phase: {
+              title: 'Phase with negative effort',
+              estimatedEffort: { value: -5, unit: 'hours', confidence: 'medium' },
+            },
+          })).rejects.toThrow('estimatedEffort.value must be >= 0');
+        });
+
+        it('RED: should reject negative effortEstimate.value via schedule.estimatedEffort', async () => {
+          await expect(service.addPhase({
+            planId,
+            phase: {
+              title: 'Phase with negative schedule effort',
+              schedule: {
+                estimatedEffort: { value: -1, unit: 'days', confidence: 'high' },
+              },
+            },
+          })).rejects.toThrow('estimatedEffort.value must be >= 0');
+        });
+
+        it('GREEN: should accept zero effortEstimate.value', async () => {
+          const result = await service.addPhase({
+            planId,
+            phase: {
+              title: 'Phase with zero effort',
+              estimatedEffort: { value: 0, unit: 'hours', confidence: 'low' },
+            },
+          });
+          expect(result.phaseId).toBeDefined();
+        });
+
+        it('GREEN: should accept positive effortEstimate.value', async () => {
+          const result = await service.addPhase({
+            planId,
+            phase: {
+              title: 'Phase with positive effort',
+              estimatedEffort: { value: 10, unit: 'hours', confidence: 'high' },
+            },
+          });
+          expect(result.phaseId).toBeDefined();
+        });
+      });
+
+      describe('progress validation in updatePhase', () => {
+        let phaseId: string;
+
+        beforeEach(async () => {
+          const result = await service.addPhase({
+            planId,
+            phase: { title: 'Phase for Progress Test' },
+          });
+          phaseId = result.phaseId;
+        });
+
+        it('RED: should reject progress > 100 in updatePhase', async () => {
+          await expect(service.updatePhase({
+            planId,
+            phaseId,
+            updates: { progress: 150 },
+          })).rejects.toThrow('progress must be between 0 and 100');
+        });
+
+        it('RED: should reject progress < 0 in updatePhase', async () => {
+          await expect(service.updatePhase({
+            planId,
+            phaseId,
+            updates: { progress: -10 },
+          })).rejects.toThrow('progress must be between 0 and 100');
+        });
+
+        it('GREEN: should accept progress = 0', async () => {
+          const result = await service.updatePhase({
+            planId,
+            phaseId,
+            updates: { progress: 0 },
+          });
+          expect(result.success).toBe(true);
+        });
+
+        it('GREEN: should accept progress = 100', async () => {
+          const result = await service.updatePhase({
+            planId,
+            phaseId,
+            updates: { progress: 100 },
+          });
+          expect(result.success).toBe(true);
+        });
+
+        it('GREEN: should accept progress = 50 (mid-range)', async () => {
+          const result = await service.updatePhase({
+            planId,
+            phaseId,
+            updates: { progress: 50 },
+          });
+          expect(result.success).toBe(true);
+
+          const updated = await service.getPhase({ planId, phaseId });
+          expect(updated.phase.progress).toBe(50);
+        });
+      });
+
+      describe('progress validation in updatePhaseStatus', () => {
+        let phaseId: string;
+
+        beforeEach(async () => {
+          const result = await service.addPhase({
+            planId,
+            phase: { title: 'Phase for Status Progress Test' },
+          });
+          phaseId = result.phaseId;
+        });
+
+        it('RED: should reject progress > 100 in updatePhaseStatus', async () => {
+          await expect(service.updatePhaseStatus({
+            planId,
+            phaseId,
+            status: 'in_progress',
+            progress: 200,
+          })).rejects.toThrow('progress must be between 0 and 100');
+        });
+
+        it('RED: should reject progress < 0 in updatePhaseStatus', async () => {
+          await expect(service.updatePhaseStatus({
+            planId,
+            phaseId,
+            status: 'in_progress',
+            progress: -5,
+          })).rejects.toThrow('progress must be between 0 and 100');
+        });
+
+        it('GREEN: should accept valid progress in updatePhaseStatus', async () => {
+          const result = await service.updatePhaseStatus({
+            planId,
+            phaseId,
+            status: 'in_progress',
+            progress: 75,
+          });
+          expect(result.success).toBe(true);
+
+          const updated = await service.getPhase({ planId, phaseId });
+          expect(updated.phase.progress).toBe(75);
+        });
       });
     });
 
@@ -2801,6 +3238,90 @@ describe('PhaseService', () => {
       // Verify no changes were applied
       const check1 = await service.getPhase({ planId, phaseId: phase1Id });
       expect(check1.phase.status).toBe('planned'); // unchanged
+    });
+  });
+
+  // Sprint 4: BUG #7 - Status validation in addPhase
+  describe('BUG #7: Status validation in addPhase (TDD - Sprint 4)', () => {
+    it('RED: should reject invalid status value', async () => {
+      await expect(
+        service.addPhase({
+          planId,
+          phase: {
+            title: 'Test Phase',
+            status: 'invalid_status' as unknown as 'planned',
+          },
+        })
+      ).rejects.toThrow('status must be one of: planned, in_progress, completed, blocked, skipped');
+    });
+
+    it('RED: should accept valid status "in_progress"', async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase with in_progress',
+          status: 'in_progress',
+        },
+      });
+
+      expect(result.phaseId).toBeDefined();
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      expect(phase.status).toBe('in_progress');
+    });
+
+    it('RED: should accept valid status "completed"', async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase with completed',
+          status: 'completed',
+        },
+      });
+
+      expect(result.phaseId).toBeDefined();
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      expect(phase.status).toBe('completed');
+    });
+
+    it('RED: should accept valid status "blocked"', async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase with blocked',
+          status: 'blocked',
+        },
+      });
+
+      expect(result.phaseId).toBeDefined();
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      expect(phase.status).toBe('blocked');
+    });
+
+    it('RED: should accept valid status "skipped"', async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase with skipped',
+          status: 'skipped',
+        },
+      });
+
+      expect(result.phaseId).toBeDefined();
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      expect(phase.status).toBe('skipped');
+    });
+
+    it('RED: should default to "planned" when status not provided', async () => {
+      const result = await service.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase without status',
+        },
+      });
+
+      expect(result.phaseId).toBeDefined();
+      const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
+      expect(phase.status).toBe('planned');
     });
   });
 });

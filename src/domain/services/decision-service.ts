@@ -186,19 +186,22 @@ export class DecisionService {
   }
 
   public async supersedeDecision(input: SupersedeDecisionInput): Promise<SupersedeDecisionResult> {
+    // Sprint 3: Validate newDecision.decision is required and non-empty
+    validateRequiredString(input.newDecision.decision, 'decision');
+
     const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
+    // findById throws NotFoundError if decision doesn't exist
     const oldDecision = await repo.findById(input.decisionId);
+
+    // Sprint 3: Validate decision is not already superseded
+    if (oldDecision.status === 'superseded') {
+      throw new Error('Cannot supersede a decision that is already superseded');
+    }
 
     const now = new Date().toISOString();
     const newDecisionId = uuidv4();
 
-    // Mark old decision as superseded
-    oldDecision.status = 'superseded';
-    oldDecision.updatedAt = now;
-    oldDecision.version += 1;
-    oldDecision.supersededBy = newDecisionId;
-
-    // Create new decision
+    // Create new decision FIRST (before modifying old decision for atomicity)
     const newDecision: Decision = {
       id: newDecisionId,
       type: 'decision',
@@ -232,9 +235,15 @@ export class DecisionService {
       supersedes: oldDecision.id,
     };
 
-    // Update old decision and create new one
-    await repo.update(oldDecision.id, oldDecision);
+    // Sprint 3: Create new decision first, then update old - if create fails, old is unchanged
     await repo.create(newDecision);
+
+    // Mark old decision as superseded (only after new decision is created)
+    oldDecision.status = 'superseded';
+    oldDecision.updatedAt = now;
+    oldDecision.version += 1;
+    oldDecision.supersededBy = newDecisionId;
+    await repo.update(oldDecision.id, oldDecision);
 
     return {
       success: true,

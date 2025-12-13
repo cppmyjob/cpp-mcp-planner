@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
 import { PhaseService } from '../../src/domain/services/phase-service.js';
+import { RequirementService } from '../../src/domain/services/requirement-service.js';
+import { SolutionService } from '../../src/domain/services/solution-service.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import * as fs from 'fs/promises';
@@ -12,6 +14,8 @@ describe('ArtifactService', () => {
   let service: ArtifactService;
   let planService: PlanService;
   let phaseService: PhaseService;
+  let requirementService: RequirementService;
+  let solutionService: SolutionService;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let testDir: string;
@@ -35,6 +39,8 @@ describe('ArtifactService', () => {
 
     planService = new PlanService(repositoryFactory);
     phaseService = new PhaseService(repositoryFactory, planService);
+    requirementService = new RequirementService(repositoryFactory, planService);
+    solutionService = new SolutionService(repositoryFactory, planService);
     service = new ArtifactService(repositoryFactory, planService);
 
     const plan = await planService.createPlan({
@@ -199,6 +205,28 @@ describe('ArtifactService', () => {
         },
       });
 
+      // Sprint 5: Create real requirements for valid relatedRequirementIds
+      const req1 = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Requirement 1',
+          description: 'Test',
+          priority: 'high',
+          category: 'functional',
+          source: { type: 'user-request' },
+        },
+      });
+      const req2 = await requirementService.addRequirement({
+        planId,
+        requirement: {
+          title: 'Requirement 2',
+          description: 'Test',
+          priority: 'medium',
+          category: 'technical',
+          source: { type: 'user-request' },
+        },
+      });
+
       const result = await service.addArtifact({
         planId,
         artifact: {
@@ -211,14 +239,14 @@ describe('ArtifactService', () => {
             filename: 'config.yml',
           },
           relatedPhaseId: phase.phaseId,
-          relatedRequirementIds: ['req-1', 'req-2'],
+          relatedRequirementIds: [req1.requirementId, req2.requirementId],
         },
       });
 
       // Verify via getArtifact
       const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
       expect(artifact.relatedPhaseId).toBe(phase.phaseId);
-      expect(artifact.relatedRequirementIds).toEqual(['req-1', 'req-2']);
+      expect(artifact.relatedRequirementIds).toEqual([req1.requirementId, req2.requirementId]);
     });
 
     // BUG #12: Foreign key validation for relatedPhaseId reference
@@ -264,6 +292,169 @@ describe('ArtifactService', () => {
           planId,
           artifact: {
             title: 'Artifact without phase',
+            artifactType: 'code',
+          },
+        });
+
+        expect(result.artifactId).toBeDefined();
+      });
+    });
+
+    // Sprint 5: BUG #11 - Foreign key validation for relatedRequirementIds
+    describe('relatedRequirementIds validation (BUG #11 - Sprint 5)', () => {
+      it('RED: should reject non-existent requirement ID in relatedRequirementIds', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Artifact with fake requirement',
+            artifactType: 'code',
+            relatedRequirementIds: ['non-existent-req-id'],
+          },
+        })).rejects.toThrow(/Requirement.*non-existent-req-id.*not found/i);
+      });
+
+      it('RED: should reject when any requirement ID in array is non-existent', async () => {
+        // Create a real requirement first
+        const req = await requirementService.addRequirement({
+          planId,
+          requirement: {
+            title: 'Real Requirement',
+            description: 'Test requirement',
+            priority: 'high',
+            category: 'functional',
+            source: { type: 'user-request' },
+          },
+        });
+
+        // Should fail because one ID is invalid
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Artifact with mixed requirements',
+            artifactType: 'code',
+            relatedRequirementIds: [req.requirementId, 'non-existent-req-id'],
+          },
+        })).rejects.toThrow(/Requirement.*non-existent-req-id.*not found/i);
+      });
+
+      it('GREEN: should accept valid requirement IDs in relatedRequirementIds', async () => {
+        // Create real requirements first
+        const req1 = await requirementService.addRequirement({
+          planId,
+          requirement: {
+            title: 'Requirement 1',
+            description: 'Test',
+            priority: 'high',
+            category: 'functional',
+            source: { type: 'user-request' },
+          },
+        });
+        const req2 = await requirementService.addRequirement({
+          planId,
+          requirement: {
+            title: 'Requirement 2',
+            description: 'Test',
+            priority: 'medium',
+            category: 'technical',
+            source: { type: 'user-request' },
+          },
+        });
+
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Artifact with real requirements',
+            artifactType: 'code',
+            relatedRequirementIds: [req1.requirementId, req2.requirementId],
+          },
+        });
+
+        expect(result.artifactId).toBeDefined();
+        const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(artifact.relatedRequirementIds).toEqual([req1.requirementId, req2.requirementId]);
+      });
+
+      it('GREEN: should accept empty relatedRequirementIds array', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Artifact with empty requirements',
+            artifactType: 'code',
+            relatedRequirementIds: [],
+          },
+        });
+
+        expect(result.artifactId).toBeDefined();
+      });
+
+      it('GREEN: should accept undefined relatedRequirementIds', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Artifact without requirements',
+            artifactType: 'code',
+          },
+        });
+
+        expect(result.artifactId).toBeDefined();
+      });
+    });
+
+    // Sprint 5: BUG #11 - Foreign key validation for relatedSolutionId
+    describe('relatedSolutionId validation (BUG #11 - Sprint 5)', () => {
+      it('RED: should reject non-existent solution ID in relatedSolutionId', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Artifact with fake solution',
+            artifactType: 'code',
+            relatedSolutionId: 'non-existent-solution-id',
+          },
+        })).rejects.toThrow(/Solution.*non-existent-solution-id.*not found/i);
+      });
+
+      it('GREEN: should accept valid solution ID in relatedSolutionId', async () => {
+        // Create a real requirement first (solution needs to address a requirement)
+        const req = await requirementService.addRequirement({
+          planId,
+          requirement: {
+            title: 'Requirement for solution',
+            description: 'Test',
+            priority: 'high',
+            category: 'functional',
+            source: { type: 'user-request' },
+          },
+        });
+
+        // Create a real solution
+        const sol = await solutionService.proposeSolution({
+          planId,
+          solution: {
+            title: 'Real Solution',
+            description: 'Test solution',
+            addressing: [req.requirementId],
+          },
+        });
+
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Artifact with real solution',
+            artifactType: 'code',
+            relatedSolutionId: sol.solutionId,
+          },
+        });
+
+        expect(result.artifactId).toBeDefined();
+        const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(artifact.relatedSolutionId).toBe(sol.solutionId);
+      });
+
+      it('GREEN: should accept undefined relatedSolutionId', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Artifact without solution',
             artifactType: 'code',
           },
         });
@@ -403,6 +594,117 @@ describe('ArtifactService', () => {
           },
         })
       ).rejects.toThrow(/must be in format/i);
+    });
+
+    // Sprint 5: BUG #11 - FK validation for relatedRequirementIds in updateArtifact
+    describe('relatedRequirementIds validation in updateArtifact (BUG #11 - Sprint 5)', () => {
+      let artifactId: string;
+
+      beforeEach(async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test Artifact',
+            artifactType: 'code',
+          },
+        });
+        artifactId = result.artifactId;
+      });
+
+      it('RED: should reject non-existent requirement ID in updateArtifact', async () => {
+        await expect(service.updateArtifact({
+          planId,
+          artifactId,
+          updates: {
+            relatedRequirementIds: ['non-existent-req-id'],
+          },
+        })).rejects.toThrow(/Requirement.*non-existent-req-id.*not found/i);
+      });
+
+      it('GREEN: should accept valid requirement IDs in updateArtifact', async () => {
+        const req = await requirementService.addRequirement({
+          planId,
+          requirement: {
+            title: 'Requirement for update',
+            description: 'Test',
+            priority: 'high',
+            category: 'functional',
+            source: { type: 'user-request' },
+          },
+        });
+
+        const result = await service.updateArtifact({
+          planId,
+          artifactId,
+          updates: {
+            relatedRequirementIds: [req.requirementId],
+          },
+        });
+
+        expect(result.success).toBe(true);
+        const { artifact } = await service.getArtifact({ planId, artifactId });
+        expect(artifact.relatedRequirementIds).toEqual([req.requirementId]);
+      });
+    });
+
+    // Sprint 5: BUG #11 - FK validation for relatedSolutionId in updateArtifact
+    describe('relatedSolutionId validation in updateArtifact (BUG #11 - Sprint 5)', () => {
+      let artifactId: string;
+
+      beforeEach(async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test Artifact',
+            artifactType: 'code',
+          },
+        });
+        artifactId = result.artifactId;
+      });
+
+      it('RED: should reject non-existent solution ID in updateArtifact', async () => {
+        await expect(service.updateArtifact({
+          planId,
+          artifactId,
+          updates: {
+            relatedSolutionId: 'non-existent-solution-id',
+          },
+        })).rejects.toThrow(/Solution.*non-existent-solution-id.*not found/i);
+      });
+
+      it('GREEN: should accept valid solution ID in updateArtifact', async () => {
+        const req = await requirementService.addRequirement({
+          planId,
+          requirement: {
+            title: 'Requirement for solution',
+            description: 'Test',
+            priority: 'high',
+            category: 'functional',
+            source: { type: 'user-request' },
+          },
+        });
+
+        const sol = await solutionService.proposeSolution({
+          planId,
+          solution: {
+            title: 'Solution for update',
+            description: 'Test solution',
+            addressing: [req.requirementId],
+          },
+        });
+
+        const result = await service.updateArtifact({
+          planId,
+          artifactId,
+          updates: {
+            relatedSolutionId: sol.solutionId,
+          },
+        });
+
+        expect(result.success).toBe(true);
+        const { artifact } = await service.getArtifact({ planId, artifactId });
+        expect(artifact.relatedSolutionId).toBe(sol.solutionId);
+      });
     });
   });
 
@@ -650,6 +952,112 @@ describe('ArtifactService', () => {
   });
 
   describe('slug functionality', () => {
+    describe('CYCLE 0: Slug format validation (Bug #13 - Sprint 6)', () => {
+      it('RED: should reject slug with spaces', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            artifactType: 'code',
+            slug: 'my slug',
+          },
+        })).rejects.toThrow(/must be lowercase alphanumeric with dashes/i);
+      });
+
+      it('RED: should reject slug with uppercase letters', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            artifactType: 'code',
+            slug: 'MySlug',
+          },
+        })).rejects.toThrow(/must be lowercase alphanumeric with dashes/i);
+      });
+
+      it('RED: should reject slug with special characters', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            artifactType: 'code',
+            slug: 'my@slug!',
+          },
+        })).rejects.toThrow(/must be lowercase alphanumeric with dashes/i);
+      });
+
+      it('RED: should reject slug with leading dash', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            artifactType: 'code',
+            slug: '-myslug',
+          },
+        })).rejects.toThrow(/cannot start or end with a dash/i);
+      });
+
+      it('RED: should reject slug with trailing dash', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            artifactType: 'code',
+            slug: 'myslug-',
+          },
+        })).rejects.toThrow(/cannot start or end with a dash/i);
+      });
+
+      it('RED: should reject slug with consecutive dashes', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            artifactType: 'code',
+            slug: 'my--slug',
+          },
+        })).rejects.toThrow(/cannot contain consecutive dashes/i);
+      });
+
+      it('RED: should reject slug exceeding max length (100)', async () => {
+        const longSlug = 'a'.repeat(101);
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            artifactType: 'code',
+            slug: longSlug,
+          },
+        })).rejects.toThrow(/must not exceed 100 characters/i);
+      });
+
+      it('RED: should reject empty slug', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            artifactType: 'code',
+            slug: '',
+          },
+        })).rejects.toThrow(/must be a non-empty string/i);
+      });
+
+      it('GREEN: should accept valid slug format', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Test',
+            artifactType: 'code',
+            slug: 'my-valid-slug-123',
+          },
+        });
+
+        expect(result.artifactId).toBeDefined();
+        const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(artifact.slug).toBe('my-valid-slug-123');
+      });
+    });
+
     describe('CYCLE 1: Basic slug storage and retrieval', () => {
       it('should save and retrieve artifact with explicit slug', async () => {
         const result = await service.addArtifact({

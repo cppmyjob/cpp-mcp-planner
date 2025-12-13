@@ -27,6 +27,11 @@ export function validateEffortEstimate(effort: unknown, fieldName = 'effortEstim
     throw new Error(`Invalid ${fieldName}: 'value' must be a number`);
   }
 
+  // Sprint 2: Validate value is non-negative
+  if (e.value < 0) {
+    throw new Error(`${fieldName}.value must be >= 0`);
+  }
+
   if (!VALID_EFFORT_UNITS.includes(e.unit as typeof VALID_EFFORT_UNITS[number])) {
     throw new Error(
       `Invalid ${fieldName}: 'unit' must be one of: ${VALID_EFFORT_UNITS.join(', ')}`
@@ -332,5 +337,111 @@ export function validateRequiredEnum(
   }
   if (!validValues.includes(value)) {
     throw new Error(`${fieldName} must be one of: ${validValues.join(', ')}`);
+  }
+}
+
+// Sprint 1: Plan validation constants and functions
+const VALID_PLAN_STATUSES = ['active', 'archived', 'completed'] as const;
+
+/**
+ * Validates plan name - must be a non-empty string (after trimming whitespace)
+ * @param name - The plan name to validate
+ * @throws Error if name is undefined, null, not a string, or empty/whitespace-only
+ */
+export function validatePlanName(name: unknown): void {
+  validateRequiredString(name, 'name');
+}
+
+/**
+ * Validates plan status - must be one of: active, archived, completed
+ * Only validates if status is provided (optional field on update)
+ * @param status - The plan status to validate
+ * @throws Error if status is provided but not a valid value
+ */
+export function validatePlanStatus(status: unknown): void {
+  if (status === undefined) {
+    return; // Optional field on update
+  }
+
+  if (typeof status !== 'string') {
+    throw new Error('status must be a string');
+  }
+
+  if (!VALID_PLAN_STATUSES.includes(status as typeof VALID_PLAN_STATUSES[number])) {
+    throw new Error(`status must be one of: ${VALID_PLAN_STATUSES.join(', ')}`);
+  }
+}
+
+// Sprint 2: Progress validation constants
+const PROGRESS_MIN = 0;
+const PROGRESS_MAX = 100;
+
+/**
+ * Validates progress value - must be between 0 and 100 (inclusive)
+ * Only validates if progress is provided (optional field)
+ * @param progress - The progress value to validate
+ * @throws Error if progress is provided but not within 0-100 range
+ */
+export function validateProgress(progress: unknown): void {
+  if (progress === undefined) {
+    return; // Optional field
+  }
+
+  if (typeof progress !== 'number') {
+    throw new Error('progress must be a number');
+  }
+
+  if (progress < PROGRESS_MIN || progress > PROGRESS_MAX) {
+    throw new Error(`progress must be between ${String(PROGRESS_MIN)} and ${String(PROGRESS_MAX)}`);
+  }
+}
+
+// Sprint 6: Slug validation constants
+const SLUG_MAX_LENGTH = 100;
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Validates artifact slug format.
+ * Slug must be lowercase alphanumeric with dashes, max 100 chars.
+ * Cannot start or end with dash, cannot have consecutive dashes.
+ * @param slug - The slug value to validate
+ * @throws Error if slug format is invalid
+ */
+export function validateSlug(slug: unknown): void {
+  // Optional field - skip if undefined
+  if (slug === undefined) {
+    return;
+  }
+
+  // Must be a string
+  if (typeof slug !== 'string') {
+    throw new Error('slug must be a string');
+  }
+
+  // Must not be empty
+  if (slug === '') {
+    throw new Error('slug must be a non-empty string');
+  }
+
+  // Check max length
+  if (slug.length > SLUG_MAX_LENGTH) {
+    throw new Error(`slug must not exceed ${String(SLUG_MAX_LENGTH)} characters`);
+  }
+
+  // Check for leading/trailing dashes first (more specific error)
+  if (slug.startsWith('-') || slug.endsWith('-')) {
+    throw new Error('slug cannot start or end with a dash');
+  }
+
+  // Check for consecutive dashes (more specific error)
+  if (slug.includes('--')) {
+    throw new Error('slug cannot contain consecutive dashes');
+  }
+
+  // Check overall format (lowercase alphanumeric with single dashes)
+  if (!SLUG_PATTERN.test(slug)) {
+    throw new Error(
+      'slug must be lowercase alphanumeric with dashes (e.g., "my-valid-slug-123")'
+    );
   }
 }

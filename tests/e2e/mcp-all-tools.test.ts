@@ -989,12 +989,30 @@ describe('E2E: All MCP Tools Validation', () => {
     });
 
     it('action: supersede', async () => {
+      // Sprint 3: Create a fresh decision for this test since previous test already superseded decisionId
+      const freshDecisionResult = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'record',
+          planId,
+          decision: {
+            title: 'Fresh Decision for Supersede Test',
+            question: 'What approach?',
+            context: 'Testing supersede action',
+            decision: 'Original approach',
+            alternativesConsidered: [],
+          },
+        },
+      });
+      const freshDecision = parseResult<{ decisionId: string }>(freshDecisionResult);
+      const freshDecisionId = freshDecision.decisionId;
+
       const result = await client.callTool({
         name: 'decision',
         arguments: {
           action: 'supersede',
           planId,
-          decisionId,
+          decisionId: freshDecisionId, // Use fresh decision, not already-superseded one
           newDecision: {
             decision: 'Use integration tests with Playwright',
             consequences: 'Better E2E coverage',
@@ -1009,7 +1027,7 @@ describe('E2E: All MCP Tools Validation', () => {
       // Verify old decision was superseded
       const oldDecisionResult = await client.callTool({
         name: 'decision',
-        arguments: { action: 'get', planId, decisionId },
+        arguments: { action: 'get', planId, decisionId: freshDecisionId },
       });
       const oldDecision = parseResult<{ decision: { status: string } }>(oldDecisionResult);
       expect(oldDecision.decision.status).toBe('superseded');

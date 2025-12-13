@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { PlanService } from '../../src/domain/services/plan-service.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
+import type { PlanStatus } from '../../src/domain/entities/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -566,6 +567,112 @@ describe('PlanService', () => {
 
         expect(result.success).toBe(true);
         expect(result).not.toHaveProperty('updatedAt');
+      });
+    });
+  });
+
+  // Sprint 1: PlanService Validation (Bugs #1, #2, #3)
+  // RED phase - these tests should FAIL initially until validation is implemented
+  describe('Sprint 1: PlanService name and status validation', () => {
+    describe('createPlan name validation', () => {
+      it('should reject empty name', async () => {
+        await expect(service.createPlan({
+          name: '',
+          description: 'Test description',
+        })).rejects.toThrow('name must be a non-empty string');
+      });
+
+      it('should reject whitespace-only name', async () => {
+        await expect(service.createPlan({
+          name: '   ',
+          description: 'Test description',
+        })).rejects.toThrow('name must be a non-empty string');
+      });
+
+      it('should reject name with only tabs and newlines', async () => {
+        await expect(service.createPlan({
+          name: '\t\n\r',
+          description: 'Test description',
+        })).rejects.toThrow('name must be a non-empty string');
+      });
+
+      it('should accept valid name with leading/trailing spaces (trimmed check)', async () => {
+        // Name with spaces around it should be accepted (spaces are trimmed for validation)
+        const result = await service.createPlan({
+          name: '  Valid Plan Name  ',
+          description: 'Test description',
+        });
+        expect(result.planId).toBeDefined();
+      });
+    });
+
+    describe('updatePlan name validation', () => {
+      it('should reject empty name on update', async () => {
+        const created = await service.createPlan({
+          name: 'Original Name',
+          description: 'Test',
+        });
+
+        await expect(service.updatePlan({
+          planId: created.planId,
+          updates: { name: '' },
+        })).rejects.toThrow('name must be a non-empty string');
+      });
+
+      it('should reject whitespace-only name on update', async () => {
+        const created = await service.createPlan({
+          name: 'Original Name',
+          description: 'Test',
+        });
+
+        await expect(service.updatePlan({
+          planId: created.planId,
+          updates: { name: '   ' },
+        })).rejects.toThrow('name must be a non-empty string');
+      });
+    });
+
+    describe('updatePlan status validation', () => {
+      it('should reject invalid status value', async () => {
+        const created = await service.createPlan({
+          name: 'Test Plan',
+          description: 'Test',
+        });
+
+        await expect(service.updatePlan({
+          planId: created.planId,
+          updates: { status: 'invalid_status' as PlanStatus },
+        })).rejects.toThrow('status must be one of: active, archived, completed');
+      });
+
+      it('should reject empty string as status', async () => {
+        const created = await service.createPlan({
+          name: 'Test Plan',
+          description: 'Test',
+        });
+
+        await expect(service.updatePlan({
+          planId: created.planId,
+          updates: { status: '' as PlanStatus },
+        })).rejects.toThrow('status must be one of: active, archived, completed');
+      });
+
+      it('should accept valid status values', async () => {
+        const created = await service.createPlan({
+          name: 'Test Plan',
+          description: 'Test',
+        });
+
+        // Test all valid statuses
+        for (const status of ['active', 'archived', 'completed'] as PlanStatus[]) {
+          await service.updatePlan({
+            planId: created.planId,
+            updates: { status },
+          });
+
+          const { plan } = await service.getPlan({ planId: created.planId });
+          expect(plan.manifest.status).toBe(status);
+        }
       });
     });
   });

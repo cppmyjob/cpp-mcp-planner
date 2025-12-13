@@ -12,6 +12,7 @@ import type {
 } from '../entities/types.js';
 import type { UsageGuide } from '../entities/usage-guide.js';
 import { DEFAULT_USAGE_GUIDE } from '../constants/default-usage-guide.js';
+import { validatePlanName, validatePlanStatus } from './validators.js';
 
 // Constants
 const MAX_HISTORY_DEPTH = 10;
@@ -162,6 +163,9 @@ export class PlanService {
   }
 
   public async createPlan(input: CreatePlanInput): Promise<CreatePlanResult> {
+    // Sprint 1: Validate required fields
+    validatePlanName(input.name);
+
     const planId = uuidv4();
     const now = new Date().toISOString();
 
@@ -330,6 +334,12 @@ export class PlanService {
   }
 
   public async updatePlan(input: UpdatePlanInput): Promise<UpdatePlanResult> {
+    // Sprint 1: Validate fields before any operations
+    if (input.updates.name !== undefined) {
+      validatePlanName(input.updates.name);
+    }
+    validatePlanStatus(input.updates.status);
+
     const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {
       throw new Error('Plan not found');
