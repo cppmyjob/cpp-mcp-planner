@@ -50,9 +50,9 @@ Task({
 # ESLint Auto-Fix and Manual Correction
 
 ## Your Task:
-1. Run \`npm run lint\` to check for violations
-2. Run \`npm run lint:fix\` to auto-fix what's possible
-3. Run \`npm run lint\` again to see remaining errors
+1. Run \`npm run lint:fix\` to auto-fix what's possible
+2. Run \`npm run lint\` again to see remaining errors
+3. If no remaining errors then exit from agent
 4. For EACH remaining error:
    - Read the file with the error
    - Manually fix the violation according to eslint.config.js rules
@@ -62,7 +62,7 @@ Task({
 
 ## Important:
 - Fix ALL errors, not just some
-- Follow eslint.config.js:5-200 strictly
+- Follow eslint.config.js strictly
 - Reference CLAUDE.md for context on each rule
 - Do NOT skip any violations
   `
