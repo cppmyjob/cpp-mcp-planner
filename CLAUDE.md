@@ -64,6 +64,70 @@ function getStatus(s: Status): string {
 
 ---
 
+## ESLint Configuration — STRICT ENFORCEMENT
+
+### MANDATORY WORKFLOW
+**BEFORE writing ANY code:**
+1. Review `eslint.config.js:5-200` for active rules
+2. Follow ALL rules without exception
+3. After code changes: `npm run lint:fix`
+4. Fix ALL errors before proceeding — **ZERO TOLERANCE**
+
+### Critical Rules (eslint.config.js)
+- **Type Safety (lines 23-30):**
+  - `@typescript-eslint/no-explicit-any: error` — NO `any` type, EVER
+  - `@typescript-eslint/no-unsafe-*: error` — NO unsafe operations
+
+- **Explicit Visibility (lines 35-43):**
+  - `@typescript-eslint/explicit-member-accessibility: error` — ALL class members MUST have `public`/`private`/`protected`
+
+- **Naming Conventions (lines 52-105):**
+  - Interfaces: `PascalCase`, NO `I` prefix (line 55-61)
+  - Class properties: `camelCase`, NO `_` prefix (line 74-78)
+  - Variables: `camelCase` or `UPPER_CASE` for constants (line 85-88)
+
+- **Module Organization (lines 110-111):**
+  - `import/no-default-export: error` — ONLY named exports
+
+- **Safety Patterns (lines 116-136):**
+  - `@typescript-eslint/no-non-null-assertion: error` — NO `!` operator
+  - `@typescript-eslint/prefer-nullish-coalescing: error` — Use `??` NOT `||`
+  - `@typescript-eslint/prefer-optional-chain: error` — Use `?.` for safe access
+  - `@typescript-eslint/switch-exhaustiveness-check: error` — Exhaustive switches
+
+- **Code Quality (lines 142-185):**
+  - `@typescript-eslint/no-magic-numbers: error` — NO magic numbers (except -1, 0, 1, 2, 100)
+  - `@typescript-eslint/explicit-function-return-type: error` — Explicit return types
+  - `@typescript-eslint/strict-boolean-expressions: error` — NO truthy/falsy coercion
+
+### Quick Reference
+```typescript
+// ❌ FORBIDDEN
+export default class Foo {}           // NO default exports
+interface IUser {}                     // NO I prefix
+private _cache: any;                   // NO _ prefix, NO any
+if (str) {}                            // NO truthy/falsy
+value || fallback                      // Use ?? instead
+value!                                 // NO non-null assertion
+
+// ✅ REQUIRED
+export class Foo {}                    // Named export
+interface User {}                      // NO I prefix
+private cache: Map<string, Entity>;    // Explicit type
+if (str !== '') {}                     // Explicit boolean
+value ?? fallback                      // Nullish coalescing
+value as Type                          // Type assertion
+```
+
+### Auto-fix Command
+```bash
+npm run lint:fix
+```
+
+Reference: `eslint.config.js` for full configuration
+
+---
+
 ## Architecture Overview
 
 ```
