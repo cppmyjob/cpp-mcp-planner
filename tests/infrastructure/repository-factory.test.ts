@@ -17,7 +17,7 @@ describe('RED: RepositoryFactory', () => {
   let lockManager: FileLockManager;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `test-factory-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `test-factory-${Date.now().toString()}`);
     await fs.mkdir(testDir, { recursive: true });
 
     // Create shared lock manager
@@ -52,14 +52,17 @@ describe('RED: RepositoryFactory', () => {
     });
 
     it('should require storage config', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect(() => new RepositoryFactory(null as any)).toThrow();
     });
 
     it('should validate storage type', () => {
       expect(
         () =>
+          // Testing invalid type - using type assertion to bypass compile-time check
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           new RepositoryFactory({
-            type: 'invalid' as any,
+            type: 'invalid' as 'file',
             baseDir: testDir,
             lockManager,
           })
@@ -73,12 +76,15 @@ describe('RED: RepositoryFactory', () => {
 
   describe('Input Validation', () => {
     it('should validate entityType in createRepository', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect(() => factory.createRepository<Requirement>('' as any, 'plan-123')).toThrow(
         /entityType is required/
       );
-      expect(() => factory.createRepository<Requirement>(null as any, 'plan-123')).toThrow(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      expect(() => factory.createRepository<Requirement>(null as unknown as any, 'plan-123')).toThrow(
         /entityType is required/
       );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect(() => factory.createRepository<Requirement>('  ' as any, 'plan-123')).toThrow(
         /entityType is required/
       );
@@ -88,7 +94,7 @@ describe('RED: RepositoryFactory', () => {
       expect(() => factory.createRepository<Requirement>('requirement', '')).toThrow(
         /planId is required/
       );
-      expect(() => factory.createRepository<Requirement>('requirement', null as any)).toThrow(
+      expect(() => factory.createRepository<Requirement>('requirement', null as unknown as string)).toThrow(
         /planId is required/
       );
       expect(() => factory.createRepository<Requirement>('requirement', '  ')).toThrow(
@@ -98,13 +104,13 @@ describe('RED: RepositoryFactory', () => {
 
     it('should validate planId in createLinkRepository', () => {
       expect(() => factory.createLinkRepository('')).toThrow(/planId is required/);
-      expect(() => factory.createLinkRepository(null as any)).toThrow(/planId is required/);
+      expect(() => factory.createLinkRepository(null as unknown as string)).toThrow(/planId is required/);
       expect(() => factory.createLinkRepository('  ')).toThrow(/planId is required/);
     });
 
     it('should validate planId in createUnitOfWork', () => {
       expect(() => factory.createUnitOfWork('')).toThrow(/planId is required/);
-      expect(() => factory.createUnitOfWork(null as any)).toThrow(/planId is required/);
+      expect(() => factory.createUnitOfWork(null as unknown as string)).toThrow(/planId is required/);
       expect(() => factory.createUnitOfWork('  ')).toThrow(/planId is required/);
     });
   });
@@ -114,7 +120,7 @@ describe('RED: RepositoryFactory', () => {
   // ============================================================================
 
   describe('Repository Creation', () => {
-    it('should create entity repository for given plan', async () => {
+    it('should create entity repository for given plan', () => {
       const planId = 'test-plan-001';
       const repo = factory.createRepository<Requirement>('requirement', planId);
 
@@ -125,7 +131,7 @@ describe('RED: RepositoryFactory', () => {
       expect(typeof repo.delete).toBe('function');
     });
 
-    it('should create link repository for given plan', async () => {
+    it('should create link repository for given plan', () => {
       const planId = 'test-plan-002';
       const linkRepo = factory.createLinkRepository(planId);
 
@@ -135,7 +141,7 @@ describe('RED: RepositoryFactory', () => {
       expect(typeof linkRepo.deleteLink).toBe('function');
     });
 
-    it('should create UnitOfWork for given plan', async () => {
+    it('should create UnitOfWork for given plan', () => {
       const planId = 'test-plan-003';
       const uow = factory.createUnitOfWork(planId);
 
@@ -152,7 +158,7 @@ describe('RED: RepositoryFactory', () => {
   // ============================================================================
 
   describe('Shared FileLockManager', () => {
-    it('should share FileLockManager across all repositories', async () => {
+    it('should share FileLockManager across all repositories', () => {
       const planId = 'test-plan-004';
 
       const repo1 = factory.createRepository<Requirement>('requirement', planId);
@@ -160,15 +166,19 @@ describe('RED: RepositoryFactory', () => {
       const linkRepo = factory.createLinkRepository(planId);
 
       // All should use the same lock manager instance
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((repo1 as any).fileLockManager).toBe(lockManager);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((repo2 as any).fileLockManager).toBe(lockManager);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((linkRepo as any).fileLockManager).toBe(lockManager);
     });
 
-    it('should share FileLockManager in UnitOfWork', async () => {
+    it('should share FileLockManager in UnitOfWork', () => {
       const planId = 'test-plan-005';
       const uow = factory.createUnitOfWork(planId);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((uow as any).fileLockManager).toBe(lockManager);
     });
   });
@@ -273,6 +283,7 @@ describe('RED: RepositoryFactory', () => {
       const repo = factory.createRepository<Requirement>('requirement', planId);
 
       // Should be able to initialize
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (repo as any).initialize();
 
       // Repository should have basic CRUD methods
@@ -289,6 +300,7 @@ describe('RED: RepositoryFactory', () => {
       await fs.mkdir(path.join(testDir, 'plans', planId), { recursive: true });
 
       const linkRepo = factory.createLinkRepository(planId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (linkRepo as any).initialize();
 
       // Create a link
@@ -329,9 +341,13 @@ describe('RED: RepositoryFactory', () => {
       const repo = factoryWithCache.createRepository<Requirement>('requirement', planId);
 
       // Cache options should be passed through
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((repo as any).cacheOptions).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((repo as any).cacheOptions.enabled).toBe(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((repo as any).cacheOptions.ttl).toBe(10000);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((repo as any).cacheOptions.maxSize).toBe(200);
     });
   });

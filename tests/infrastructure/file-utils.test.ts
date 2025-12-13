@@ -17,7 +17,7 @@ describe('file-utils', () => {
   let testDir: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `file-utils-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = path.join(os.tmpdir(), `file-utils-test-${Date.now().toString()}-${Math.random().toString(36).slice(2)}`);
     await fs.mkdir(testDir, { recursive: true });
   });
 
@@ -29,6 +29,7 @@ describe('file-utils', () => {
   // REVIEW: atomicWriteJSON
   // ============================================================================
 
+  /* eslint-disable @typescript-eslint/no-unsafe-call */
   describe('atomicWriteJSON', () => {
     it('should write JSON file atomically', async () => {
       const filePath = path.join(testDir, 'test.json');
@@ -151,7 +152,7 @@ describe('file-utils', () => {
     it('should handle concurrent writes to different files', async () => {
       // Concurrent writes to DIFFERENT files is the supported pattern
       const writes = Array.from({ length: 10 }, (_, i) => {
-        const filePath = path.join(testDir, `concurrent-${i}.json`);
+        const filePath = path.join(testDir, `concurrent-${i.toString()}.json`);
         return atomicWriteJSON(filePath, { iteration: i });
       });
 
@@ -159,17 +160,19 @@ describe('file-utils', () => {
 
       // All files should exist with correct content
       for (let i = 0; i < 10; i++) {
-        const filePath = path.join(testDir, `concurrent-${i}.json`);
+        const filePath = path.join(testDir, `concurrent-${i.toString()}.json`);
         const content = await fs.readFile(filePath, 'utf-8');
         expect(JSON.parse(content)).toEqual({ iteration: i });
       }
     });
   });
+  /* eslint-enable @typescript-eslint/no-unsafe-call */
 
   // ============================================================================
   // REVIEW: loadJSON
   // ============================================================================
 
+  /* eslint-disable @typescript-eslint/no-unsafe-call */
   describe('loadJSON', () => {
     it('should load and parse JSON file', async () => {
       const filePath = path.join(testDir, 'load.json');
@@ -188,8 +191,8 @@ describe('file-utils', () => {
 
       try {
         await loadJSON(filePath);
-      } catch (error: any) {
-        expect(error.code).toBe('ENOENT');
+      } catch (error: unknown) {
+        expect((error as NodeJS.ErrnoException).code).toBe('ENOENT');
       }
     });
 
@@ -270,7 +273,7 @@ describe('file-utils', () => {
 
       // Create a large object (~1MB)
       const largeArray = Array.from({ length: 10000 }, (_, i) => ({
-        id: `item-${i}`,
+        id: `item-${i.toString()}`,
         data: 'x'.repeat(100),
       }));
       await fs.writeFile(filePath, JSON.stringify(largeArray), 'utf-8');
@@ -282,11 +285,13 @@ describe('file-utils', () => {
       expect(result[9999].id).toBe('item-9999');
     });
   });
+  /* eslint-enable @typescript-eslint/no-unsafe-call */
 
   // ============================================================================
   // REVIEW: Integration - atomicWriteJSON + loadJSON roundtrip
   // ============================================================================
 
+  /* eslint-disable @typescript-eslint/no-unsafe-call */
   describe('roundtrip', () => {
     it('should write and read data consistently', async () => {
       const filePath = path.join(testDir, 'roundtrip.json');
@@ -320,4 +325,5 @@ describe('file-utils', () => {
       }
     });
   });
+  /* eslint-enable @typescript-eslint/no-unsafe-call */
 });

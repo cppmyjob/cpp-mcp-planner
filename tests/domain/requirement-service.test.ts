@@ -3,6 +3,7 @@ import { RequirementService } from '../../src/domain/services/requirement-servic
 import { PlanService } from '../../src/domain/services/plan-service.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
+import type { Requirement } from '../../src/domain/entities/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -16,7 +17,7 @@ describe('RequirementService', () => {
   let planId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `mcp-req-test-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-req-test-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -176,7 +177,7 @@ describe('RequirementService', () => {
         },
       });
 
-      const _result = await service.updateRequirement({
+      await service.updateRequirement({
         planId,
         requirementId: added.requirementId,
         updates: {
@@ -485,9 +486,9 @@ describe('RequirementService', () => {
       });
 
       // Simulate legacy requirement by setting votes to undefined
-      const repo = repositoryFactory.createRepository<any>('requirement', planId);
+      const repo = repositoryFactory.createRepository<Requirement>('requirement', planId);
       const requirement = await repo.findById(added.requirementId);
-      delete requirement.votes; // Remove votes field
+      delete (requirement as Partial<Requirement>).votes; // Remove votes field
       await repo.update(requirement.id, requirement);
 
       // Now vote should initialize to 0 and increment to 1
@@ -581,9 +582,9 @@ describe('RequirementService', () => {
       });
 
       // Simulate legacy requirement by setting votes to undefined
-      const repo = repositoryFactory.createRepository<any>('requirement', planId);
+      const repo = repositoryFactory.createRepository<Requirement>('requirement', planId);
       const requirement = await repo.findById(added.requirementId);
-      delete requirement.votes; // Remove votes field
+      delete (requirement as Partial<Requirement>).votes; // Remove votes field
       await repo.update(requirement.id, requirement);
 
       // Should initialize to 0 and throw error (cannot go below 0)
@@ -689,9 +690,9 @@ describe('RequirementService', () => {
       });
 
       // Simulate legacy requirement by deleting votes field
-      const repo = repositoryFactory.createRepository<any>('requirement', planId);
+      const repo = repositoryFactory.createRepository<Requirement>('requirement', planId);
       const requirement = await repo.findById(req.requirementId);
-      delete requirement.votes;
+      delete (requirement as Partial<Requirement>).votes;
       await repo.update(requirement.id, requirement);
 
       // Reset should initialize to 0 and count as updated
@@ -705,7 +706,7 @@ describe('RequirementService', () => {
     });
 
     it('should only count actually modified requirements', async () => {
-      const _req1 = await service.addRequirement({
+      await service.addRequirement({
         planId,
         requirement: {
           title: 'Already Zero',
@@ -932,8 +933,9 @@ describe('RequirementService', () => {
 
         const fullReq = result.requirements.find((r) => r.title === 'Complete Requirement');
         expect(fullReq).toBeDefined();
-        expect(fullReq!.acceptanceCriteria).toBeDefined();
-        expect(fullReq!.impact).toBeDefined();
+        if (fullReq === undefined) throw new Error('FullReq should be defined');
+        expect(fullReq.acceptanceCriteria).toBeDefined();
+        expect(fullReq.impact).toBeDefined();
       });
 
       it('should combine fields with filters', async () => {
@@ -1405,7 +1407,7 @@ describe('RequirementService', () => {
           planId,
           updates: [
             { requirementId: req1.requirementId, updates: { priority: 'critical' } },
-            { requirementId: req2.requirementId, updates: { tags: [{ invalidField: 'test' }] as any } },
+            { requirementId: req2.requirementId, updates: { tags: [{ invalidField: 'test' }] as unknown as { key: string; value: string }[] } },
           ],
           atomic: true,
         })

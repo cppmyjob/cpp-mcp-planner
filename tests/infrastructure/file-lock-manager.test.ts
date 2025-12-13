@@ -20,7 +20,7 @@ describe('FileLockManager', () => {
 
   beforeEach(async () => {
     // Create unique temp directory for each test
-    testDir = path.join(os.tmpdir(), `file-lock-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = path.join(os.tmpdir(), `file-lock-test-${Date.now().toString()}-${Math.random().toString(36).slice(2)}`);
     await fs.mkdir(testDir, { recursive: true });
 
     lockManager = new FileLockManager(testDir, {
@@ -34,12 +34,14 @@ describe('FileLockManager', () => {
 
   afterEach(async () => {
     // Dispose lock manager
-    if (lockManager && !lockManager.isDisposed()) {
+    if (!lockManager.isDisposed()) {
       await lockManager.dispose();
     }
 
     // Clean up test directory
-    await fs.rm(testDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(testDir, { recursive: true, force: true }).catch(() => {
+      // Ignore cleanup errors in tests
+    });
   });
 
   // ============================================================================
@@ -58,7 +60,7 @@ describe('FileLockManager', () => {
     });
 
     it('should use warn as default logLevel', async () => {
-      const logs: Array<{ level: string; message: string }> = [];
+      const logs: { level: string; message: string }[] = [];
 
       const lm = new FileLockManager(testDir, {
         logger: {
@@ -198,9 +200,9 @@ describe('FileLockManager', () => {
     it('should execute callback with lock held', async () => {
       let wasLocked = false;
 
-      const result = await lockManager.withLock('resource', async () => {
+      const result = await lockManager.withLock('resource', () => {
         wasLocked = lockManager.isHeldByUs('resource');
-        return 'success';
+        return Promise.resolve('success');
       });
 
       expect(wasLocked).toBe(true);
@@ -210,7 +212,7 @@ describe('FileLockManager', () => {
 
     it('should release lock even if callback throws', async () => {
       await expect(
-        lockManager.withLock('resource', async () => {
+        lockManager.withLock('resource', () => {
           throw new Error('Callback error');
         })
       ).rejects.toThrow('Callback error');
@@ -257,7 +259,9 @@ describe('FileLockManager', () => {
       // Create a .lock directory that proper-lockfile would create
       // This simulates a crashed process that left a lock
       const staleLockDir = `${lockFile}.lock`;
-      await fs.mkdir(staleLockDir, { recursive: true }).catch(() => {});
+      await fs.mkdir(staleLockDir, { recursive: true }).catch(() => {
+        // Ignore errors - directory might already exist
+      });
 
       // Set mtime to old time (proper-lockfile uses mtime for stale detection)
       const oldTime = new Date(Date.now() - 10000); // 10 seconds ago
@@ -353,7 +357,7 @@ describe('FileLockManager', () => {
     (isWindows ? it.skip : it)(
       'should call onLockCompromised when lock is externally released',
       async () => {
-        const compromisedLocks: Array<{ resource: string; heldFor: number }> = [];
+        const compromisedLocks: { resource: string; heldFor: number }[] = [];
 
         // Use longer staleThreshold for reliability
         const staleThreshold = 500;
@@ -461,7 +465,7 @@ describe('FileLockManager', () => {
   // ============================================================================
   describe('Logging', () => {
     it('should log operations when logger provided', async () => {
-      const logs: Array<{ level: string; message: string }> = [];
+      const logs: { level: string; message: string }[] = [];
 
       const lm = new FileLockManager(testDir, {
         logger: {

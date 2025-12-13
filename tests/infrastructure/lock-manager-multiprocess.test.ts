@@ -29,14 +29,16 @@ describe('LockManager Multi-Process Safety', () => {
         reentrant: true,
       });
 
+      if (lockId === undefined) throw new Error('LockId should be defined');
+
       // Run many concurrent operations
       const promises: Promise<void>[] = [];
 
       for (let i = 0; i < 10; i++) {
         // Extend operations
         promises.push(
-          lm.extend(lockId!, 1000).then(() => {
-            operations.push(`extend-${i}`);
+          lm.extend(lockId, 1000).then(() => {
+            operations.push(`extend-${i.toString()}`);
           })
         );
 
@@ -49,7 +51,7 @@ describe('LockManager Multi-Process Safety', () => {
             ttl: 1000,
           }).then((r) => {
             if (r.acquired) {
-              operations.push(`acquire-${i}`);
+              operations.push(`acquire-${i.toString()}`);
             }
           })
         );
@@ -63,14 +65,15 @@ describe('LockManager Multi-Process Safety', () => {
       // Verify lock state is consistent
       const holder = await lm.getLockHolder('resource');
       expect(holder).toBeDefined();
-      expect(holder!.refCount).toBeGreaterThanOrEqual(1);
+      if (holder === undefined) throw new Error('Holder should be defined');
+      expect(holder.refCount).toBeGreaterThanOrEqual(1);
 
       // Timer invariant: timer exists <=> expiresAt exists
-      if (holder!.timer) {
-        expect(holder!.expiresAt).toBeDefined();
+      if (holder.timer) {
+        expect(holder.expiresAt).toBeDefined();
       }
-      if (holder!.expiresAt) {
-        expect(holder!.timer).toBeDefined();
+      if (holder.expiresAt !== undefined) {
+        expect(holder.timer).toBeDefined();
       }
 
       await lm.dispose();
@@ -89,10 +92,13 @@ describe('LockManager Multi-Process Safety', () => {
           acquireTimeout: 0,
         });
 
+        if (lockId === undefined) throw new Error('LockId should be defined');
+
         // Concurrent release + reentrant acquire
         const [, acquireResult] = await Promise.all([
-          lm.release(lockId!).catch((e) => {
-            if (!e.message.includes('not found')) {
+          lm.release(lockId).catch((e: unknown) => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            if (e !== null && typeof e === 'object' && 'message' in e && typeof e.message === 'string' && !e.message.includes('not found')) {
               errors.push(`release error: ${e.message}`);
             }
           }),
@@ -106,7 +112,7 @@ describe('LockManager Multi-Process Safety', () => {
         // Check consistency
         const holder = await lm.getLockHolder('resource');
 
-        if (acquireResult.acquired && holder) {
+        if (acquireResult.acquired && holder !== undefined) {
           // If acquire succeeded, refCount should be valid
           if (holder.refCount < 1) {
             errors.push(`Invalid refCount: ${holder.refCount}`);
@@ -131,10 +137,12 @@ describe('LockManager Multi-Process Safety', () => {
           acquireTimeout: 0,
         });
 
+        if (lockId === undefined) throw new Error('LockId should be defined');
+
         // Race: extend and release
-        const _results = await Promise.allSettled([
-          lm.extend(lockId!, 1000),
-          lm.release(lockId!),
+        await Promise.allSettled([
+          lm.extend(lockId, 1000),
+          lm.release(lockId),
         ]);
 
         // After race, state should be consistent
@@ -172,9 +180,9 @@ describe('LockManager Multi-Process Safety', () => {
       });
 
       // Block resource with very short TTL (causes frequent releases)
-      let running = true;
+      const state = { running: true };
       const churner = (async () => {
-        while (running) {
+        while (state.running) {
           const r = await lm.acquire('hot-resource', {
             holderId: 'churner',
             acquireTimeout: 0,
@@ -183,7 +191,9 @@ describe('LockManager Multi-Process Safety', () => {
           if (r.acquired) {
             await new Promise((resolve) => setTimeout(resolve, 3));
             try {
-              await lm.release(r.lockId!);
+              if (r.lockId !== undefined) {
+                await lm.release(r.lockId);
+              }
             } catch {
               // Ignore
             }
@@ -201,12 +211,12 @@ describe('LockManager Multi-Process Safety', () => {
       });
       const elapsed = Date.now() - start;
 
-      running = false;
+      state.running = false;
       await churner;
 
       // Should have stopped due to maxRetries, not timeout
       // With maxRetries=3, should fail relatively quickly
-      if (!result.acquired) {
+      if (result.acquired === false) {
         expect(result.reason).toContain('max retries');
         expect(elapsed).toBeLessThan(5000); // Much less than 10s timeout
       }
@@ -304,7 +314,7 @@ describe('LockManager Multi-Process Safety', () => {
 
       // Access internal to verify default
       // This is a bit hacky but necessary for the test
-      const options = (lm as any);
+      const options = lm as any; // eslint-disable-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
 
       // Default should be reasonable (e.g., 100ms as currently hardcoded)
       // After fix, should be configurable
@@ -361,14 +371,14 @@ describe('LockManager Multi-Process Safety', () => {
         operations.push(
           (async () => {
             try {
-              const result = await lm.acquire(`resource-${i % 3}`, {
-                holderId: `holder-${i % 5}`,
+              const result = await lm.acquire(`resource-${(i % 3).toString()}`, {
+                holderId: `holder-${(i % 5).toString()}`,
                 reentrant: true,
                 acquireTimeout: 200,
                 ttl: 50,
               });
 
-              if (result.acquired && result.lockId) {
+              if (result.acquired && result.lockId !== undefined) {
                 // Random operations
                 if (Math.random() > 0.5) {
                   await lm.extend(result.lockId, 100);
@@ -380,8 +390,8 @@ describe('LockManager Multi-Process Safety', () => {
                   // May have auto-released
                 }
               }
-            } catch (e: any) {
-              if (!e.message.includes('disposed')) {
+            } catch (e: unknown) {
+              if (e instanceof Error && !e.message.includes('disposed')) {
                 errors.push(e.message);
               }
             }
@@ -398,7 +408,7 @@ describe('LockManager Multi-Process Safety', () => {
 
       // Verify consistent state
       for (let i = 0; i < 3; i++) {
-        const holder = await lm.getLockHolder(`resource-${i}`);
+        const holder = await lm.getLockHolder(`resource-${i.toString()}`);
         if (holder) {
           expect(holder.refCount).toBeGreaterThanOrEqual(1);
         }

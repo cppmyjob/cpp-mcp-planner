@@ -72,8 +72,9 @@ describe('E2E: MCP Server Discovery & Errors', () => {
       const planTool = result.tools.find(t => t.name === 'plan');
 
       expect(planTool).toBeDefined();
-      expect(planTool!.inputSchema.properties).toHaveProperty('action');
-      expect(planTool!.inputSchema.required).toContain('action');
+      if (planTool === undefined) throw new Error('PlanTool should be defined');
+      expect(planTool.inputSchema.properties).toHaveProperty('action');
+      expect(planTool.inputSchema.required).toContain('action');
     });
 
     it('should have correct actions for each tool', async () => {
@@ -92,10 +93,11 @@ describe('E2E: MCP Server Discovery & Errors', () => {
 
       for (const tool of result.tools) {
         // Skip tools without actions (like batch)
-        if (!expectedActions[tool.name]) continue;
+        if (!(tool.name in expectedActions)) continue;
 
-        const actionProp = tool.inputSchema.properties?.action as { enum?: string[] };
-        expect(actionProp?.enum?.sort()).toEqual(expectedActions[tool.name].sort());
+        const toolName = tool.name as keyof typeof expectedActions;
+        const actionProp = tool.inputSchema.properties?.action as { enum?: string[] } | undefined;
+        expect(actionProp?.enum?.sort()).toEqual(expectedActions[toolName].sort());
       }
     });
   });

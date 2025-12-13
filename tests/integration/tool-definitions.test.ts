@@ -6,18 +6,20 @@ describe('Tool Definitions', () => {
     it('should recommend get_summary for plan overview', () => {
       const planTool = tools.find(t => t.name === 'plan');
       expect(planTool).toBeDefined();
-      expect(planTool!.description).toContain('get_summary');
+      expect(planTool?.description).toContain('get_summary');
     });
 
     it('should warn that includeEntities is for export/backup only', () => {
       const planTool = tools.find(t => t.name === 'plan');
-      expect(planTool!.description).toMatch(/includeEntities.*export|backup/i);
+      expect(planTool?.description).toMatch(/includeEntities.*export|backup/i);
     });
 
     it('should have get_summary in enum', () => {
       const planTool = tools.find(t => t.name === 'plan');
-      const actionProp = planTool!.inputSchema.properties?.action as { enum?: string[] };
-      expect(actionProp?.enum).toContain('get_summary');
+      if (planTool === undefined) throw new Error('plan tool not found');
+      const actionProp = planTool.inputSchema.properties.action;
+      if (!actionProp || !('enum' in actionProp)) throw new Error('action property not found');
+      expect(actionProp.enum).toContain('get_summary');
     });
   });
 
@@ -25,13 +27,13 @@ describe('Tool Definitions', () => {
     it('should recommend get_tree with fields for overview', () => {
       const phaseTool = tools.find(t => t.name === 'phase');
       expect(phaseTool).toBeDefined();
-      expect(phaseTool!.description).toContain('get_tree');
-      expect(phaseTool!.description).toContain('fields');
+      expect(phaseTool?.description).toContain('get_tree');
+      expect(phaseTool?.description).toContain('fields');
     });
 
     it('should mention summary or overview in context', () => {
       const phaseTool = tools.find(t => t.name === 'phase');
-      expect(phaseTool!.description).toMatch(/overview|summary/i);
+      expect(phaseTool?.description).toMatch(/overview|summary/i);
     });
   });
 
@@ -40,7 +42,8 @@ describe('Tool Definitions', () => {
       const phaseTool = tools.find(t => t.name === 'phase');
       expect(phaseTool).toBeDefined();
 
-      const description = phaseTool!.description;
+      if (phaseTool === undefined) throw new Error('PhaseTool should be defined');
+      const description = phaseTool.description;
 
       // Verify link tool is mentioned
       expect(description.toLowerCase()).toContain('link tool');
@@ -58,7 +61,8 @@ describe('Tool Definitions', () => {
       const linkTool = tools.find(t => t.name === 'link');
       expect(linkTool).toBeDefined();
 
-      const description = linkTool!.description;
+      if (linkTool === undefined) throw new Error('LinkTool should be defined');
+      const description = linkTool.description;
 
       // Verify depends_on is listed
       expect(description).toContain('depends_on');

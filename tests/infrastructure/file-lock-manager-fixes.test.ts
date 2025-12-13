@@ -22,12 +22,14 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
   let testDir: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `file-lock-fix-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = path.join(os.tmpdir(), `file-lock-fix-test-${Date.now().toString()}-${Math.random().toString(36).slice(2)}`);
     await fs.mkdir(testDir, { recursive: true });
   });
 
   afterEach(async () => {
-    await fs.rm(testDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(testDir, { recursive: true, force: true }).catch(() => {
+      // Ignore cleanup errors in tests
+    });
   });
 
   // ============================================================================
@@ -77,7 +79,7 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
         'entity-abc-def',
       ];
 
-      const releases: Array<() => Promise<boolean>> = [];
+      const releases: (() => Promise<boolean>)[] = [];
 
       // All should be acquirable simultaneously
       for (const resource of resources) {
@@ -163,7 +165,7 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
       await lockManager.initialize();
 
       // Multiple concurrent acquires on same resource
-      const results: Array<{ index: number; acquired: boolean; error?: string }> = [];
+      const results: { index: number; acquired: boolean; error?: string }[] = [];
 
       const promises = Array.from({ length: 5 }, async (_, i) => {
         try {
@@ -171,8 +173,8 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
           results.push({ index: i, acquired: true });
           await new Promise(r => setTimeout(r, 50)); // Hold lock briefly
           await release();
-        } catch (err: any) {
-          results.push({ index: i, acquired: false, error: err.message });
+        } catch (err: unknown) {
+          results.push({ index: i, acquired: false, error: (err as Error).message });
         }
       });
 
@@ -205,7 +207,7 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
       // Note: NOT calling initialize()
 
       await expect(
-        lockManager.withLock('resource', async () => 'result')
+        lockManager.withLock('resource', () => Promise.resolve('result'))
       ).rejects.toThrow(/initialize/i);
     });
 
@@ -257,7 +259,11 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
       // Neither should throw EEXIST or other file system errors
       const errors = results
         .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-        .filter(r => !r.reason.message.includes('Timeout'));
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        .filter(r => {
+          const reason = r.reason as unknown;
+          return Boolean(reason) && typeof reason === 'object' && reason !== null && 'message' in reason && typeof (reason as { message: unknown }).message === 'string' && !(reason as { message: string }).message.includes('Timeout');
+        });
       expect(errors).toHaveLength(0);
 
       // Cleanup
@@ -289,8 +295,11 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
       // Check for unexpected errors (not Timeout)
       for (const result of results) {
         if (result.status === 'rejected') {
-          if (!result.reason.message.includes('Timeout')) {
-            errors.push(result.reason.message);
+          const reason = result.reason as unknown;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          if (Boolean(reason) && typeof reason === 'object' && reason !== null && 'message' in reason && typeof (reason as { message: unknown }).message === 'string' && !(reason as { message: string }).message.includes('Timeout')) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+            errors.push((reason as { message: string }).message);
           }
         }
       }
@@ -354,10 +363,10 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
       try {
         await lockManager.acquire('resource');
         fail('Should have thrown');
-      } catch (err: any) {
-        expect(err.message).toMatch(/timeout/i);
-        expect(err.message).toContain('resource');
-        expect(err.message).toContain('100'); // timeout value
+      } catch (err: unknown) {
+        expect((err as Error).message).toMatch(/timeout/i);
+        expect((err as Error).message).toContain('resource');
+        expect((err as Error).message).toContain('100'); // timeout value
       }
 
       await blocker.dispose();
@@ -381,9 +390,9 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
       try {
         await lockManager.acquire('resource');
         fail('Should have thrown');
-      } catch (err: any) {
+      } catch (err: unknown) {
         // Should have clear error, not raw EACCES
-        expect(err.message.toLowerCase()).toMatch(/permission|access|denied/i);
+        expect((err as Error).message.toLowerCase()).toMatch(/permission|access|denied/i);
       } finally {
         // Restore permissions for cleanup
         await fs.chmod(lockDir, 0o755);
@@ -433,9 +442,9 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
               const release = await manager.acquire(resource);
               await new Promise(r => setTimeout(r, Math.random() * 20));
               await release();
-            } catch (err: any) {
-              if (!err.message.includes('Timeout') && !err.message.includes('disposed')) {
-                errors.push(`${resource}: ${err.message}`);
+            } catch (err: unknown) {
+              if (!(err as Error).message.includes('Timeout') && !(err as Error).message.includes('disposed')) {
+                errors.push(`${resource}: ${(err as Error).message}`);
               }
             }
           })()

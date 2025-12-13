@@ -16,7 +16,7 @@ describe('PhaseService', () => {
   let planId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `mcp-phase-test-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-phase-test-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -265,7 +265,7 @@ describe('PhaseService', () => {
     });
 
     it('should save each priority value correctly', async () => {
-      const priorities: Array<'critical' | 'high' | 'medium' | 'low'> =
+      const priorities: ('critical' | 'high' | 'medium' | 'low')[] =
         ['critical', 'high', 'medium', 'low'];
 
       for (const prio of priorities) {
@@ -310,7 +310,7 @@ describe('PhaseService', () => {
             objectives: ['T'],
             deliverables: ['T'],
             successCriteria: ['T'],
-            priority: 'urgent' as any,
+            priority: 'urgent' as unknown as 'critical',
           },
         })
       ).rejects.toThrow(/Invalid priority/);
@@ -329,7 +329,7 @@ describe('PhaseService', () => {
         },
       });
 
-      const _updated = await service.updatePhase({
+      await service.updatePhase({
         planId,
         phaseId: added.phaseId,
         updates: { priority: 'critical' },
@@ -817,18 +817,18 @@ describe('PhaseService', () => {
       expect(node.hasChildren).toBe(false);
 
       // childCount must be added to summary
-      expect((node.phase as any).childCount).toBe(0);
+      expect((node.phase as Record<string, unknown>).childCount).toBe(0);
 
       // These fields should NOT be present in summary mode
-      expect((node.phase as any).objectives).toBeUndefined();
-      expect((node.phase as any).deliverables).toBeUndefined();
-      expect((node.phase as any).description).toBeUndefined();
-      expect((node.phase as any).successCriteria).toBeUndefined();
-      expect((node.phase as any).implementationNotes).toBeUndefined();
-      expect((node.phase as any).schedule).toBeUndefined();
+      expect((node.phase as Record<string, unknown>).objectives).toBeUndefined();
+      expect((node.phase as Record<string, unknown>).deliverables).toBeUndefined();
+      expect((node.phase as Record<string, unknown>).description).toBeUndefined();
+      expect((node.phase as Record<string, unknown>).successCriteria).toBeUndefined();
+      expect((node.phase as Record<string, unknown>).implementationNotes).toBeUndefined();
+      expect((node.phase as Record<string, unknown>).schedule).toBeUndefined();
 
       // Metadata IS included in summary mode (use excludeMetadata to remove it)
-      expect((node.phase as any).metadata).toBeDefined();
+      expect((node.phase as Record<string, unknown>).metadata).toBeDefined();
     });
 
     it('should include objectives when requested via fields', async () => {
@@ -847,7 +847,7 @@ describe('PhaseService', () => {
         planId,
         fields: ['id', 'title', 'status', 'childCount', 'objectives'],
       });
-      const phase = result.tree[0].phase as any;
+      const phase = result.tree[0].phase as Record<string, unknown>;
 
       // Requested fields should be present
       expect(phase.id).toBeDefined();
@@ -878,7 +878,7 @@ describe('PhaseService', () => {
         planId,
         fields: ['id', 'title', 'objectives', 'deliverables', 'schedule'],
       });
-      const phase = result.tree[0].phase as any;
+      const phase = result.tree[0].phase;
 
       // Requested fields should be present
       expect(phase.id).toBeDefined();
@@ -886,7 +886,7 @@ describe('PhaseService', () => {
       expect(phase.objectives).toEqual(['obj1', 'obj2']);
       expect(phase.deliverables).toEqual(['del1']);
       expect(phase.schedule).toBeDefined();
-      expect(phase.schedule.estimatedEffort.value).toBe(2);
+      expect((phase.schedule as { estimatedEffort?: { value: number } } | undefined)?.estimatedEffort?.value).toBe(2);
 
       // NOT requested - should not be present
       expect(phase.successCriteria).toBeUndefined();
@@ -908,7 +908,7 @@ describe('PhaseService', () => {
       });
 
       const result = await service.getPhaseTree({ planId, fields: ['*'] });
-      const phase = result.tree[0].phase as any;
+      const phase = result.tree[0].phase as Record<string, unknown>;
 
       // ALL fields must be present
       expect(phase.id).toBeDefined();
@@ -940,7 +940,7 @@ describe('PhaseService', () => {
         planId,
         fields: ['objectives', 'unknownField123', 'anotherBadField'],
       });
-      const phase = result.tree[0].phase as any;
+      const phase = result.tree[0].phase as Record<string, unknown>;
 
       expect(phase.objectives).toEqual(['obj1']);
       expect(phase.unknownField123).toBeUndefined();
@@ -990,7 +990,7 @@ describe('PhaseService', () => {
       expect(result.tree[0].phase.title).toBe('Parent');
       expect(result.tree[0].children).toEqual([]); // children truncated
       expect(result.tree[0].hasChildren).toBe(true); // but flag set
-      expect((result.tree[0].phase as any).childCount).toBe(1); // direct children count
+      expect((result.tree[0].phase as Record<string, unknown>).childCount).toBe(1); // direct children count
     });
 
     it('should respect maxDepth=1 to include one level of children', async () => {
@@ -1034,12 +1034,12 @@ describe('PhaseService', () => {
       // Root level
       expect(result.tree).toHaveLength(1);
       expect(result.tree[0].phase.title).toBe('P1');
-      expect((result.tree[0].phase as any).childCount).toBe(1);
+      expect((result.tree[0].phase as Record<string, unknown>).childCount).toBe(1);
 
       // First level children included
       expect(result.tree[0].children).toHaveLength(1);
       expect(result.tree[0].children[0].phase.title).toBe('P1.1');
-      expect((result.tree[0].children[0].phase as any).childCount).toBe(1);
+      expect((result.tree[0].children[0].phase as Record<string, unknown>).childCount).toBe(1);
 
       // Second level children truncated
       expect(result.tree[0].children[0].children).toEqual([]);
@@ -1121,11 +1121,11 @@ describe('PhaseService', () => {
 
       const result = await service.getPhaseTree({ planId });
 
-      expect((result.tree[0].phase as any).childCount).toBe(3); // only direct children
+      expect((result.tree[0].phase as Record<string, unknown>).childCount).toBe(3); // only direct children
       expect(result.tree[0].hasChildren).toBe(true);
 
-      expect((result.tree[0].children[0].phase as any).childCount).toBe(2); // Child1 has 2 grandchildren
-      expect((result.tree[0].children[1].phase as any).childCount).toBe(0); // Child2 has no children
+      expect((result.tree[0].children[0].phase as Record<string, unknown>).childCount).toBe(2); // Child1 has 2 grandchildren
+      expect((result.tree[0].children[1].phase as Record<string, unknown>).childCount).toBe(0); // Child2 has no children
     });
 
     it('should combine maxDepth and fields parameters', async () => {
@@ -1160,7 +1160,7 @@ describe('PhaseService', () => {
 
       expect(result.tree).toHaveLength(1);
 
-      const phase = result.tree[0].phase as any;
+      const phase = result.tree[0].phase as Record<string, unknown>;
 
       // Requested fields should be present
       expect(phase.id).toBeDefined();
@@ -1184,7 +1184,7 @@ describe('PhaseService', () => {
         await service.addPhase({
           planId,
           phase: {
-            title: `Phase ${i}`,
+            title: `Phase ${i.toString()}`,
             description:
               'A very long description with lots of details that would make the response large.',
             objectives: ['Objective 1', 'Objective 2', 'Objective 3'],
@@ -1671,7 +1671,8 @@ describe('PhaseService', () => {
         const after = new Date();
 
         const completed = await service.getPhase({ planId, phaseId: p1.phaseId });
-        const timestamp = new Date(completed.phase.completedAt!);
+        if (completed.phase.completedAt === undefined) throw new Error('CompletedAt should be defined');
+        const timestamp = new Date(completed.phase.completedAt);
         expect(timestamp.getTime()).toBeGreaterThanOrEqual(before.getTime());
         expect(timestamp.getTime()).toBeLessThanOrEqual(after.getTime());
       });
@@ -2272,7 +2273,7 @@ describe('PhaseService', () => {
     });
 
     it('should enforce max limit of 100 IDs', async () => {
-      const manyIds = Array.from({ length: 101 }, (_, i) => `id-${i}`);
+      const manyIds = Array.from({ length: 101 }, (_, i) => `id-${i.toString()}`);
 
       await expect(
         service.getPhases({
@@ -2473,7 +2474,7 @@ describe('PhaseService', () => {
         service.arrayAppend({
           planId,
           phaseId,
-          field: 'title' as any,
+          field: 'title' as unknown as 'objectives',
           value: 'Invalid',
         })
       ).rejects.toThrow('Field title is not a valid array field');

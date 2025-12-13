@@ -21,13 +21,15 @@ describe('FileLockManager Issues', () => {
   beforeEach(async () => {
     testDir = path.join(
       os.tmpdir(),
-      `file-lock-issues-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      `file-lock-issues-${Date.now().toString()}-${Math.random().toString(36).slice(2)}`
     );
     await fs.mkdir(testDir, { recursive: true });
   });
 
   afterEach(async () => {
-    await fs.rm(testDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(testDir, { recursive: true, force: true }).catch(() => {
+      // Ignore cleanup errors in tests
+    });
   });
 
   // ============================================================================
@@ -42,7 +44,7 @@ describe('FileLockManager Issues', () => {
       await lockManager.initialize();
 
       // Acquire first lock
-      const _release1 = await lockManager.acquire('resource');
+      await lockManager.acquire('resource');
 
       // Track events
       const events: string[] = [];
@@ -94,7 +96,9 @@ describe('FileLockManager Issues', () => {
       await lockManager.acquire('resource');
 
       // Start another acquire that will wait
-      const acquire2Promise = lockManager.acquire('resource').catch(() => {});
+      const acquire2Promise = lockManager.acquire('resource').catch(() => {
+        // Ignore errors - lock should fail after dispose
+      });
 
       // Small delay then dispose
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -118,16 +122,22 @@ describe('FileLockManager Issues', () => {
   // ============================================================================
   describe('Issue #2: ENOTACQUIRED should log warning', () => {
     it('should log warning when lock was externally released', async () => {
-      const warnings: Array<{ message: string; context?: Record<string, unknown> }> = [];
+      const warnings: { message: string; context?: Record<string, unknown> }[] = [];
 
       const lockManager = new FileLockManager(testDir, {
         acquireTimeout: 1000,
         staleThreshold: 100, // Short stale threshold
         logger: {
-          debug: () => {},
-          info: () => {},
+          debug: () => {
+            // No-op for tests
+          },
+          info: () => {
+            // No-op for tests
+          },
           warn: (msg, ctx) => warnings.push({ message: msg, context: ctx }),
-          error: () => {},
+          error: () => {
+            // No-op for tests
+          },
         },
         logLevel: 'warn',
       });
@@ -142,7 +152,7 @@ describe('FileLockManager Issues', () => {
       const files = await fs.readdir(lockDir);
       const lockFile = files.find((f) => f.endsWith('.lock') && !f.includes('.lock.'));
 
-      if (lockFile) {
+      if (lockFile !== undefined) {
         const lockPath = path.join(lockDir, lockFile);
         try {
           // Try to forcefully release (simulating stale detection)
@@ -187,7 +197,7 @@ describe('FileLockManager Issues', () => {
 
         // Start multiple acquires and dispose concurrently
         const acquirePromises = Array.from({ length: 3 }, () =>
-          lockManager.acquire(`resource-${i}`).catch(() => null)
+          lockManager.acquire(`resource-${i.toString()}`).catch(() => null)
         );
 
         // Dispose very quickly
@@ -207,12 +217,12 @@ describe('FileLockManager Issues', () => {
 
         // Should be able to acquire (no dangling lock)
         try {
-          const release = await checker.acquire(`resource-${i}`);
+          const release = await checker.acquire(`resource-${i.toString()}`);
           await release();
-        } catch (error: any) {
+        } catch (error) {
           // If this fails with timeout, there's a dangling lock
-          if (error.message.includes('Timeout')) {
-            fail(`Dangling lock detected on iteration ${i}`);
+          if ((error as Error).message.includes('Timeout')) {
+            fail(`Dangling lock detected on iteration ${i.toString()}`);
           }
         }
 
@@ -304,8 +314,8 @@ describe('FileLockManager Issues', () => {
         try {
           const release = await checker.acquire('contested-resource');
           await release();
-        } catch (error: any) {
-          if (error.message.includes('Timeout')) {
+        } catch (error) {
+          if ((error as Error).message.includes('Timeout')) {
             fail(`Round ${round}: Dangling lock detected after dispose`);
           }
         }
@@ -324,10 +334,18 @@ describe('FileLockManager Issues', () => {
         acquireTimeout: 1000,
         disposeTimeout: 200, // Short dispose timeout
         logger: {
-          debug: () => {},
-          info: () => {},
-          warn: () => {},
-          error: () => {},
+          debug: () => {
+            // No-op for tests
+          },
+          info: () => {
+            // No-op for tests
+          },
+          warn: () => {
+            // No-op for tests
+          },
+          error: () => {
+            // No-op for tests
+          },
         },
         logLevel: 'warn',
       });
@@ -345,7 +363,9 @@ describe('FileLockManager Issues', () => {
           const lockPath = path.join(lockDir, file);
           try {
             // Try to corrupt/remove lock directory to cause release to take time
-            await fs.rm(lockPath, { recursive: true, force: true }).catch(() => {});
+            await fs.rm(lockPath, { recursive: true, force: true }).catch(() => {
+              // Ignore cleanup errors
+            });
           } catch {
             // Ignore
           }
@@ -370,10 +390,16 @@ describe('FileLockManager Issues', () => {
         acquireTimeout: 1000,
         disposeTimeout: 50, // Very short
         logger: {
-          debug: () => {},
-          info: () => {},
+          debug: () => {
+            // No-op for tests
+          },
+          info: () => {
+            // No-op for tests
+          },
           warn: (msg) => warnings.push(msg),
-          error: () => {},
+          error: () => {
+            // No-op for tests
+          },
         },
         logLevel: 'warn',
       });
@@ -416,8 +442,9 @@ describe('FileLockManager Issues', () => {
 
       // Test withLock (uses acquireWithOptions internally)
       let wasHeld = false;
-      await lockManager.withLock('resource-2', async () => {
+      await lockManager.withLock('resource-2', () => {
         wasHeld = lockManager.isHeldByUs('resource-2');
+        return Promise.resolve();
       });
       expect(wasHeld).toBe(true);
       expect(lockManager.isHeldByUs('resource-2')).toBe(false);
@@ -457,7 +484,7 @@ describe('FileLockManager Issues', () => {
 
       // Acquire multiple different resources concurrently
       const releases = await Promise.all(
-        Array.from({ length: 10 }, (_, i) => lockManager.acquire(`resource-${i}`))
+        Array.from({ length: 10 }, (_, i) => lockManager.acquire(`resource-${i.toString()}`))
       );
 
       expect(lockManager.getActiveLocksCount()).toBe(10);

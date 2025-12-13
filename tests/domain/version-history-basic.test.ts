@@ -23,7 +23,7 @@ describe('Version History - Basic Tests', () => {
   let planId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `mcp-version-history-basic-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-version-history-basic-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -177,7 +177,7 @@ describe('Version History - Basic Tests', () => {
         planId: plan2.planId,
         requirementId: req.requirementId,
         updates: {
-          title: `V${i}`
+          title: `V${i.toString()}`
         }
       });
     }

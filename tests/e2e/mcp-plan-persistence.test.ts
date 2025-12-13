@@ -8,7 +8,7 @@ import * as crypto from 'crypto';
 
 // Helper to parse MCP tool result
 function parseResult<T>(result: unknown): T {
-  const r = result as { content: Array<{ type: string; text: string }> };
+  const r = result as { content: { type: string; text: string }[] };
   return JSON.parse(r.content[0].text) as T;
 }
 
@@ -57,7 +57,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
     expect(planId).toBeDefined();
 
     // Set it as active
-    const _setActiveResult = await client1.callTool({
+    await client1.callTool({
       name: 'plan',
       arguments: {
         action: 'set_active',
@@ -101,7 +101,8 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
     });
     const activeData2 = parseResult<{ activePlan: { planId: string } | null }>(getActiveResult2);
     expect(activeData2.activePlan).not.toBeNull();
-    expect(activeData2.activePlan!.planId).toBe(planId);
+    if (activeData2.activePlan === null) throw new Error('ActivePlan should not be null');
+    expect(activeData2.activePlan.planId).toBe(planId);
 
     // Clean up second server
     await client2.close();

@@ -16,7 +16,7 @@ describe('ArtifactService', () => {
   let planId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `mcp-artifact-test-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-artifact-test-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -94,7 +94,10 @@ describe('ArtifactService', () => {
       // Verify via getArtifact
       const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
       expect(artifact.targets).toHaveLength(2);
-      expect(artifact.targets![0].action).toBe('create');
+      if (artifact.targets === undefined || artifact.targets.length === 0) {
+        throw new Error('Targets should be defined and not empty');
+      }
+      expect(artifact.targets[0].action).toBe('create');
     });
 
     it('should add artifact with related entities', async () => {
@@ -164,7 +167,7 @@ describe('ArtifactService', () => {
         },
       });
 
-      const _result = await service.updateArtifact({
+      await service.updateArtifact({
         planId,
         artifactId: added.artifactId,
         updates: {
@@ -224,8 +227,11 @@ describe('ArtifactService', () => {
       // Verify via getArtifact
       const { artifact } = await service.getArtifact({ planId, artifactId: added.artifactId });
       expect(artifact.codeRefs).toHaveLength(2);
-      expect(artifact.codeRefs![0]).toBe('src/updated-file.ts:50');
-      expect(artifact.codeRefs![1]).toBe('tests/updated.test.ts:75');
+      if (artifact.codeRefs === undefined || artifact.codeRefs.length < 2) {
+        throw new Error('CodeRefs should be defined with at least 2 elements');
+      }
+      expect(artifact.codeRefs[0]).toBe('src/updated-file.ts:50');
+      expect(artifact.codeRefs[1]).toBe('tests/updated.test.ts:75');
     });
 
     it('should validate codeRefs on update', async () => {
@@ -416,7 +422,7 @@ describe('ArtifactService', () => {
           artifact: {
             title: 'Test',
             description: 'Test',
-            artifactType: 'invalid' as any,
+            artifactType: 'invalid' as unknown as 'code',
             content: { language: 'ts', sourceCode: '' },
           },
         })
@@ -432,7 +438,7 @@ describe('ArtifactService', () => {
             description: 'Test',
             artifactType: 'code',
             content: { language: 'ts', sourceCode: '' },
-            targets: [{ path: 'file.ts', action: 'invalid' as any }],
+            targets: [{ path: 'file.ts', action: 'invalid' as unknown as 'create' }],
           },
         })
       ).rejects.toThrow(/action/i);
@@ -456,8 +462,11 @@ describe('ArtifactService', () => {
       // Verify via getArtifact
       const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
       expect(artifact.codeRefs).toHaveLength(2);
-      expect(artifact.codeRefs![0]).toBe('src/services/my-service.ts:42');
-      expect(artifact.codeRefs![1]).toBe('tests/my-service.test.ts:100');
+      if (artifact.codeRefs === undefined || artifact.codeRefs.length < 2) {
+        throw new Error('CodeRefs should be defined with at least 2 elements');
+      }
+      expect(artifact.codeRefs[0]).toBe('src/services/my-service.ts:42');
+      expect(artifact.codeRefs[1]).toBe('tests/my-service.test.ts:100');
     });
 
     it('should validate codeRefs format in addArtifact', async () => {
@@ -714,8 +723,11 @@ describe('ArtifactService', () => {
         const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
         expect(retrieved.artifact.targets).toBeDefined();
         expect(retrieved.artifact.targets).toHaveLength(1);
-        expect(retrieved.artifact.targets![0].path).toBe('src/file.ts');
-        expect(retrieved.artifact.targets![0].action).toBe('create');
+        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+          throw new Error('Targets should be defined and not empty');
+        }
+        expect(retrieved.artifact.targets[0].path).toBe('src/file.ts');
+        expect(retrieved.artifact.targets[0].action).toBe('create');
       });
 
       it('RED: should accept targets with lineNumber', async () => {
@@ -731,7 +743,10 @@ describe('ArtifactService', () => {
         });
 
         const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
-        expect(retrieved.artifact.targets![0].lineNumber).toBe(42);
+        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+          throw new Error('Targets should be defined and not empty');
+        }
+        expect(retrieved.artifact.targets[0].lineNumber).toBe(42);
       });
 
       it('RED: should accept targets with lineNumber and lineEnd', async () => {
@@ -747,8 +762,11 @@ describe('ArtifactService', () => {
         });
 
         const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
-        expect(retrieved.artifact.targets![0].lineNumber).toBe(10);
-        expect(retrieved.artifact.targets![0].lineEnd).toBe(20);
+        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+          throw new Error('Targets should be defined and not empty');
+        }
+        expect(retrieved.artifact.targets[0].lineNumber).toBe(10);
+        expect(retrieved.artifact.targets[0].lineEnd).toBe(20);
       });
 
       it('RED: should accept targets with searchPattern', async () => {
@@ -764,7 +782,10 @@ describe('ArtifactService', () => {
         });
 
         const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
-        expect(retrieved.artifact.targets![0].searchPattern).toBe('function.*test');
+        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+          throw new Error('Targets should be defined and not empty');
+        }
+        expect(retrieved.artifact.targets[0].searchPattern).toBe('function.*test');
       });
 
       it('RED: should accept targets with description', async () => {
@@ -780,7 +801,10 @@ describe('ArtifactService', () => {
         });
 
         const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
-        expect(retrieved.artifact.targets![0].description).toBe('Main source file');
+        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+          throw new Error('Targets should be defined and not empty');
+        }
+        expect(retrieved.artifact.targets[0].description).toBe('Main source file');
       });
     });
 
@@ -805,8 +829,11 @@ describe('ArtifactService', () => {
 
         const retrieved = await service.getArtifact({ planId, artifactId: added.artifactId });
         expect(retrieved.artifact.targets).toHaveLength(1);
-        expect(retrieved.artifact.targets![0].path).toBe('new.ts');
-        expect(retrieved.artifact.targets![0].lineNumber).toBe(10);
+        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+          throw new Error('Targets should be defined and not empty');
+        }
+        expect(retrieved.artifact.targets[0].path).toBe('new.ts');
+        expect(retrieved.artifact.targets[0].lineNumber).toBe(10);
       });
     });
 
@@ -833,15 +860,18 @@ describe('ArtifactService', () => {
           metadata: { createdBy: 'test', tags: [], annotations: [] },
         };
 
-        await repo.create(legacyArtifact as any);
+        await repo.create(legacyArtifact as unknown as Parameters<typeof repo.create>[0]);
 
         // Read via service - should auto-migrate
         const retrieved = await service.getArtifact({ planId, artifactId });
         expect(retrieved.artifact.targets).toBeDefined();
         expect(retrieved.artifact.targets).toHaveLength(1);
-        expect(retrieved.artifact.targets![0].path).toBe('src/old.ts');
-        expect(retrieved.artifact.targets![0].action).toBe('create');
-        expect(retrieved.artifact.targets![0].description).toBe('Old format');
+        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+          throw new Error('Targets should be defined and not empty');
+        }
+        expect(retrieved.artifact.targets[0].path).toBe('src/old.ts');
+        expect(retrieved.artifact.targets[0].action).toBe('create');
+        expect(retrieved.artifact.targets[0].description).toBe('Old format');
       });
 
       it('RED: should preserve targets if both fileTable and targets exist', async () => {
@@ -865,12 +895,15 @@ describe('ArtifactService', () => {
           metadata: { createdBy: 'test', tags: [], annotations: [] },
         };
 
-        await repo.create(artifact as any);
+        await repo.create(artifact as unknown as Parameters<typeof repo.create>[0]);
 
         const retrieved = await service.getArtifact({ planId, artifactId });
         expect(retrieved.artifact.targets).toHaveLength(1);
-        expect(retrieved.artifact.targets![0].path).toBe('src/new.ts');
-        expect(retrieved.artifact.targets![0].lineNumber).toBe(5);
+        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+          throw new Error('Targets should be defined and not empty');
+        }
+        expect(retrieved.artifact.targets[0].path).toBe('src/new.ts');
+        expect(retrieved.artifact.targets[0].lineNumber).toBe(5);
       });
     });
 
@@ -1021,7 +1054,7 @@ describe('ArtifactService', () => {
         expect(art.title).toBeDefined();
 
         // sourceCode should NEVER be in list even with full mode (too heavy)
-        const content = art.content as unknown as Record<string, unknown>;
+        const content = art.content as unknown as Record<string, unknown> | undefined;
         expect(content?.sourceCode).toBeUndefined();
       });
 
@@ -1096,7 +1129,8 @@ describe('ArtifactService', () => {
         const art = result.artifact;
         expect(art.content.sourceCode).toBeDefined();
         expect(art.content.sourceCode).toContain('Large source code');
-        expect(art.content.sourceCode!.length).toBeGreaterThan(50000);
+        if (art.content.sourceCode === undefined) throw new Error('SourceCode should be defined');
+        expect(art.content.sourceCode.length).toBeGreaterThan(50000);
       });
 
       it('RED: includeContent=true should work with fields parameter', async () => {
@@ -1166,7 +1200,8 @@ describe('ArtifactService', () => {
 
         const art = result.artifacts.find((a) => a.id === artId);
         expect(art).toBeDefined();
-        expect(art!.content.sourceCode).toBeUndefined();
+        if (art === undefined) throw new Error('Art should be defined');
+        expect(art.content.sourceCode).toBeUndefined();
       });
 
       it('RED: should IGNORE includeContent=true in list (security: never return sourceCode in list)', async () => {
@@ -1177,7 +1212,8 @@ describe('ArtifactService', () => {
 
         const art = result.artifacts.find((a) => a.id === artId);
         // Even with includeContent=true, list should NEVER return sourceCode
-        expect(art!.content.sourceCode).toBeUndefined();
+        if (art === undefined) throw new Error('Art should be defined');
+        expect(art.content.sourceCode).toBeUndefined();
       });
     });
 

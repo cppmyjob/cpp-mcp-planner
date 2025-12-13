@@ -33,6 +33,7 @@ async function loadEntities<T extends Entity>(
   const typeMap: Record<string, string> = {
     phases: 'phase'
   };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
   const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
   return repo.findAll();
 }
@@ -46,6 +47,7 @@ async function saveEntities<T extends Entity>(
   const typeMap: Record<string, string> = {
     phases: 'phase'
   };
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
   const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
   for (const entity of entities) {
     await repo.update(entity.id, entity);
@@ -63,7 +65,7 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
 
   beforeEach(async () => {
     // Create temp directory for test
-    testDir = path.join(os.tmpdir(), `test-sprint10-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `test-sprint10-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -105,13 +107,14 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
     it('1.1 should not have CodeExample interface in types', () => {
       // TypeScript compilation test: if CodeExample exists, this will fail
       // @ts-expect-error CodeExample should not exist
-      const _test: import('../../src/domain/entities/types.js').CodeExample = {
+      const testValue: import('../../src/domain/entities/types.js').CodeExample = {
         language: 'typescript',
         code: 'test',
       };
 
       // This test passes if TypeScript cannot find CodeExample type
       expect(true).toBe(true);
+      expect(testValue).toBeDefined();
     });
 
     it('1.2 should fail to import CodeExample from types', async () => {
@@ -119,7 +122,7 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       const types = await import('../../src/domain/entities/types.js');
 
       // CodeExample should not be exported
-      expect((types as any).CodeExample).toBeUndefined();
+      expect((types as Record<string, unknown>).CodeExample).toBeUndefined();
     });
   });
 
@@ -158,6 +161,7 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       });
 
       // codeExamples field should not exist
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((phaseData.phase as any).codeExamples).toBeUndefined();
     });
 
@@ -173,12 +177,14 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
           successCriteria: ['Test'],
           // Intentionally passing invalid field using 'as any' to bypass type checking
           codeExamples: [{ language: 'ts', code: 'test' }],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
         } as any,
       });
 
       // If phase was created, verify codeExamples was not stored
       const repo = repositoryFactory.createRepository<Phase>('phase', testPlanId);
       const phases = await repo.findAll();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((phases[0] as any).codeExamples).toBeUndefined();
     });
   });
@@ -218,6 +224,7 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       });
 
       // codeRefs field should not exist
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((phaseData.phase as any).codeRefs).toBeUndefined();
     });
 
@@ -233,12 +240,14 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
           successCriteria: ['Test'],
           // Intentionally passing invalid field using 'as any' to bypass type checking
           codeRefs: ['src/test.ts:10'],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
         } as any,
       });
 
       // Verify codeRefs was not stored
       const repo = repositoryFactory.createRepository<Phase>('phase', testPlanId);
       const phases = await repo.findAll();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((phases[0] as any).codeRefs).toBeUndefined();
     });
   });
@@ -351,9 +360,11 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       });
 
       // Simulate legacy data: manually inject codeExamples into storage
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       const phases = await loadEntities<any>(repositoryFactory, testPlanId, 'phases');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       const legacyPhase = phases.find((p: any) => p.id === phaseResult.phaseId);
-      if (legacyPhase) {
+      if (legacyPhase !== undefined) {
         legacyPhase.codeExamples = [
           { language: 'typescript', code: 'legacy code', description: 'old example' },
         ];
@@ -368,6 +379,7 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       });
 
       // CRITICAL: codeExamples should be stripped from response
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((result.phase as any).codeExamples).toBeUndefined();
       expect(result.phase.title).toBe('Legacy Phase');
     });
@@ -386,9 +398,11 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       });
 
       // Simulate legacy data: manually inject codeRefs into storage
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       const phases = await loadEntities<any>(repositoryFactory, testPlanId, 'phases');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       const legacyPhase = phases.find((p: any) => p.id === phaseResult.phaseId);
-      if (legacyPhase) {
+      if (legacyPhase !== undefined) {
         legacyPhase.codeRefs = ['src/legacy.ts:42', 'tests/old.test.ts:100'];
         await saveEntities(repositoryFactory, testPlanId, 'phases', phases);
       }
@@ -401,6 +415,7 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       });
 
       // CRITICAL: codeRefs should be stripped from response
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect((result.phase as any).codeRefs).toBeUndefined();
       expect(result.phase.title).toBe('Legacy Phase with Refs');
     });

@@ -111,7 +111,7 @@ describe('Repository Error System', () => {
     });
 
     it('should support all conflict types', () => {
-      const types: Array<'duplicate' | 'version' | 'constraint' | 'state'> =
+      const types: ('duplicate' | 'version' | 'constraint' | 'state')[] =
         ['duplicate', 'version', 'constraint', 'state'];
 
       types.forEach(type => {
@@ -146,7 +146,7 @@ describe('Repository Error System', () => {
     });
 
     it('should support all operation types', () => {
-      const operations: Array<'begin' | 'commit' | 'rollback'> =
+      const operations: ('begin' | 'commit' | 'rollback')[] =
         ['begin', 'commit', 'rollback'];
 
       operations.forEach(op => {
@@ -167,7 +167,7 @@ describe('Repository Error System', () => {
     });
 
     it('should support all lock types', () => {
-      const types: Array<'acquire' | 'release' | 'timeout' | 'deadlock'> =
+      const types: ('acquire' | 'release' | 'timeout' | 'deadlock')[] =
         ['acquire', 'release', 'timeout', 'deadlock'];
 
       types.forEach(type => {
@@ -223,7 +223,7 @@ describe('Repository Error System', () => {
     });
 
     it('should support all query types', () => {
-      const types: Array<'filter' | 'sort' | 'pagination' | 'syntax'> =
+      const types: ('filter' | 'sort' | 'pagination' | 'syntax')[] =
         ['filter', 'sort', 'pagination', 'syntax'];
 
       types.forEach(type => {
@@ -244,7 +244,7 @@ describe('Repository Error System', () => {
     });
 
     it('should support all operation types', () => {
-      const operations: Array<'create' | 'update' | 'delete' | 'rebuild'> =
+      const operations: ('create' | 'update' | 'delete' | 'rebuild')[] =
         ['create', 'update', 'delete', 'rebuild'];
 
       operations.forEach(op => {

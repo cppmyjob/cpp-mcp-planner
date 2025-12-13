@@ -128,6 +128,8 @@ export default tseslint.config(
         'error',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
       ],
+      // Prefer dot notation over bracket notation
+      '@typescript-eslint/dot-notation': 'error',
 
       // ═══════════════════════════════════════════════════════════════
       // CODE QUALITY

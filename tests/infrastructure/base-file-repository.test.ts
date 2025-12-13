@@ -21,13 +21,15 @@ import { DEFAULT_CACHE_OPTIONS } from '../../src/infrastructure/repositories/fil
  * Concrete test implementation of BaseFileRepository
  * Exposes protected methods for testing
  */
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
 class TestRepository extends BaseFileRepository {
   public testCache = new Map<string, string>();
   public initializeCallCount = 0;
 
-  public async initialize(): Promise<void> {
+  public initialize(): Promise<void> {
     this.initializeCallCount++;
     this.markInitialized();
+    return Promise.resolve();
   }
 
   // Expose protected methods for testing
@@ -47,7 +49,7 @@ class TestRepository extends BaseFileRepository {
     this.cacheClear(this.testCache);
   }
 
-  public async testEnsureInitialized(): Promise<void> {
+  public testEnsureInitialized(): Promise<void> {
     return this.ensureInitialized();
   }
 
@@ -68,20 +70,21 @@ class TestRepository extends BaseFileRepository {
   }
 
   // Expose file operations for integration tests
-  public async testAtomicWriteJSON(filePath: string, data: unknown): Promise<void> {
+  public testAtomicWriteJSON(filePath: string, data: unknown): Promise<void> {
     return this.atomicWriteJSON(filePath, data);
   }
 
-  public async testLoadJSON<T>(filePath: string): Promise<T> {
+  public testLoadJSON<T>(filePath: string): Promise<T> {
     return this.loadJSON<T>(filePath);
   }
 }
+/* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
 
 describe('BaseFileRepository', () => {
   let testDir: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `base-repo-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = path.join(os.tmpdir(), `base-repo-test-${Date.now().toString()}-${Math.random().toString(36).slice(2)}`);
     await fs.mkdir(testDir, { recursive: true });
   });
 
@@ -288,7 +291,7 @@ describe('BaseFileRepository', () => {
         const repo = new TestRepository(testDir);
 
         // Should not throw
-        expect(() => repo.testCacheInvalidate('nonexistent')).not.toThrow();
+        expect(() => { repo.testCacheInvalidate('nonexistent'); }).not.toThrow();
       });
 
       it('should only remove specified key', () => {
@@ -322,7 +325,7 @@ describe('BaseFileRepository', () => {
         const repo = new TestRepository(testDir);
 
         // Should not throw
-        expect(() => repo.testCacheClear()).not.toThrow();
+        expect(() => { repo.testCacheClear(); }).not.toThrow();
         expect(repo.testCache.size).toBe(0);
       });
     });

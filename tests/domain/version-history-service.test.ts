@@ -45,7 +45,7 @@ describe('Version History Service (Sprint 7)', () => {
   let testDir: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `mcp-version-history-test-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-version-history-test-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -76,18 +76,21 @@ describe('Version History Service (Sprint 7)', () => {
   });
 
   // Helper function to create a valid requirement object
-  const createRequirement = (title: string, additionalFields: any = {}) => ({
-    title,
-    description: additionalFields.description ?? `Description for ${title}`,
-    priority: additionalFields.priority ?? 'high' as const,
-    category: additionalFields.category ?? 'functional' as const,
-    source: additionalFields.source ?? {
-      type: 'user-request' as const,
-      context: 'Test context'
-    },
-    acceptanceCriteria: additionalFields.acceptanceCriteria ?? ['Criteria 1', 'Criteria 2'],
-    ...additionalFields
-  });
+  const createRequirement = (title: string, additionalFields: Record<string, unknown> = {}) => {
+    const { description, priority, category, source, acceptanceCriteria, ...rest } = additionalFields;
+    return {
+      title,
+      description: (description as string | undefined) ?? `Description for ${title}`,
+      priority: (priority as 'high' | 'medium' | 'low' | 'critical' | undefined) ?? 'high',
+      category: (category as 'functional' | 'non-functional' | 'technical' | undefined) ?? 'functional',
+      source: (source as { type: 'user-request'; context?: string } | undefined) ?? {
+        type: 'user-request' as const,
+        context: 'Test context'
+      },
+      acceptanceCriteria: (acceptanceCriteria as string[] | undefined) ?? ['Criteria 1', 'Criteria 2'],
+      ...rest
+    };
+  };
 
   // ============================================================================
   // TEST GROUP 1: enableHistory and maxHistoryDepth in plan creation (12 tests)
@@ -200,7 +203,7 @@ describe('Version History Service (Sprint 7)', () => {
       await expect(planService.createPlan({
         name: 'Test Plan',
         description: 'Test',
-        maxHistoryDepth: 5.5 as any
+        maxHistoryDepth: 5.5 as unknown as number
       })).rejects.toThrow(/maxHistoryDepth must be an integer/i);
     });
 
@@ -375,7 +378,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId,
           requirementId: req.requirementId,
-          updates: { title: `V${i}` }
+          updates: { title: `V${i.toString()}` }
         });
       }
 
@@ -402,7 +405,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId,
           requirementId: req.requirementId,
-          updates: { title: `V${i}` }
+          updates: { title: `V${i.toString()}` }
         });
       }
 
@@ -561,7 +564,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId: plan.planId,
           requirementId: req.requirementId,
-          updates: { title: `V${i}` }
+          updates: { title: `V${i.toString()}` }
         });
       }
 
@@ -595,7 +598,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId: plan.planId,
           requirementId: req.requirementId,
-          updates: { title: `V${i}` }
+          updates: { title: `V${i.toString()}` }
         });
       }
 
@@ -670,7 +673,7 @@ describe('Version History Service (Sprint 7)', () => {
         await solutionService.updateSolution({
           planId: plan.planId,
           solutionId: sol.solutionId,
-          updates: { title: `Solution V${i}` }
+          updates: { title: `Solution V${i.toString()}` }
         });
       }
 
@@ -706,7 +709,7 @@ describe('Version History Service (Sprint 7)', () => {
         await phaseService.updatePhase({
           planId: plan.planId,
           phaseId: phase.phaseId,
-          updates: { title: `Phase V${i}` }
+          updates: { title: `Phase V${i.toString()}` }
         });
       }
 
@@ -742,7 +745,7 @@ describe('Version History Service (Sprint 7)', () => {
         await decisionService.updateDecision({
           planId: plan.planId,
           decisionId: decision.decisionId,
-          updates: { title: `Decision V${i}` }
+          updates: { title: `Decision V${i.toString()}` }
         });
       }
 
@@ -780,7 +783,7 @@ describe('Version History Service (Sprint 7)', () => {
         await artifactService.updateArtifact({
           planId: plan.planId,
           artifactId: artifact.artifactId,
-          updates: { title: `Artifact V${i}` }
+          updates: { title: `Artifact V${i.toString()}` }
         });
       }
 
@@ -917,7 +920,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId: plan.planId,
           requirementId: req.requirementId,
-          updates: { title: `V${i}` }
+          updates: { title: `V${i.toString()}` }
         });
       }
 
@@ -955,7 +958,7 @@ describe('Version History Service (Sprint 7)', () => {
           requirementService.updateRequirement({
             planId: plan.planId,
             requirementId: req.requirementId,
-            updates: { title: `V${i}` }
+            updates: { title: `V${i.toString()}` }
           })
         );
       }
@@ -1865,13 +1868,13 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId: planWithHistory.planId,
           requirementId: req1.requirementId,
-          updates: { title: `Update ${i}` }
+          updates: { title: `Update ${i.toString()}` }
         });
 
         await requirementService.updateRequirement({
           planId: planWithoutHistory.planId,
           requirementId: req2.requirementId,
-          updates: { title: `Update ${i}` }
+          updates: { title: `Update ${i.toString()}` }
         });
       }
 
@@ -1899,7 +1902,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId: plan.planId,
           requirementId: req.requirementId,
-          updates: { title: `V${i}` }
+          updates: { title: `V${i.toString()}` }
         });
       }
 
@@ -2006,7 +2009,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId: plan.planId,
           requirementId: req.requirementId,
-          updates: { title: `Update ${i}` }
+          updates: { title: `Update ${i.toString()}` }
         });
       }
 
@@ -2075,7 +2078,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId: plan.planId,
           requirementId: req.requirementId,
-          updates: { title: `Rapid Update ${i}` }
+          updates: { title: `Rapid Update ${i.toString()}` }
         });
       }
 
@@ -2105,7 +2108,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId: plan.planId,
           requirementId: req.requirementId,
-          updates: { title: `V${i}` }
+          updates: { title: `V${i.toString()}` }
         });
       }
 
@@ -2147,7 +2150,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId: plan.planId,
           requirementId: req.requirementId,
-          updates: { title: `V${i}` }
+          updates: { title: `V${i.toString()}` }
         });
       }
 
@@ -2207,7 +2210,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId: plan.planId,
           requirementId: req.requirementId,
-          updates: { title: `V${i}` }
+          updates: { title: `V${i.toString()}` }
         });
       }
 
@@ -2246,7 +2249,7 @@ describe('Version History Service (Sprint 7)', () => {
         await requirementService.updateRequirement({
           planId: plan.planId,
           requirementId: req.requirementId,
-          updates: { title: `V${i}` }
+          updates: { title: `V${i.toString()}` }
         });
       }
 

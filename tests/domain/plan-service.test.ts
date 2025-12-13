@@ -13,7 +13,7 @@ describe('PlanService', () => {
   let testDir: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `mcp-plan-test-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-plan-test-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -146,7 +146,7 @@ describe('PlanService', () => {
     it('should update plan name', async () => {
       const created = await service.createPlan({ name: 'Old Name', description: 'Test' });
 
-      const _result = await service.updatePlan({
+      await service.updatePlan({
         planId: created.planId,
         updates: { name: 'New Name' },
       });
@@ -159,7 +159,7 @@ describe('PlanService', () => {
     it('should update plan status', async () => {
       const created = await service.createPlan({ name: 'Test', description: 'Test' });
 
-      const _result2 = await service.updatePlan({
+      await service.updatePlan({
         planId: created.planId,
         updates: { status: 'completed' },
       });
@@ -259,10 +259,12 @@ describe('PlanService', () => {
       });
 
       expect(result.activePlan).toBeDefined();
-      expect(result.activePlan!.usageGuide).toBeDefined();
-      expect(result.activePlan!.usageGuide!.quickStart).toContain('phase get_tree');
-      expect(result.activePlan!.usageGuide!.commands.overview).toHaveLength(4);
-      expect(result.activePlan!.usageGuide!.warnings[0]).toContain("NEVER use fields: ['*']");
+      if (result.activePlan === null) throw new Error('ActivePlan should be defined');
+      expect(result.activePlan.usageGuide).toBeDefined();
+      if (result.activePlan.usageGuide === undefined) throw new Error('UsageGuide should be defined');
+      expect(result.activePlan.usageGuide.quickStart).toContain('phase get_tree');
+      expect(result.activePlan.usageGuide.commands.overview).toHaveLength(4);
+      expect(result.activePlan.usageGuide.warnings[0]).toContain("NEVER use fields: ['*']");
     });
 
     it('should exclude usageGuide when includeGuide=false', async () => {
@@ -278,7 +280,7 @@ describe('PlanService', () => {
       });
 
       expect(result.activePlan).toBeDefined();
-      expect(result.activePlan!.usageGuide).toBeUndefined();
+      expect(result.activePlan?.usageGuide).toBeUndefined();
     });
 
     it('should have valid usageGuide structure', async () => {
@@ -293,7 +295,9 @@ describe('PlanService', () => {
         workspacePath: '/test/workspace',
         includeGuide: true
       });
-      const guide = result.activePlan!.usageGuide!;
+      if (result.activePlan === null) throw new Error('ActivePlan should be defined');
+      if (result.activePlan.usageGuide === undefined) throw new Error('UsageGuide should be defined');
+      const guide = result.activePlan.usageGuide;
 
       expect(guide.quickStart).toBeTruthy();
       expect(guide.commands.overview).toBeInstanceOf(Array);
@@ -321,9 +325,9 @@ describe('PlanService', () => {
       const result = await service.getActivePlan({ workspacePath: '/test/workspace-sprint6-1' });
 
       expect(result.activePlan).toBeDefined();
-      expect(result.activePlan!.usageGuide).toBeUndefined(); // Will FAIL with current default=true
-      expect(result.activePlan!.planId).toBe(created.planId);
-      expect(result.activePlan!.plan).toBeDefined();
+      expect(result.activePlan?.usageGuide).toBeUndefined(); // Will FAIL with current default=true
+      expect(result.activePlan?.planId).toBe(created.planId);
+      expect(result.activePlan?.plan).toBeDefined();
     });
 
     // Test 2: Explicit includeGuide=false should NOT include guide
@@ -340,7 +344,7 @@ describe('PlanService', () => {
       });
 
       expect(result.activePlan).toBeDefined();
-      expect(result.activePlan!.usageGuide).toBeUndefined(); // Should PASS already
+      expect(result.activePlan?.usageGuide).toBeUndefined(); // Should PASS already
     });
 
     // Test 3: Explicit includeGuide=true should include guide (backward compatibility)
@@ -357,8 +361,10 @@ describe('PlanService', () => {
       });
 
       expect(result.activePlan).toBeDefined();
-      expect(result.activePlan!.usageGuide).toBeDefined(); // Should PASS with any default
-      expect(result.activePlan!.usageGuide!.quickStart).toContain('phase get_tree');
+      if (result.activePlan === null) throw new Error('ActivePlan should be defined');
+      expect(result.activePlan.usageGuide).toBeDefined(); // Should PASS with any default
+      if (result.activePlan.usageGuide === undefined) throw new Error('UsageGuide should be defined');
+      expect(result.activePlan.usageGuide.quickStart).toContain('phase get_tree');
     });
 
     // Test 4: Measure payload size difference
@@ -403,11 +409,11 @@ describe('PlanService', () => {
       });
 
       expect(result.activePlan).toBeDefined();
-      expect(result.activePlan!.planId).toBe(created.planId);
-      expect(result.activePlan!.plan).toBeDefined();
-      expect(result.activePlan!.plan.name).toBe('Test Plan');
-      expect(result.activePlan!.lastUpdated).toBeDefined();
-      expect(result.activePlan!.usageGuide).toBeUndefined();
+      expect(result.activePlan?.planId).toBe(created.planId);
+      expect(result.activePlan?.plan).toBeDefined();
+      expect(result.activePlan?.plan.name).toBe('Test Plan');
+      expect(result.activePlan?.lastUpdated).toBeDefined();
+      expect(result.activePlan?.usageGuide).toBeUndefined();
     });
 
     // Test 6: includeGuide=null should use default (false)
@@ -420,11 +426,11 @@ describe('PlanService', () => {
 
       const result = await service.getActivePlan({
         workspacePath: '/test/workspace-sprint6-6',
-        includeGuide: null as any, // Explicitly pass null
+        includeGuide: null as unknown as boolean, // Explicitly pass null
       });
 
       expect(result.activePlan).toBeDefined();
-      expect(result.activePlan!.usageGuide).toBeUndefined(); // Will FAIL with current default=true
+      expect(result.activePlan?.usageGuide).toBeUndefined(); // Will FAIL with current default=true
     });
 
     // Test 7: includeGuide=undefined should use default (false)
@@ -441,7 +447,7 @@ describe('PlanService', () => {
       });
 
       expect(result.activePlan).toBeDefined();
-      expect(result.activePlan!.usageGuide).toBeUndefined(); // Will FAIL with current default=true
+      expect(result.activePlan?.usageGuide).toBeUndefined(); // Will FAIL with current default=true
     });
 
     // Test 8: includeGuide as string should be handled with strict type checking
@@ -456,12 +462,12 @@ describe('PlanService', () => {
       // String 'true' is NOT strictly equal to boolean true, so guide should NOT be included
       const result = await service.getActivePlan({
         workspacePath: '/test/workspace-sprint6-8',
-        includeGuide: 'true' as any,
+        includeGuide: 'true' as unknown as boolean,
       });
 
       // Sprint 6: Strict checking (=== true) means string 'true' does NOT include guide
       expect(result.activePlan).toBeDefined();
-      expect(result.activePlan!.usageGuide).toBeUndefined();
+      expect(result.activePlan?.usageGuide).toBeUndefined();
     });
 
     // Test 9: Backward compatibility - existing code with includeGuide=true
@@ -479,8 +485,10 @@ describe('PlanService', () => {
       });
 
       expect(result.activePlan).toBeDefined();
-      expect(result.activePlan!.usageGuide).toBeDefined(); // Should ALWAYS work
-      expect(result.activePlan!.usageGuide!.commands).toBeDefined();
+      if (result.activePlan === null) throw new Error('ActivePlan should be defined');
+      expect(result.activePlan.usageGuide).toBeDefined(); // Should ALWAYS work
+      if (result.activePlan.usageGuide === undefined) throw new Error('UsageGuide should be defined');
+      expect(result.activePlan.usageGuide.commands).toBeDefined();
     });
 
     // Test 10: Verify default behavior matches new expectation
@@ -498,11 +506,11 @@ describe('PlanService', () => {
 
       // After implementation, omitting includeGuide should mean NO guide (default=false)
       expect(result.activePlan).toBeDefined();
-      expect(result.activePlan!.usageGuide).toBeUndefined(); // Will FAIL until default changes
+      expect(result.activePlan?.usageGuide).toBeUndefined(); // Will FAIL until default changes
 
       // But all other data should be present
-      expect(result.activePlan!.planId).toBe(created.planId);
-      expect(result.activePlan!.plan.name).toBe('Test Plan');
+      expect(result.activePlan?.planId).toBe(created.planId);
+      expect(result.activePlan?.plan.name).toBe('Test Plan');
     });
   });
 
@@ -601,6 +609,7 @@ describe('PlanService', () => {
       });
 
       // Add phases via repository
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       const phaseRepo = repositoryFactory.createRepository<any>('phase', created.planId);
       const phase1 = {
         id: 'phase-1',

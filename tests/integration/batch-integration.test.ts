@@ -38,6 +38,7 @@ async function loadEntities<T extends Entity>(
     decisions: 'decision',
     artifacts: 'artifact'
   };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
   const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
   return repo.findAll();
 }
@@ -56,7 +57,7 @@ async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<vo
     try {
       await fs.rm(dir, { recursive: true, force: true });
       return;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (i === maxRetries - 1) throw error;
       // Wait before retry (exponential backoff)
       await new Promise((resolve) => setTimeout(resolve, 100 * (i + 1)));
@@ -80,7 +81,7 @@ describe('BatchService - Integration Tests', () => {
 
   beforeEach(async () => {
     // Create temporary directory for tests
-    testDir = path.join(os.tmpdir(), `mcp-batch-test-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-batch-test-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -245,8 +246,8 @@ describe('BatchService - Integration Tests', () => {
         ],
       });
       throw new Error('Should have thrown validation error');
-    } catch (error: any) {
-      expect(error.message).toContain('Title is required');
+    } catch (error: unknown) {
+      expect((error as Error).message).toContain('Title is required');
     }
 
     // Verify nothing was written to disk
@@ -350,8 +351,8 @@ describe('BatchService - Integration Tests', () => {
       operations.push({
         entityType: 'requirement' as const,
         payload: {
-          title: `Requirement ${i}`,
-          description: `Description ${i}`,
+          title: `Requirement ${i.toString()}`,
+          description: `Description ${i.toString()}`,
           source: { type: 'user-request' as const },
           acceptanceCriteria: [],
           priority: 'medium' as const,
@@ -463,7 +464,8 @@ describe('BatchService - Integration Tests', () => {
     const phase11 = phases.find((p) => p.title === 'Phase 1.1');
     expect(phase11).toBeDefined();
     expect(phase1).toBeDefined();
-    expect(phase11!.parentId).toBe(phase1!.id);
+    if (!phase11 || !phase1) throw new Error('Phases should be defined');
+    expect(phase11.parentId).toBe(phase1.id);
   });
 
   it('Test 39: Batch with all entity types', async () => {

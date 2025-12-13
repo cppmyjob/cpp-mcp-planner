@@ -13,6 +13,7 @@
  */
 
 import { LockManager } from '../../src/infrastructure/repositories/file/lock-manager.js';
+import type { LockResult } from '../../src/infrastructure/repositories/file/types.js';
 
 describe('LockManager Bug Fixes (Code Review)', () => {
   let lockManager: LockManager;
@@ -39,9 +40,9 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       });
 
       // Race: extend and release simultaneously
-      const _results = await Promise.all([
-        lockManager.extend(lockId!, 5000),
-        lockManager.release(lockId!),
+      await Promise.all([
+        lockId !== undefined ? lockManager.extend(lockId, 5000) : Promise.resolve(),
+        lockId !== undefined ? lockManager.release(lockId) : Promise.resolve(),
       ]);
 
       // After race, lock should be fully released (no dangling state)
@@ -67,24 +68,26 @@ describe('LockManager Bug Fixes (Code Review)', () => {
         acquireTimeout: 0,
       });
 
+      if (lockId === undefined) throw new Error('lockId should be defined');
+
       // Multiple concurrent extends should not corrupt state
-      const extends_ = await Promise.all([
-        lockManager.extend(lockId!, 2000),
-        lockManager.extend(lockId!, 3000),
-        lockManager.extend(lockId!, 1500),
+      const extendResults = await Promise.all([
+        lockManager.extend(lockId, 2000),
+        lockManager.extend(lockId, 3000),
+        lockManager.extend(lockId, 1500),
       ]);
 
       // All should succeed (serialized)
-      const successCount = extends_.filter(r => r.extended).length;
+      const successCount = extendResults.filter(r => r.extended).length;
       expect(successCount).toBe(3);
 
       // Lock should have exactly one timer (no leaks)
       const holder = await lockManager.getLockHolder('resource-1');
       expect(holder).toBeDefined();
-      expect(holder!.timer).toBeDefined();
+      expect(holder?.timer).toBeDefined();
 
       // Verify only one timer by checking expiresAt is set correctly
-      expect(holder!.expiresAt).toBeDefined();
+      expect(holder?.expiresAt).toBeDefined();
     });
 
     it('should handle extend racing with reentrant acquire', async () => {
@@ -97,7 +100,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
 
       // Race: extend and reentrant acquire
       await Promise.all([
-        lockManager.extend(lockId!, 5000),
+        lockId !== undefined ? lockManager.extend(lockId, 5000) : Promise.resolve(),
         lockManager.acquire('resource-1', {
           ttl: 3000,
           acquireTimeout: 0,
@@ -108,10 +111,10 @@ describe('LockManager Bug Fixes (Code Review)', () => {
 
       const holder = await lockManager.getLockHolder('resource-1');
       expect(holder).toBeDefined();
-      expect(holder!.refCount).toBe(2); // Both operations should complete
+      expect(holder?.refCount).toBe(2); // Both operations should complete
 
       // Only one timer should exist
-      expect(holder!.timer).toBeDefined();
+      expect(holder?.timer).toBeDefined();
     });
   });
 
@@ -121,17 +124,17 @@ describe('LockManager Bug Fixes (Code Review)', () => {
   describe('CRITICAL #2: doAcquire() infinite loop protection', () => {
     it('should timeout even with constantly contested resource', async () => {
       // Create a "hot" resource that keeps getting grabbed
-      const { lockId: _initialLock } = await lockManager.acquire('hot-resource', {
+      await lockManager.acquire('hot-resource', {
         acquireTimeout: 0,
         ttl: 50, // Short TTL - will auto-release often
       });
 
       // Start multiple competing acquires
-      const competitors: Promise<any>[] = [];
+      const competitors: Promise<LockResult>[] = [];
       for (let i = 0; i < 5; i++) {
         competitors.push(
           lockManager.acquire('hot-resource', {
-            holderId: `competitor-${i}`,
+            holderId: `competitor-${i.toString()}`,
             acquireTimeout: 200, // Should timeout within 200ms
             ttl: 30, // Short TTL if they get it
           })
@@ -147,8 +150,9 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       expect(duration).toBeLessThan(1000); // Should be ~200ms, definitely not infinite
 
       // At least some should have timed out (high contention)
-      const _timeouts = results.filter(r => !r.acquired);
+      const timeouts = results.filter(r => !r.acquired);
       // We don't assert exact count because it's timing-dependent
+      expect(timeouts).toBeDefined();
     });
 
     it('should have bounded retry attempts in doAcquire', async () => {
@@ -158,9 +162,9 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       const lm = new LockManager({ defaultAcquireTimeout: 100 });
 
       // Start a background loop that constantly grabs and releases the lock
-      let running = true;
+      const state = { running: true };
       const churnPromise = (async () => {
-        while (running) {
+        while (state.running) {
           try {
             const r = await lm.acquire('churning-resource', {
               holderId: 'churner',
@@ -169,10 +173,11 @@ describe('LockManager Bug Fixes (Code Review)', () => {
             });
             if (r.acquired) {
               await new Promise(resolve => setTimeout(resolve, 3));
-              await lm.release(r.lockId!);
+              if (r.lockId !== undefined) await lm.release(r.lockId);
             }
-          } catch {
+          } catch (error) {
             // Ignore errors during churn
+            void error;
           }
           await new Promise(resolve => setTimeout(resolve, 1));
         }
@@ -180,13 +185,13 @@ describe('LockManager Bug Fixes (Code Review)', () => {
 
       // Try to acquire while churning
       const start = Date.now();
-      const _result = await lm.acquire('churning-resource', {
+      await lm.acquire('churning-resource', {
         holderId: 'victim',
         acquireTimeout: 100,
       });
       const elapsed = Date.now() - start;
 
-      running = false;
+      state.running = false;
       await churnPromise;
 
       // Should complete within timeout + buffer, not hang
@@ -212,7 +217,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       });
 
       // Access internal lockEvents for verification
-      const events = (lm as any).lockEvents;
+      const events = (lm as unknown as Record<string, unknown>).lockEvents;
 
       // Wait almost to expiration, then dispose
       await new Promise(resolve => setTimeout(resolve, 40));
@@ -221,8 +226,10 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       // NOW install the mock - AFTER dispose completes
       // This tracks only emits that happen AFTER dispose finished
       let emitCalledAfterDisposeComplete = false;
-      const originalEmit = events.emit.bind(events);
-      events.emit = (...args: any[]) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      const originalEmit = ((events as any).emit as (...args: unknown[]) => boolean).bind(events);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      (events as any).emit = (...args: unknown[]) => {
         emitCalledAfterDisposeComplete = true;
         return originalEmit(...args);
       };
@@ -277,7 +284,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
 
         // Race: release and reentrant acquire
         const [, acquireResult] = await Promise.all([
-          lm.release(lockId!),
+          lockId !== undefined ? lm.release(lockId) : Promise.resolve(),
           lm.acquire('resource', {
             reentrant: true,
             holderId: 'holder',
@@ -328,8 +335,8 @@ describe('LockManager Bug Fixes (Code Review)', () => {
 
       // Race: two releases and one acquire
       await Promise.all([
-        lm.release(lockId!),
-        lm.release(lockId!),
+        lockId !== undefined ? lm.release(lockId) : Promise.resolve(),
+        lockId !== undefined ? lm.release(lockId) : Promise.resolve(),
         lm.acquire('resource', {
           reentrant: true,
           holderId: 'holder',
@@ -357,7 +364,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       const lm = new LockManager({ defaultAcquireTimeout: 5000 });
 
       // Block the resource
-      const { lockId: _lockId } = await lm.acquire('resource-1', {
+      await lm.acquire('resource-1', {
         holderId: 'blocker',
         acquireTimeout: 0,
       });
@@ -390,7 +397,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       const lm = new LockManager({ defaultAcquireTimeout: 5000 });
 
       // Create contention scenario
-      const { lockId: _lock1 } = await lm.acquire('resource', {
+      await lm.acquire('resource', {
         holderId: 'holder-1',
         acquireTimeout: 0,
         ttl: 100,
@@ -434,25 +441,25 @@ describe('LockManager Bug Fixes (Code Review)', () => {
         // Acquire operations
         operations.push(
           lm.acquire('shared-resource', {
-            holderId: `holder-${i % 3}`,
+            holderId: `holder-${(i % 3).toString()}`,
             reentrant: true,
             acquireTimeout: 100,
             ttl: 50,
           }).then(async (result) => {
-            if (result.acquired && result.lockId) {
+            if (result.acquired && result.lockId !== undefined) {
               // Random delay then release
               await new Promise(r => setTimeout(r, Math.random() * 30));
               try {
                 await lm.release(result.lockId);
-              } catch (e: any) {
-                if (!e.message.includes('disposed') && !e.message.includes('not found')) {
-                  errors.push(`Release error: ${e.message}`);
+              } catch (e: unknown) {
+                if (!(e as Error).message.includes('disposed') && !(e as Error).message.includes('not found')) {
+                  errors.push(`Release error: ${(e as Error).message}`);
                 }
               }
             }
           }).catch(e => {
-            if (!e.message.includes('disposed')) {
-              errors.push(`Acquire error: ${e.message}`);
+            if (!(e as Error).message.includes('disposed')) {
+              errors.push(`Acquire error: ${(e as Error).message}`);
             }
           })
         );
@@ -460,21 +467,23 @@ describe('LockManager Bug Fixes (Code Review)', () => {
         // Extend operations (on potentially non-existent locks)
         operations.push(
           lm.acquire('shared-resource', {
-            holderId: `extender-${i}`,
+            holderId: `extender-${i.toString()}`,
             acquireTimeout: 50,
             ttl: 100,
           }).then(async (result) => {
-            if (result.acquired && result.lockId) {
+            if (result.acquired && result.lockId !== undefined) {
               await lm.extend(result.lockId, 200);
               await new Promise(r => setTimeout(r, 20));
               try {
                 await lm.release(result.lockId);
-              } catch {
+              } catch (error) {
                 // Ignore - may have auto-released
+                void error;
               }
             }
-          }).catch(() => {
+          }).catch((error) => {
             // Ignore acquire failures
+            void error;
           })
         );
       }
@@ -493,7 +502,7 @@ describe('LockManager Bug Fixes (Code Review)', () => {
         if (holder.timer) {
           expect(holder.expiresAt).toBeDefined();
         }
-        if (holder.expiresAt) {
+        if (holder.expiresAt !== undefined) {
           expect(holder.timer).toBeDefined();
         }
       }

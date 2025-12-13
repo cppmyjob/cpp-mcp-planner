@@ -8,7 +8,7 @@ import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { LinkingService } from '../../src/domain/services/linking-service.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
-import type { Requirement, Solution, Phase, Entity } from '../../src/domain/entities/types.js';
+import type { Requirement, Solution, Phase, Entity, EntityType } from '../../src/domain/entities/types.js';
 
 // Helper functions for loading/saving entities via repository
 async function loadEntities<T extends Entity>(
@@ -16,13 +16,14 @@ async function loadEntities<T extends Entity>(
   planId: string,
   entityType: 'requirements' | 'solutions' | 'phases' | 'artifacts'
 ): Promise<T[]> {
-  const typeMap: Record<string, string> = {
+  const typeMap: Record<string, EntityType> = {
     requirements: 'requirement',
     solutions: 'solution',
     phases: 'phase',
     artifacts: 'artifact'
   };
-  const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  const repo = repositoryFactory.createRepository<T>(typeMap[entityType], planId);
   return repo.findAll();
 }
 
@@ -32,13 +33,14 @@ async function saveEntities<T extends Entity>(
   entityType: 'requirements' | 'solutions' | 'phases' | 'artifacts',
   entities: T[]
 ): Promise<void> {
-  const typeMap: Record<string, string> = {
+  const typeMap: Record<string, EntityType> = {
     requirements: 'requirement',
     solutions: 'solution',
     phases: 'phase',
     artifacts: 'artifact'
   };
-  const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  const repo = repositoryFactory.createRepository<T>(typeMap[entityType], planId);
   for (const entity of entities) {
     await repo.update(entity.id, entity);
   }
@@ -393,11 +395,12 @@ describe('QueryService', () => {
 
       const issue = result.issues.find(i => i.type === 'invalid_phase_status' && i.entityId === childId);
       expect(issue).toBeDefined();
-      expect(issue!.severity).toBe('error');
-      expect(issue!.message).toContain('Child Phase');
-      expect(issue!.message).toContain('completed');
-      expect(issue!.message).toContain('Parent Phase');
-      expect(issue!.message).toContain('planned');
+      if (issue === undefined) throw new Error('issue is required');
+      expect(issue.severity).toBe('error');
+      expect(issue.message).toContain('Child Phase');
+      expect(issue.message).toContain('completed');
+      expect(issue.message).toContain('Parent Phase');
+      expect(issue.message).toContain('planned');
     });
 
     // RED TEST 2: Phase status logic - child in_progress but parent planned
@@ -432,9 +435,10 @@ describe('QueryService', () => {
 
       const issue = result.issues.find(i => i.type === 'invalid_phase_status' && i.entityId === childId);
       expect(issue).toBeDefined();
-      expect(issue!.severity).toBe('warning');
-      expect(issue!.message).toContain('in progress');
-      expect(issue!.message).toContain('planned');
+      if (issue === undefined) throw new Error('issue is required');
+      expect(issue.severity).toBe('warning');
+      expect(issue.message).toContain('in progress');
+      expect(issue.message).toContain('planned');
     });
 
     // GREEN TEST 3: Phase status logic - child completed and parent completed (valid)
@@ -549,9 +553,10 @@ describe('QueryService', () => {
 
       const issue = result.issues.find(i => i.type === 'parent_should_complete' && i.entityId === parentId);
       expect(issue).toBeDefined();
-      expect(issue!.severity).toBe('info');
-      expect(issue!.message).toContain('all children completed');
-      expect(issue!.message).toContain('Parent Phase');
+      if (issue === undefined) throw new Error('issue is required');
+      expect(issue.severity).toBe('info');
+      expect(issue.message).toContain('all children completed');
+      expect(issue.message).toContain('Parent Phase');
     });
 
     // RED TEST 6: File existence - detect missing file in artifact.targets
@@ -574,10 +579,11 @@ describe('QueryService', () => {
 
       const issue = result.issues.find(i => i.type === 'missing_file');
       expect(issue).toBeDefined();
-      expect(issue!.severity).toBe('warning');
-      expect(issue!.filePath).toBe('/absolute/nonexistent.ts');
-      expect(issue!.message).toContain('/absolute/nonexistent.ts');
-      expect(issue!.message).toContain('modify');
+      if (issue === undefined) throw new Error('issue is required');
+      expect(issue.severity).toBe('warning');
+      expect(issue.filePath).toBe('/absolute/nonexistent.ts');
+      expect(issue.message).toContain('/absolute/nonexistent.ts');
+      expect(issue.message).toContain('modify');
     });
 
     // GREEN TEST 7: File existence - skip files with action='create'
@@ -704,9 +710,10 @@ describe('QueryService', () => {
 
       const issue = result.issues.find(i => i.type === 'unimplemented_solution' && i.entityId === solutionId);
       expect(issue).toBeDefined();
-      expect(issue!.severity).toBe('warning');
-      expect(issue!.message).toContain('Selected Solution');
-      expect(issue!.message).toContain('no implementing phases');
+      if (issue === undefined) throw new Error('issue is required');
+      expect(issue.severity).toBe('warning');
+      expect(issue.message).toContain('Selected Solution');
+      expect(issue.message).toContain('no implementing phases');
     });
 
     // GREEN TEST 12: Requirement coverage - solution with implementing phase passes
@@ -807,7 +814,7 @@ describe('QueryService', () => {
     });
 
     // RED TEST 14: Validation level - ValidatePlanInput accepts validationLevel
-    it('should accept validationLevel parameter in ValidatePlanInput', async () => {
+    it('should accept validationLevel parameter in ValidatePlanInput', () => {
       // This test verifies TypeScript compilation
       const input: import('../../src/domain/services/query-service.js').ValidatePlanInput = {
         planId,
@@ -1012,7 +1019,8 @@ describe('QueryService', () => {
 
       expect(result.filePath).toBeDefined();
       // File should exist
-      const content = await fs.readFile(result.filePath!, 'utf-8');
+      if (result.filePath === undefined) throw new Error('filePath is required');
+      const content = await fs.readFile(result.filePath, 'utf-8');
       expect(content).toBe(result.content);
     });
 
@@ -1029,7 +1037,8 @@ describe('QueryService', () => {
     it('should handle solutions without tradeoffs field (undefined)', async () => {
       // Simulate solution created without tradeoffs field (as happens via MCP tool)
       // Use RepositoryFactory directly to bypass validation
-      const repo = repositoryFactory.createRepository<any>('solution', planId);
+      const repo = repositoryFactory.createRepository<Solution>('solution', planId);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       await repo.create({
         id: 'solution-without-tradeoffs',
         type: 'solution',
@@ -1052,7 +1061,7 @@ describe('QueryService', () => {
         },
         status: 'proposed',
         // NOTE: tradeoffs field is intentionally missing (undefined)
-      });
+      } as unknown as Solution);
 
       // This should NOT throw "Cannot read properties of undefined (reading 'length')"
       const result = await queryService.exportPlan({
@@ -1179,11 +1188,12 @@ describe('QueryService', () => {
     // REQUIREMENT ENTITY
     it('RED: should handle requirement with undefined acceptanceCriteria', async () => {
       // Use RepositoryFactory instead of FileStorage
-      const repo = repositoryFactory.createRepository<any>('requirement', planId);
+      const repo = repositoryFactory.createRepository<Requirement>('requirement', planId);
       const requirements = await repo.findAll();
-      const requirement = requirements[0];
+      const requirement = requirements[0] as Partial<Requirement>;
       delete requirement.acceptanceCriteria; // Set to undefined
-      await repo.update(requirement.id, requirement);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+      await repo.update(requirement.id as string, requirement as Requirement);
 
       const result = await queryService.searchEntities({
         planId,
@@ -1216,10 +1226,11 @@ describe('QueryService', () => {
 
     it('RED: should handle requirement with null rationale', async () => {
       // Use RepositoryFactory instead of FileStorage
-      const repo = repositoryFactory.createRepository<any>('requirement', planId);
+      const repo = repositoryFactory.createRepository<Requirement>('requirement', planId);
       const requirements = await repo.findAll();
       const requirement = requirements[0];
-      requirement.rationale = null as any;
+      requirement.rationale = null as unknown as string;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
       await repo.update(requirement.id, requirement);
 
       const result = await queryService.searchEntities({ planId, query: 'test' });
@@ -1230,7 +1241,7 @@ describe('QueryService', () => {
     it('RED: should handle solution with undefined tradeoffs', async () => {
       const solutions = await loadEntities<Solution>(repositoryFactory, planId, 'solutions');
       if (solutions.length > 0) {
-        solutions[0].tradeoffs = undefined as any;
+        solutions[0].tradeoffs = undefined as unknown as never;
         await saveEntities(repositoryFactory, planId, 'solutions', solutions);
       }
 
@@ -1244,7 +1255,7 @@ describe('QueryService', () => {
         solutions[0].tradeoffs = [
           {
             aspect: 'Performance',
-            pros: undefined as any,
+            pros: undefined as unknown as string[],
             cons: ['Slower'],
           },
         ];
@@ -1262,7 +1273,7 @@ describe('QueryService', () => {
           {
             aspect: 'Test',
             pros: ['Fast'],
-            cons: undefined as any,
+            cons: undefined as unknown as string[],
           },
         ];
         await saveEntities(repositoryFactory, planId, 'solutions', solutions);
@@ -1276,7 +1287,7 @@ describe('QueryService', () => {
     it('RED: should handle phase with undefined objectives', async () => {
       const phases = await loadEntities<Phase>(repositoryFactory, planId, 'phases');
       if (phases.length > 0) {
-        phases[0].objectives = undefined as any;
+        phases[0].objectives = undefined as unknown as never;
         await saveEntities(repositoryFactory, planId, 'phases', phases);
       }
 
@@ -1287,7 +1298,7 @@ describe('QueryService', () => {
     it('RED: should handle phase with undefined deliverables', async () => {
       const phases = await loadEntities<Phase>(repositoryFactory, planId, 'phases');
       if (phases.length > 0) {
-        phases[0].deliverables = undefined as any;
+        phases[0].deliverables = undefined as unknown as never;
         await saveEntities(repositoryFactory, planId, 'phases', phases);
       }
 
@@ -1320,7 +1331,7 @@ describe('QueryService', () => {
           description: 'Test undefined sourceCode',
           artifactType: 'code',
           content: {
-            sourceCode: undefined as any,
+            sourceCode: undefined as unknown as string,
           },
         },
       });
@@ -1352,8 +1363,8 @@ describe('QueryService', () => {
       const phases = await loadEntities<Phase>(repositoryFactory, planId, 'phases');
       if (phases.length > 0) {
         const phaseTitle = phases[0].title;
-        phases[0].objectives = undefined as any;
-        phases[0].deliverables = undefined as any;
+        phases[0].objectives = undefined as unknown as never;
+        phases[0].deliverables = undefined as unknown as never;
         await saveEntities(repositoryFactory, planId, 'phases', phases);
 
         const result = await queryService.searchEntities({
@@ -1372,13 +1383,13 @@ describe('QueryService', () => {
       // Create entities with various undefined fields
       const phases = await loadEntities<Phase>(repositoryFactory, planId, 'phases');
       if (phases.length > 0) {
-        phases[0].objectives = undefined as any;
+        phases[0].objectives = undefined as unknown as never;
         await saveEntities(repositoryFactory, planId, 'phases', phases);
       }
 
       const requirements = await loadEntities<Requirement>(repositoryFactory, planId, 'requirements');
       if (requirements.length > 0) {
-        requirements[0].acceptanceCriteria = undefined as any;
+        requirements[0].acceptanceCriteria = undefined as unknown as never;
         await saveEntities(repositoryFactory, planId, 'requirements', requirements);
       }
 
@@ -1392,7 +1403,7 @@ describe('QueryService', () => {
     it('RED: should export markdown with undefined acceptanceCriteria', async () => {
       const requirements = await loadEntities<Requirement>(repositoryFactory, planId, 'requirements');
       if (requirements.length > 0) {
-        requirements[0].acceptanceCriteria = undefined as any;
+        requirements[0].acceptanceCriteria = undefined as unknown as never;
         await saveEntities(repositoryFactory, planId, 'requirements', requirements);
       }
 
@@ -1617,13 +1628,14 @@ describe('QueryService', () => {
     // ========================================================================
     // 1. DEPTH PARAMETER TESTS (10 tests)
     // ========================================================================
+    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
     describe('depth parameter', () => {
       it('GREEN 1.1: should accept depth=1 parameter and return only solutions', async () => {
         const result = await queryService.traceRequirement({
           planId,
           requirementId: reqId,
           depth: 1,
-        } as any);
+        } as never);
 
         // depth=1: only solutions, no phases, no artifacts
         expect(result.trace.proposedSolutions).toBeDefined();
@@ -1637,13 +1649,14 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           depth: 2,
-        } as any);
+        } as never);
 
         // depth=2: solutions + phases, but no artifacts
         expect(result.trace.proposedSolutions).toBeDefined();
         expect(result.trace.proposedSolutions.length).toBe(3);
         expect(result.trace.implementingPhases).toBeDefined();
-        expect(result.trace.implementingPhases!.length).toBe(3);
+        if (result.trace.implementingPhases === undefined) throw new Error('implementingPhases is required');
+        expect(result.trace.implementingPhases.length).toBe(3);
         expect(result.trace.artifacts).toBeUndefined();
       });
 
@@ -1652,15 +1665,17 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           depth: 3,
-        } as any);
+        } as never);
 
         // depth=3: full trace with all levels
         expect(result.trace.proposedSolutions).toBeDefined();
         expect(result.trace.proposedSolutions.length).toBe(3);
         expect(result.trace.implementingPhases).toBeDefined();
-        expect(result.trace.implementingPhases!.length).toBe(3);
+        if (result.trace.implementingPhases === undefined) throw new Error('implementingPhases is required');
+        expect(result.trace.implementingPhases.length).toBe(3);
         expect(result.trace.artifacts).toBeDefined();
-        expect(result.trace.artifacts!.length).toBe(2);
+        if (result.trace.artifacts === undefined) throw new Error('artifacts is required');
+        expect(result.trace.artifacts.length).toBe(2);
       });
 
       it('RED 1.4: should reject depth=0 (invalid)', async () => {
@@ -1669,7 +1684,7 @@ describe('QueryService', () => {
             planId,
             requirementId: reqId,
             depth: 0,
-          } as any)
+          } as never)
         ).rejects.toThrow('depth must be between 1 and 3');
       });
 
@@ -1679,7 +1694,7 @@ describe('QueryService', () => {
             planId,
             requirementId: reqId,
             depth: 4,
-          } as any)
+          } as never)
         ).rejects.toThrow('depth must be between 1 and 3');
       });
 
@@ -1689,7 +1704,7 @@ describe('QueryService', () => {
             planId,
             requirementId: reqId,
             depth: -1,
-          } as any)
+          } as never)
         ).rejects.toThrow('depth must be between 1 and 3');
       });
 
@@ -1698,8 +1713,8 @@ describe('QueryService', () => {
           queryService.traceRequirement({
             planId,
             requirementId: reqId,
-            depth: '2' as any,
-          } as any)
+            depth: '2' as unknown as number,
+          } as never)
         ).rejects.toThrow('depth must be a number');
       });
 
@@ -1708,7 +1723,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           depth: 1,
-        } as any);
+        } as never);
 
         // Depth 1: requirement -> solutions only
         expect(result.trace.proposedSolutions).toHaveLength(3);
@@ -1720,7 +1735,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           depth: 2,
-        } as any);
+        } as never);
 
         // Depth 2: requirement -> solutions -> phases
         expect(result.trace.proposedSolutions).toHaveLength(3);
@@ -1732,7 +1747,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           depth: 3,
-        } as any);
+        } as never);
 
         // Depth 3: requirement -> solutions -> phases -> artifacts
         expect(result.trace.proposedSolutions).toHaveLength(3);
@@ -1740,17 +1755,19 @@ describe('QueryService', () => {
         expect(result.trace.artifacts).toHaveLength(2); // New field
       });
     });
+    /* eslint-enable @typescript-eslint/no-unsafe-argument */
 
     // ========================================================================
     // 2. INCLUDE FLAGS TESTS (12 tests)
     // ========================================================================
+    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
     describe('includePhases and includeArtifacts flags', () => {
       it('RED 2.1: should accept includePhases=true', async () => {
         const result = await queryService.traceRequirement({
           planId,
           requirementId: reqId,
           includePhases: true,
-        } as any);
+        } as never);
 
         expect(result.trace.implementingPhases).toHaveLength(3);
       });
@@ -1760,7 +1777,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           includePhases: false,
-        } as any);
+        } as never);
 
         expect(result.trace.implementingPhases).toBeUndefined(); // Should not be returned
       });
@@ -1796,7 +1813,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           includePhases: false,
-        } as any);
+        } as never);
 
         // Phases should not be in output
         expect(result.trace.implementingPhases).toBeUndefined();
@@ -1816,7 +1833,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           includeArtifacts: true,
-        } as any);
+        } as never);
 
         expect(result.trace.artifacts).toHaveLength(2);
       });
@@ -1826,7 +1843,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           includeArtifacts: false,
-        } as any);
+        } as never);
 
         expect(result.trace.artifacts).toBeUndefined();
       });
@@ -1837,7 +1854,7 @@ describe('QueryService', () => {
           requirementId: reqId,
           includePhases: false,
           includeArtifacts: false,
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions).toHaveLength(3);
         expect(result.trace.implementingPhases).toBeUndefined();
@@ -1850,7 +1867,7 @@ describe('QueryService', () => {
           requirementId: reqId,
           includePhases: true,
           includeArtifacts: true,
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions).toHaveLength(3);
         expect(result.trace.implementingPhases).toHaveLength(3);
@@ -1861,7 +1878,7 @@ describe('QueryService', () => {
         const result = await queryService.traceRequirement({
           planId,
           requirementId: reqId,
-        } as any);
+        } as never);
 
         // Default: include everything (backward compatible)
         expect(result.trace.implementingPhases).toHaveLength(3);
@@ -1872,8 +1889,8 @@ describe('QueryService', () => {
           queryService.traceRequirement({
             planId,
             requirementId: reqId,
-            includePhases: 'true' as any,
-          } as any)
+            includePhases: 'true' as unknown as boolean,
+          } as never)
         ).rejects.toThrow('includePhases must be a boolean');
       });
 
@@ -1881,8 +1898,8 @@ describe('QueryService', () => {
         const result = await queryService.traceRequirement({
           planId,
           requirementId: reqId,
-          includeArtifacts: null as any,
-        } as any);
+          includeArtifacts: null as unknown as boolean,
+        } as never);
 
         // null -> default true
         expect(result.trace.artifacts).toBeDefined();
@@ -1893,7 +1910,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           includePhases: undefined,
-        } as any);
+        } as never);
 
         expect(result.trace.implementingPhases).toBeDefined();
       });
@@ -1904,7 +1921,7 @@ describe('QueryService', () => {
           requirementId: reqId,
           depth: 1,
           includePhases: false,
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions).toHaveLength(3);
         expect(result.trace.implementingPhases).toBeUndefined();
@@ -1916,7 +1933,7 @@ describe('QueryService', () => {
           requirementId: reqId,
           depth: 2,
           includeArtifacts: false,
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions).toHaveLength(3);
         expect(result.trace.implementingPhases).toHaveLength(3);
@@ -1954,7 +1971,7 @@ describe('QueryService', () => {
           depth: 3,
           includePhases: false,
           includeArtifacts: true,
-        } as any);
+        } as never);
 
         // Phases should NOT be in the output (includePhases=false)
         expect(result.trace.implementingPhases).toBeUndefined();
@@ -1962,29 +1979,33 @@ describe('QueryService', () => {
         // But artifacts should include the phase-linked artifact
         // because artifact discovery should work independently of includePhases flag
         expect(result.trace.artifacts).toBeDefined();
+        if (result.trace.artifacts === undefined) throw new Error('artifacts is required');
 
         // Should find: 2 artifacts with relatedRequirementIds + 1 phase-only artifact = 3 total
-        expect(result.trace.artifacts!.length).toBe(3);
+        expect(result.trace.artifacts.length).toBe(3);
 
         // Verify the phase-only artifact is included
-        const foundPhaseOnlyArtifact = result.trace.artifacts!.find(
-          (a: any) => a.id === phaseOnlyArtifact.artifactId
+        const foundPhaseOnlyArtifact = result.trace.artifacts.find(
+          (a: { id: string }) => a.id === phaseOnlyArtifact.artifactId
         );
         expect(foundPhaseOnlyArtifact).toBeDefined();
-        expect(foundPhaseOnlyArtifact!.title).toBe('Phase-Only Artifact');
+        if (foundPhaseOnlyArtifact === undefined) throw new Error('foundPhaseOnlyArtifact is required');
+        expect(foundPhaseOnlyArtifact.title).toBe('Phase-Only Artifact');
       });
     });
+    /* eslint-enable @typescript-eslint/no-unsafe-argument */
 
     // ========================================================================
     // 3. LIMIT PARAMETER TESTS (8 tests)
     // ========================================================================
+    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
     describe('limit parameter', () => {
       it('RED 3.1: should accept limit parameter', async () => {
         const result = await queryService.traceRequirement({
           planId,
           requirementId: reqId,
           limit: 2,
-        } as any);
+        } as never);
 
         expect(result).toBeDefined();
       });
@@ -1994,7 +2015,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           limit: 1,
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions).toHaveLength(1);
       });
@@ -2004,7 +2025,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           limit: 2,
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions.length).toBeLessThanOrEqual(2);
       });
@@ -2014,7 +2035,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           limit: 10,
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions).toHaveLength(3);
       });
@@ -2025,7 +2046,7 @@ describe('QueryService', () => {
             planId,
             requirementId: reqId,
             limit: 0,
-          } as any)
+          } as never)
         ).rejects.toThrow('limit must be greater than 0');
       });
 
@@ -2035,7 +2056,7 @@ describe('QueryService', () => {
             planId,
             requirementId: reqId,
             limit: -1,
-          } as any)
+          } as never)
         ).rejects.toThrow('limit must be greater than 0');
       });
 
@@ -2044,8 +2065,8 @@ describe('QueryService', () => {
           queryService.traceRequirement({
             planId,
             requirementId: reqId,
-            limit: '2' as any,
-          } as any)
+            limit: '2' as unknown as number,
+          } as never)
         ).rejects.toThrow('limit must be a number');
       });
 
@@ -2054,21 +2075,24 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           limit: 2,
-        } as any);
+        } as never);
 
         // Limit=2 applies to each entity type independently
         expect(result.trace.proposedSolutions.length).toBeLessThanOrEqual(2);
         expect(result.trace.implementingPhases).toBeDefined();
-        expect(result.trace.implementingPhases!.length).toBeLessThanOrEqual(2);
+        if (result.trace.implementingPhases === undefined) throw new Error('implementingPhases is required');
+        expect(result.trace.implementingPhases.length).toBeLessThanOrEqual(2);
         if (result.trace.artifacts) {
           expect(result.trace.artifacts.length).toBeLessThanOrEqual(2);
         }
       });
     });
+    /* eslint-enable @typescript-eslint/no-unsafe-argument */
 
     // ========================================================================
     // 4. COMBINATIONS: depth + fields + exclude (10 tests)
     // ========================================================================
+    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
     describe('combinations with fields and exclude parameters', () => {
       it('RED 4.1: depth=1 + fields=["id","title"] should work', async () => {
         const result = await queryService.traceRequirement({
@@ -2076,7 +2100,7 @@ describe('QueryService', () => {
           requirementId: reqId,
           depth: 1,
           fields: ['id', 'title'],
-        } as any);
+        } as never);
 
         // Solutions should have only id and title
         const solution = result.trace.proposedSolutions[0];
@@ -2091,7 +2115,7 @@ describe('QueryService', () => {
           requirementId: reqId,
           depth: 2,
           excludeMetadata: true,
-        } as any);
+        } as never);
 
         const solution = result.trace.proposedSolutions[0];
         expect(solution.metadata).toBeUndefined();
@@ -2113,7 +2137,7 @@ describe('QueryService', () => {
           requirementId: reqId,
           depth: 2,
           excludeMetadata: true,
-        } as any);
+        } as never);
 
         const solution = result.trace.proposedSolutions[0];
         // Per API docs, excludeMetadata should remove: createdAt, updatedAt, version, metadata, type
@@ -2121,7 +2145,7 @@ describe('QueryService', () => {
         expect(solution.createdAt).toBeUndefined();
         expect(solution.updatedAt).toBeUndefined();
         expect(solution.version).toBeUndefined();
-        expect((solution as any).type).toBeUndefined(); // BUGFIX: type should also be removed
+        expect((solution as unknown as Record<string, unknown>).type).toBeUndefined(); // BUGFIX: type should also be removed
       });
 
       it('RED 4.3: includePhases=true + fields=["id","title","status"] for phases', async () => {
@@ -2130,10 +2154,11 @@ describe('QueryService', () => {
           requirementId: reqId,
           includePhases: true,
           phaseFields: ['id', 'title', 'status'],
-        } as any);
+        } as never);
 
         expect(result.trace.implementingPhases).toBeDefined();
-        const phase = result.trace.implementingPhases![0];
+        if (result.trace.implementingPhases === undefined) throw new Error('implementingPhases is required');
+        const phase = result.trace.implementingPhases[0];
         expect(phase.id).toBeDefined();
         expect(phase.title).toBeDefined();
         expect(phase.status).toBeDefined();
@@ -2147,7 +2172,7 @@ describe('QueryService', () => {
           depth: 1,
           limit: 2,
           fields: ['id'],
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions).toHaveLength(2); // limit
         const sol = result.trace.proposedSolutions[0];
@@ -2161,9 +2186,9 @@ describe('QueryService', () => {
           requirementId: reqId,
           includeArtifacts: true,
           excludeMetadata: true,
-        } as any);
+        } as never);
 
-        if (result.trace.artifacts && result.trace.artifacts.length > 0) {
+        if (result.trace.artifacts !== undefined && result.trace.artifacts.length > 0) {
           const artifact = result.trace.artifacts[0];
           expect(artifact.metadata).toBeUndefined();
         }
@@ -2176,7 +2201,7 @@ describe('QueryService', () => {
           depth: 3,
           includePhases: false,
           includeArtifacts: true,
-        } as any);
+        } as never);
 
         expect(result.trace.implementingPhases).toBeUndefined();
         expect(result.trace.artifacts).toBeDefined();
@@ -2189,7 +2214,7 @@ describe('QueryService', () => {
           limit: 1,
           excludeMetadata: true,
           fields: ['id', 'title'],
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions).toHaveLength(1);
         const sol = result.trace.proposedSolutions[0];
@@ -2206,10 +2231,11 @@ describe('QueryService', () => {
           depth: 2,
           limit: 2,
           includePhases: true,
-        } as any);
+        } as never);
 
         expect(result.trace.implementingPhases).toBeDefined();
-        expect(result.trace.implementingPhases!.length).toBeLessThanOrEqual(2);
+        if (result.trace.implementingPhases === undefined) throw new Error('implementingPhases is required');
+        expect(result.trace.implementingPhases.length).toBeLessThanOrEqual(2);
       });
 
       it('RED 4.9: all parameters combined: depth + limit + include flags + fields + exclude', async () => {
@@ -2222,11 +2248,12 @@ describe('QueryService', () => {
           includeArtifacts: false,
           fields: ['id', 'title'],
           excludeMetadata: true,
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions.length).toBeLessThanOrEqual(2);
         expect(result.trace.implementingPhases).toBeDefined();
-        expect(result.trace.implementingPhases!.length).toBeLessThanOrEqual(2);
+        if (result.trace.implementingPhases === undefined) throw new Error('implementingPhases is required');
+        expect(result.trace.implementingPhases.length).toBeLessThanOrEqual(2);
         expect(result.trace.artifacts).toBeUndefined();
 
         const sol = result.trace.proposedSolutions[0];
@@ -2242,7 +2269,7 @@ describe('QueryService', () => {
           requirementId: reqId,
           solutionFields: ['id', 'title', 'approach'],
           phaseFields: ['id', 'title', 'status'],
-        } as any);
+        } as never);
 
         const sol = result.trace.proposedSolutions[0];
         expect(sol.id).toBeDefined();
@@ -2251,17 +2278,20 @@ describe('QueryService', () => {
         expect(sol.description).toBeUndefined();
 
         expect(result.trace.implementingPhases).toBeDefined();
-        const phase = result.trace.implementingPhases![0];
+        if (result.trace.implementingPhases === undefined) throw new Error('implementingPhases is required');
+        const phase = result.trace.implementingPhases[0];
         expect(phase.id).toBeDefined();
         expect(phase.title).toBeDefined();
         expect(phase.status).toBeDefined();
         expect(phase.description).toBeUndefined();
       });
     });
+    /* eslint-enable @typescript-eslint/no-unsafe-argument */
 
     // ========================================================================
     // 5. PERFORMANCE TESTS (8 tests)
     // ========================================================================
+    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
     describe('performance and payload size', () => {
       it('RED 5.1: depth=1 + minimal fields should reduce payload to ~5KB (from ~32KB)', async () => {
         const result = await queryService.traceRequirement({
@@ -2269,7 +2299,7 @@ describe('QueryService', () => {
           requirementId: reqId,
           depth: 1,
           fields: ['id', 'title'],
-        } as any);
+        } as never);
 
         const payloadSize = JSON.stringify(result).length;
         expect(payloadSize).toBeLessThan(6000); // ~5KB with buffer
@@ -2299,7 +2329,7 @@ describe('QueryService', () => {
           depth: 1,
           fields: ['id', 'title'],
           excludeMetadata: true,
-        } as any);
+        } as never);
         const minimalSize = JSON.stringify(minimalResult).length;
 
         const ratio = fullSize / minimalSize;
@@ -2311,14 +2341,14 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           includePhases: true,
-        } as any);
+        } as never);
         const withPhasesSize = JSON.stringify(withPhases).length;
 
         const withoutPhases = await queryService.traceRequirement({
           planId,
           requirementId: reqId,
           includePhases: false,
-        } as any);
+        } as never);
         const withoutPhasesSize = JSON.stringify(withoutPhases).length;
 
         expect(withoutPhasesSize).toBeLessThan(withPhasesSize);
@@ -2329,14 +2359,14 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           includeArtifacts: true,
-        } as any);
+        } as never);
         const withArtifactsSize = JSON.stringify(withArtifacts).length;
 
         const withoutArtifacts = await queryService.traceRequirement({
           planId,
           requirementId: reqId,
           includeArtifacts: false,
-        } as any);
+        } as never);
         const withoutArtifactsSize = JSON.stringify(withoutArtifacts).length;
 
         expect(withoutArtifactsSize).toBeLessThan(withArtifactsSize);
@@ -2353,7 +2383,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           limit: 1,
-        } as any);
+        } as never);
         const limitedSize = JSON.stringify(limited).length;
 
         expect(limitedSize).toBeLessThan(unlimitedSize);
@@ -2364,14 +2394,14 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           excludeMetadata: false,
-        } as any);
+        } as never);
         const withSize = JSON.stringify(withMetadata).length;
 
         const withoutMetadata = await queryService.traceRequirement({
           planId,
           requirementId: reqId,
           excludeMetadata: true,
-        } as any);
+        } as never);
         const withoutSize = JSON.stringify(withoutMetadata).length;
 
         // With 3 solutions + 3 phases = 6 entities * 162 bytes = ~972 bytes saved
@@ -2386,16 +2416,18 @@ describe('QueryService', () => {
           requirementId: reqId,
           depth: 1,
           fields: ['id', 'title'],
-        } as any);
+        } as never);
         const duration = Date.now() - start;
 
         expect(duration).toBeLessThan(100); // Fast response
       });
     });
+    /* eslint-enable @typescript-eslint/no-unsafe-argument */
 
     // ========================================================================
     // 6. EDGE CASES AND VALIDATION (10 tests)
     // ========================================================================
+    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
     describe('edge cases and validation', () => {
       it('RED 6.1: empty trace (no solutions, phases, artifacts) should work', async () => {
         const emptyReq = await requirementService.addRequirement({
@@ -2438,7 +2470,7 @@ describe('QueryService', () => {
           depth: 2,
           limit: 5,
           fields: ['id', 'title'],
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions).toHaveLength(0);
       });
@@ -2449,7 +2481,7 @@ describe('QueryService', () => {
             planId,
             requirementId: 'invalid-id',
             depth: 1,
-          } as any)
+          } as never)
         ).rejects.toThrow(/requirement.*not found/i);
       });
 
@@ -2459,7 +2491,7 @@ describe('QueryService', () => {
             planId,
             requirementId: reqId,
             depth: 1.5,
-          } as any)
+          } as never)
         ).rejects.toThrow('depth must be an integer');
       });
 
@@ -2469,7 +2501,7 @@ describe('QueryService', () => {
             planId,
             requirementId: reqId,
             limit: 2.5,
-          } as any)
+          } as never)
         ).rejects.toThrow('limit must be an integer');
       });
 
@@ -2478,7 +2510,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           fields: [],
-        } as any);
+        } as never);
 
         const sol = result.trace.proposedSolutions[0];
         expect(sol.id).toBeDefined();
@@ -2491,7 +2523,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           fields: ['nonexistent', 'id', 'title'],
-        } as any);
+        } as never);
 
         const sol = result.trace.proposedSolutions[0];
         expect(sol.id).toBeDefined();
@@ -2502,7 +2534,7 @@ describe('QueryService', () => {
       it('RED 6.8: null planId should throw error', async () => {
         await expect(
           queryService.traceRequirement({
-            planId: null as any,
+            planId: null as unknown as string,
             requirementId: reqId,
           })
         ).rejects.toThrow();
@@ -2513,7 +2545,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           limit: 1000,
-        } as any);
+        } as never);
 
         expect(result.trace.proposedSolutions).toHaveLength(3); // Only 3 available
       });
@@ -2543,7 +2575,7 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           limit: 1,
-        } as any);
+        } as never);
 
         // BUG: selectedSolution should NOT be null even though it's beyond limit
         // The selectedSolution is a semantic singleton and should always be found
@@ -2576,9 +2608,10 @@ describe('QueryService', () => {
           planId,
           requirementId: reqId,
           depth: 3,
-        } as any);
+        } as never);
 
-        expect(resultNoLimit.trace.artifacts!.length).toBe(3);
+        if (resultNoLimit.trace.artifacts === undefined) throw new Error('artifacts is required');
+        expect(resultNoLimit.trace.artifacts.length).toBe(3);
 
         // BUG TEST: The key issue is that artifact DISCOVERY should use all phases,
         // not just limited phases. The limit applies to the RESPONSE, not discovery.
@@ -2595,13 +2628,15 @@ describe('QueryService', () => {
           requirementId: reqId,
           depth: 3,
           limit: 1, // Limits each entity type to 1 in response
-        } as any);
+        } as never);
 
         // Phases ARE limited to 1 in response
-        expect(limitedResult.trace.implementingPhases!.length).toBe(1);
+        if (limitedResult.trace.implementingPhases === undefined) throw new Error('implementingPhases is required');
+        expect(limitedResult.trace.implementingPhases.length).toBe(1);
 
         // Artifacts are also limited to 1 in response (limit applies per entity type)
-        expect(limitedResult.trace.artifacts!.length).toBe(1);
+        if (limitedResult.trace.artifacts === undefined) throw new Error('artifacts is required');
+        expect(limitedResult.trace.artifacts.length).toBe(1);
 
         // KEY TEST: Use high limit to verify artifact DISCOVERY uses all phases
         // With buggy code: even with high limit, artifacts from excluded phases
@@ -2612,15 +2647,16 @@ describe('QueryService', () => {
           requirementId: reqId,
           depth: 3,
           limit: 100, // High limit to see full discovery pool
-        } as any);
+        } as never);
 
         // With high limit, all 3 artifacts should be found
         // This proves artifact DISCOVERY uses all phases (allPhaseIds), not limited ones
-        expect(resultHighLimit.trace.artifacts!.length).toBe(3);
+        if (resultHighLimit.trace.artifacts === undefined) throw new Error('artifacts is required');
+        expect(resultHighLimit.trace.artifacts.length).toBe(3);
 
         // Verify the phase-only artifact (linked only to phase3) IS discoverable
-        const hasPhaseOnlyArtifact = resultHighLimit.trace.artifacts?.some(
-          (a: any) => a.id === phaseOnlyArtifact.artifactId
+        const hasPhaseOnlyArtifact = resultHighLimit.trace.artifacts.some(
+          (a: { id: string }) => a.id === phaseOnlyArtifact.artifactId
         );
         expect(hasPhaseOnlyArtifact).toBe(true);
       });
@@ -2653,26 +2689,28 @@ describe('QueryService', () => {
         const result = await queryService.traceRequirement({
           planId,
           requirementId: reqId,
-        } as any);
+        } as never);
 
         // BUGFIX TEST: proposedSolutions MUST include selected solution
         expect(result.trace.proposedSolutions).toHaveLength(3); // ALL solutions
         expect(result.trace.selectedSolution).not.toBeNull();
-        expect(result.trace.selectedSolution!.id).toBe(sol2Id);
+        if (result.trace.selectedSolution === null) throw new Error('selectedSolution is required');
+        expect(result.trace.selectedSolution.id).toBe(sol2Id);
         expect(result.trace.alternativeSolutions).toHaveLength(2); // only alternatives
 
         // Verify selected solution IS in proposedSolutions
         const selectedInProposed = result.trace.proposedSolutions.some(
-          (s: any) => s.id === sol2Id
+          (s: { id: string }) => s.id === sol2Id
         );
         expect(selectedInProposed).toBe(true); // MUST be true for backward compatibility
 
         // Verify proposedSolutions contains all 3 solution IDs
-        const solutionIds = result.trace.proposedSolutions.map((s: any) => s.id);
+        const solutionIds = result.trace.proposedSolutions.map((s: { id: string }) => s.id);
         expect(solutionIds).toContain(sol1Id);
         expect(solutionIds).toContain(sol2Id); // selected
         expect(solutionIds).toContain(sol3Id);
       });
     });
+    /* eslint-enable @typescript-eslint/no-unsafe-argument */
   });
 });

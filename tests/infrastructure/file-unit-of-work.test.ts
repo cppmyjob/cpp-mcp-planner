@@ -8,7 +8,7 @@ import type { Requirement } from '../../src/domain/entities/types.js';
 
 describe('FileUnitOfWork', () => {
   // FIX M-4: Use os.tmpdir() instead of process.cwd()
-  const testDir = path.join(os.tmpdir(), `test-${Date.now()}-file-unit-of-work`);
+  const testDir = path.join(os.tmpdir(), `test-${Date.now().toString()}-file-unit-of-work`);
   const planId = 'test-plan-1';
 
   let uow: FileUnitOfWork;
@@ -55,7 +55,7 @@ describe('FileUnitOfWork', () => {
       expect(uow).toBeDefined();
     });
 
-    it('should initialize with shared FileLockManager', async () => {
+    it('should initialize with shared FileLockManager', () => {
       expect(lockManager.isInitialized()).toBe(true);
       // Verify that UoW uses the same lock manager instance
       expect(uow.getLockManager()).toBe(lockManager);
@@ -118,9 +118,10 @@ describe('FileUnitOfWork', () => {
     it('should execute callback within transaction', async () => {
       let executed = false;
 
-      await uow.execute(async () => {
+      await uow.execute(() => {
         executed = true;
         expect(uow.isActive()).toBe(true);
+        return Promise.resolve();
       });
 
       expect(executed).toBe(true);
@@ -128,8 +129,8 @@ describe('FileUnitOfWork', () => {
     });
 
     it('should auto-commit on successful execution', async () => {
-      const result = await uow.execute(async () => {
-        return 'success';
+      const result = await uow.execute(() => {
+        return Promise.resolve('success');
       });
 
       expect(result).toBe('success');
@@ -138,7 +139,7 @@ describe('FileUnitOfWork', () => {
 
     it('should auto-rollback on execution error', async () => {
       await expect(
-        uow.execute(async () => {
+        uow.execute(() => {
           throw new Error('Test error');
         })
       ).rejects.toThrow('Test error');
@@ -147,8 +148,8 @@ describe('FileUnitOfWork', () => {
     });
 
     it('should pass through callback return value', async () => {
-      const result = await uow.execute(async () => {
-        return { data: 'test', count: 42 };
+      const result = await uow.execute(() => {
+        return Promise.resolve({ data: 'test', count: 42 });
       });
 
       expect(result).toEqual({ data: 'test', count: 42 });
@@ -156,13 +157,13 @@ describe('FileUnitOfWork', () => {
   });
 
   describe('REVIEW: Repository Access', () => {
-    it('should provide access to Repository for entity types', async () => {
+    it('should provide access to Repository for entity types', () => {
       const requirementRepo = uow.getRepository<Requirement>('requirement');
       expect(requirementRepo).toBeDefined();
       expect(requirementRepo.entityType).toBe('requirement');
     });
 
-    it('should provide access to LinkRepository', async () => {
+    it('should provide access to LinkRepository', () => {
       const linkRepo = uow.getLinkRepository();
       expect(linkRepo).toBeDefined();
     });
@@ -216,7 +217,7 @@ describe('FileUnitOfWork', () => {
       expect(results).toHaveLength(3);
 
       // All should succeed without race conditions
-      expect(results.every((r: any) => r.id)).toBe(true);
+      expect(results.every((r: Requirement) => r.id !== '')).toBe(true);
     });
 
     it('should release locks on transaction commit', async () => {
@@ -277,9 +278,9 @@ describe('FileUnitOfWork', () => {
 
       try {
         await uow.rollback();
-      } catch (error: any) {
+      } catch (error: unknown) {
         // If rollback throws, message should mention limitations
-        expect(error.message).toMatch(/rollback|file storage|limitation/i);
+        expect((error as Error).message).toMatch(/rollback|file storage|limitation/i);
       }
     });
 
@@ -345,9 +346,10 @@ describe('FileUnitOfWork', () => {
         expect(uow.isActive()).toBe(true);
 
         // Nested execute should reuse existing transaction
-        await uow.execute(async () => {
+        await uow.execute(() => {
           innerExecuted = true;
           expect(uow.isActive()).toBe(true);
+          return Promise.resolve();
         });
 
         expect(uow.isActive()).toBe(true);
@@ -495,9 +497,9 @@ describe('FileUnitOfWork', () => {
     it('should document LIMITATION in error messages', async () => {
       try {
         await uow.commit(); // No active transaction
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Error message should mention limitations if relevant
-        expect(error.message).toBeDefined();
+        expect((error as Error).message).toBeDefined();
       }
     });
 

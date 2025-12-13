@@ -37,7 +37,7 @@ async function loadEntities<T extends Entity>(
     decisions: 'decision',
     artifacts: 'artifact'
   };
-  const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
+  const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as unknown as 'requirement', planId);
   return repo.findAll();
 }
 
@@ -47,7 +47,7 @@ async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<vo
     try {
       await fs.rm(dir, { recursive: true, force: true });
       return;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (i === maxRetries - 1) throw error;
       // Wait before retry (exponential backoff)
       await new Promise((resolve) => setTimeout(resolve, 100 * (i + 1)));
@@ -63,7 +63,7 @@ describe('BatchService - Edge Cases', () => {
   let testPlanId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `mcp-batch-edge-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-batch-edge-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -148,7 +148,7 @@ describe('BatchService - Edge Cases', () => {
         planId: testPlanId,
         operations: [
           {
-            entityType: 'invalid' as any,
+            entityType: 'invalid' as unknown as 'requirement',
             payload: {},
           },
         ],
@@ -157,7 +157,7 @@ describe('BatchService - Edge Cases', () => {
   });
 
   it('Test 43: Temp ID in text content is NOT resolved', async () => {
-    const _result = await batchService.executeBatch({
+    await batchService.executeBatch({
       planId: testPlanId,
       operations: [
         {
@@ -241,8 +241,8 @@ describe('BatchService - Edge Cases', () => {
       operations.push({
         entityType: 'requirement' as const,
         payload: {
-          title: `Requirement ${i}`,
-          description: `Description for requirement ${i}`,
+          title: `Requirement ${i.toString()}`,
+          description: `Description for requirement ${i.toString()}`,
           source: { type: 'user-request' as const },
           acceptanceCriteria: [],
           priority: 'medium' as const,
@@ -268,10 +268,10 @@ describe('BatchService - Edge Cases', () => {
       operations.push({
         entityType: 'phase' as const,
         payload: {
-          tempId: `$${i}`,
-          title: `Phase Level ${i}`,
-          description: `Phase at depth ${i}`,
-          parentId: i > 0 ? `$${i - 1}` : undefined,
+          tempId: `$${i.toString()}`,
+          title: `Phase Level ${i.toString()}`,
+          description: `Phase at depth ${i.toString()}`,
+          parentId: i > 0 ? `$${(i - 1).toString()}` : undefined,
           objectives: [],
           deliverables: [],
         },
@@ -289,11 +289,12 @@ describe('BatchService - Edge Cases', () => {
     // Verify chain
     const phases = await loadEntities<Phase>(repositoryFactory, testPlanId, 'phases');
     for (let i = 1; i < 10; i++) {
-      const phase = phases.find((p) => p.title === `Phase Level ${i}`);
-      const parent = phases.find((p) => p.title === `Phase Level ${i - 1}`);
+      const phase = phases.find((p) => p.title === `Phase Level ${i.toString()}`);
+      const parent = phases.find((p) => p.title === `Phase Level ${(i - 1).toString()}`);
       expect(phase).toBeDefined();
       expect(parent).toBeDefined();
-      expect(phase!.parentId).toBe(parent!.id);
+      if (phase === undefined || parent === undefined) throw new Error('Phase and parent should be defined');
+      expect(phase.parentId).toBe(parent.id);
     }
   });
 
@@ -385,7 +386,8 @@ describe('BatchService - Edge Cases', () => {
     const requirements = await loadEntities<Requirement>(repositoryFactory, testPlanId, 'requirements');
     const childReq = requirements.find((r) => r.title === 'Child Req');
     expect(childReq).toBeDefined();
-    expect(childReq!.source.parentId).toBe(result.results[0].id);
+    if (childReq === undefined) throw new Error('ChildReq should be defined');
+    expect(childReq.source.parentId).toBe(result.results[0].id);
   });
 
   it('Test 50: Multiple temp IDs in single payload resolve correctly', async () => {
@@ -491,9 +493,9 @@ describe('BatchService - Edge Cases', () => {
     });
 
     // Verify temp IDs mapped in order
-    expect(result.tempIdMapping['$0']).toBe(result.results[0].id);
-    expect(result.tempIdMapping['$1']).toBe(result.results[1].id);
-    expect(result.tempIdMapping['$2']).toBe(result.results[2].id);
+    expect(result.tempIdMapping.$0).toBe(result.results[0].id);
+    expect(result.tempIdMapping.$1).toBe(result.results[1].id);
+    expect(result.tempIdMapping.$2).toBe(result.results[2].id);
   });
 
   it('Test 52: Artifact with multiple related entities resolves correctly', async () => {
@@ -550,6 +552,9 @@ describe('BatchService - Edge Cases', () => {
     expect(artifacts[0].relatedPhaseId).toBe(result.results[2].id);
     expect(artifacts[0].relatedSolutionId).toBe(result.results[1].id);
     expect(artifacts[0].relatedRequirementIds).toBeDefined();
-    expect(artifacts[0].relatedRequirementIds![0]).toBe(result.results[0].id);
+    if (artifacts[0].relatedRequirementIds === undefined || artifacts[0].relatedRequirementIds.length === 0) {
+      throw new Error('RelatedRequirementIds should be defined and not empty');
+    }
+    expect(artifacts[0].relatedRequirementIds[0]).toBe(result.results[0].id);
   });
 });

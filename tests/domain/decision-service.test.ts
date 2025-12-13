@@ -16,7 +16,7 @@ describe('DecisionService', () => {
   let planId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `mcp-dec-test-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-dec-test-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();

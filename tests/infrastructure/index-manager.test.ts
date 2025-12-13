@@ -272,9 +272,9 @@ describe('IndexManager', () => {
       for (let i = 0; i < 10; i++) {
         promises.push(
           manager.add({
-            id: `item-${i}`,
+            id: `item-${i.toString()}`,
             type: 'requirement',
-            filePath: `file-${i}`,
+            filePath: `file-${i.toString()}`,
             version: 1,
             updatedAt: '2025-01-01',
           })

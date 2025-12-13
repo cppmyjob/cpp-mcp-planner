@@ -20,7 +20,7 @@ describe('SolutionService', () => {
   let planId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `mcp-sol-test-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-sol-test-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
@@ -209,7 +209,7 @@ describe('SolutionService', () => {
       await expect(
         service.compareSolutions({
           planId,
-          solutionIds: undefined as any,
+          solutionIds: undefined as unknown as string[],
         })
       ).rejects.toThrow('solutionIds must be a non-empty array');
     });
@@ -227,7 +227,7 @@ describe('SolutionService', () => {
       await expect(
         service.compareSolutions({
           planId,
-          solutionIds: 'not-an-array' as any,
+          solutionIds: 'not-an-array' as unknown as string[],
         })
       ).rejects.toThrow('solutionIds must be a non-empty array');
     });
@@ -251,7 +251,7 @@ describe('SolutionService', () => {
         },
       });
 
-      const _result = await service.selectSolution({
+      await service.selectSolution({
         planId,
         solutionId: proposed.solutionId,
         reason: 'Best fit',
@@ -306,7 +306,10 @@ describe('SolutionService', () => {
       const { solution } = await service.getSolution({ planId, solutionId: s2.solutionId, fields: ['*'] });
       expect(solution.status).toBe('selected');
       expect(result.deselectedIds).toHaveLength(1);
-      expect(result.deselectedIds![0]).toBe(s1.solutionId);
+      if (result.deselectedIds === undefined || result.deselectedIds.length === 0) {
+        throw new Error('DeselectedIds should be defined and not empty');
+      }
+      expect(result.deselectedIds[0]).toBe(s1.solutionId);
     });
   });
 
@@ -437,9 +440,10 @@ describe('SolutionService', () => {
         createDecisionRecord: true,
       });
 
+      if (result.decisionId === undefined) throw new Error('DecisionId should be defined');
       const { decision } = await decisionService.getDecision({
         planId,
-        decisionId: result.decisionId!,
+        decisionId: result.decisionId,
         fields: ['*'],
       });
 
@@ -457,7 +461,7 @@ describe('SolutionService', () => {
 
     it('should include deselected solutions in alternativesConsidered', async () => {
       // Create three solutions for the same requirement
-      const _sol1 = await service.proposeSolution({
+      await service.proposeSolution({
         planId,
         solution: {
           title: 'REST API',
@@ -493,7 +497,7 @@ describe('SolutionService', () => {
         },
       });
 
-      const _sol3 = await service.proposeSolution({
+      await service.proposeSolution({
         planId,
         solution: {
           title: 'gRPC',
@@ -519,9 +523,10 @@ describe('SolutionService', () => {
         createDecisionRecord: true,
       });
 
+      if (result.decisionId === undefined) throw new Error('DecisionId should be defined');
       const { decision } = await decisionService.getDecision({
         planId,
-        decisionId: result.decisionId!,
+        decisionId: result.decisionId,
         fields: ['*'],
       });
 
@@ -529,7 +534,7 @@ describe('SolutionService', () => {
       expect(decision.alternativesConsidered).toBeDefined();
       expect(decision.alternativesConsidered.length).toBeGreaterThanOrEqual(2);
 
-      const alternativeTitles = decision.alternativesConsidered.map((alt: any) => alt.option);
+      const alternativeTitles = decision.alternativesConsidered.map((alt: { option: string }) => alt.option);
       expect(alternativeTitles).toContain('REST API');
       expect(alternativeTitles).toContain('gRPC');
     });
@@ -557,9 +562,10 @@ describe('SolutionService', () => {
         createDecisionRecord: true,
       });
 
+      if (result.decisionId === undefined) throw new Error('DecisionId should be defined');
       const { decision } = await decisionService.getDecision({
         planId,
-        decisionId: result.decisionId!,
+        decisionId: result.decisionId,
         fields: ['*'],
       });
 

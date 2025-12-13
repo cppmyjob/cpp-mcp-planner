@@ -8,7 +8,7 @@ import * as crypto from 'crypto';
 
 // Helper to parse MCP tool result
 function parseResult<T>(result: unknown): T {
-  const r = result as { content: Array<{ type: string; text: string }> };
+  const r = result as { content: { type: string; text: string }[] };
   return JSON.parse(r.content[0].text) as T;
 }
 
@@ -358,7 +358,7 @@ describe('E2E: Requirement Voting via MCP Tool', () => {
         },
       });
 
-      const listData = parseResult<{ requirements: Array<{ id: string; votes: number }> }>(
+      const listData = parseResult<{ requirements: { id: string; votes: number }[] }>(
         listResult
       );
 

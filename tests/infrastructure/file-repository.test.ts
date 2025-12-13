@@ -7,7 +7,7 @@ import type { Requirement, EntityType } from '../../src/domain/entities/types.js
 
 describe('FileRepository', () => {
   // FIX M-4: Use os.tmpdir() instead of process.cwd()
-  const testDir = path.join(os.tmpdir(), `test-${Date.now()}-file-repository`);
+  const testDir = path.join(os.tmpdir(), `test-${Date.now().toString()}-file-repository`);
   const planId = 'test-plan-1';
   const entityType: EntityType = 'requirement';
 
@@ -406,7 +406,7 @@ describe('FileRepository', () => {
     it('should handle concurrent creates', async () => {
       const promises = [];
       for (let i = 0; i < 10; i++) {
-        promises.push(repository.create(createTestRequirement(`req-${i}`, `Req ${i}`)));
+        promises.push(repository.create(createTestRequirement(`req-${i.toString()}`, `Req ${i.toString()}`)));
       }
 
       await Promise.all(promises);
@@ -633,9 +633,9 @@ describe('FileRepository', () => {
   // ============================================================================
   describe('REVIEW: Shared FileLockManager', () => {
     it('should use injected FileLockManager', async () => {
-      const { FileLockManager } = await import('../../src/infrastructure/repositories/file/file-lock-manager.js');
+      const { FileLockManager: fileLockManagerClass } = await import('../../src/infrastructure/repositories/file/file-lock-manager.js');
 
-      const sharedLockManager = new FileLockManager(path.join(testDir, 'plans', 'shared-plan'));
+      const sharedLockManager = new fileLockManagerClass(path.join(testDir, 'plans', 'shared-plan'));
       await sharedLockManager.initialize();
 
       // Create repository with shared lock manager
@@ -658,9 +658,9 @@ describe('FileRepository', () => {
     });
 
     it('should NOT dispose shared FileLockManager when repository disposes', async () => {
-      const { FileLockManager } = await import('../../src/infrastructure/repositories/file/file-lock-manager.js');
+      const { FileLockManager: fileLockManagerClass } = await import('../../src/infrastructure/repositories/file/file-lock-manager.js');
 
-      const sharedLockManager = new FileLockManager(path.join(testDir, 'plans', 'shared-plan-2'));
+      const sharedLockManager = new fileLockManagerClass(path.join(testDir, 'plans', 'shared-plan-2'));
       await sharedLockManager.initialize();
 
       // Create first repository with shared lock manager

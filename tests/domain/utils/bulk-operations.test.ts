@@ -23,6 +23,7 @@ describe('bulkUpdateEntities utility', () => {
 
       // Attempt atomic mode without providing storage
       await expect(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         bulkUpdateEntities({
           entityType: 'requirements',
           entityIdField: 'requirementId',
@@ -41,6 +42,7 @@ describe('bulkUpdateEntities utility', () => {
     it('should work normally in non-atomic mode without storage', async () => {
       const mockUpdateFn = jest.fn().mockResolvedValue(undefined);
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       const result = await bulkUpdateEntities({
         entityType: 'requirements',
         entityIdField: 'requirementId',
@@ -69,6 +71,7 @@ describe('bulkUpdateEntities utility', () => {
         saveEntities: jest.fn().mockResolvedValue(undefined),
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       const result = await bulkUpdateEntities({
         entityType: 'requirements',
         entityIdField: 'requirementId',
@@ -91,18 +94,18 @@ describe('bulkUpdateEntities utility', () => {
     it('RED (BUGFIX): atomic rollback should preserve all entity fields, not just ID', async () => {
       /**
        * CRITICAL BUG: BulkUpdateConfig.storage interface declares loadEntities returning
-       * Array<{ id: string }> (line 14), which is too narrow. In atomic mode, the snapshot
+       * { id: string }[] (line 14), which is too narrow. In atomic mode, the snapshot
        * created on line 75 will only contain `id` fields for each entity.
        *
        * When rollback occurs on line 99, saveEntities is called with this incomplete snapshot,
        * causing ALL entity fields except `id` to be permanently lost.
        *
        * Current type (bulk-operations.ts:14):
-       *   loadEntities: (planId: string, entityType: string) => Promise<Array<{ id: string }>>;
+       *   loadEntities: (planId: string, entityType: string) => Promise<{ id: string }[]>;
        *
        * This is catastrophic - rollback should restore FULL entity state, not destroy data!
        *
-       * Expected: loadEntities should return full entities (Array<any>) so snapshot preserves all fields
+       * Expected: loadEntities should return full entities (any[]) so snapshot preserves all fields
        */
 
       const fullEntities = [
@@ -145,6 +148,7 @@ describe('bulkUpdateEntities utility', () => {
 
       // Attempt atomic bulk update that will fail and rollback
       await expect(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         bulkUpdateEntities({
           entityType: 'requirements',
           entityIdField: 'requirementId',
@@ -188,9 +192,9 @@ describe('bulkUpdateEntities utility', () => {
        * impossible to diagnose why the update actually failed.
        *
        * Current code (bulk-operations.ts:99-102):
-       *   } catch (error: any) {
+       *   } catch (error: unknown) {
        *     await storage.saveEntities(planId, entityType, snapshot);  // <-- if this throws
-       *     throw new Error(`Atomic bulk update failed: ${error.message}...`); // original error is lost!
+       *     throw new Error(`Atomic bulk update failed: ${(error as Error).message}...`); // original error is lost!
        *   }
        *
        * If saveEntities throws during rollback, the original error is masked.
@@ -218,6 +222,7 @@ describe('bulkUpdateEntities utility', () => {
       // 1. The original validation error
       // 2. The rollback failure
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         await bulkUpdateEntities({
           entityType: 'requirements',
           entityIdField: 'requirementId',
@@ -231,14 +236,14 @@ describe('bulkUpdateEntities utility', () => {
           storage: mockStorage,
         });
         throw new Error('Expected bulkUpdateEntities to throw');
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Skip if it's our own assertion error
-        if (error.message === 'Expected bulkUpdateEntities to throw') {
+        if ((error as Error).message === 'Expected bulkUpdateEntities to throw') {
           throw error;
         }
         // CRITICAL: Error message should mention BOTH the original error and rollback failure
-        expect(error.message).toMatch(/validation error.*invalid title format/i);
-        expect(error.message).toMatch(/rollback.*failed.*disk full/i);
+        expect((error as Error).message).toMatch(/validation error.*invalid title format/i);
+        expect((error as Error).message).toMatch(/rollback.*failed.*disk full/i);
       }
     });
   });

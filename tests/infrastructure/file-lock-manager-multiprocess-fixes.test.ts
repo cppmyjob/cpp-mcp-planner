@@ -24,7 +24,7 @@ describe('FileLockManager Multi-Process Fixes', () => {
   beforeEach(async () => {
     testDir = path.join(
       os.tmpdir(),
-      `file-lock-mp-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      `file-lock-mp-test-${Date.now().toString()}-${Math.random().toString(36).slice(2)}`
     );
     await fs.mkdir(testDir, { recursive: true });
   });
@@ -32,7 +32,9 @@ describe('FileLockManager Multi-Process Fixes', () => {
   afterEach(async () => {
     // Wait a bit for any pending operations
     await new Promise(r => setTimeout(r, 100));
-    await fs.rm(testDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(testDir, { recursive: true, force: true }).catch(() => {
+      // Ignore cleanup errors in tests
+    });
   });
 
   // ============================================================================
@@ -44,7 +46,7 @@ describe('FileLockManager Multi-Process Fixes', () => {
       await lockManager.initialize();
 
       // Acquire a lock
-      const _release = await lockManager.acquire('resource');
+      await lockManager.acquire('resource');
       expect(lockManager.getActiveLocksCount()).toBe(1);
 
       // Dispose should release file lock first
@@ -104,8 +106,8 @@ describe('FileLockManager Multi-Process Fixes', () => {
             return release();
           },
           (err) => {
-            if (!err.message.includes('disposed')) {
-              errors.push(err.message);
+            if (!(err as Error).message.includes('disposed')) {
+              errors.push((err as Error).message);
             }
           }
         );
@@ -135,7 +137,7 @@ describe('FileLockManager Multi-Process Fixes', () => {
 
       // Acquire 5 different resources in parallel
       const promises = Array.from({ length: 5 }, (_, i) =>
-        lockManager.acquire(`resource-${i}`)
+        lockManager.acquire(`resource-${i.toString()}`)
       );
 
       const releases = await Promise.all(promises);
@@ -197,9 +199,15 @@ describe('FileLockManager Multi-Process Fixes', () => {
         warn: (msg: string, _ctx?: Record<string, unknown>) => {
           warnings.push(msg);
         },
-        debug: () => {},
-        info: () => {},
-        error: () => {},
+        debug: () => {
+          // No-op for tests
+        },
+        info: () => {
+          // No-op for tests
+        },
+        error: () => {
+          // No-op for tests
+        },
       };
 
       const lockManager = new FileLockManager(testDir, {
@@ -218,7 +226,7 @@ describe('FileLockManager Multi-Process Fixes', () => {
       const lockPath = path.join(testDir, '.locks');
       const files = await fs.readdir(lockPath);
       const lockDir = files.find(f => f.endsWith('.lock'));
-      if (lockDir) {
+      if (lockDir !== undefined) {
         // Remove the lock directory to simulate external release
         await fs.rm(path.join(lockPath, lockDir), { recursive: true, force: true });
       }
@@ -283,7 +291,9 @@ describe('FileLockManager Multi-Process Fixes', () => {
       const filesBefore = await fs.readdir(lockDir).catch(() => []);
 
       // Try isLocked (should throw)
-      await lockManager.isLocked('new-resource').catch(() => {});
+      await lockManager.isLocked('new-resource').catch(() => {
+        // Ignore error - disposed manager should reject operations
+      });
 
       // Count files after - should be same (no new file created)
       const filesAfter = await fs.readdir(lockDir).catch(() => []);
@@ -312,12 +322,12 @@ describe('FileLockManager Multi-Process Fixes', () => {
       try {
         await lockManager.withLock(
           'resource',
-          async () => 'result',
+          () => Promise.resolve('result'),
           { acquireTimeout: 200 } // Custom short timeout
         );
         fail('Should have thrown timeout');
-      } catch (err: any) {
-        expect(err.message).toMatch(/timeout/i);
+      } catch (err: unknown) {
+        expect((err as Error).message).toMatch(/timeout/i);
       }
 
       const elapsed = Date.now() - startTime;
@@ -342,7 +352,7 @@ describe('FileLockManager Multi-Process Fixes', () => {
 
       // withLock without options should use default timeout
       await expect(
-        lockManager.withLock('resource', async () => 'result')
+        lockManager.withLock('resource', () => Promise.resolve('result'))
       ).rejects.toThrow(/timeout/i);
 
       await blocker.dispose();
@@ -373,7 +383,7 @@ describe('FileLockManager Multi-Process Fixes', () => {
 
       for (let i = 0; i < 30; i++) {
         const manager = managers[i % managers.length];
-        const resource = `resource-${i % 3}`; // 3 resources, high contention
+        const resource = `resource-${(i % 3).toString()}`; // 3 resources, high contention
 
         operations.push(
           (async () => {
@@ -382,12 +392,12 @@ describe('FileLockManager Multi-Process Fixes', () => {
               // Simulate some work
               await new Promise(r => setTimeout(r, Math.random() * 20));
               await release();
-            } catch (err: any) {
+            } catch (err: unknown) {
               if (
-                !err.message.includes('Timeout') &&
-                !err.message.includes('disposed')
+                !(err as Error).message.includes('Timeout') &&
+                !(err as Error).message.includes('disposed')
               ) {
-                errors.push(`${resource}: ${err.message}`);
+                errors.push(`${resource}: ${(err as Error).message}`);
               }
             }
           })()
@@ -420,12 +430,12 @@ describe('FileLockManager Multi-Process Fixes', () => {
       const operations = Array.from({ length: 5 }, (_, i) =>
         (async () => {
           try {
-            const release = await lm.acquire(`resource-${i}`);
+            const release = await lm.acquire(`resource-${i.toString()}`);
             await new Promise(r => setTimeout(r, 500)); // Long operation
             await release();
-          } catch (err: any) {
-            if (!err.message.includes('disposed')) {
-              errors.push(err.message);
+          } catch (err: unknown) {
+            if (!(err as Error).message.includes('disposed')) {
+              errors.push((err as Error).message);
             }
           }
         })()

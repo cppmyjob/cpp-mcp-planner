@@ -32,8 +32,9 @@ describe('Repository Interfaces - Type System', () => {
 
       // Type checking - this will fail at compile time if types don't match
       operators.forEach(op => {
-        const _: FilterOperator = op;
+        const unused: FilterOperator = op;
         expect(typeof op).toBe('string');
+        expect(unused).toBeDefined();
       });
     });
 
@@ -270,8 +271,9 @@ describe('Repository Interfaces - Type System', () => {
       ];
 
       levels.forEach(level => {
-        const _: IsolationLevel = level;
+        const unused: IsolationLevel = level;
         expect(typeof level).toBe('string');
+        expect(unused).toBeDefined();
       });
     });
   });
@@ -286,8 +288,9 @@ describe('Repository Interfaces - Type System', () => {
       ];
 
       backends.forEach(backend => {
-        const _: StorageBackend = backend;
+        const unused: StorageBackend = backend;
         expect(typeof backend).toBe('string');
+        expect(unused).toBeDefined();
       });
     });
 

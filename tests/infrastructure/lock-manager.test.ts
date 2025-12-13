@@ -37,7 +37,8 @@ describe('LockManager', () => {
       const { lockId } = await lockManager.acquire('resource-1');
       expect(lockId).toBeDefined();
 
-      await lockManager.release(lockId!);
+      if (lockId === undefined) throw new Error('LockId should be defined');
+      await lockManager.release(lockId);
 
       // Should be able to acquire again
       const result = await lockManager.acquire('resource-1');
@@ -91,12 +92,14 @@ describe('LockManager', () => {
       const { lockId } = await lockManager.acquire('resource-1', { reentrant: true, holderId });
       await lockManager.acquire('resource-1', { reentrant: true, holderId });
 
+      if (lockId === undefined) throw new Error('LockId should be defined');
+
       // First release - should still be locked
-      await lockManager.release(lockId!);
+      await lockManager.release(lockId);
       expect(await lockManager.isLocked('resource-1')).toBe(true);
 
       // Second release - should be unlocked
-      await lockManager.release(lockId!);
+      await lockManager.release(lockId);
       expect(await lockManager.isLocked('resource-1')).toBe(false);
     });
 
@@ -131,13 +134,13 @@ describe('LockManager', () => {
       expect(holderAfter?.refCount).toBe(3);
 
       // Manually release all 3 times
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
       expect((await lockManager.getLockHolder('resource-1'))?.refCount).toBe(2);
 
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
       expect((await lockManager.getLockHolder('resource-1'))?.refCount).toBe(1);
 
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
       expect(await lockManager.isLocked('resource-1')).toBe(false);
     });
 
@@ -152,7 +155,7 @@ describe('LockManager', () => {
       expect((await lockManager.getLockHolder('resource-1'))?.refCount).toBe(3);
 
       // Partially release (refCount should become 2)
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
       expect((await lockManager.getLockHolder('resource-1'))?.refCount).toBe(2);
       expect(await lockManager.isLocked('resource-1')).toBe(true);
 
@@ -168,10 +171,10 @@ describe('LockManager', () => {
       expect(holder?.refCount).toBe(2);
 
       // Finish releasing remaining references
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
       expect((await lockManager.getLockHolder('resource-1'))?.refCount).toBe(1);
 
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
       expect(await lockManager.isLocked('resource-1')).toBe(false);
 
       // Verify we can acquire fresh lock without issues
@@ -246,7 +249,7 @@ describe('LockManager', () => {
 
       // Release after 100ms
       setTimeout(async () => {
-        await lockManager.release(lockId!);
+        if (lockId !== undefined) await lockManager.release(lockId);
       }, 100);
 
       // Try to acquire with 500ms timeout
@@ -279,9 +282,9 @@ describe('LockManager', () => {
 
     it('should release only specified lock', async () => {
       const { lockId: lock1 } = await lockManager.acquire('resource-1');
-      const { lockId: _lock2 } = await lockManager.acquire('resource-2');
+      await lockManager.acquire('resource-2');
 
-      await lockManager.release(lock1!);
+      if (lock1 !== undefined) await lockManager.release(lock1);
 
       expect(await lockManager.isLocked('resource-1')).toBe(false);
       expect(await lockManager.isLocked('resource-2')).toBe(true);
@@ -330,8 +333,8 @@ describe('LockManager', () => {
     it('should handle double release gracefully', async () => {
       const { lockId } = await lockManager.acquire('resource-1');
 
-      await lockManager.release(lockId!);
-      await expect(lockManager.release(lockId!)).rejects.toThrow();
+      if (lockId !== undefined) await lockManager.release(lockId);
+      if (lockId !== undefined) await expect(lockManager.release(lockId)).rejects.toThrow();
     });
 
     it('should validate lock options', async () => {
@@ -352,7 +355,7 @@ describe('LockManager', () => {
   });
 
   describe('RED: Deadlock Prevention', () => {
-    it('should detect potential deadlock', async () => {
+    it('should detect potential deadlock', () => {
       // This test will be implemented when deadlock detection is added
       expect(true).toBe(true);
     });
@@ -373,7 +376,7 @@ describe('LockManager', () => {
 
     it('should release lock even if callback throws', async () => {
       await expect(
-        lockManager.withLock('resource-1', async () => {
+        lockManager.withLock('resource-1', () => {
           throw new Error('Test error');
         })
       ).rejects.toThrow('Test error');
@@ -382,8 +385,8 @@ describe('LockManager', () => {
     });
 
     it('should return callback result', async () => {
-      const result = await lockManager.withLock('resource-1', async () => {
-        return 42;
+      const result = await lockManager.withLock('resource-1', () => {
+        return Promise.resolve(42);
       });
 
       expect(result).toBe(42);
@@ -398,8 +401,8 @@ describe('LockManager', () => {
           // Nested withLock - should NOT deadlock with reentrant
           const inner = await lockManager.withLock(
             'resource-1',
-            async () => {
-              return 42;
+            () => {
+              return Promise.resolve(42);
             },
             { reentrant: true, holderId, timeout: 100 }
           );
@@ -426,7 +429,7 @@ describe('LockManager', () => {
       const results = await Promise.all(
         Array.from({ length: 10 }, (_, i) =>
           lockManager.acquire('resource-1', {
-            holderId: `holder-${i}`,
+            holderId: `holder-${i.toString()}`,
             timeout: 50, // Short timeout to fail quickly
           })
         )
@@ -441,7 +444,7 @@ describe('LockManager', () => {
       expect(failed).toHaveLength(10);
 
       // Cleanup
-      await lockManager.release(firstResult.lockId!);
+      if (firstResult.lockId !== undefined) await lockManager.release(firstResult.lockId);
     });
 
     it('should serialize concurrent acquires - only one succeeds after release', async () => {
@@ -455,7 +458,7 @@ describe('LockManager', () => {
       // Start concurrent acquire attempts that will wait for release
       const acquirePromises = Array.from({ length: 5 }, (_, i) =>
         lockManager.acquire('resource-1', {
-          holderId: `holder-${i}`,
+          holderId: `holder-${i.toString()}`,
           timeout: 500, // Long enough to wait for release
         })
       );
@@ -464,7 +467,7 @@ describe('LockManager', () => {
       await new Promise(resolve => setTimeout(resolve, 20));
 
       // Release the first lock - ONE of the waiters should acquire
-      await lockManager.release(firstResult.lockId!);
+      if (firstResult.lockId !== undefined) await lockManager.release(firstResult.lockId);
 
       // Wait for all acquire attempts to complete
       const results = await Promise.all(acquirePromises);
@@ -474,7 +477,7 @@ describe('LockManager', () => {
       expect(succeeded).toHaveLength(1);
 
       // Clean up
-      if (succeeded[0]?.lockId) {
+      if (succeeded[0]?.lockId !== undefined) {
         await lockManager.release(succeeded[0].lockId);
       }
     });
@@ -526,7 +529,7 @@ describe('LockManager', () => {
       expect(holder?.holderId).toBe('holder-1');
 
       // Clean up
-      await lockManager.release(result1.lockId!);
+      if (result1.lockId !== undefined) await lockManager.release(result1.lockId);
     });
   });
 
@@ -539,7 +542,7 @@ describe('LockManager', () => {
       expect(holder?.timer).toBeDefined();
 
       // Release manually
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
 
       // Timer should be cleared (lock should be fully released)
       expect(await lockManager.isLocked('resource-1')).toBe(false);
@@ -565,9 +568,9 @@ describe('LockManager', () => {
       await lockManager.acquire('resource-1', { reentrant: true, holderId });
 
       // Release all 3 times
-      await lockManager.release(lockId!);
-      await lockManager.release(lockId!);
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
+      if (lockId !== undefined) await lockManager.release(lockId);
+      if (lockId !== undefined) await lockManager.release(lockId);
 
       // Should be fully released
       expect(await lockManager.isLocked('resource-1')).toBe(false);
@@ -594,7 +597,7 @@ describe('LockManager', () => {
       const r2 = await lockManager.acquire('resource-2');
       const r3 = await lockManager.acquire('resource-3');
 
-      expect(r1.acquired && r2.acquired && r3.acquired).toBe(true);
+      expect(r1.acquired === true && r2.acquired === true && r3.acquired === true).toBe(true);
     });
   });
 
@@ -629,8 +632,8 @@ describe('LockManager', () => {
       expect(holder?.refCount).toBe(2);
 
       // Clean up
-      await lockManager.release(lockId!);
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
+      if (lockId !== undefined) await lockManager.release(lockId);
     });
   });
 
@@ -649,14 +652,14 @@ describe('LockManager', () => {
       expect((await lockManager.getLockHolder('resource-1'))?.refCount).toBe(3);
 
       // Release 3 times (OK)
-      await lockManager.release(lockId!);
-      await lockManager.release(lockId!);
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
+      if (lockId !== undefined) await lockManager.release(lockId);
+      if (lockId !== undefined) await lockManager.release(lockId);
 
       expect(await lockManager.isLocked('resource-1')).toBe(false);
 
       // Try to release again (should throw, not cause negative refCount)
-      await expect(lockManager.release(lockId!)).rejects.toThrow();
+      if (lockId !== undefined) await expect(lockManager.release(lockId)).rejects.toThrow();
     });
 
     it('should handle concurrent releases safely', async () => {
@@ -675,7 +678,7 @@ describe('LockManager', () => {
 
       // Concurrent releases
       const results = await Promise.allSettled(
-        Array.from({ length: 10 }, () => lockManager.release(lockId!))
+        Array.from({ length: 10 }, () => lockId !== undefined ? lockManager.release(lockId) : Promise.resolve())
       );
 
       // All should succeed (refCount goes from 10 to 0)
@@ -714,7 +717,7 @@ describe('LockManager', () => {
       // Should be instant (< 10ms tolerance for JS event loop)
       expect(duration).toBeLessThan(10);
 
-      await lockManager.release(first.lockId!);
+      if (first.lockId !== undefined) await lockManager.release(first.lockId);
     });
 
     it('should serialize rapid concurrent acquires correctly', async () => {
@@ -726,7 +729,7 @@ describe('LockManager', () => {
       for (let i = 0; i < 20; i++) {
         promises.push(
           lockManager.acquire('resource-1', {
-            holderId: `holder-${i}`,
+            holderId: `holder-${i.toString()}`,
             timeout: 0, // No waiting - instant fail if locked
           }).then(r => { results.push(r); })
         );
@@ -754,7 +757,7 @@ describe('LockManager', () => {
       // Start waiting acquires
       const waitingPromises = Array.from({ length: 5 }, (_, i) =>
         lockManager.acquire('resource-1', {
-          holderId: `waiter-${i}`,
+          holderId: `waiter-${i.toString()}`,
           timeout: 1000,
         })
       );
@@ -763,7 +766,7 @@ describe('LockManager', () => {
       await new Promise(r => setTimeout(r, 10));
 
       // Release first lock
-      await lockManager.release(first.lockId!);
+      if (first.lockId !== undefined) await lockManager.release(first.lockId);
 
       // Wait for all
       const results = await Promise.all(waitingPromises);
@@ -773,7 +776,7 @@ describe('LockManager', () => {
       expect(succeeded).toHaveLength(1);
 
       // Clean up
-      if (succeeded[0]?.lockId) {
+      if (succeeded[0]?.lockId !== undefined) {
         await lockManager.release(succeeded[0].lockId);
       }
     });
@@ -789,6 +792,7 @@ describe('LockManager', () => {
       expect(first.acquired).toBe(true);
 
       // Get initial listener count
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const initialListeners = (lockManager as any).lockEvents.listenerCount('release:resource-1');
 
       // Start many acquire attempts that will timeout
@@ -802,11 +806,12 @@ describe('LockManager', () => {
       await Promise.all(promises);
 
       // All listeners should be cleaned up
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const finalListeners = (lockManager as any).lockEvents.listenerCount('release:resource-1');
       expect(finalListeners).toBe(initialListeners);
 
       // Clean up
-      await lockManager.release(first.lockId!);
+      if (first.lockId !== undefined) await lockManager.release(first.lockId);
     });
 
     it('should not leak listeners on successful acquire after release', async () => {
@@ -824,17 +829,18 @@ describe('LockManager', () => {
       await new Promise(r => setTimeout(r, 10));
 
       // Release - waiter should acquire
-      await lockManager.release(first.lockId!);
+      if (first.lockId !== undefined) await lockManager.release(first.lockId);
 
       const result = await waitingPromise;
       expect(result.acquired).toBe(true);
 
       // No dangling listeners
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const listeners = (lockManager as any).lockEvents.listenerCount('release:resource-1');
       expect(listeners).toBe(0);
 
       // Clean up
-      await lockManager.release(result.lockId!);
+      if (result.lockId !== undefined) await lockManager.release(result.lockId);
     });
   });
 
@@ -861,14 +867,14 @@ describe('LockManager', () => {
       expect(holder?.holderId).toBe('holder-1');
 
       // Should be able to acquire after release
-      await lockManager.release(first.lockId!);
+      if (first.lockId !== undefined) await lockManager.release(first.lockId);
       const third = await lockManager.acquire('resource-1', {
         holderId: 'holder-3',
         timeout: 100,
       });
       expect(third.acquired).toBe(true);
 
-      await lockManager.release(third.lockId!);
+      if (third.lockId !== undefined) await lockManager.release(third.lockId);
     });
   });
 
@@ -903,8 +909,8 @@ describe('LockManager', () => {
       expect(timer2).not.toBe(timer1);
 
       // Clean up
-      await lockManager.release(lockId!);
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
+      if (lockId !== undefined) await lockManager.release(lockId);
     });
   });
 
@@ -920,7 +926,7 @@ describe('LockManager', () => {
       await new Promise(r => setTimeout(r, 40));
 
       // Manual release - might race with auto-release timer
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
 
       // Wait for auto-release timer to fire (it should be a no-op)
       await new Promise(r => setTimeout(r, 50));
@@ -931,7 +937,7 @@ describe('LockManager', () => {
       });
       expect(result.acquired).toBe(true);
 
-      await lockManager.release(result.lockId!);
+      if (result.lockId !== undefined) await lockManager.release(result.lockId);
     });
   });
 
@@ -943,10 +949,10 @@ describe('LockManager', () => {
       });
 
       // Release once (refCount: 1 -> 0, lock deleted)
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
 
       // Second release should throw (lock not found, not negative refCount)
-      await expect(lockManager.release(lockId!)).rejects.toThrow('not found');
+      if (lockId !== undefined) await expect(lockManager.release(lockId)).rejects.toThrow('not found');
     });
 
     it('should maintain correct refCount under concurrent operations', async () => {
@@ -959,7 +965,8 @@ describe('LockManager', () => {
         lockManager.acquire('resource-1', { holderId, reentrant: true }),
       ]);
 
-      const lockId = results[0].lockId!;
+      if (results[0].lockId === undefined) throw new Error('LockId should be defined');
+      const lockId = results[0].lockId;
 
       // Check refCount is exactly 3
       const holder = await lockManager.getLockHolder('resource-1');
@@ -996,7 +1003,7 @@ describe('LockManager', () => {
       const waiterResult = await waiterPromise;
 
       // If waiter succeeded (grabbed lock after release), clean it up
-      if (waiterResult.acquired && waiterResult.lockId) {
+      if (waiterResult.acquired && waiterResult.lockId !== undefined) {
         await lockManager.release(waiterResult.lockId);
       }
 
@@ -1020,6 +1027,7 @@ describe('LockManager', () => {
       await lockManager.releaseAll();
 
       // acquireMutexes should be empty
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       const mutexes = (lockManager as any).acquireMutexes;
       expect(mutexes.size).toBe(0);
     });
@@ -1038,7 +1046,7 @@ describe('LockManager', () => {
       // Start multiple waiters
       const waiterPromises = Array.from({ length: 3 }, (_, i) =>
         lockManager.acquire('resource-1', {
-          holderId: `waiter-${i}`,
+          holderId: `waiter-${i.toString()}`,
           timeout: 200,
         })
       );
@@ -1046,7 +1054,7 @@ describe('LockManager', () => {
       await new Promise(r => setTimeout(r, 10));
 
       // Release
-      await lockManager.release(first.lockId!);
+      if (first.lockId !== undefined) await lockManager.release(first.lockId);
 
       const results = await Promise.all(waiterPromises);
 
@@ -1056,7 +1064,7 @@ describe('LockManager', () => {
 
       // Clean up
       for (const r of results) {
-        if (r.acquired && r.lockId) {
+        if (r.acquired && r.lockId !== undefined) {
           await lockManager.release(r.lockId);
         }
       }
@@ -1070,8 +1078,10 @@ describe('LockManager', () => {
       await lockManager.acquire('resource-2', { timeout: 10000 });
 
       // Dispose should exist and clean up
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       expect(typeof (lockManager as any).dispose).toBe('function');
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (lockManager as any).dispose();
 
       // All locks should be released
@@ -1083,6 +1093,7 @@ describe('LockManager', () => {
       expect(result.reason).toContain('disposed');
 
       // isDisposed should return true
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       expect((lockManager as any).isDisposed()).toBe(true);
     });
   });
@@ -1123,12 +1134,12 @@ describe('LockManager', () => {
 
       // Waiter should have failed (disposed) or succeeded (grabbed lock before dispose completed)
       // Either way, it should NOT hang forever
-      expect(waiterResult.acquired === true || waiterResult.acquired === false).toBe(true);
+      expect(typeof waiterResult.acquired === 'boolean').toBe(true);
     });
 
     it('should handle multiple waiters on dispose', async () => {
       // Acquire lock
-      const _first = await lockManager.acquire('resource-1', {
+      await lockManager.acquire('resource-1', {
         holderId: 'holder-1',
         timeout: 0,
       });
@@ -1136,7 +1147,7 @@ describe('LockManager', () => {
       // Start multiple waiters
       const waiterPromises = Array.from({ length: 5 }, (_, i) =>
         lockManager.acquire('resource-1', {
-          holderId: `waiter-${i}`,
+          holderId: `waiter-${i.toString()}`,
           timeout: 5000,
         })
       );
@@ -1195,7 +1206,7 @@ describe('LockManager', () => {
       const { lockId } = await lockManager.acquire('resource-1');
       expect(await lockManager.isLocked('resource-1')).toBe(true);
 
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
       expect(await lockManager.isLocked('resource-1')).toBe(false);
     });
 
@@ -1229,7 +1240,7 @@ describe('LockManager', () => {
   describe('FIX #5: acquireMutex - disposed check after await', () => {
     it('should return false if disposed during mutex wait', async () => {
       // Acquire lock to make next acquire wait on mutex/release
-      const _first = await lockManager.acquire('resource-1', {
+      await lockManager.acquire('resource-1', {
         holderId: 'holder-1',
         timeout: 0,
       });
@@ -1254,7 +1265,7 @@ describe('LockManager', () => {
 
     it('should check disposed immediately after await returns', async () => {
       // This tests the fix: disposed check right after "await existingMutex.promise"
-      const _first = await lockManager.acquire('resource-1', {
+      await lockManager.acquire('resource-1', {
         holderId: 'holder-1',
         timeout: 0,
       });
@@ -1262,7 +1273,7 @@ describe('LockManager', () => {
       // Start multiple waiters
       const waiterPromises = Array.from({ length: 3 }, (_, i) =>
         lockManager.acquire('resource-1', {
-          holderId: `waiter-${i}`,
+          holderId: `waiter-${i.toString()}`,
           timeout: 5000,
         })
       );
@@ -1277,7 +1288,7 @@ describe('LockManager', () => {
 
       // All should have failed (disposed)
       for (const result of results) {
-        if (!result.acquired) {
+        if (result.acquired === false) {
           expect(result.reason).toContain('disposed');
         }
       }
@@ -1299,11 +1310,12 @@ describe('LockManager', () => {
       const [acquireResult] = await Promise.all([acquirePromise, disposePromise]);
 
       // Acquire may have succeeded or failed (disposed), but should not hang
-      expect(acquireResult.acquired === true || acquireResult.acquired === false).toBe(true);
+      expect(typeof acquireResult.acquired === 'boolean').toBe(true);
     });
 
     it('should track in-flight operations correctly', async () => {
       // Access private counter for testing
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       const getInFlightOps = () => (lockManager as any).inFlightOps;
 
       expect(getInFlightOps()).toBe(0);
@@ -1325,6 +1337,7 @@ describe('LockManager', () => {
     });
 
     it('should decrement in-flight counter even on failure', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
       const getInFlightOps = () => (lockManager as any).inFlightOps;
 
       // First acquire succeeds
@@ -1343,12 +1356,12 @@ describe('LockManager', () => {
       // Counter should still be 0 (properly decremented in finally block)
       expect(getInFlightOps()).toBe(0);
 
-      await lockManager.release(first.lockId!);
+      if (first.lockId !== undefined) await lockManager.release(first.lockId);
     });
 
     it('should handle dispose during slow operation', async () => {
       // Acquire first lock
-      const _first = await lockManager.acquire('resource-1', {
+      await lockManager.acquire('resource-1', {
         holderId: 'holder-1',
         timeout: 0,
       });
@@ -1365,7 +1378,7 @@ describe('LockManager', () => {
 
       // Slow waiter should complete (disposed wakes it up)
       const result = await slowWaiterPromise;
-      expect(result.acquired === true || result.acquired === false).toBe(true);
+      expect(typeof result.acquired === 'boolean').toBe(true);
     });
   });
 
@@ -1375,7 +1388,7 @@ describe('LockManager', () => {
       await lockManager.dispose();
 
       // Should NOT throw - just return silently (lock already released by releaseAll)
-      await expect(lockManager.release(lockId!)).resolves.toBeUndefined();
+      if (lockId !== undefined) await expect(lockManager.release(lockId)).resolves.toBeUndefined();
     });
 
     it('withLock() should handle dispose during callback gracefully', async () => {
@@ -1402,13 +1415,13 @@ describe('LockManager', () => {
 
     it('withLock() should handle dispose before callback gracefully', async () => {
       // Edge case: dispose after acquire but immediately before callback starts
-      let _callbackStarted = false;
+      let callbackStarted = false;
 
       // Create a new lock manager for this test (previous was disposed)
       const lm = new LockManager();
 
       const withLockPromise = lm.withLock('resource-1', async () => {
-        _callbackStarted = true;
+        callbackStarted = true;
         await new Promise(r => setTimeout(r, 30));
         return 'success';
       });
@@ -1477,7 +1490,7 @@ describe('LockManager', () => {
         expect(duration).toBeGreaterThanOrEqual(100);
         expect(duration).toBeLessThan(150);
 
-        await lockManager.release(first.lockId!);
+        if (first.lockId !== undefined) await lockManager.release(first.lockId);
       });
 
       it('should acquire immediately if acquireTimeout=0 and resource is free', async () => {
@@ -1490,7 +1503,7 @@ describe('LockManager', () => {
         expect(result.acquired).toBe(true);
         expect(duration).toBeLessThan(10);
 
-        await lockManager.release(result.lockId!);
+        if (result.lockId !== undefined) await lockManager.release(result.lockId);
       });
 
       it('should fail immediately if acquireTimeout=0 and resource is locked', async () => {
@@ -1536,7 +1549,7 @@ describe('LockManager', () => {
         // Still locked
         expect(await lockManager.isLocked('resource-1')).toBe(true);
 
-        await lockManager.release(result.lockId!);
+        if (result.lockId !== undefined) await lockManager.release(result.lockId);
       });
 
       it('should NOT auto-release if ttl is undefined (infinite)', async () => {
@@ -1550,7 +1563,7 @@ describe('LockManager', () => {
 
         expect(await lockManager.isLocked('resource-1')).toBe(true);
 
-        await lockManager.release(result.lockId!);
+        if (result.lockId !== undefined) await lockManager.release(result.lockId);
       });
 
       it('should allow long acquireTimeout with short ttl', async () => {
@@ -1576,7 +1589,7 @@ describe('LockManager', () => {
         expect(duration).toBeGreaterThanOrEqual(100);
         expect(duration).toBeLessThan(200);
 
-        await lockManager.release(second.lockId!);
+        if (second.lockId !== undefined) await lockManager.release(second.lockId);
       });
     });
 
@@ -1612,7 +1625,7 @@ describe('LockManager', () => {
         expect(duration).toBeGreaterThanOrEqual(50);
         expect(duration).toBeLessThan(100); // NOT 500ms
 
-        await lockManager.release(first.lockId!);
+        if (first.lockId !== undefined) await lockManager.release(first.lockId);
       });
 
       it('should prefer ttl over timeout when both specified', async () => {
@@ -1632,7 +1645,7 @@ describe('LockManager', () => {
       it('should use defaultAcquireTimeout from constructor', async () => {
         const lm = new LockManager({ defaultAcquireTimeout: 50 });
 
-        const _first = await lm.acquire('resource-1', {
+        await lm.acquire('resource-1', {
           holderId: 'holder-1',
           acquireTimeout: 0,
           ttl: 0,
@@ -1675,7 +1688,7 @@ describe('LockManager', () => {
 
   describe('NEW API: Optional Logging', () => {
     it('should call logger.debug on acquire', async () => {
-      const logs: Array<{ level: string; message: string; context?: Record<string, unknown> }> = [];
+      const logs: { level: string; message: string; context?: Record<string, unknown> }[] = [];
       const logger: LockLogger = {
         debug: (message, context) => logs.push({ level: 'debug', message, context }),
         info: (message, context) => logs.push({ level: 'info', message, context }),
@@ -1685,14 +1698,14 @@ describe('LockManager', () => {
 
       await lm.acquire('resource-1', { holderId: 'test-holder' });
 
-      expect(logs.some(l => l.level === 'debug' && l.message.includes('acquire'))).toBe(true);
+      expect(logs.some(l => l.level === 'debug' && l.message.includes('acquire') === true)).toBe(true);
       expect(logs.some(l => l.context?.resource === 'resource-1')).toBe(true);
 
       await lm.dispose();
     });
 
     it('should call logger.debug on release', async () => {
-      const logs: Array<{ level: string; message: string }> = [];
+      const logs: { level: string; message: string }[] = [];
       const logger: LockLogger = {
         debug: (message) => logs.push({ level: 'debug', message }),
       };
@@ -1702,7 +1715,7 @@ describe('LockManager', () => {
       const { lockId } = await lm.acquire('resource-1');
       logs.length = 0; // Clear acquire logs
 
-      await lm.release(lockId!);
+      if (lockId !== undefined) await lm.release(lockId);
 
       expect(logs.some(l => l.message.includes('release'))).toBe(true);
 
@@ -1729,7 +1742,7 @@ describe('LockManager', () => {
     });
 
     it('should respect logLevel filtering', async () => {
-      const logs: Array<{ level: string; message: string }> = [];
+      const logs: { level: string; message: string }[] = [];
       const logger: LockLogger = {
         debug: (message) => logs.push({ level: 'debug', message }),
         info: (message) => logs.push({ level: 'info', message }),
@@ -1740,7 +1753,7 @@ describe('LockManager', () => {
 
       // Acquire/release normally - should NOT log (only debug/info)
       const { lockId } = await lm.acquire('resource-1');
-      await lm.release(lockId!);
+      if (lockId !== undefined) await lm.release(lockId);
 
       // Only warn and above should be logged
       const hasDebug = logs.some(l => l.level === 'debug');
@@ -1753,7 +1766,7 @@ describe('LockManager', () => {
     });
 
     it('should log warning on timeout', async () => {
-      const logs: Array<{ level: string; message: string }> = [];
+      const logs: { level: string; message: string }[] = [];
       const logger: LockLogger = {
         debug: (message) => logs.push({ level: 'debug', message }),
         warn: (message) => logs.push({ level: 'warn', message }),
@@ -1764,7 +1777,7 @@ describe('LockManager', () => {
       await lm.acquire('resource-1', { holderId: 'holder-1', acquireTimeout: 0, ttl: 0 });
       await lm.acquire('resource-1', { holderId: 'holder-2', acquireTimeout: 50 });
 
-      expect(logs.some(l => l.level === 'warn' && l.message.includes('timeout'))).toBe(true);
+      expect(logs.some(l => l.level === 'warn' && l.message.includes('timeout') === true)).toBe(true);
 
       await lm.dispose();
     });
@@ -1775,7 +1788,7 @@ describe('LockManager', () => {
       const result = await lm.acquire('resource-1');
       expect(result.acquired).toBe(true);
 
-      await lm.release(result.lockId!);
+      if (result.lockId !== undefined) await lm.release(result.lockId);
       await lm.dispose();
     });
   });
@@ -1795,11 +1808,13 @@ describe('LockManager', () => {
       await new Promise(r => setTimeout(r, 50));
 
       // Extend by 200ms
-      const result = await lockManager.extend(lockId!, 200);
+      if (lockId === undefined) throw new Error('LockId should be defined');
+      const result = await lockManager.extend(lockId, 200);
 
       expect(result.extended).toBe(true);
       expect(result.newExpiresAt).toBeDefined();
-      expect(result.newExpiresAt!).toBeGreaterThan(Date.now() + 150);
+      if (result.newExpiresAt === undefined) throw new Error('NewExpiresAt should be defined');
+      expect(result.newExpiresAt).toBeGreaterThan(Date.now() + 150);
 
       // Wait 100ms more (original TTL would have expired)
       await new Promise(r => setTimeout(r, 100));
@@ -1807,7 +1822,7 @@ describe('LockManager', () => {
       // Still locked because we extended
       expect(await lockManager.isLocked('resource-1')).toBe(true);
 
-      await lockManager.release(lockId!);
+      await lockManager.release(lockId);
     });
 
     it('should fail to extend non-existent lock', async () => {
@@ -1823,9 +1838,10 @@ describe('LockManager', () => {
         ttl: 1000,
       });
 
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
 
-      const result = await lockManager.extend(lockId!, 1000);
+      if (lockId === undefined) throw new Error('LockId should be defined');
+      const result = await lockManager.extend(lockId, 1000);
 
       expect(result.extended).toBe(false);
       expect(result.reason).toContain('not found');
@@ -1840,7 +1856,8 @@ describe('LockManager', () => {
       // Wait for auto-release
       await new Promise(r => setTimeout(r, 80));
 
-      const result = await lockManager.extend(lockId!, 1000);
+      if (lockId === undefined) throw new Error('LockId should be defined');
+      const result = await lockManager.extend(lockId, 1000);
 
       expect(result.extended).toBe(false);
       expect(result.reason).toContain('not found');
@@ -1856,7 +1873,8 @@ describe('LockManager', () => {
       expect(holder1?.expiresAt).toBeUndefined();
 
       // Extend with TTL
-      const result = await lockManager.extend(lockId!, 100);
+      if (lockId === undefined) throw new Error('LockId should be defined');
+      const result = await lockManager.extend(lockId, 100);
 
       expect(result.extended).toBe(true);
       const holder2 = await lockManager.getLockHolder('resource-1');
@@ -1888,15 +1906,16 @@ describe('LockManager', () => {
       expect(holder1?.refCount).toBe(2);
 
       // Extend
-      const result = await lockManager.extend(lockId!, 300);
+      if (lockId === undefined) throw new Error('LockId should be defined');
+      const result = await lockManager.extend(lockId, 300);
       expect(result.extended).toBe(true);
 
       // refCount should remain 2
       const holder2 = await lockManager.getLockHolder('resource-1');
       expect(holder2?.refCount).toBe(2);
 
-      await lockManager.release(lockId!);
-      await lockManager.release(lockId!);
+      await lockManager.release(lockId);
+      await lockManager.release(lockId);
     });
 
     it('should fail extend when disposed', async () => {
@@ -1907,7 +1926,8 @@ describe('LockManager', () => {
 
       await lockManager.dispose();
 
-      const result = await lockManager.extend(lockId!, 1000);
+      if (lockId === undefined) throw new Error('LockId should be defined');
+      const result = await lockManager.extend(lockId, 1000);
 
       expect(result.extended).toBe(false);
       expect(result.reason).toContain('disposed');
@@ -1920,9 +1940,10 @@ describe('LockManager', () => {
       });
 
       // Negative TTL should fail
-      await expect(lockManager.extend(lockId!, -100)).rejects.toThrow(/ttl must be non-negative/);
+      if (lockId === undefined) throw new Error('LockId should be defined');
+      await expect(lockManager.extend(lockId, -100)).rejects.toThrow(/ttl must be non-negative/);
 
-      await lockManager.release(lockId!);
+      await lockManager.release(lockId);
     });
 
     it('should clear existing timer and set new one on extend', async () => {
@@ -1936,7 +1957,7 @@ describe('LockManager', () => {
       const timer1 = holder1?.timer;
 
       // Extend
-      await lockManager.extend(lockId!, 200);
+      if (lockId !== undefined) await lockManager.extend(lockId, 200);
 
       const holder2 = await lockManager.getLockHolder('resource-1');
       const timer2 = holder2?.timer;
@@ -1944,7 +1965,7 @@ describe('LockManager', () => {
       // Timer should be different
       expect(timer2).not.toBe(timer1);
 
-      await lockManager.release(lockId!);
+      if (lockId !== undefined) await lockManager.release(lockId);
     });
   });
 
@@ -1964,9 +1985,11 @@ describe('LockManager', () => {
           ttl: 1000,
         });
 
+        if (lockId === undefined) throw new Error('lockId should be defined');
+
         // Race: extend and reentrant acquire simultaneously
         const results = await Promise.all([
-          lockManager.extend(lockId!, 500),
+          lockManager.extend(lockId, 500),
           lockManager.acquire('resource-1', {
             holderId,
             reentrant: true,
@@ -1982,17 +2005,18 @@ describe('LockManager', () => {
         // Lock should have consistent state
         const holder = await lockManager.getLockHolder('resource-1');
         expect(holder).toBeDefined();
-        expect(holder!.timer).toBeDefined();
-        expect(holder!.expiresAt).toBeDefined();
+        expect(holder?.timer).toBeDefined();
+        expect(holder?.expiresAt).toBeDefined();
 
         // Timer and expiresAt should be consistent
         // (timer should fire around expiresAt time)
         const now = Date.now();
-        expect(holder!.expiresAt!).toBeGreaterThan(now);
+        if (holder === undefined || holder.expiresAt === undefined) throw new Error('Holder and expiresAt should be defined');
+        expect(holder.expiresAt).toBeGreaterThan(now);
 
         // Cleanup
-        await lockManager.release(lockId!);
-        await lockManager.release(lockId!);
+        if (lockId !== undefined) await lockManager.release(lockId);
+        if (lockId !== undefined) await lockManager.release(lockId);
       });
 
       it('should serialize extend() operations on same resource', async () => {
@@ -2001,11 +2025,13 @@ describe('LockManager', () => {
           ttl: 1000,
         });
 
+        if (lockId === undefined) throw new Error('lockId should be defined');
+
         // Multiple concurrent extends
         const results = await Promise.all([
-          lockManager.extend(lockId!, 100),
-          lockManager.extend(lockId!, 200),
-          lockManager.extend(lockId!, 300),
+          lockManager.extend(lockId, 100),
+          lockManager.extend(lockId, 200),
+          lockManager.extend(lockId, 300),
         ]);
 
         // All should succeed (serialized)
@@ -2014,9 +2040,9 @@ describe('LockManager', () => {
         // Final state should be consistent
         const holder = await lockManager.getLockHolder('resource-1');
         expect(holder).toBeDefined();
-        expect(holder!.timer).toBeDefined();
+        expect(holder?.timer).toBeDefined();
 
-        await lockManager.release(lockId!);
+        if (lockId !== undefined) await lockManager.release(lockId);
       });
     });
 
@@ -2028,21 +2054,22 @@ describe('LockManager', () => {
         });
 
         // Extend with ttl=0 should make lock infinite
-        const result = await lockManager.extend(lockId!, 0);
+        if (lockId === undefined) throw new Error('LockId should be defined');
+        const result = await lockManager.extend(lockId, 0);
 
         expect(result.extended).toBe(true);
 
         // Lock should now be infinite (no expiresAt, no timer)
         const holder = await lockManager.getLockHolder('resource-1');
         expect(holder).toBeDefined();
-        expect(holder!.expiresAt).toBeUndefined();
-        expect(holder!.timer).toBeUndefined();
+        expect(holder?.expiresAt).toBeUndefined();
+        expect(holder?.timer).toBeUndefined();
 
         // Wait past original TTL - lock should still exist
         await new Promise(r => setTimeout(r, 150));
         expect(await lockManager.isLocked('resource-1')).toBe(true);
 
-        await lockManager.release(lockId!);
+        await lockManager.release(lockId);
       });
 
       it('should maintain invariant: timer exists <=> expiresAt exists', async () => {
@@ -2053,22 +2080,22 @@ describe('LockManager', () => {
 
         // With TTL: both should exist
         let holder = await lockManager.getLockHolder('resource-1');
-        expect(holder!.timer).toBeDefined();
-        expect(holder!.expiresAt).toBeDefined();
+        expect(holder?.timer).toBeDefined();
+        expect(holder?.expiresAt).toBeDefined();
 
         // Extend to infinite: both should be undefined
-        await lockManager.extend(lockId!, 0);
+        if (lockId !== undefined) await lockManager.extend(lockId, 0);
         holder = await lockManager.getLockHolder('resource-1');
-        expect(holder!.timer).toBeUndefined();
-        expect(holder!.expiresAt).toBeUndefined();
+        expect(holder?.timer).toBeUndefined();
+        expect(holder?.expiresAt).toBeUndefined();
 
         // Extend back to TTL: both should exist again
-        await lockManager.extend(lockId!, 200);
+        if (lockId !== undefined) await lockManager.extend(lockId, 200);
         holder = await lockManager.getLockHolder('resource-1');
-        expect(holder!.timer).toBeDefined();
-        expect(holder!.expiresAt).toBeDefined();
+        expect(holder?.timer).toBeDefined();
+        expect(holder?.expiresAt).toBeDefined();
 
-        await lockManager.release(lockId!);
+        if (lockId !== undefined) await lockManager.release(lockId);
       });
     });
 
@@ -2101,7 +2128,7 @@ describe('LockManager', () => {
         const lockPromises = [];
         for (let i = 0; i < 10; i++) {
           lockPromises.push(
-            lm.acquire(`resource-${i}`, {
+            lm.acquire(`resource-${i.toString()}`, {
               acquireTimeout: 0,
               ttl: 30 + i * 5, // Staggered TTLs
             })
@@ -2126,7 +2153,7 @@ describe('LockManager', () => {
         const lm = new LockManager();
 
         // First holder
-        const _first = await lm.acquire('resource-1', {
+        await lm.acquire('resource-1', {
           holderId: 'holder-1',
           acquireTimeout: 0,
           ttl: 0,
@@ -2173,6 +2200,7 @@ describe('LockManager', () => {
 
     describe('HIGH #2: Event names consistency', () => {
       it('should use consistent event names (lock:release:resource)', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
         const events = (lockManager as any).lockEvents;
 
         // Correct event name format
@@ -2180,6 +2208,7 @@ describe('LockManager', () => {
 
         // Start listening
         let eventReceived = false;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         events.once(correctEventName, () => {
           eventReceived = true;
         });
@@ -2188,16 +2217,18 @@ describe('LockManager', () => {
         const { lockId } = await lockManager.acquire('resource-1', {
           acquireTimeout: 0,
         });
-        await lockManager.release(lockId!);
+        if (lockId !== undefined) await lockManager.release(lockId);
 
         // Event should have been received
         expect(eventReceived).toBe(true);
       });
 
       it('should not leak listeners with correct event names', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
         const events = (lockManager as any).lockEvents;
         const eventName = 'lock:release:resource-1';
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         const initialCount = events.listenerCount(eventName);
 
         // FIRST: Block the resource (must be first to create contention)
@@ -2216,10 +2247,11 @@ describe('LockManager', () => {
         await acquirePromise;
 
         // Listeners should be cleaned up
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         const finalCount = events.listenerCount(eventName);
         expect(finalCount).toBe(initialCount);
 
-        await lockManager.release(lockId!);
+        if (lockId !== undefined) await lockManager.release(lockId);
       });
     });
 
@@ -2231,7 +2263,7 @@ describe('LockManager', () => {
         const lm = new LockManager({ defaultAcquireTimeout: 100 });
 
         // Block resource
-        const { lockId: _lockId } = await lm.acquire('resource-1', {
+        await lm.acquire('resource-1', {
           holderId: 'holder-1',
           acquireTimeout: 0,
           ttl: 0,

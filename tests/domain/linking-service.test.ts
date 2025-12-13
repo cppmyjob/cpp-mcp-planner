@@ -16,7 +16,7 @@ describe('LinkingService', () => {
   let planId: string;
 
   beforeEach(async () => {
-    testDir = path.join(os.tmpdir(), `mcp-link-test-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `mcp-link-test-${Date.now().toString()}`);
 
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();

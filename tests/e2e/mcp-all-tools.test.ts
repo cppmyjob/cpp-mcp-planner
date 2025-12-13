@@ -31,7 +31,7 @@ async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<vo
     try {
       await fs.rm(dir, { recursive: true, force: true });
       return;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (i === maxRetries - 1) throw error;
       // Wait before retry (exponential backoff)
       await new Promise((resolve) => setTimeout(resolve, 100 * (i + 1)));
@@ -41,7 +41,7 @@ async function removeDirectoryWithRetry(dir: string, maxRetries = 3): Promise<vo
 
 // Helper to parse MCP tool result
 function parseResult<T>(result: unknown): T {
-  const r = result as { content: Array<{ type: string; text: string }> };
+  const r = result as { content: { type: string; text: string }[] };
   return JSON.parse(r.content[0].text) as T;
 }
 
@@ -127,7 +127,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ plans: Array<{ id: string }> }>(result);
+      const parsed = parseResult<{ plans: { id: string }[] }>(result);
       expect(parsed.plans.length).toBeGreaterThan(0);
     });
 
@@ -141,7 +141,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ plans: Array<{ id: string; status: string }> }>(result);
+      const parsed = parseResult<{ plans: { id: string; status: string }[] }>(result);
       expect(parsed.plans).toBeDefined();
       // All returned plans should be active
       parsed.plans.forEach((plan) => {
@@ -228,7 +228,7 @@ describe('E2E: All MCP Tools Validation', () => {
 
       const parsed = parseResult<{
         plan: { id: string; name: string; status: string };
-        phases: Array<{ id: string; title: string; status: string }>;
+        phases: { id: string; title: string; status: string }[];
         statistics: { totalPhases: number };
       }>(result);
 
@@ -498,7 +498,7 @@ describe('E2E: All MCP Tools Validation', () => {
         entityId: string;
         entityType: string;
         currentVersion: number;
-        versions: Array<{ version: number; data: any; timestamp: string }>;
+        versions: { version: number; data: Record<string, unknown>; timestamp: string }[];
         total: number;
         hasMore?: boolean;
       }>(result);
@@ -539,7 +539,7 @@ describe('E2E: All MCP Tools Validation', () => {
       });
 
       const history = parseResult<{
-        versions: Array<{ version: number }>;
+        versions: { version: number }[];
       }>(historyResult);
 
       expect(history.versions.length).toBeGreaterThanOrEqual(2);
@@ -564,7 +564,7 @@ describe('E2E: All MCP Tools Validation', () => {
         entityType: string;
         version1: { version: number; timestamp: string };
         version2: { version: number; timestamp: string };
-        changes: Record<string, { from: any; to: any; changed: boolean }>;
+        changes: Record<string, { from: unknown; to: unknown; changed: boolean }>;
       }>(result);
 
       expect(parsed.entityId).toBe(requirementId);
@@ -730,7 +730,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ solutions: Array<{ id: string }>; total: number }>(result);
+      const parsed = parseResult<{ solutions: { id: string }[]; total: number }>(result);
       expect(parsed.solutions.length).toBeGreaterThan(0);
       expect(parsed.total).toBeGreaterThan(0);
       expect(parsed.solutions.some((s) => s.id === solutionId)).toBe(true);
@@ -813,7 +813,7 @@ describe('E2E: All MCP Tools Validation', () => {
       const parsed = parseResult<{
         entityId: string;
         entityType: string;
-        versions: Array<{ version: number }>;
+        versions: { version: number }[];
         total: number;
       }>(result);
 
@@ -844,7 +844,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const history = parseResult<{ versions: Array<{ version: number }> }>(historyResult);
+      const history = parseResult<{ versions: { version: number }[] }>(historyResult);
       expect(history.versions.length).toBeGreaterThanOrEqual(2);
 
       const result = await client.callTool({
@@ -858,7 +858,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ entityId: string; changes: Record<string, any> }>(result);
+      const parsed = parseResult<{ entityId: string; changes: Record<string, unknown> }>(result);
       expect(parsed.entityId).toBe(solutionId);
       expect(parsed.changes).toBeDefined();
     });
@@ -1046,7 +1046,7 @@ describe('E2E: All MCP Tools Validation', () => {
       const parsed = parseResult<{
         entityId: string;
         entityType: string;
-        versions: Array<{ version: number }>;
+        versions: { version: number }[];
         total: number;
       }>(result);
 
@@ -1077,7 +1077,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const history = parseResult<{ versions: Array<{ version: number }> }>(historyResult);
+      const history = parseResult<{ versions: { version: number }[] }>(historyResult);
       expect(history.versions.length).toBeGreaterThanOrEqual(2);
 
       const result = await client.callTool({
@@ -1091,7 +1091,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ entityId: string; changes: Record<string, any> }>(result);
+      const parsed = parseResult<{ entityId: string; changes: Record<string, unknown> }>(result);
       expect(parsed.entityId).toBe(decisionId);
       expect(parsed.changes).toBeDefined();
     });
@@ -1172,7 +1172,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ tree: Array<{ phase: Record<string, unknown> }> }>(result);
+      const parsed = parseResult<{ tree: { phase: Record<string, unknown> }[] }>(result);
       expect(parsed.tree.length).toBeGreaterThan(0);
 
       const phase = parsed.tree[0].phase;
@@ -1202,7 +1202,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ tree: Array<{ phase: Record<string, unknown> }> }>(result);
+      const parsed = parseResult<{ tree: { phase: Record<string, unknown> }[] }>(result);
       const phase = parsed.tree[0].phase;
 
       // ONLY requested fields should be present
@@ -1229,7 +1229,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ tree: Array<{ phase: Record<string, unknown> }> }>(result);
+      const parsed = parseResult<{ tree: { phase: Record<string, unknown> }[] }>(result);
       const phase = parsed.tree[0].phase;
 
       // All fields should be present
@@ -1253,7 +1253,7 @@ describe('E2E: All MCP Tools Validation', () => {
       });
 
       const parsed = parseResult<{
-        tree: Array<{ phase: Record<string, unknown>; children: unknown[]; hasChildren: boolean }>;
+        tree: { phase: Record<string, unknown>; children: unknown[]; hasChildren: boolean }[];
       }>(result);
 
       expect(parsed.tree.length).toBeGreaterThan(0);
@@ -1311,7 +1311,7 @@ describe('E2E: All MCP Tools Validation', () => {
       const testPhaseId = parseResult<{ phaseId: string }>(createResult).phaseId;
 
       // Test all phase statuses (blocked requires notes)
-      const statusConfigs: Array<{ status: string; notes?: string }> = [
+      const statusConfigs: { status: string; notes?: string }[] = [
         { status: 'planned' },
         { status: 'in_progress' },
         { status: 'completed' },
@@ -1327,7 +1327,7 @@ describe('E2E: All MCP Tools Validation', () => {
             planId,
             phaseId: testPhaseId,
             status,
-            ...(notes && { notes }),
+            ...(notes !== undefined && notes !== '' && { notes }),
           },
         });
         const parsed = parseResult<{ success: boolean }>(result);
@@ -1724,9 +1724,9 @@ describe('E2E: All MCP Tools Validation', () => {
           },
         });
 
-        const _c1 = parseResult<{ phaseId: string }>(child1Result);
+        parseResult<{ phaseId: string }>(child1Result);
         const c2 = parseResult<{ phaseId: string }>(child2Result);
-        const _c3 = parseResult<{ phaseId: string }>(child3Result);
+        parseResult<{ phaseId: string }>(child3Result);
 
         // Delete child 2
         await client.callTool({
@@ -1775,18 +1775,18 @@ describe('E2E: All MCP Tools Validation', () => {
         });
 
         const tree = parseResult<{
-          tree: Array<{ phase: { path: string }; children: Array<{ phase: { path: string } }> }>;
+          tree: { phase: { path: string }; children: { phase: { path: string } }[] }[];
         }>(treeResult);
 
         // Collect all paths and verify uniqueness
         const allPaths = new Set<string>();
         const collectPaths = (
-          nodes: Array<{ phase: { path: string }; children?: Array<{ phase: { path: string } }> }>
+          nodes: { phase: { path: string }; children?: { phase: { path: string } }[] }[]
         ) => {
           for (const node of nodes) {
             expect(allPaths.has(node.phase.path)).toBe(false);
             allPaths.add(node.phase.path);
-            if (node.children && node.children.length > 0) {
+            if (node.children !== undefined && node.children.length > 0) {
               collectPaths(node.children);
             }
           }
@@ -1871,7 +1871,7 @@ describe('E2E: All MCP Tools Validation', () => {
       const parsed = parseResult<{
         entityId: string;
         entityType: string;
-        versions: Array<{ version: number }>;
+        versions: { version: number }[];
         total: number;
       }>(result);
 
@@ -1902,7 +1902,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const history = parseResult<{ versions: Array<{ version: number }> }>(historyResult);
+      const history = parseResult<{ versions: { version: number }[] }>(historyResult);
       expect(history.versions.length).toBeGreaterThanOrEqual(2);
 
       const result = await client.callTool({
@@ -1916,7 +1916,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ entityId: string; changes: Record<string, any> }>(result);
+      const parsed = parseResult<{ entityId: string; changes: Record<string, unknown> }>(result);
       expect(parsed.entityId).toBe(phaseId);
       expect(parsed.changes).toBeDefined();
     });
@@ -2026,7 +2026,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ links: Array<{ relationType: string }> }>(result);
+      const parsed = parseResult<{ links: { relationType: string }[] }>(result);
       expect(parsed.links).toBeDefined();
       // All returned links should be of type 'implements'
       parsed.links.forEach((link) => {
@@ -2219,7 +2219,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ artifacts: Array<{ id: string }>; total: number }>(result);
+      const parsed = parseResult<{ artifacts: { id: string }[]; total: number }>(result);
       expect(parsed.artifacts.length).toBeGreaterThan(0);
       expect(parsed.total).toBeGreaterThan(0);
       expect(parsed.artifacts.some((a) => a.id === artifactId)).toBe(true);
@@ -2237,7 +2237,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ artifacts: Array<{ id: string }>; total: number }>(result);
+      const parsed = parseResult<{ artifacts: { id: string }[]; total: number }>(result);
       expect(parsed.artifacts).toBeDefined();
       expect(parsed.total).toBeGreaterThanOrEqual(0);
     });
@@ -2254,7 +2254,7 @@ describe('E2E: All MCP Tools Validation', () => {
         },
       });
 
-      const parsed = parseResult<{ artifacts: Array<{ id: string }>; total: number }>(result);
+      const parsed = parseResult<{ artifacts: { id: string }[]; total: number }>(result);
       expect(parsed.artifacts).toBeDefined();
       // Should find at least our created artifact
       expect(parsed.artifacts.length).toBeGreaterThan(0);
@@ -2434,7 +2434,7 @@ describe('E2E: All MCP Tools Validation', () => {
       });
 
       const parsed = parseResult<{
-        results: Array<{ success: boolean; id?: string }>;
+        results: { success: boolean; id?: string }[];
         tempIdMapping: Record<string, string>;
       }>(result);
 
@@ -2494,7 +2494,7 @@ describe('E2E: All MCP Tools Validation', () => {
       });
 
       const parsed = parseResult<{
-        results: Array<{ success: boolean; id?: string }>;
+        results: { success: boolean; id?: string }[];
         tempIdMapping: Record<string, string>;
       }>(result);
 
@@ -2504,9 +2504,9 @@ describe('E2E: All MCP Tools Validation', () => {
       expect(parsed.results[2].success).toBe(true);
 
       // Verify temp ID mapping
-      expect(parsed.tempIdMapping['$0']).toBeDefined();
-      expect(parsed.tempIdMapping['$1']).toBeDefined();
-      expect(parsed.tempIdMapping['$2']).toBeDefined();
+      expect(parsed.tempIdMapping.$0).toBeDefined();
+      expect(parsed.tempIdMapping.$1).toBeDefined();
+      expect(parsed.tempIdMapping.$2).toBeDefined();
 
       // Verify all operations returned IDs
       expect(parsed.results[0].id).toBeDefined();
@@ -2519,15 +2519,15 @@ describe('E2E: All MCP Tools Validation', () => {
         arguments: {
           action: 'get',
           planId,
-          solutionId: parsed.tempIdMapping['$2'],
+          solutionId: parsed.tempIdMapping.$2,
           fields: ['*'],
         },
       });
 
       const solution = parseResult<{ solution: { addressing: string[] } }>(solutionResult);
       expect(solution.solution.addressing).toHaveLength(2);
-      expect(solution.solution.addressing).toContain(parsed.tempIdMapping['$0']);
-      expect(solution.solution.addressing).toContain(parsed.tempIdMapping['$1']);
+      expect(solution.solution.addressing).toContain(parsed.tempIdMapping.$0);
+      expect(solution.solution.addressing).toContain(parsed.tempIdMapping.$1);
     });
 
     it('action: execute with cross-entity references (requirement → phase → link)', async () => {
@@ -2573,7 +2573,7 @@ describe('E2E: All MCP Tools Validation', () => {
       });
 
       const parsed = parseResult<{
-        results: Array<{ success: boolean; id?: string }>;
+        results: { success: boolean; id?: string }[];
         tempIdMapping: Record<string, string>;
       }>(result);
 
@@ -2588,15 +2588,15 @@ describe('E2E: All MCP Tools Validation', () => {
         arguments: {
           action: 'get',
           planId,
-          entityId: parsed.tempIdMapping['$1'], // Phase ID
+          entityId: parsed.tempIdMapping.$1, // Phase ID
           direction: 'both',
         },
       });
 
-      const links = parseResult<{ links: Array<{ sourceId: string; targetId: string }> }>(linkResult);
+      const links = parseResult<{ links: { sourceId: string; targetId: string }[] }>(linkResult);
       expect(links.links.length).toBeGreaterThan(0);
       const createdLink = links.links.find(
-        (l) => l.sourceId === parsed.tempIdMapping['$1'] && l.targetId === parsed.tempIdMapping['$0']
+        (l) => l.sourceId === parsed.tempIdMapping.$1 && l.targetId === parsed.tempIdMapping.$0
       );
       expect(createdLink).toBeDefined();
     });
@@ -2687,7 +2687,7 @@ describe('E2E: All MCP Tools Validation', () => {
       });
 
       const parsed = parseResult<{
-        results: Array<{ success: boolean; id?: string }>;
+        results: { success: boolean; id?: string }[];
         tempIdMapping: Record<string, string>;
       }>(result);
 
@@ -2700,11 +2700,11 @@ describe('E2E: All MCP Tools Validation', () => {
       });
 
       // Verify all temp IDs were mapped
-      expect(parsed.tempIdMapping['$0']).toBeDefined();
-      expect(parsed.tempIdMapping['$1']).toBeDefined();
-      expect(parsed.tempIdMapping['$2']).toBeDefined();
-      expect(parsed.tempIdMapping['$3']).toBeDefined();
-      expect(parsed.tempIdMapping['$4']).toBeDefined();
+      expect(parsed.tempIdMapping.$0).toBeDefined();
+      expect(parsed.tempIdMapping.$1).toBeDefined();
+      expect(parsed.tempIdMapping.$2).toBeDefined();
+      expect(parsed.tempIdMapping.$3).toBeDefined();
+      expect(parsed.tempIdMapping.$4).toBeDefined();
 
       // Verify artifact has resolved relatedPhaseId
       const artifactResult = await client.callTool({
@@ -2712,7 +2712,7 @@ describe('E2E: All MCP Tools Validation', () => {
         arguments: {
           action: 'get',
           planId,
-          artifactId: parsed.tempIdMapping['$4'],
+          artifactId: parsed.tempIdMapping.$4,
           fields: ['*'],
         },
       });
@@ -2720,8 +2720,8 @@ describe('E2E: All MCP Tools Validation', () => {
       const artifact = parseResult<{
         artifact: { relatedPhaseId: string; relatedRequirementIds: string[] };
       }>(artifactResult);
-      expect(artifact.artifact.relatedPhaseId).toBe(parsed.tempIdMapping['$3']); // Resolved from $3
-      expect(artifact.artifact.relatedRequirementIds).toContain(parsed.tempIdMapping['$0']); // Resolved from $0
+      expect(artifact.artifact.relatedPhaseId).toBe(parsed.tempIdMapping.$3); // Resolved from $3
+      expect(artifact.artifact.relatedRequirementIds).toContain(parsed.tempIdMapping.$0); // Resolved from $0
     });
 
     it('action: execute with rollback on error (atomic transaction)', async () => {

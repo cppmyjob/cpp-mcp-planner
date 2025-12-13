@@ -8,7 +8,7 @@ import { FileLockManager } from '../../src/infrastructure/repositories/file/file
 
 describe('FileLinkRepository', () => {
   // FIX M-4: Use os.tmpdir() instead of process.cwd()
-  const testDir = path.join(os.tmpdir(), `test-${Date.now()}-file-link-repository`);
+  const testDir = path.join(os.tmpdir(), `test-${Date.now().toString()}-file-link-repository`);
   const planId = 'test-plan-1';
 
   let repository: FileLinkRepository;
@@ -44,7 +44,7 @@ describe('FileLinkRepository', () => {
       expect(repository).toBeDefined();
     });
 
-    it('should initialize with FileLockManager', async () => {
+    it('should initialize with FileLockManager', () => {
       expect(lockManager.isInitialized()).toBe(true);
     });
 
@@ -152,7 +152,7 @@ describe('FileLinkRepository', () => {
 
       const links = await repository.findLinksBySource('req-1');
       expect(links).toHaveLength(2);
-      expect(links.every((l: any) => l.sourceId === 'req-1')).toBe(true);
+      expect(links.every((l: Link) => l.sourceId === 'req-1')).toBe(true);
     });
 
     it('should find links by source ID and relation type', async () => {
@@ -172,7 +172,7 @@ describe('FileLinkRepository', () => {
 
       const links = await repository.findLinksByTarget('sol-1');
       expect(links).toHaveLength(2);
-      expect(links.every((l: any) => l.targetId === 'sol-1')).toBe(true);
+      expect(links.every((l: Link) => l.targetId === 'sol-1')).toBe(true);
     });
 
     it('should find links by target ID and relation type', async () => {
@@ -273,7 +273,7 @@ describe('FileLinkRepository', () => {
 
       const created = await repository.createMany(links);
       expect(created).toHaveLength(3);
-      expect(created.every((l: any) => l.id && l.createdAt)).toBe(true);
+      expect(created.every((l: Link) => Boolean(l.id) && Boolean(l.createdAt))).toBe(true);
     });
 
     it('should rollback all on createMany failure', async () => {
@@ -282,7 +282,7 @@ describe('FileLinkRepository', () => {
         { sourceId: '', targetId: 'sol-2', relationType: 'implements' as RelationType }, // Invalid
       ];
 
-      await expect(repository.createMany(links as any)).rejects.toThrow();
+      await expect(repository.createMany(links as Omit<Link, 'id' | 'createdAt' | 'createdBy'>[])).rejects.toThrow();
 
       // Verify rollback - no links should exist
       const allLinks = await repository.findLinksBySource('req-1');
@@ -372,25 +372,25 @@ describe('FileLinkRepository', () => {
   describe('REVIEW: Concurrent Operations with FileLockManager', () => {
     it('should handle concurrent creates safely', async () => {
       const promises = Array.from({ length: 10 }, (_, i) =>
-        repository.createLink(createTestLink(`req-${i}`, `sol-${i}`, 'implements'))
+        repository.createLink(createTestLink(`req-${i.toString()}`, `sol-${i.toString()}`, 'implements'))
       );
 
       const results = await Promise.all(promises);
       expect(results).toHaveLength(10);
 
       // All IDs should be unique
-      const ids = results.map((r: any) => r.id);
+      const ids = results.map((r: Link) => r.id);
       expect(new Set(ids).size).toBe(10);
     });
 
     it('should handle concurrent deletes safely', async () => {
       const links = await Promise.all(
         Array.from({ length: 10 }, (_, i) =>
-          repository.createLink(createTestLink(`req-${i}`, `sol-${i}`, 'implements'))
+          repository.createLink(createTestLink(`req-${i.toString()}`, `sol-${i.toString()}`, 'implements'))
         )
       );
 
-      const deletePromises = links.map((l: any) => repository.deleteLink(l.id));
+      const deletePromises = links.map((l: Link) => repository.deleteLink(l.id));
       await Promise.all(deletePromises);
 
       for (const link of links) {
@@ -424,7 +424,7 @@ describe('FileLinkRepository', () => {
 
       const links = await repository.findLinksBySource('req-1');
       expect(links).toHaveLength(2);
-      expect(links.map((l: any) => l.id)).not.toContain(link1.id);
+      expect(links.map((l: Link) => l.id)).not.toContain(link1.id);
     });
 
     it('should maintain target index consistency after multiple operations', async () => {
@@ -436,7 +436,7 @@ describe('FileLinkRepository', () => {
 
       const links = await repository.findLinksByTarget('sol-1');
       expect(links).toHaveLength(2);
-      expect(links.map((l: any) => l.id)).not.toContain(link1.id);
+      expect(links.map((l: Link) => l.id)).not.toContain(link1.id);
     });
 
     it('should maintain index consistency with createMany and deleteMany', async () => {
@@ -491,7 +491,7 @@ describe('FileLinkRepository', () => {
       const invalidLink = {
         sourceId: 'req-1',
         targetId: 'sol-1',
-        relationType: 'invalid_type' as any, // Not a valid RelationType
+        relationType: 'invalid_type' as RelationType, // Not a valid RelationType
       };
 
       await expect(repository.createLink(invalidLink)).rejects.toThrow(/validation|relationType/i);
@@ -505,9 +505,9 @@ describe('FileLinkRepository', () => {
 
       for (let i = 0; i < validTypes.length; i++) {
         const link = {
-          sourceId: `src-${i}`,
-          targetId: `tgt-${i}`,
-          relationType: validTypes[i] as any,
+          sourceId: `src-${i.toString()}`,
+          targetId: `tgt-${i.toString()}`,
+          relationType: validTypes[i] as RelationType,
         };
         const created = await repository.createLink(link);
         expect(created.relationType).toBe(validTypes[i]);
