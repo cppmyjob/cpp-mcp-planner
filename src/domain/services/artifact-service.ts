@@ -10,6 +10,7 @@ import type {
   Tag,
   VersionHistory,
   VersionDiff,
+  Phase,
 } from '../entities/types.js';
 import { validateTags, validateTargets, validateCodeRefs, validateRequiredString, validateRequiredEnum } from './validators.js';
 import { filterArtifact } from '../utils/field-filter.js';
@@ -156,6 +157,18 @@ export class ArtifactService {
   }
 
   /**
+   * BUG #12 FIX: Validate that relatedPhaseId references an existing phase
+   */
+  private async validatePhaseReference(planId: string, phaseId: string): Promise<void> {
+    const phaseRepo = this.repositoryFactory.createRepository<Phase>('phase', planId);
+    try {
+      await phaseRepo.findById(phaseId);
+    } catch {
+      throw new Error(`Phase '${phaseId}' not found`);
+    }
+  }
+
+  /**
    * Validates that a slug is unique within the plan
    * @param artifacts - Existing artifacts in the plan
    * @param slug - The slug to validate
@@ -194,6 +207,11 @@ export class ArtifactService {
     }
     // Validate codeRefs format
     validateCodeRefs(input.artifact.codeRefs ?? []);
+
+    // BUG #12 FIX: Validate relatedPhaseId reference exists
+    if (input.artifact.relatedPhaseId !== undefined && input.artifact.relatedPhaseId !== '') {
+      await this.validatePhaseReference(input.planId, input.artifact.relatedPhaseId);
+    }
 
     const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
     const artifacts = await repo.findAll();

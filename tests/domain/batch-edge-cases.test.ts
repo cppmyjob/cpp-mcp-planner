@@ -202,7 +202,7 @@ describe('BatchService - Edge Cases', () => {
     ).rejects.toThrow('Parent phase not found');
   });
 
-  it('Test 45: Mixed real UUIDs and temp IDs in arrays resolve correctly', async () => {
+  it('Test 45: Mixed temp IDs in arrays resolve correctly', async () => {
     const result = await batchService.executeBatch({
       planId: testPlanId,
       operations: [
@@ -219,11 +219,23 @@ describe('BatchService - Edge Cases', () => {
           },
         },
         {
+          entityType: 'requirement',
+          payload: {
+            tempId: '$1',
+            title: 'Req 2',
+            description: 'Second',
+            source: { type: 'user-request' },
+            acceptanceCriteria: [],
+            priority: 'medium',
+            category: 'functional',
+          },
+        },
+        {
           entityType: 'solution',
           payload: {
             title: 'Solution',
             description: 'Implementation',
-            addressing: ['$0', '550e8400-e29b-41d4-a716-446655440000'], // Mix of temp ID and real UUID
+            addressing: ['$0', '$1'], // Multiple temp IDs
             approach: 'Approach',
           },
         },
@@ -232,7 +244,7 @@ describe('BatchService - Edge Cases', () => {
 
     const solutions = await loadEntities<Solution>(repositoryFactory, testPlanId, 'solutions');
     expect(solutions[0].addressing[0]).toBe(result.results[0].id); // $0 resolved
-    expect(solutions[0].addressing[1]).toBe('550e8400-e29b-41d4-a716-446655440000'); // Real UUID unchanged
+    expect(solutions[0].addressing[1]).toBe(result.results[1].id); // $1 resolved
   });
 
   it('Test 46: Large batch (100 operations) succeeds', async () => {

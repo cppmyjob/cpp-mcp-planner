@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { ArtifactService } from '../../src/domain/services/artifact-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
+import { PhaseService } from '../../src/domain/services/phase-service.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import * as fs from 'fs/promises';
@@ -10,6 +11,7 @@ import * as os from 'os';
 describe('ArtifactService', () => {
   let service: ArtifactService;
   let planService: PlanService;
+  let phaseService: PhaseService;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let testDir: string;
@@ -32,6 +34,7 @@ describe('ArtifactService', () => {
     await planRepo.initialize();
 
     planService = new PlanService(repositoryFactory);
+    phaseService = new PhaseService(repositoryFactory, planService);
     service = new ArtifactService(repositoryFactory, planService);
 
     const plan = await planService.createPlan({
@@ -187,6 +190,15 @@ describe('ArtifactService', () => {
     });
 
     it('should add artifact with related entities', async () => {
+      // Create a real phase first for valid relatedPhaseId
+      const phase = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Implementation Phase',
+          description: 'Test phase',
+        },
+      });
+
       const result = await service.addArtifact({
         planId,
         artifact: {
@@ -198,15 +210,66 @@ describe('ArtifactService', () => {
             sourceCode: 'database:\n  host: localhost',
             filename: 'config.yml',
           },
-          relatedPhaseId: 'phase-123',
+          relatedPhaseId: phase.phaseId,
           relatedRequirementIds: ['req-1', 'req-2'],
         },
       });
 
       // Verify via getArtifact
       const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
-      expect(artifact.relatedPhaseId).toBe('phase-123');
+      expect(artifact.relatedPhaseId).toBe(phase.phaseId);
       expect(artifact.relatedRequirementIds).toEqual(['req-1', 'req-2']);
+    });
+
+    // BUG #12: Foreign key validation for relatedPhaseId reference
+    describe('relatedPhaseId validation (BUG #12 - Sprint 4)', () => {
+      it('RED: should reject non-existent phase ID in relatedPhaseId', async () => {
+        await expect(service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Artifact with fake phase',
+            artifactType: 'code',
+            relatedPhaseId: 'non-existent-phase-id',
+          },
+        })).rejects.toThrow(/Phase.*non-existent-phase-id.*not found/i);
+      });
+
+      it('GREEN: should accept valid phase ID in relatedPhaseId', async () => {
+        // Create a real phase first
+        const phase = await phaseService.addPhase({
+          planId,
+          phase: {
+            title: 'Real Phase',
+            description: 'Test phase',
+          },
+        });
+
+        // Should succeed with valid phase ID
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Artifact with real phase',
+            artifactType: 'code',
+            relatedPhaseId: phase.phaseId,
+          },
+        });
+
+        expect(result.artifactId).toBeDefined();
+        const { artifact } = await service.getArtifact({ planId, artifactId: result.artifactId });
+        expect(artifact.relatedPhaseId).toBe(phase.phaseId);
+      });
+
+      it('GREEN: should accept undefined relatedPhaseId (no validation needed)', async () => {
+        const result = await service.addArtifact({
+          planId,
+          artifact: {
+            title: 'Artifact without phase',
+            artifactType: 'code',
+          },
+        });
+
+        expect(result.artifactId).toBeDefined();
+      });
     });
   });
 
@@ -1101,8 +1164,16 @@ describe('ArtifactService', () => {
 
   describe('fields parameter support', () => {
     let artId: string;
+    let testPhaseId: string;
 
     beforeEach(async () => {
+      // Create a real phase for relatedPhaseId
+      const phase = await phaseService.addPhase({
+        planId,
+        phase: { title: 'Test Phase for Fields' },
+      });
+      testPhaseId = phase.phaseId;
+
       const result = await service.addArtifact({
         planId,
         artifact: {
@@ -1118,7 +1189,7 @@ describe('ArtifactService', () => {
           targets: [
             { path: 'src/test.ts', action: 'create', lineNumber: 42, description: 'Main file' },
           ],
-          relatedPhaseId: 'phase-123',
+          relatedPhaseId: testPhaseId,
           codeRefs: ['src/main.ts:10'],
         },
       });

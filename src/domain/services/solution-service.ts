@@ -3,7 +3,7 @@ import type { RepositoryFactory } from '../../domain/repositories/interfaces.js'
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { DecisionService } from './decision-service.js';
-import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
+import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag, VersionHistory, VersionDiff, Requirement } from '../entities/types.js';
 import { validateEffortEstimate, validateTags, validateRequiredString } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
@@ -281,6 +281,12 @@ export class SolutionService {
     }
     // Validate tags format
     validateTags(input.solution.tags ?? []);
+
+    // BUG #5 FIX: Validate addressing[] references exist
+    const addressingIds = input.solution.addressing ?? [];
+    if (addressingIds.length > 0) {
+      await this.validateAddressingReferences(input.planId, addressingIds);
+    }
 
     const solutionId = uuidv4();
     const now = new Date().toISOString();
@@ -586,6 +592,21 @@ export class SolutionService {
     await this.planService.updateStatistics(input.planId);
 
     return { success: true, message: 'Solution deleted' };
+  }
+
+  /**
+   * BUG #5 FIX: Validate that all requirement IDs in addressing[] exist
+   */
+  private async validateAddressingReferences(planId: string, addressingIds: string[]): Promise<void> {
+    const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', planId);
+
+    for (const reqId of addressingIds) {
+      try {
+        await reqRepo.findById(reqId);
+      } catch {
+        throw new Error(`Requirement '${reqId}' not found`);
+      }
+    }
   }
 
   private validateTradeoffs(tradeoffs: unknown[]): void {

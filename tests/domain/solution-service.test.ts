@@ -19,6 +19,10 @@ describe('SolutionService', () => {
   let testDir: string;
   let planId: string;
 
+  // Helper IDs for real entities (created in beforeEach)
+  let req1Id: string;
+  let req2Id: string;
+
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `mcp-sol-test-${Date.now().toString()}`);
 
@@ -45,6 +49,33 @@ describe('SolutionService', () => {
       description: 'For testing solutions',
     });
     planId = plan.planId;
+
+    // Create real requirements for testing
+    const req1 = await requirementService.addRequirement({
+      planId,
+      requirement: {
+        title: 'Requirement 1',
+        description: 'First test requirement',
+        category: 'functional',
+        priority: 'high',
+        acceptanceCriteria: [],
+        source: { type: 'user-request' },
+      },
+    });
+    req1Id = req1.requirementId;
+
+    const req2 = await requirementService.addRequirement({
+      planId,
+      requirement: {
+        title: 'Requirement 2',
+        description: 'Second test requirement',
+        category: 'functional',
+        priority: 'medium',
+        acceptanceCriteria: [],
+        source: { type: 'user-request' },
+      },
+    });
+    req2Id = req2.requirementId;
   });
 
   afterEach(async () => {
@@ -145,7 +176,7 @@ describe('SolutionService', () => {
           tradeoffs: [
             { aspect: 'Security', pros: ['Battle-tested'], cons: ['Dependency'], score: 8 },
           ],
-          addressing: ['req-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 4, unit: 'hours', confidence: 'high' },
             technicalFeasibility: 'high',
@@ -187,6 +218,106 @@ describe('SolutionService', () => {
       expect(solution.tradeoffs).toHaveLength(2);
       expect(solution.tradeoffs[0].score).toBe(7);
     });
+
+    // BUG #5: Foreign key validation for addressing[] references
+    describe('addressing[] validation (BUG #5 - Sprint 4)', () => {
+      it('RED: should reject non-existent requirement ID in addressing[]', async () => {
+        await expect(service.proposeSolution({
+          planId,
+          solution: {
+            title: 'Solution with fake requirement',
+            description: 'Test',
+            approach: 'Test',
+            addressing: ['non-existent-requirement-id'],
+          },
+        })).rejects.toThrow(/Requirement.*non-existent-requirement-id.*not found/i);
+      });
+
+      it('RED: should reject multiple non-existent requirement IDs', async () => {
+        await expect(service.proposeSolution({
+          planId,
+          solution: {
+            title: 'Solution with fake requirements',
+            addressing: ['fake-req-1', 'fake-req-2'],
+          },
+        })).rejects.toThrow(/Requirement.*not found/i);
+      });
+
+      it('GREEN: should accept valid requirement ID in addressing[]', async () => {
+        // Create a real requirement first
+        const req = await requirementService.addRequirement({
+          planId,
+          requirement: {
+            title: 'Real Requirement',
+            description: 'Test requirement',
+            category: 'functional',
+            priority: 'high',
+            acceptanceCriteria: [],
+            source: { type: 'user-request' },
+          },
+        });
+
+        // Should succeed with valid requirement ID
+        const result = await service.proposeSolution({
+          planId,
+          solution: {
+            title: 'Solution with real requirement',
+            addressing: [req.requirementId],
+          },
+        });
+
+        expect(result.solutionId).toBeDefined();
+        const { solution } = await service.getSolution({ planId, solutionId: result.solutionId });
+        expect(solution.addressing).toContain(req.requirementId);
+      });
+
+      it('GREEN: should accept empty addressing[] (no validation needed)', async () => {
+        const result = await service.proposeSolution({
+          planId,
+          solution: {
+            title: 'Solution without addressing',
+            addressing: [],
+          },
+        });
+
+        expect(result.solutionId).toBeDefined();
+      });
+
+      it('GREEN: should accept undefined addressing (defaults to [])', async () => {
+        const result = await service.proposeSolution({
+          planId,
+          solution: {
+            title: 'Solution with undefined addressing',
+          },
+        });
+
+        expect(result.solutionId).toBeDefined();
+      });
+
+      it('RED: should reject mix of valid and invalid requirement IDs', async () => {
+        // Create a real requirement
+        const req = await requirementService.addRequirement({
+          planId,
+          requirement: {
+            title: 'Real Requirement',
+            description: 'Test',
+            category: 'functional',
+            priority: 'medium',
+            acceptanceCriteria: [],
+            source: { type: 'user-request' },
+          },
+        });
+
+        // Mix of valid and invalid IDs should fail
+        await expect(service.proposeSolution({
+          planId,
+          solution: {
+            title: 'Solution with mixed addressing',
+            addressing: [req.requirementId, 'non-existent-id'],
+          },
+        })).rejects.toThrow(/Requirement.*non-existent-id.*not found/i);
+      });
+    });
   });
 
   describe('compare_solutions', () => {
@@ -205,7 +336,7 @@ describe('SolutionService', () => {
             { aspect: 'Security', pros: ['Tested'], cons: ['Dep'], score: 8 },
             { aspect: 'Performance', pros: ['Fast'], cons: [], score: 9 },
           ],
-          addressing: ['req-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 4, unit: 'hours', confidence: 'high' },
             technicalFeasibility: 'high',
@@ -225,7 +356,7 @@ describe('SolutionService', () => {
             { aspect: 'Security', pros: ['Modern'], cons: ['New'], score: 7 },
             { aspect: 'Performance', pros: ['Async'], cons: ['Overhead'], score: 7 },
           ],
-          addressing: ['req-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 6, unit: 'hours', confidence: 'medium' },
             technicalFeasibility: 'high',
@@ -245,7 +376,7 @@ describe('SolutionService', () => {
             { aspect: 'Security', pros: ['Passport ecosystem'], cons: ['Heavy'], score: 6 },
             { aspect: 'Performance', pros: [], cons: ['Slow'], score: 5 },
           ],
-          addressing: ['req-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 8, unit: 'hours', confidence: 'low' },
             technicalFeasibility: 'medium',
@@ -404,7 +535,7 @@ describe('SolutionService', () => {
           description: 'First',
           approach: 'A',
           tradeoffs: [],
-          addressing: ['req-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
             technicalFeasibility: 'high',
@@ -420,7 +551,7 @@ describe('SolutionService', () => {
           description: 'Second',
           approach: 'B',
           tradeoffs: [],
-          addressing: ['req-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
             technicalFeasibility: 'high',
@@ -458,7 +589,7 @@ describe('SolutionService', () => {
           tradeoffs: [
             { aspect: 'Security', pros: ['Stateless', 'Scalable'], cons: ['Token management'], score: 8 },
           ],
-          addressing: ['req-auth-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 8, unit: 'hours', confidence: 'high' },
             technicalFeasibility: 'high',
@@ -491,7 +622,7 @@ describe('SolutionService', () => {
           description: 'Description A',
           approach: 'Approach A',
           tradeoffs: [],
-          addressing: ['req-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
             technicalFeasibility: 'high',
@@ -522,7 +653,7 @@ describe('SolutionService', () => {
           description: 'Description B',
           approach: 'Approach B',
           tradeoffs: [],
-          addressing: ['req-002'],
+          addressing: [req2Id],
           evaluation: {
             effortEstimate: { value: 2, unit: 'hours', confidence: 'medium' },
             technicalFeasibility: 'medium',
@@ -557,7 +688,7 @@ describe('SolutionService', () => {
             { aspect: 'Flexibility', pros: ['Query what you need'], cons: ['Learning curve'], score: 9 },
             { aspect: 'Performance', pros: ['Efficient'], cons: ['Complexity'], score: 7 },
           ],
-          addressing: ['req-api-001', 'req-api-002'],
+          addressing: [req1Id, req2Id],
           evaluation: {
             effortEstimate: { value: 3, unit: 'days', confidence: 'medium' },
             technicalFeasibility: 'high',
@@ -587,8 +718,8 @@ describe('SolutionService', () => {
       expect(decision.context).toContain('Apollo Server');
       expect(decision.decision).toContain('GraphQL API');
       expect(decision.consequences).toContain('risk');
-      expect(decision.impactScope).toContain('req-api-001');
-      expect(decision.impactScope).toContain('req-api-002');
+      expect(decision.impactScope).toContain(req1Id);
+      expect(decision.impactScope).toContain(req2Id);
       expect(decision.status).toBe('active');
     });
 
@@ -603,7 +734,7 @@ describe('SolutionService', () => {
           tradeoffs: [
             { aspect: 'Simplicity', pros: ['Well known'], cons: ['Over-fetching'], score: 6 },
           ],
-          addressing: ['req-api-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 2, unit: 'days', confidence: 'high' },
             technicalFeasibility: 'high',
@@ -621,7 +752,7 @@ describe('SolutionService', () => {
           tradeoffs: [
             { aspect: 'Flexibility', pros: ['Efficient'], cons: ['Complex'], score: 9 },
           ],
-          addressing: ['req-api-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 3, unit: 'days', confidence: 'medium' },
             technicalFeasibility: 'high',
@@ -639,7 +770,7 @@ describe('SolutionService', () => {
           tradeoffs: [
             { aspect: 'Performance', pros: ['Very fast'], cons: ['Steep learning'], score: 7 },
           ],
-          addressing: ['req-api-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 5, unit: 'days', confidence: 'low' },
             technicalFeasibility: 'medium',
@@ -680,7 +811,7 @@ describe('SolutionService', () => {
           description: 'The only option',
           approach: 'Do it this way',
           tradeoffs: [],
-          addressing: ['req-unique-001'],
+          addressing: [req1Id],
           evaluation: {
             effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
             technicalFeasibility: 'high',
@@ -933,11 +1064,9 @@ describe('SolutionService', () => {
   });
 
   describe('fields parameter support', () => {
-    let reqId: string;
     let solId: string;
 
     beforeEach(async () => {
-      reqId = 'req-123';
       const result = await service.proposeSolution({
         planId,
         solution: {
@@ -945,7 +1074,7 @@ describe('SolutionService', () => {
           description: 'Full description',
           approach: 'Detailed approach',
           implementationNotes: 'Important implementation notes',
-          addressing: [reqId],
+          addressing: [req1Id],
           tradeoffs: [
             { aspect: 'performance', pros: ['fast'], cons: ['memory'], score: 8 },
           ],

@@ -1,5 +1,8 @@
 import type { RepositoryFactory } from '../../infrastructure/factory/repository-factory.js';
-import type { Link, RelationType } from '../entities/types.js';
+import type { Link, RelationType, Requirement, Solution, Phase, Decision, Artifact } from '../entities/types.js';
+
+// Entity types for validation
+type EntityType = 'requirement' | 'solution' | 'phase' | 'decision' | 'artifact';
 
 // Input types
 export interface LinkEntitiesInput {
@@ -47,6 +50,10 @@ export class LinkingService {
 
   public async linkEntities(input: LinkEntitiesInput): Promise<LinkEntitiesResult> {
     const linkRepo = this.repositoryFactory.createLinkRepository(input.planId);
+
+    // BUG #13 FIX: Validate that sourceId and targetId reference existing entities
+    await this.validateEntityExists(input.planId, input.sourceId, 'sourceId');
+    await this.validateEntityExists(input.planId, input.targetId, 'targetId');
 
     // Check for cycle if depends_on
     if (input.relationType === 'depends_on') {
@@ -187,5 +194,48 @@ export class LinkingService {
   public async deleteLinksForEntity(planId: string, entityId: string): Promise<number> {
     const linkRepo = this.repositoryFactory.createLinkRepository(planId);
     return linkRepo.deleteLinksForEntity(entityId);
+  }
+
+  /**
+   * BUG #13 FIX: Validate that an entity ID references an existing entity
+   * Checks all entity types (requirement, solution, phase, decision, artifact)
+   */
+  private async validateEntityExists(planId: string, entityId: string, fieldName: string): Promise<void> {
+    const entityTypes: EntityType[] = ['requirement', 'solution', 'phase', 'decision', 'artifact'];
+
+    for (const entityType of entityTypes) {
+      try {
+        const repo = this.getRepositoryForType(planId, entityType);
+        await repo.findById(entityId);
+        return; // Found - validation passed
+      } catch {
+        // Not found in this type - continue checking other types
+      }
+    }
+
+    // Not found in any entity type
+    throw new Error(`Entity '${entityId}' not found`);
+  }
+
+  /**
+   * Get repository for a specific entity type
+   */
+  private getRepositoryForType(planId: string, entityType: EntityType): ReturnType<typeof this.repositoryFactory.createRepository> {
+    switch (entityType) {
+      case 'requirement':
+        return this.repositoryFactory.createRepository<Requirement>('requirement', planId);
+      case 'solution':
+        return this.repositoryFactory.createRepository<Solution>('solution', planId);
+      case 'phase':
+        return this.repositoryFactory.createRepository<Phase>('phase', planId);
+      case 'decision':
+        return this.repositoryFactory.createRepository<Decision>('decision', planId);
+      case 'artifact':
+        return this.repositoryFactory.createRepository<Artifact>('artifact', planId);
+      default: {
+        const _exhaustive: never = entityType;
+        throw new Error(`Unknown entity type: ${String(_exhaustive)}`);
+      }
+    }
   }
 }

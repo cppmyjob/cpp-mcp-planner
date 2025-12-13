@@ -1194,14 +1194,25 @@ describe('Tool Handlers Integration', () => {
   });
 
   describe('Linking Tools', () => {
+    let solutionId: string;
+    let requirementId: string;
+
+    beforeEach(async () => {
+      // Create real entities for link tests
+      const req = await createTestRequirement(ctx, { title: 'Test Requirement' });
+      requirementId = req.requirementId;
+      const sol = await createTestSolution(ctx, [], { title: 'Test Solution' });
+      solutionId = sol.solutionId;
+    });
+
     it('link create should create link', async () => {
       const result = await handleToolCall(
         'link',
         {
           action: 'create',
           planId: ctx.planId,
-          sourceId: 'entity-1',
-          targetId: 'entity-2',
+          sourceId: solutionId,
+          targetId: requirementId,
           relationType: 'implements',
         },
         ctx.services
@@ -1217,8 +1228,8 @@ describe('Tool Handlers Integration', () => {
         {
           action: 'create',
           planId: ctx.planId,
-          sourceId: 'entity-1',
-          targetId: 'entity-2',
+          sourceId: solutionId,
+          targetId: requirementId,
           relationType: 'implements',
         },
         ctx.services
@@ -1226,7 +1237,7 @@ describe('Tool Handlers Integration', () => {
 
       const result = await handleToolCall(
         'link',
-        { action: 'get', planId: ctx.planId, entityId: 'entity-1' },
+        { action: 'get', planId: ctx.planId, entityId: solutionId },
         ctx.services
       );
 
@@ -1240,8 +1251,8 @@ describe('Tool Handlers Integration', () => {
         {
           action: 'create',
           planId: ctx.planId,
-          sourceId: 'entity-1',
-          targetId: 'entity-2',
+          sourceId: solutionId,
+          targetId: requirementId,
           relationType: 'implements',
         },
         ctx.services
@@ -1784,13 +1795,17 @@ describe('Tool Handlers Integration', () => {
       });
 
       it('link create should not return full link object', async () => {
+        // Create real entities for link test
+        const req = await createTestRequirement(ctx, { title: 'Link Test Requirement' });
+        const sol = await createTestSolution(ctx, [], { title: 'Link Test Solution' });
+
         const result = await handleToolCall(
           'link',
           {
             action: 'create',
             planId: ctx.planId,
-            sourceId: 'entity-1',
-            targetId: 'entity-2',
+            sourceId: sol.solutionId,
+            targetId: req.requirementId,
             relationType: 'implements',
           },
           ctx.services
