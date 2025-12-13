@@ -97,7 +97,7 @@ describe('LockManager Multi-Process Safety', () => {
         // Concurrent release + reentrant acquire
         const [, acquireResult] = await Promise.all([
           lm.release(lockId).catch((e: unknown) => {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+             
             if (e !== null && typeof e === 'object' && 'message' in e && typeof e.message === 'string' && !e.message.includes('not found')) {
               errors.push(`release error: ${e.message}`);
             }
@@ -316,7 +316,7 @@ describe('LockManager Multi-Process Safety', () => {
 
       // Access internal to verify default
       // This is a bit hacky but necessary for the test
-      const options = lm as any; // eslint-disable-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      const options = lm as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
       // Default should be reasonable (e.g., 100ms as currently hardcoded)
       // After fix, should be configurable

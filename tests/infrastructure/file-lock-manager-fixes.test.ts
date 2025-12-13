@@ -259,7 +259,7 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
       // Neither should throw EEXIST or other file system errors
       const errors = results
         .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+         
         .filter(r => {
           const reason = r.reason as unknown;
           return Boolean(reason) && typeof reason === 'object' && reason !== null && 'message' in reason && typeof (reason as { message: unknown }).message === 'string' && !(reason as { message: string }).message.includes('Timeout');
@@ -296,9 +296,9 @@ describe('FileLockManager Bug Fixes (Code Review)', () => {
       for (const result of results) {
         if (result.status === 'rejected') {
           const reason = result.reason as unknown;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+           
           if (Boolean(reason) && typeof reason === 'object' && reason !== null && 'message' in reason && typeof (reason as { message: unknown }).message === 'string' && !(reason as { message: string }).message.includes('Timeout')) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+             
             errors.push((reason as { message: string }).message);
           }
         }

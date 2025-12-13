@@ -609,7 +609,7 @@ describe('PlanService', () => {
       });
 
       // Add phases via repository
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const phaseRepo = repositoryFactory.createRepository<any>('phase', created.planId);
       const phase1 = {
         id: 'phase-1',

@@ -60,7 +60,7 @@ describe('RED: RepositoryFactory', () => {
       expect(
         () =>
           // Testing invalid type - using type assertion to bypass compile-time check
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+           
           new RepositoryFactory({
             type: 'invalid' as 'file',
             baseDir: testDir,
@@ -166,11 +166,11 @@ describe('RED: RepositoryFactory', () => {
       const linkRepo = factory.createLinkRepository(planId);
 
       // All should use the same lock manager instance
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((repo1 as any).fileLockManager).toBe(lockManager);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((repo2 as any).fileLockManager).toBe(lockManager);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((linkRepo as any).fileLockManager).toBe(lockManager);
     });
 
@@ -178,7 +178,7 @@ describe('RED: RepositoryFactory', () => {
       const planId = 'test-plan-005';
       const uow = factory.createUnitOfWork(planId);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((uow as any).fileLockManager).toBe(lockManager);
     });
   });
@@ -283,7 +283,7 @@ describe('RED: RepositoryFactory', () => {
       const repo = factory.createRepository<Requirement>('requirement', planId);
 
       // Should be able to initialize
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
       await (repo as any).initialize();
 
       // Repository should have basic CRUD methods
@@ -300,7 +300,7 @@ describe('RED: RepositoryFactory', () => {
       await fs.mkdir(path.join(testDir, 'plans', planId), { recursive: true });
 
       const linkRepo = factory.createLinkRepository(planId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
       await (linkRepo as any).initialize();
 
       // Create a link
@@ -341,13 +341,13 @@ describe('RED: RepositoryFactory', () => {
       const repo = factoryWithCache.createRepository<Requirement>('requirement', planId);
 
       // Cache options should be passed through
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((repo as any).cacheOptions).toBeDefined();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((repo as any).cacheOptions.enabled).toBe(true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((repo as any).cacheOptions.ttl).toBe(10000);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((repo as any).cacheOptions.maxSize).toBe(200);
     });
   });

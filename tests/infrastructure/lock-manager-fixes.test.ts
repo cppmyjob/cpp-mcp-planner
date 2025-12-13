@@ -226,9 +226,9 @@ describe('LockManager Bug Fixes (Code Review)', () => {
       // NOW install the mock - AFTER dispose completes
       // This tracks only emits that happen AFTER dispose finished
       let emitCalledAfterDisposeComplete = false;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const originalEmit = ((events as any).emit as (...args: unknown[]) => boolean).bind(events);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (events as any).emit = (...args: unknown[]) => {
         emitCalledAfterDisposeComplete = true;
         return originalEmit(...args);

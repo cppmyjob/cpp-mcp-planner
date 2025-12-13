@@ -23,7 +23,7 @@ async function loadEntities<T extends Entity>(
     phases: 'phase',
     artifacts: 'artifact'
   };
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+   
   const repo = repositoryFactory.createRepository<T>(typeMap[entityType], planId);
   return repo.findAll();
 }
@@ -40,7 +40,7 @@ async function saveEntities(
     phases: 'phase',
     artifacts: 'artifact'
   };
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+   
   const repo = repositoryFactory.createRepository<Entity>(typeMap[entityType], planId);
   for (const entity of entities) {
     await repo.update(entity.id, entity);
@@ -1039,7 +1039,7 @@ describe('QueryService', () => {
       // Simulate solution created without tradeoffs field (as happens via MCP tool)
       // Use RepositoryFactory directly to bypass validation
       const repo = repositoryFactory.createRepository<Solution>('solution', planId);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+       
       await repo.create({
         id: 'solution-without-tradeoffs',
         type: 'solution',
@@ -1193,7 +1193,7 @@ describe('QueryService', () => {
       const requirements = await repo.findAll();
       const requirement = requirements[0] as Partial<Requirement>;
       delete requirement.acceptanceCriteria; // Set to undefined
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+       
       await repo.update(requirement.id as string, requirement as Requirement);
 
       const result = await queryService.searchEntities({
@@ -1231,7 +1231,7 @@ describe('QueryService', () => {
       const requirements = await repo.findAll();
       const requirement = requirements[0];
       requirement.rationale = null as unknown as string;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+       
       await repo.update(requirement.id, requirement);
 
       const result = await queryService.searchEntities({ planId, query: 'test' });
@@ -1629,7 +1629,7 @@ describe('QueryService', () => {
     // ========================================================================
     // 1. DEPTH PARAMETER TESTS (10 tests)
     // ========================================================================
-    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
+     
     describe('depth parameter', () => {
       it('GREEN 1.1: should accept depth=1 parameter and return only solutions', async () => {
         const result = await queryService.traceRequirement({
@@ -1756,12 +1756,12 @@ describe('QueryService', () => {
         expect(result.trace.artifacts).toHaveLength(2); // New field
       });
     });
-    /* eslint-enable @typescript-eslint/no-unsafe-argument */
+     
 
     // ========================================================================
     // 2. INCLUDE FLAGS TESTS (12 tests)
     // ========================================================================
-    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
+     
     describe('includePhases and includeArtifacts flags', () => {
       it('RED 2.1: should accept includePhases=true', async () => {
         const result = await queryService.traceRequirement({
@@ -1994,12 +1994,12 @@ describe('QueryService', () => {
         expect(foundPhaseOnlyArtifact.title).toBe('Phase-Only Artifact');
       });
     });
-    /* eslint-enable @typescript-eslint/no-unsafe-argument */
+     
 
     // ========================================================================
     // 3. LIMIT PARAMETER TESTS (8 tests)
     // ========================================================================
-    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
+     
     describe('limit parameter', () => {
       it('RED 3.1: should accept limit parameter', async () => {
         const result = await queryService.traceRequirement({
@@ -2088,12 +2088,12 @@ describe('QueryService', () => {
         }
       });
     });
-    /* eslint-enable @typescript-eslint/no-unsafe-argument */
+     
 
     // ========================================================================
     // 4. COMBINATIONS: depth + fields + exclude (10 tests)
     // ========================================================================
-    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
+     
     describe('combinations with fields and exclude parameters', () => {
       it('RED 4.1: depth=1 + fields=["id","title"] should work', async () => {
         const result = await queryService.traceRequirement({
@@ -2287,12 +2287,12 @@ describe('QueryService', () => {
         expect(phase.description).toBeUndefined();
       });
     });
-    /* eslint-enable @typescript-eslint/no-unsafe-argument */
+     
 
     // ========================================================================
     // 5. PERFORMANCE TESTS (8 tests)
     // ========================================================================
-    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
+     
     describe('performance and payload size', () => {
       it('RED 5.1: depth=1 + minimal fields should reduce payload to ~5KB (from ~32KB)', async () => {
         const result = await queryService.traceRequirement({
@@ -2423,12 +2423,12 @@ describe('QueryService', () => {
         expect(duration).toBeLessThan(100); // Fast response
       });
     });
-    /* eslint-enable @typescript-eslint/no-unsafe-argument */
+     
 
     // ========================================================================
     // 6. EDGE CASES AND VALIDATION (10 tests)
     // ========================================================================
-    /* eslint-disable @typescript-eslint/no-unsafe-argument -- Testing with intentionally invalid inputs using 'as any' */
+     
     describe('edge cases and validation', () => {
       it('RED 6.1: empty trace (no solutions, phases, artifacts) should work', async () => {
         const emptyReq = await requirementService.addRequirement({
@@ -2712,6 +2712,6 @@ describe('QueryService', () => {
         expect(solutionIds).toContain(sol3Id);
       });
     });
-    /* eslint-enable @typescript-eslint/no-unsafe-argument */
+     
   });
 });

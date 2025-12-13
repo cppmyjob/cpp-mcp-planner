@@ -794,7 +794,7 @@ describe('LockManager', () => {
       expect(first.acquired).toBe(true);
 
       // Get initial listener count
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
       const initialListeners = (lockManager as any).lockEvents.listenerCount('release:resource-1');
 
       // Start many acquire attempts that will timeout
@@ -808,7 +808,7 @@ describe('LockManager', () => {
       await Promise.all(promises);
 
       // All listeners should be cleaned up
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
       const finalListeners = (lockManager as any).lockEvents.listenerCount('release:resource-1');
       expect(finalListeners).toBe(initialListeners);
 
@@ -837,7 +837,7 @@ describe('LockManager', () => {
       expect(result.acquired).toBe(true);
 
       // No dangling listeners
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
       const listeners = (lockManager as any).lockEvents.listenerCount('release:resource-1');
       expect(listeners).toBe(0);
 
@@ -1029,7 +1029,7 @@ describe('LockManager', () => {
       await lockManager.releaseAll();
 
       // acquireMutexes should be empty
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mutexes = (lockManager as any).acquireMutexes;
       expect(mutexes.size).toBe(0);
     });
@@ -1080,10 +1080,10 @@ describe('LockManager', () => {
       await lockManager.acquire('resource-2', { timeout: 10000 });
 
       // Dispose should exist and clean up
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect(typeof (lockManager as any).dispose).toBe('function');
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
       await (lockManager as any).dispose();
 
       // All locks should be released
@@ -1095,7 +1095,7 @@ describe('LockManager', () => {
       expect(result.reason).toContain('disposed');
 
       // isDisposed should return true
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
       expect((lockManager as any).isDisposed()).toBe(true);
     });
   });
@@ -1317,7 +1317,7 @@ describe('LockManager', () => {
 
     it('should track in-flight operations correctly', async () => {
       // Access private counter for testing
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const getInFlightOps = (): number => (lockManager as any).inFlightOps as number;
 
       expect(getInFlightOps()).toBe(0);
@@ -1339,7 +1339,7 @@ describe('LockManager', () => {
     });
 
     it('should decrement in-flight counter even on failure', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const getInFlightOps = (): number => (lockManager as any).inFlightOps as number;
 
       // First acquire succeeds
@@ -2200,7 +2200,7 @@ describe('LockManager', () => {
 
     describe('HIGH #2: Event names consistency', () => {
       it('should use consistent event names (lock:release:resource)', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const events = (lockManager as any).lockEvents;
 
         // Correct event name format
@@ -2208,7 +2208,7 @@ describe('LockManager', () => {
 
         // Start listening
         let eventReceived = false;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         events.once(correctEventName, () => {
           eventReceived = true;
         });
@@ -2224,11 +2224,11 @@ describe('LockManager', () => {
       });
 
       it('should not leak listeners with correct event names', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const events = (lockManager as any).lockEvents;
         const eventName = 'lock:release:resource-1';
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         const initialCount = events.listenerCount(eventName);
 
         // FIRST: Block the resource (must be first to create contention)
@@ -2247,7 +2247,7 @@ describe('LockManager', () => {
         await acquirePromise;
 
         // Listeners should be cleaned up
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         const finalCount = events.listenerCount(eventName);
         expect(finalCount).toBe(initialCount);
 
