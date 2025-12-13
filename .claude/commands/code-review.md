@@ -36,9 +36,46 @@ argument-hint: "[--auto-sprint]"
 
 ---
 
+## ESLint Check
+
+**MANDATORY STEP - Launch ESLint Agent:**
+
+Before analyzing code manually, launch a separate agent to handle ESLint:
+
+```typescript
+Task({
+  subagent_type: "general-purpose",
+  description: "Fix ESLint violations",
+  prompt: `
+# ESLint Auto-Fix and Manual Correction
+
+## Your Task:
+1. Run \`npm run lint\` to check for violations
+2. Run \`npm run lint:fix\` to auto-fix what's possible
+3. Run \`npm run lint\` again to see remaining errors
+4. For EACH remaining error:
+   - Read the file with the error
+   - Manually fix the violation according to eslint.config.js rules
+   - Ensure the fix follows CLAUDE.md best practices
+5. Run \`npm run lint\` one final time to verify all errors are fixed
+6. Report summary: how many auto-fixed, how many manually fixed
+
+## Important:
+- Fix ALL errors, not just some
+- Follow eslint.config.js:5-200 strictly
+- Reference CLAUDE.md for context on each rule
+- Do NOT skip any violations
+  `
+})
+```
+
+**Wait for the ESLint agent to complete before continuing with manual code review.**
+
+---
+
 ## Your Task
 
-Analyze unpushed commits for compliance with project standards (see CLAUDE.md).
+After ESLint agent completes, analyze unpushed commits for compliance with project standards (see CLAUDE.md).
 
 **Arguments:**
 - `--auto-sprint`: Auto-create sprint for CRITICAL/HIGH issues (skip confirmation)
