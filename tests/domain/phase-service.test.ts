@@ -43,6 +43,7 @@ describe('PhaseService', () => {
 
   afterEach(async () => {
     await repositoryFactory.dispose();
+    await lockManager.dispose();
     await fs.rm(testDir, { recursive: true, force: true });
   });
 
@@ -1555,9 +1556,8 @@ describe('PhaseService', () => {
       // Summary should be smaller than full (includes metadata by default, still excludes heavy fields)
       expect(summarySize).toBeLessThan(fullSize);
 
-      console.log(`Summary size: ${String(summarySize)} bytes`);
-      console.log(`Full size: ${String(fullSize)} bytes`);
-      console.log(`Compression ratio: ${(fullSize / summarySize).toFixed(1)}x`);
+      // Verify meaningful compression ratio (full should be at least 1.5x larger)
+      expect(fullSize / summarySize).toBeGreaterThan(1.5);
     });
   });
 
@@ -2069,7 +2069,7 @@ describe('PhaseService', () => {
               title: 'Phase with negative effort',
               estimatedEffort: { value: -5, unit: 'hours', confidence: 'medium' },
             },
-          })).rejects.toThrow('estimatedEffort.value must be >= 0');
+          })).rejects.toThrow("Invalid estimatedEffort: 'value' must be >= 0");
         });
 
         it('RED: should reject negative effortEstimate.value via schedule.estimatedEffort', async () => {
@@ -2081,7 +2081,7 @@ describe('PhaseService', () => {
                 estimatedEffort: { value: -1, unit: 'days', confidence: 'high' },
               },
             },
-          })).rejects.toThrow('estimatedEffort.value must be >= 0');
+          })).rejects.toThrow("Invalid estimatedEffort: 'value' must be >= 0");
         });
 
         it('GREEN: should accept zero effortEstimate.value', async () => {

@@ -29,7 +29,7 @@ export function validateEffortEstimate(effort: unknown, fieldName = 'effortEstim
 
   // Sprint 2: Validate value is non-negative
   if (e.value < 0) {
-    throw new Error(`${fieldName}.value must be >= 0`);
+    throw new Error(`Invalid ${fieldName}: 'value' must be >= 0`);
   }
 
   if (!VALID_EFFORT_UNITS.includes(e.unit as typeof VALID_EFFORT_UNITS[number])) {

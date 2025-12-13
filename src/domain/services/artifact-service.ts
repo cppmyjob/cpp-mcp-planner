@@ -159,44 +159,47 @@ export class ArtifactService {
   }
 
   /**
-   * BUG #12 FIX: Validate that relatedPhaseId references an existing phase
+   * Helper to validate that an entity reference exists (BUG #11, #12)
+   * @param planId - Plan ID containing the entity
+   * @param entityType - Type of entity to validate ('phase', 'requirement', 'solution')
+   * @param entityId - ID of the entity to validate
+   * @throws Error if entity not found
+   */
+  private async validateEntityReference(
+    planId: string,
+    entityType: 'phase' | 'requirement' | 'solution',
+    entityId: string
+  ): Promise<void> {
+    const repo = this.repositoryFactory.createRepository<Phase | Requirement | Solution>(entityType, planId);
+    try {
+      await repo.findById(entityId);
+    } catch {
+      const entityName = entityType.charAt(0).toUpperCase() + entityType.slice(1);
+      throw new Error(`${entityName} '${entityId}' not found`);
+    }
+  }
+
+  /**
+   * Validates that relatedPhaseId references an existing phase
    */
   private async validatePhaseReference(planId: string, phaseId: string): Promise<void> {
-    const phaseRepo = this.repositoryFactory.createRepository<Phase>('phase', planId);
-    try {
-      await phaseRepo.findById(phaseId);
-    } catch {
-      throw new Error(`Phase '${phaseId}' not found`);
-    }
+    await this.validateEntityReference(planId, 'phase', phaseId);
   }
 
   /**
-   * Sprint 5 BUG #11 FIX: Validate that relatedRequirementIds reference existing requirements
+   * Validates that relatedRequirementIds reference existing requirements
    */
   private async validateRequirementReferences(planId: string, requirementIds: string[]): Promise<void> {
-    if (requirementIds.length === 0) {
-      return; // Empty array is valid
-    }
-    const reqRepo = this.repositoryFactory.createRepository<Requirement>('requirement', planId);
     for (const reqId of requirementIds) {
-      try {
-        await reqRepo.findById(reqId);
-      } catch {
-        throw new Error(`Requirement '${reqId}' not found`);
-      }
+      await this.validateEntityReference(planId, 'requirement', reqId);
     }
   }
 
   /**
-   * Sprint 5 BUG #11 FIX: Validate that relatedSolutionId references an existing solution
+   * Validates that relatedSolutionId references an existing solution
    */
   private async validateSolutionReference(planId: string, solutionId: string): Promise<void> {
-    const solRepo = this.repositoryFactory.createRepository<Solution>('solution', planId);
-    try {
-      await solRepo.findById(solutionId);
-    } catch {
-      throw new Error(`Solution '${solutionId}' not found`);
-    }
+    await this.validateEntityReference(planId, 'solution', solutionId);
   }
 
   /**
@@ -243,15 +246,13 @@ export class ArtifactService {
       validateSlug(input.artifact.slug);
     }
 
-    // BUG #12 FIX: Validate relatedPhaseId reference exists
+    // Foreign key validation: ensure referenced entities exist (BUG #11, #12)
     if (input.artifact.relatedPhaseId !== undefined && input.artifact.relatedPhaseId !== '') {
       await this.validatePhaseReference(input.planId, input.artifact.relatedPhaseId);
     }
-    // Sprint 5 BUG #11 FIX: Validate relatedRequirementIds references exist
     if (input.artifact.relatedRequirementIds !== undefined && input.artifact.relatedRequirementIds.length > 0) {
       await this.validateRequirementReferences(input.planId, input.artifact.relatedRequirementIds);
     }
-    // Sprint 5 BUG #11 FIX: Validate relatedSolutionId reference exists
     if (input.artifact.relatedSolutionId !== undefined && input.artifact.relatedSolutionId !== '') {
       await this.validateSolutionReference(input.planId, input.artifact.relatedSolutionId);
     }
@@ -346,11 +347,10 @@ export class ArtifactService {
     if (input.updates.codeRefs !== undefined) {
       validateCodeRefs(input.updates.codeRefs);
     }
-    // Sprint 5 BUG #11 FIX: Validate relatedRequirementIds references exist on update
+    // Foreign key validation on update (BUG #11)
     if (input.updates.relatedRequirementIds !== undefined && input.updates.relatedRequirementIds.length > 0) {
       await this.validateRequirementReferences(input.planId, input.updates.relatedRequirementIds);
     }
-    // Sprint 5 BUG #11 FIX: Validate relatedSolutionId reference exists on update
     if (input.updates.relatedSolutionId !== undefined && input.updates.relatedSolutionId !== '') {
       await this.validateSolutionReference(input.planId, input.updates.relatedSolutionId);
     }
