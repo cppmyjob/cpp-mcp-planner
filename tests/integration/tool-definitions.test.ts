@@ -17,8 +17,10 @@ describe('Tool Definitions', () => {
     it('should have get_summary in enum', () => {
       const planTool = tools.find(t => t.name === 'plan');
       if (planTool === undefined) throw new Error('plan tool not found');
-      const actionProp = planTool.inputSchema.properties.action;
-      if (!actionProp || !('enum' in actionProp)) throw new Error('action property not found');
+      const actionProp: unknown = planTool.inputSchema.properties.action;
+      if (actionProp == null || typeof actionProp !== 'object' || !('enum' in actionProp)) {
+        throw new Error('action property not found');
+      }
       expect(actionProp.enum).toContain('get_summary');
     });
   });
