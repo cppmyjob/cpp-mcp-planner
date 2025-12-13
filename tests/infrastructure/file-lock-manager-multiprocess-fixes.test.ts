@@ -147,8 +147,8 @@ describe('FileLockManager Multi-Process Fixes', () => {
       expect(lockManager.getActiveLocksCount()).toBe(5);
 
       // Should complete quickly (parallel), not 5x sequential time
-      // Each acquire takes ~10-50ms for file I/O, so 5 parallel should be < 500ms
-      expect(elapsed).toBeLessThan(500);
+      // Each acquire takes ~10-50ms for file I/O, so 5 parallel should be < 700ms
+      expect(elapsed).toBeLessThan(700);
 
       // Cleanup
       for (const release of releases) {

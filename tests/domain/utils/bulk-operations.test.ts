@@ -3,6 +3,7 @@
  * Sprint 9 BUGFIX: Atomic mode API contract validation
  */
 
+import { describe, it, expect, jest } from '@jest/globals';
 import { bulkUpdateEntities } from '../../../src/domain/utils/bulk-operations';
 
 describe('bulkUpdateEntities utility', () => {
