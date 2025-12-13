@@ -214,8 +214,9 @@ export class DecisionService {
       question: oldDecision.question,
       context: input.newDecision.context ?? oldDecision.context,
       decision: input.newDecision.decision,
+      // GREEN: BUG #8 Fix - Handle missing or undefined alternativesConsidered field
       alternativesConsidered: [
-        ...oldDecision.alternativesConsidered,
+        ...(oldDecision.alternativesConsidered ?? []),
         {
           option: oldDecision.decision,
           reasoning: 'Previous decision',

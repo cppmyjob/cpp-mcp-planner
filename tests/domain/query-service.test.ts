@@ -196,6 +196,41 @@ describe('QueryService', () => {
       expect(result.results).toHaveLength(0);
       expect(result.total).toBe(0);
     });
+
+    // RED: BUG #15 - searchEntities crashes when entity has undefined description/approach/context
+    it('should handle entities with undefined searchable fields', async () => {
+      // Create entities with missing description/approach/context fields
+      const repo = repositoryFactory.createRepository('solution', planId);
+      const solutionWithMissingFields = {
+        id: 'sol-missing-desc',
+        type: 'solution' as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1,
+        metadata: { createdBy: 'test', tags: [], annotations: [] },
+        title: 'Solution Without Description',
+        // description: undefined - intentionally missing
+        // approach: undefined - intentionally missing
+        addressing: [],
+        tradeoffs: [],
+        evaluation: {
+          effortEstimate: { value: 1, unit: 'hours' as const, confidence: 'high' as const },
+          technicalFeasibility: 'high' as const,
+          riskAssessment: 'Low',
+        },
+        status: 'proposed' as const,
+      };
+      await repo.create(solutionWithMissingFields);
+
+      // This should NOT crash - it should handle undefined fields gracefully
+      const result = await queryService.searchEntities({
+        planId,
+        query: 'solution',
+      });
+
+      expect(result).toBeDefined();
+      expect(result.results.length).toBeGreaterThan(0);
+    });
   });
 
   describe('trace_requirement', () => {

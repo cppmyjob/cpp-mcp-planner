@@ -231,6 +231,58 @@ describe('SolutionService', () => {
         })
       ).rejects.toThrow('solutionIds must be a non-empty array');
     });
+
+    // RED: BUG #6 - compareSolutions crashes when solution has undefined tradeoffs
+    it('should handle solutions with missing tradeoffs field', async () => {
+      // Create a solution with missing tradeoffs (simulating corrupted data or legacy solution)
+      const repo = repositoryFactory.createRepository('solution', planId);
+      const solutionWithMissingTradeoffs = {
+        id: 'sol-missing-tradeoffs',
+        type: 'solution' as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1,
+        metadata: { createdBy: 'test', tags: [], annotations: [] },
+        title: 'Solution Without Tradeoffs',
+        description: 'This solution has no tradeoffs field',
+        approach: 'Test approach',
+        addressing: [],
+        evaluation: {
+          effortEstimate: { value: 1, unit: 'hours' as const, confidence: 'high' as const },
+          technicalFeasibility: 'high' as const,
+          riskAssessment: 'Low',
+        },
+        status: 'proposed' as const,
+        // NOTE: tradeoffs field is intentionally missing
+      };
+      await repo.create(solutionWithMissingTradeoffs);
+
+      // Create a normal solution
+      const normalSolution = await service.proposeSolution({
+        planId,
+        solution: {
+          title: 'Normal Solution',
+          description: 'Has tradeoffs',
+          approach: 'Normal approach',
+          tradeoffs: [{ aspect: 'Test', pros: ['Good'], cons: ['Bad'], score: 5 }],
+          addressing: [],
+          evaluation: {
+            effortEstimate: { value: 1, unit: 'hours', confidence: 'high' },
+            technicalFeasibility: 'high',
+            riskAssessment: 'Low',
+          },
+        },
+      });
+
+      // This should NOT crash - it should handle missing tradeoffs gracefully
+      const result = await service.compareSolutions({
+        planId,
+        solutionIds: ['sol-missing-tradeoffs', normalSolution.solutionId],
+      });
+
+      expect(result.comparison.solutions).toHaveLength(2);
+      expect(result.comparison.matrix.length).toBeGreaterThanOrEqual(0);
+    });
   });
 
   describe('select_solution', () => {

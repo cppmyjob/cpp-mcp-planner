@@ -330,7 +330,12 @@ export class SolutionService {
 
     // Collect all aspects
     const aspectsSet = new Set<string>();
-    solutions.forEach((s) => { s.tradeoffs.forEach((t) => aspectsSet.add(t.aspect)); });
+    solutions.forEach((s) => {
+      // GREEN: BUG #6 Fix - Handle missing or undefined tradeoffs field
+      if (s.tradeoffs !== undefined && s.tradeoffs !== null) {
+        s.tradeoffs.forEach((t) => aspectsSet.add(t.aspect));
+      }
+    });
 
     let aspects = Array.from(aspectsSet);
     if (input.aspects && input.aspects.length > 0) {
@@ -341,7 +346,10 @@ export class SolutionService {
     // Build comparison matrix
     const matrix = aspects.map((aspect) => {
       const solutionData = solutions.map((s) => {
-        const tradeoff = s.tradeoffs.find((t) => t.aspect === aspect);
+        // GREEN: BUG #6 Fix - Handle missing or undefined tradeoffs field
+        const tradeoff = (s.tradeoffs !== undefined && s.tradeoffs !== null)
+          ? s.tradeoffs.find((t) => t.aspect === aspect)
+          : undefined;
         return {
           solutionId: s.id,
           solutionTitle: s.title,
@@ -367,14 +375,19 @@ export class SolutionService {
     // Calculate overall best
     const scores: Record<string, number[]> = {};
     solutions.forEach((s) => {
-      scores[s.id] = s.tradeoffs
-        .filter((t) => t.score !== undefined)
-        .map((t) => {
-          if (t.score === undefined) {
-            throw new Error('Unexpected undefined score after filtering');
-          }
-          return t.score;
-        });
+      // GREEN: BUG #6 Fix - Handle missing or undefined tradeoffs field
+      if (s.tradeoffs !== undefined && s.tradeoffs !== null) {
+        scores[s.id] = s.tradeoffs
+          .filter((t) => t.score !== undefined)
+          .map((t) => {
+            if (t.score === undefined) {
+              throw new Error('Unexpected undefined score after filtering');
+            }
+            return t.score;
+          });
+      } else {
+        scores[s.id] = [];
+      }
     });
 
     let bestOverall: string | undefined;

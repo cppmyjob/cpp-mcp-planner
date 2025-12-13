@@ -742,8 +742,9 @@ export class QueryService {
         return {
           ...base,
           title: sol.title,
-          description: sol.description,
-          approach: sol.approach,
+          // GREEN: BUG #15 Fix - Handle undefined optional fields
+          description: sol.description ?? '',
+          approach: sol.approach ?? '',
         };
       }
       case 'decision': {
@@ -753,7 +754,8 @@ export class QueryService {
           title: dec.title,
           question: dec.question,
           decision: dec.decision,
-          context: dec.context,
+          // GREEN: BUG #15 Fix - Handle undefined optional fields
+          context: dec.context ?? '',
         };
       }
       case 'phase': {
@@ -761,7 +763,8 @@ export class QueryService {
         return {
           ...base,
           title: phase.title,
-          description: phase.description,
+          // GREEN: BUG #15 Fix - Handle undefined optional fields
+          description: phase.description ?? '',
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           objectives: (phase.objectives ?? []).join(' '),
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition

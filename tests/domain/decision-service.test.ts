@@ -192,6 +192,50 @@ describe('DecisionService', () => {
       expect(oldInAlternatives).toBeDefined();
       expect(oldInAlternatives?.whyNotChosen).toBe('Better performance');
     });
+
+    // RED: BUG #8 - supersedeDecision crashes when alternativesConsidered is missing
+    it('should handle decisions with missing alternativesConsidered field', async () => {
+      // Create a decision with missing alternativesConsidered (simulating corrupted/legacy data)
+      const repo = repositoryFactory.createRepository('decision', planId);
+      const decisionWithoutAlternatives = {
+        id: 'dec-no-alternatives',
+        type: 'decision' as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1,
+        metadata: { createdBy: 'test', tags: [], annotations: [] },
+        title: 'Legacy Decision',
+        question: 'Which approach?',
+        context: 'Old decision from before alternativesConsidered was required',
+        decision: 'Option A',
+        status: 'active' as const,
+        // NOTE: alternativesConsidered field is intentionally missing
+      };
+      await repo.create(decisionWithoutAlternatives);
+
+      // This should NOT crash - it should handle missing alternativesConsidered gracefully
+      const result = await service.supersedeDecision({
+        planId,
+        decisionId: 'dec-no-alternatives',
+        newDecision: {
+          decision: 'Option B',
+        },
+        reason: 'Better approach found',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.newDecisionId).toBeDefined();
+
+      // Verify new decision was created with old decision in alternatives
+      const { decision: newDecision } = await service.getDecision({
+        planId,
+        decisionId: result.newDecisionId,
+        fields: ['*'],
+      });
+      expect(newDecision.decision).toBe('Option B');
+      expect(newDecision.alternativesConsidered).toHaveLength(1);
+      expect(newDecision.alternativesConsidered[0].option).toBe('Option A');
+    });
   });
 
   describe('list_decisions', () => {
