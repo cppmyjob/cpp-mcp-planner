@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
-import { handleToolCall } from '../../src/server/tool-handlers.js';
+import { handleToolCall } from '../../src/server/handlers/index.js';
 import {
   createTestContext,
   cleanupTestContext,

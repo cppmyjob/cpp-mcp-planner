@@ -11,6 +11,8 @@ const planUpdatesSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   status: planStatusSchema.optional(),
+  enableHistory: z.boolean().optional(),
+  maxHistoryDepth: z.number().optional(),
 });
 
 export const planSchema = z.object({
@@ -28,6 +30,9 @@ export const planSchema = z.object({
   includeLinks: z.boolean().optional(),
   limit: z.number().optional(),
   offset: z.number().optional(),
+  // Sprint 7: Version history settings
+  enableHistory: z.boolean().optional(),
+  maxHistoryDepth: z.number().optional(),
 });
 
 export const planToolDescription = 'Manage development plans - the top-level container for all planning entities. Create a plan first before using other tools. Set active plan per workspace to avoid passing planId repeatedly. Use get_summary for plan overview (returns plan info, phase tree summary, statistics). Use includeEntities only for full export/backup - it returns large data. Actions: create, list, get, update, archive, set_active, get_active, get_summary.';

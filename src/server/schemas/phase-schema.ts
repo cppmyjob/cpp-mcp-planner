@@ -15,6 +15,7 @@ const phaseDataSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
   parentId: z.string().optional(),
+  order: z.number().optional(), // Explicit order for phase positioning
   objectives: z.array(z.string()).optional(),
   deliverables: z.array(z.string()).optional(),
   successCriteria: z.array(z.string()).optional(),

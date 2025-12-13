@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { tools } from '../../src/server/tool-definitions.js';
+import { tools } from '../../src/server/schemas/index.js';
 
 describe('Tool Definitions', () => {
   describe('Plan Tool Description UX', () => {

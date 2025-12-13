@@ -177,17 +177,18 @@ describe('E2E: Requirement Voting via MCP Tool', () => {
       expect(vote3Data.votes).toBe(3);
     });
 
-    it('should throw error for non-existent requirement', async () => {
-      await expect(
-        client.callTool({
-          name: 'requirement',
-          arguments: {
-            action: 'vote',
-            planId,
-            requirementId: 'non-existent-id',
-          },
-        })
-      ).rejects.toThrow();
+    it('should return error for non-existent requirement', async () => {
+      const result = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'vote',
+          planId,
+          requirementId: 'non-existent-id',
+        },
+      });
+
+      // MCP SDK returns isError: true instead of throwing
+      expect((result as { isError?: boolean }).isError).toBe(true);
     });
   });
 
@@ -271,29 +272,31 @@ describe('E2E: Requirement Voting via MCP Tool', () => {
       const { requirementId } = parseResult<{ requirementId: string }>(addResult);
 
       // Try to unvote when votes = 0
-      await expect(
-        client.callTool({
-          name: 'requirement',
-          arguments: {
-            action: 'unvote',
-            planId,
-            requirementId,
-          },
-        })
-      ).rejects.toThrow();
+      const result = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'unvote',
+          planId,
+          requirementId,
+        },
+      });
+
+      // MCP SDK returns isError: true instead of throwing
+      expect((result as { isError?: boolean }).isError).toBe(true);
     });
 
-    it('should throw error for non-existent requirement', async () => {
-      await expect(
-        client.callTool({
-          name: 'requirement',
-          arguments: {
-            action: 'unvote',
-            planId,
-            requirementId: 'non-existent-id',
-          },
-        })
-      ).rejects.toThrow();
+    it('should return error for non-existent requirement', async () => {
+      const result = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'unvote',
+          planId,
+          requirementId: 'non-existent-id',
+        },
+      });
+
+      // MCP SDK returns isError: true instead of throwing
+      expect((result as { isError?: boolean }).isError).toBe(true);
     });
   });
 
