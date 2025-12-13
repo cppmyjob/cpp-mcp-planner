@@ -1166,4 +1166,112 @@ describe('BatchService - Unit Tests', () => {
       expect(solution.approach).toBe('Approach 2');
     });
   });
+
+  describe('BUG #14: Error message accuracy', () => {
+    it('GREEN: should show "title is required" when requirement created without title', async () => {
+      // BUG #14: Batch operations show correct error message
+      // Verified: 'title is required' (fixed via validateRequiredString)
+      await expect(
+        batchService.executeBatch({
+          planId,
+          operations: [
+            {
+              entityType: 'requirement',
+              payload: {
+                // Missing title - should throw "title is required"
+                description: 'Some description',
+                source: { type: 'user-request' },
+                acceptanceCriteria: [],
+                priority: 'high',
+                category: 'functional',
+              },
+            },
+          ],
+        })
+      ).rejects.toThrow(/title is required/i);
+    });
+
+    it('GREEN: should show "title is required" when solution created without title', async () => {
+      await expect(
+        batchService.executeBatch({
+          planId,
+          operations: [
+            {
+              entityType: 'solution',
+              payload: {
+                // Missing title - should throw "title is required"
+                description: 'Some description',
+                approach: 'Approach',
+                addressing: [],
+                tradeoffs: [],
+              },
+            },
+          ],
+        })
+      ).rejects.toThrow(/title is required/i);
+    });
+
+    it('GREEN: should show "title is required" when phase created without title', async () => {
+      await expect(
+        batchService.executeBatch({
+          planId,
+          operations: [
+            {
+              entityType: 'phase',
+              payload: {
+                // Missing title - should throw "title is required"
+                description: 'Some description',
+              },
+            },
+          ],
+        })
+      ).rejects.toThrow(/title is required/i);
+    });
+
+    it('GREEN: should show "title is required" when decision created without title', async () => {
+      await expect(
+        batchService.executeBatch({
+          planId,
+          operations: [
+            {
+              entityType: 'decision',
+              payload: {
+                // Missing title - should throw "title is required"
+                question: 'Some question',
+                decision: 'Some decision',
+                context: 'Some context',
+              },
+            },
+          ],
+        })
+      ).rejects.toThrow(/title is required/i);
+    });
+
+    it('GREEN: should show "title is required" when artifact created without title', async () => {
+      const phase = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Test Phase',
+          description: 'Test',
+        },
+      });
+
+      await expect(
+        batchService.executeBatch({
+          planId,
+          operations: [
+            {
+              entityType: 'artifact',
+              payload: {
+                // Missing title - should throw "title is required"
+                description: 'Some description',
+                artifactType: 'code',
+                relatedPhaseId: phase.phaseId,
+              },
+            },
+          ],
+        })
+      ).rejects.toThrow(/title is required/i);
+    });
+  });
 });

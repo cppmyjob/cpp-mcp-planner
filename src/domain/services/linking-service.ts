@@ -200,7 +200,7 @@ export class LinkingService {
    * BUG #13 FIX: Validate that an entity ID references an existing entity
    * Checks all entity types (requirement, solution, phase, decision, artifact)
    */
-  private async validateEntityExists(planId: string, entityId: string, fieldName: string): Promise<void> {
+  private async validateEntityExists(planId: string, entityId: string, _fieldName: string): Promise<void> {
     const entityTypes: EntityType[] = ['requirement', 'solution', 'phase', 'decision', 'artifact'];
 
     for (const entityType of entityTypes) {
@@ -233,8 +233,8 @@ export class LinkingService {
       case 'artifact':
         return this.repositoryFactory.createRepository<Artifact>('artifact', planId);
       default: {
-        const _exhaustive: never = entityType;
-        throw new Error(`Unknown entity type: ${String(_exhaustive)}`);
+        const exhaustiveCheck: never = entityType;
+        throw new Error(`Unknown entity type: ${String(exhaustiveCheck)}`);
       }
     }
   }
