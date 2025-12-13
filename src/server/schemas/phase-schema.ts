@@ -57,6 +57,9 @@ export const phaseSchema = z.object({
   excludeMetadata: z.boolean().optional(),
   excludeComputed: z.boolean().optional(),
   limit: z.number().optional(),
+  // For diff action
+  version1: z.number().optional(),
+  version2: z.number().optional(),
 });
 
 export const phaseToolDescription = 'Manage implementation phases/tasks in hierarchical structure. Break selected solutions into phases with objectives, deliverables, and estimates. Track progress, update status (planned/in_progress/completed/blocked), and get next actionable items. For plan overview/summary, use get_tree with fields parameter to get compact tree. Use link tool with depends_on relation to create phase dependencies with cycle detection. Use after solution selection. Actions: add, get, get_many, get_tree, update, update_status, move, delete, get_next_actions, complete_and_advance, get_history, diff.';

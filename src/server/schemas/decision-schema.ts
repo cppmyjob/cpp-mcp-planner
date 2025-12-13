@@ -36,6 +36,9 @@ export const decisionSchema = z.object({
   status: decisionStatusSchema.optional(),
   fields: z.array(z.string()).optional(),
   excludeMetadata: z.boolean().optional(),
+  // For diff action
+  version1: z.number().optional(),
+  version2: z.number().optional(),
 });
 
 export const decisionToolDescription = 'Record architectural decisions (ADR pattern) with context and alternatives considered. Use after solution selection or for any significant technical choice. Decisions can be superseded when context changes, maintaining decision history. Link decisions to requirements/solutions for traceability. Actions: record, get, get_many, update, list, supersede, get_history, diff.';

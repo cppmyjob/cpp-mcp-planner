@@ -45,6 +45,9 @@ export const solutionSchema = z.object({
   createDecisionRecord: z.boolean().optional(),
   fields: z.array(z.string()).optional(),
   excludeMetadata: z.boolean().optional(),
+  // For diff action
+  version1: z.number().optional(),
+  version2: z.number().optional(),
 });
 
 export const solutionToolDescription = 'Manage solution proposals for requirements. Propose multiple solutions with tradeoff analysis, compare them to evaluate options, then select the best one. Use `decision` tool to record selection rationale. Selected solutions guide phase implementation. Actions: propose, get, get_many, update, list, compare, select, delete, get_history, diff.';

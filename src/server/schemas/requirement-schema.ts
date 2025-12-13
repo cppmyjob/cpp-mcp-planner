@@ -44,6 +44,9 @@ export const requirementSchema = z.object({
   force: z.boolean().optional(),
   fields: z.array(z.string()).optional(),
   excludeMetadata: z.boolean().optional(),
+  // For diff action
+  version1: z.number().optional(),
+  version2: z.number().optional(),
 });
 
 export const requirementToolDescription = 'Manage project requirements - the foundation of planning workflow. Add requirements first, then propose solutions with `solution` tool to address them. Link requirements to phases for implementation tracking. Use `query` tool to trace requirement coverage. Use vote/unvote to prioritize requirements based on user feedback - each requirement has a votes field (default: 0) that can be incremented/decremented. Use reset_all_votes to reset all requirement votes to 0 in a plan. Actions: add, get, get_many, update, list, delete, vote, unvote, get_history, diff, reset_all_votes';
