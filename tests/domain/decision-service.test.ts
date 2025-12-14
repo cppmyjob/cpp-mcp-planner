@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { DecisionService } from '../../src/domain/services/decision-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
@@ -655,6 +655,99 @@ describe('DecisionService', () => {
 
           // Decision 2 should also increment by 1 (repo.update() call)
           expect(d2After.version).toBe(2);
+        });
+
+        // M-1: Partial failure atomicity test
+        describe('M-1: Atomicity of reuseExistingDecision on partial failure', () => {
+          it('GREEN: on partial failure, old decision should NOT be marked as superseded (rollback works)', async () => {
+            /**
+             * M-1 FIX: reuseExistingDecision() now has atomicity via explicit rollback
+             *
+             * Fixed behavior:
+             * 1. oldDecision.status = 'superseded' → repo.update(oldDecision) ✓ SUCCESS
+             * 2. existingDecision.supersedes = oldId → repo.update(existingDecision) ✗ FAILS
+             * 3. ROLLBACK: re-read oldDecision, restore original state → repo.update() ✓
+             * Result: oldDecision remains 'active' (rolled back)
+             *
+             * SQL-READY: When migrating to SQL backend, replace with UnitOfWork.execute()
+             * for ACID transaction guarantees.
+             */
+
+            // Create Decision 1 (will be superseded)
+            const decision1 = await service.recordDecision({
+              planId,
+              decision: {
+                title: 'Decision 1 - atomicity test',
+                question: 'Test partial failure atomicity?',
+                decision: 'Yes',
+                context: 'Testing M-1 bug',
+                alternativesConsidered: [],
+              },
+            });
+
+            // Create Decision 2 (will be used to supersede)
+            const decision2 = await service.recordDecision({
+              planId,
+              decision: {
+                title: 'Decision 2 - reuse target',
+                question: 'Reuse this?',
+                decision: 'Yes, reuse me',
+                context: 'Will be linked via supersede',
+                alternativesConsidered: [],
+              },
+            });
+
+            // Get initial state
+            const { decision: d1Before } = await service.getDecision({
+              planId,
+              decisionId: decision1.decisionId,
+              fields: ['*'],
+            });
+            expect(d1Before.status).toBe('active');
+            expect(d1Before.supersededBy).toBeUndefined();
+
+            // Get the cached repository that service will use
+            const repo = repositoryFactory.createRepository('decision', planId);
+
+            // Spy on update to fail on the SECOND call (existingDecision update)
+            let updateCallCount = 0;
+            const originalUpdate = repo.update.bind(repo);
+            const updateSpy = jest.spyOn(repo, 'update').mockImplementation(async (id: string, data: unknown) => {
+              updateCallCount++;
+              if (updateCallCount === 2) {
+                // Simulate disk failure / network error on second update
+                throw new Error('M-1 TEST: Simulated failure on second update');
+              }
+              return originalUpdate(id, data);
+            });
+
+            // Attempt supersede - should fail on second update
+            await expect(service.supersedeDecision({
+              planId,
+              decisionId: decision1.decisionId,
+              newDecision: {
+                decision: decision2.decisionId, // UUID triggers reuseExistingDecision path
+              },
+              reason: 'Testing partial failure atomicity',
+            })).rejects.toThrow('M-1 TEST: Simulated failure on second update');
+
+            // Restore spy for verification queries
+            updateSpy.mockRestore();
+
+            // Verify state after partial failure
+            const { decision: d1After } = await service.getDecision({
+              planId,
+              decisionId: decision1.decisionId,
+              fields: ['*'],
+            });
+
+            // GREEN ASSERTION: After partial failure, old decision remains 'active' (rolled back)
+            expect(d1After.status).toBe('active'); // ✓ Rollback worked
+            expect(d1After.supersededBy).toBeUndefined(); // ✓ Rollback worked
+
+            // M-1 FIX verified: atomicity via explicit rollback
+            // SQL-READY: Will use UnitOfWork.execute() for ACID guarantees
+          });
         });
       });
     });

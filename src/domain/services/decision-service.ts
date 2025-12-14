@@ -241,6 +241,11 @@ export class DecisionService {
   /**
    * BUG-014 FIX: Reuse existing decision when superseding (ADR pattern)
    * Updates existing decision with supersedes link instead of creating duplicate
+   *
+   * M-1 FIX: Explicit rollback for atomicity on partial failure
+   * SQL-READY: When migrating to SQL backend, replace with UnitOfWork.execute()
+   * for ACID transaction guarantees. Current implementation uses best-effort
+   * rollback for file-based storage.
    */
   private async reuseExistingDecision(
     repo: ReturnType<RepositoryFactory['createRepository']>,
@@ -250,20 +255,40 @@ export class DecisionService {
   ): Promise<string> {
     const newDecisionId = existingDecision.id;
 
-    // Update existing decision to add supersedes link
-    existingDecision.supersedes = oldDecision.id;
-    existingDecision.updatedAt = now;
-    // version will be auto-incremented by repo.update()
+    // M-1 FIX: Save original state for rollback
+    const originalOldStatus = oldDecision.status;
+    const originalOldUpdatedAt = oldDecision.updatedAt;
+    const originalOldSupersededBy = oldDecision.supersededBy;
 
-    // Mark old decision as superseded FIRST (atomic operation order)
+    // Mark old decision as superseded FIRST
     oldDecision.status = 'superseded';
     oldDecision.updatedAt = now;
-    // M-2 FIX: Don't manually increment version - repo.update() does it automatically
     oldDecision.supersededBy = newDecisionId;
     await repo.update(oldDecision.id, oldDecision);
 
-    // Update existing decision with supersedes link
-    await repo.update(existingDecision.id, existingDecision);
+    try {
+      // Update existing decision with supersedes link
+      existingDecision.supersedes = oldDecision.id;
+      existingDecision.updatedAt = now;
+      await repo.update(existingDecision.id, existingDecision);
+    } catch (error) {
+      // M-1 FIX: Rollback old decision to original state on partial failure
+      // NOTE: For file-based storage this is best-effort rollback
+      // For SQL with transactions, rollback is automatic via transaction abort
+      try {
+        // Re-read current state to get updated version (optimistic locking)
+        const currentOld = await repo.findById(oldDecision.id) as Decision;
+        currentOld.status = originalOldStatus;
+        currentOld.updatedAt = originalOldUpdatedAt;
+        currentOld.supersededBy = originalOldSupersededBy;
+        await repo.update(currentOld.id, currentOld);
+      } catch (rollbackError) {
+        // Log rollback failure but throw original error
+        // In production, consider structured logging
+        console.error('M-1: Rollback failed after partial failure in reuseExistingDecision', rollbackError);
+      }
+      throw error;
+    }
 
     return newDecisionId;
   }
