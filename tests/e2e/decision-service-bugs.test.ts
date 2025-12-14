@@ -350,4 +350,117 @@ describe('E2E: Decision Service Bug Fixes (RED Phase)', () => {
       expect(Array.isArray(newDecision.decision.alternativesConsidered)).toBe(true);
     });
   });
+
+  // RED PHASE - BUG-014: Supersede action missing newDecision parameter
+  describe('BUG-014: Supersede Action Missing newDecision Parameter', () => {
+    it('should fail with validation error when newDecision is missing', async () => {
+      // Step 1: Create a decision
+      const decisionResult = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'record',
+          planId,
+          decision: {
+            title: 'Initial Decision',
+            question: 'What approach should we use?',
+            decision: 'Approach A',
+          },
+        },
+      });
+      const decision = parseResult<{ decisionId: string }>(decisionResult);
+
+      // Step 2: Try to supersede without newDecision parameter
+      // This reproduces the QA bug report format
+      const supersedeResult = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'supersede',
+          planId,
+          decisionId: decision.decisionId,
+          // newDecision: missing!
+          reason: 'Better approach',
+        },
+      });
+
+      // GREEN: Should return validation error with isError: true
+      // Expected: Zod validation error "newDecision is required for supersede action"
+      // Before fix: TypeError: Cannot read properties of undefined (reading 'decision')
+      const error = supersedeResult as { content: { type: string; text: string }[]; isError: boolean };
+      expect(error.isError).toBe(true);
+      expect(error.content[0].text).toContain('newDecision is required for supersede action');
+    });
+
+    it('should fail with validation error when newDecision.decision is missing', async () => {
+      // Step 1: Create a decision
+      const decisionResult = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'record',
+          planId,
+          decision: {
+            title: 'Initial Decision 2',
+            question: 'What tool to use?',
+            decision: 'Tool X',
+          },
+        },
+      });
+      const decision = parseResult<{ decisionId: string }>(decisionResult);
+
+      // Step 2: Try to supersede with newDecision object but missing decision field
+      const supersedeResult = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'supersede',
+          planId,
+          decisionId: decision.decisionId,
+          newDecision: {
+            context: 'New context',
+            // decision: missing!
+          },
+          reason: 'Better reasoning',
+        },
+      });
+
+      // GREEN: Should return validation error
+      const error = supersedeResult as { content: { type: string; text: string }[]; isError: boolean };
+      expect(error.isError).toBe(true);
+      expect(error.content[0].text).toContain('newDecision.decision is required for supersede action');
+    });
+
+    it('should fail with validation error when reason is missing', async () => {
+      // Step 1: Create a decision
+      const decisionResult = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'record',
+          planId,
+          decision: {
+            title: 'Initial Decision 3',
+            question: 'What framework?',
+            decision: 'Framework Y',
+          },
+        },
+      });
+      const decision = parseResult<{ decisionId: string }>(decisionResult);
+
+      // Step 2: Try to supersede without reason parameter
+      const supersedeResult = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'supersede',
+          planId,
+          decisionId: decision.decisionId,
+          newDecision: {
+            decision: 'Framework Z',
+          },
+          // reason: missing!
+        },
+      });
+
+      // GREEN: Should return validation error
+      const error = supersedeResult as { content: { type: string; text: string }[]; isError: boolean };
+      expect(error.isError).toBe(true);
+      expect(error.content[0].text).toContain('reason is required for supersede action');
+    });
+  });
 });

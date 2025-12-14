@@ -36,6 +36,13 @@ const supersedeSchema = z.object({
   reason: z.string(),
 });
 
+// REFACTOR: Structured schema for newDecision in supersede action
+const newDecisionSchema = z.object({
+  decision: z.string().optional(),
+  context: z.string().optional(),
+  consequences: z.string().optional(),
+});
+
 // Base schema with all fields
 const baseDecisionSchema = z.object({
   action: z.enum(['record', 'get', 'get_many', 'update', 'list', 'supersede', 'get_history', 'diff', 'list_fields']),
@@ -44,12 +51,11 @@ const baseDecisionSchema = z.object({
   decisionIds: z.array(z.string()).optional(),
   decision: decisionDataSchema.optional(),
   updates: decisionUpdatesSchema.optional(),
-  supersede: supersedeSchema.optional(), // BUG-014 FIX: Add supersede parameter for updateDecision
-  newDecision: z.record(z.string(), z.unknown()).optional(),
+  supersede: supersedeSchema.optional(), // For update action with supersede option
+  newDecision: newDecisionSchema.optional(), // REFACTOR: Structured schema for supersede action
   reason: z.string().optional(),
   status: decisionStatusSchema.optional(),
-  supersededBy: z.string().optional(),
-  supersedes: z.string().optional(),
+  // REFACTOR: Removed supersededBy and supersedes - they are entity output fields, not MCP input parameters
   fields: z.array(z.string()).optional(),
   excludeMetadata: z.boolean().optional(),
   // For diff action
@@ -107,7 +113,6 @@ export const decisionSchema = baseDecisionSchema.superRefine((data: DecisionInpu
 
     case 'get':
     case 'update':
-    case 'supersede':
     case 'get_history':
     case 'diff':
       // decisionId is required
@@ -116,6 +121,40 @@ export const decisionSchema = baseDecisionSchema.superRefine((data: DecisionInpu
           code: 'custom',
           message: `decisionId is required for ${data.action} action`,
           path: ['decisionId'],
+        });
+      }
+      break;
+
+    case 'supersede':
+      // BUG-014 FIX: decisionId, newDecision, newDecision.decision, and reason are all required
+      if (typeof data.decisionId !== 'string' || data.decisionId === '') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'decisionId is required for supersede action',
+          path: ['decisionId'],
+        });
+      }
+      if (data.newDecision === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'newDecision is required for supersede action',
+          path: ['newDecision'],
+        });
+      } else {
+        // Validate newDecision.decision is required and non-empty
+        if (typeof data.newDecision.decision !== 'string' || data.newDecision.decision === '') {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'newDecision.decision is required for supersede action',
+            path: ['newDecision', 'decision'],
+          });
+        }
+      }
+      if (typeof data.reason !== 'string' || data.reason === '') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'reason is required for supersede action',
+          path: ['reason'],
         });
       }
       break;
