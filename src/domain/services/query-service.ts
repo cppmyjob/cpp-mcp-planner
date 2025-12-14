@@ -164,7 +164,9 @@ export class QueryService {
       ...entities.artifacts,
     ];
 
-    const query = input.query.toLowerCase();
+    // Convert SQL LIKE pattern to regex
+    const searchRegex = this.convertSqlLikeToRegex(input.query);
+
     const results: SearchResult[] = [];
 
     for (const entity of allEntities) {
@@ -179,7 +181,7 @@ export class QueryService {
 
       const searchableText = this.getSearchableText(entity);
       for (const [field, text] of Object.entries(searchableText)) {
-        if (text.toLowerCase().includes(query)) {
+        if (searchRegex.test(text)) {
           matchedFields.push(field);
           score += 1;
         }
@@ -1004,5 +1006,43 @@ export class QueryService {
     void excludedVersion;
     void excludedType;
     return rest as unknown as T;
+  }
+
+  /**
+   * Convert SQL LIKE pattern to JavaScript RegExp
+   * Supports SQL LIKE wildcards:
+   * - % (percent) matches any sequence of characters (including empty)
+   * - _ (underscore) matches exactly one character
+   *
+   * All other regex special characters are escaped to be treated as literals.
+   * Pattern matching is case-insensitive and searches anywhere in the text.
+   *
+   * @param pattern - SQL LIKE pattern (e.g., "%service%", "test_", "API%")
+   * @returns RegExp for pattern matching
+   *
+   * @example
+   * convertSqlLikeToRegex("%service%") // matches "User Service", "ServiceLayer"
+   * convertSqlLikeToRegex("test_") // matches "test1", "testA"
+   * convertSqlLikeToRegex("API%") // matches "API Gateway", "API"
+   * convertSqlLikeToRegex("") // matches everything
+   */
+  private convertSqlLikeToRegex(pattern: string): RegExp {
+    // Empty pattern matches everything
+    if (pattern === '') {
+      return /./i; // Match any character (case-insensitive)
+    }
+
+    // Escape all regex special characters except % and _
+    // Special chars to escape: . * + ? ^ $ { } ( ) | [ ] \
+    let regexPattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+
+    // Convert SQL LIKE wildcards to regex:
+    // % -> .* (zero or more of any character)
+    // _ -> . (exactly one character)
+    regexPattern = regexPattern.replace(/%/g, '.*').replace(/_/g, '.');
+
+    // Create case-insensitive regex
+    // Note: We don't anchor (^$) because SQL LIKE searches within text
+    return new RegExp(regexPattern, 'i');
   }
 }

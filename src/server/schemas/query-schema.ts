@@ -20,4 +20,4 @@ export const querySchema = z.object({
   offset: z.number().optional(),
 });
 
-export const queryToolDescription = 'Search, analyze, and validate plans. Search entities by text/tags, trace requirement implementation path (requirements->solutions->phases), validate plan integrity (uncovered requirements, orphan solutions, broken links), export to markdown/json, check plan health. Use for analysis and quality assurance. Actions: search, trace, validate, export, health.';
+export const queryToolDescription = 'Search, analyze, and validate plans. Search supports SQL LIKE syntax (% = any chars, _ = single char, case-insensitive). Trace requirement implementation path (requirements->solutions->phases), validate plan integrity (uncovered requirements, orphan solutions, broken links), export to markdown/json, check plan health. Use for analysis and quality assurance. Actions: search, trace, validate, export, health.';
