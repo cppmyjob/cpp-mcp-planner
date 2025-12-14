@@ -47,9 +47,40 @@ export async function handleDecision(args: DecisionArgs, services: Services): Pr
     case 'update':
       result = await decisionService.updateDecision(args as unknown as UpdateDecisionInput);
       break;
-    case 'list':
-      result = await decisionService.listDecisions(args as unknown as ListDecisionsInput);
+    case 'list': {
+      // BUG-004 FIX: Map MCP API (status in root) to Service API (status in filters)
+      const { status, tags, planId, limit, offset, fields, excludeMetadata } = args as {
+        status?: string;
+        tags?: unknown[];
+        planId: string;
+        limit?: number;
+        offset?: number;
+        fields?: string[];
+        excludeMetadata?: boolean;
+      };
+
+      const listInput: ListDecisionsInput = {
+        planId,
+        limit,
+        offset,
+        fields,
+        excludeMetadata,
+      };
+
+      // Map status and tags to filters object if present
+      if (status !== undefined || (tags !== undefined && tags.length > 0)) {
+        listInput.filters = {};
+        if (status !== undefined) {
+          listInput.filters.status = status as 'active' | 'superseded' | 'reversed';
+        }
+        if (tags !== undefined && tags.length > 0) {
+          listInput.filters.tags = tags as { key: string; value: string }[];
+        }
+      }
+
+      result = await decisionService.listDecisions(listInput);
       break;
+    }
     case 'supersede':
       result = await decisionService.supersedeDecision(args as unknown as SupersedeDecisionInput);
       break;

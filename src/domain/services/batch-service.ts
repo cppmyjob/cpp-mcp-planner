@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { RepositoryFactory, Repository, LinkRepository, PlanRepository, QueryOptions, QueryResult, Filter } from '../repositories/interfaces.js';
-import { NotFoundError, ConflictError } from '../repositories/errors.js';
+import { NotFoundError, ConflictError, ValidationError } from '../repositories/errors.js';
 import type { PlanService } from './plan-service.js';
 import type { RequirementService } from './requirement-service.js';
 import type { SolutionService } from './solution-service.js';
@@ -734,6 +734,18 @@ export class BatchService {
   }
 
   public async executeBatch(input: ExecuteBatchInput): Promise<BatchResult> {
+    // BUG-026 FIX: Validate operations array is not empty (service-level validation)
+    // Empty operations waste resources and indicate user error
+    const EMPTY_OPERATIONS_COUNT = 0;
+    const EMPTY_OPERATIONS_ERROR = 'operations array cannot be empty';
+
+    if (input.operations.length === EMPTY_OPERATIONS_COUNT) {
+      throw new ValidationError(
+        EMPTY_OPERATIONS_ERROR,
+        [{ field: 'operations', message: EMPTY_OPERATIONS_ERROR }]
+      );
+    }
+
     // Validate plan exists
     const exists = await this.planRepo.planExists(input.planId);
     if (!exists) {

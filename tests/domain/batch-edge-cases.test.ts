@@ -110,14 +110,14 @@ describe('BatchService - Edge Cases', () => {
     await removeDirectoryWithRetry(testDir);
   });
 
-  it('Test 40: Empty operations array returns empty result', async () => {
-    const result = await batchService.executeBatch({
-      planId: testPlanId,
-      operations: [],
-    });
-
-    expect(result.results).toHaveLength(0);
-    expect(result.tempIdMapping).toEqual({});
+  it('Test 40: Empty operations array throws ValidationError', async () => {
+    // BUG-026 FIX: Empty operations should be rejected at service level
+    await expect(
+      batchService.executeBatch({
+        planId: testPlanId,
+        operations: [],
+      })
+    ).rejects.toThrow('operations array cannot be empty');
   });
 
   it('Test 41: Single operation batch succeeds', async () => {

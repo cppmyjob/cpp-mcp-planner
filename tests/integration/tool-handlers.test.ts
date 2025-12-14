@@ -1976,4 +1976,130 @@ describe('Tool Handlers Integration', () => {
 
     });
   });
+
+  describe('Batch Tools', () => {
+    /**
+     * BUG-026 E2E Test: Empty operations validation
+     * RED → GREEN → REFACTOR → VERIFY
+     *
+     * E2E test through MCP tool handler
+     */
+    it('BUG-026 E2E: batch with empty operations should throw ValidationError', async () => {
+      await expect(
+        handleToolCall(
+          'batch',
+          {
+            planId: ctx.planId,
+            operations: []
+          },
+          ctx.services
+        )
+      ).rejects.toThrow('operations array cannot be empty');
+    });
+
+    /**
+     * BUG-001 E2E Test: Temp ID resolution in addressing
+     * Verify temp IDs resolve correctly through full stack
+     */
+    it('BUG-001 E2E: batch should resolve temp IDs in solution addressing', async () => {
+      const result = await handleToolCall(
+        'batch',
+        {
+          planId: ctx.planId,
+          operations: [
+            {
+              entityType: 'requirement',
+              payload: {
+                tempId: '$0',
+                title: 'Test Req',
+                description: 'Test requirement',
+                source: { type: 'user-request' },
+                acceptanceCriteria: [],
+                priority: 'high',
+                category: 'functional'
+              }
+            },
+            {
+              entityType: 'solution',
+              payload: {
+                title: 'Test Solution',
+                description: 'Addresses requirement',
+                approach: 'Use library X',
+                addressing: ['$0']
+              }
+            }
+          ]
+        },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.results).toHaveLength(2);
+      expect(parsed.results[0].success).toBe(true);
+      expect(parsed.results[1].success).toBe(true);
+
+      // Verify tempIdMapping populated
+      expect(parsed.tempIdMapping).toHaveProperty('$0');
+      expect(parsed.tempIdMapping.$0).toMatch(/^[a-f0-9-]{36}$/i);
+
+      // Verify solution addressing contains resolved ID
+      const solutionResult = await handleToolCall(
+        'solution',
+        {
+          action: 'get',
+          planId: ctx.planId,
+          solutionId: parsed.results[1].id
+        },
+        ctx.services
+      );
+      const solution = JSON.parse(solutionResult.content[0].text);
+      expect(solution.solution.addressing).toContain(parsed.tempIdMapping.$0);
+      expect(solution.solution.addressing).not.toContain('$0');
+    });
+
+    /**
+     * BUG-008 E2E Test: tempIdMapping populated
+     * Verify tempIdMapping returned through full stack
+     */
+    it('BUG-008 E2E: batch should return tempIdMapping with all temp IDs', async () => {
+      const result = await handleToolCall(
+        'batch',
+        {
+          planId: ctx.planId,
+          operations: [
+            {
+              entityType: 'requirement',
+              payload: {
+                tempId: '$0',
+                title: 'Req with tempId',
+                description: 'Test',
+                source: { type: 'user-request' },
+                acceptanceCriteria: [],
+                priority: 'high',
+                category: 'functional'
+              }
+            },
+            {
+              entityType: 'phase',
+              payload: {
+                tempId: '$1',
+                title: 'Phase with tempId',
+                description: 'Test phase'
+              }
+            }
+          ]
+        },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+
+      // Verify tempIdMapping is not empty
+      expect(parsed.tempIdMapping).not.toEqual({});
+      expect(parsed.tempIdMapping).toHaveProperty('$0');
+      expect(parsed.tempIdMapping).toHaveProperty('$1');
+      expect(parsed.tempIdMapping.$0).toMatch(/^[a-f0-9-]{36}$/i);
+      expect(parsed.tempIdMapping.$1).toMatch(/^[a-f0-9-]{36}$/i);
+    });
+  });
 });

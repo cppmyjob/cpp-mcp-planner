@@ -31,6 +31,11 @@ const decisionUpdatesSchema = z.object({
   consequences: z.string().optional(),
 });
 
+const supersedeSchema = z.object({
+  newDecision: z.string(),
+  reason: z.string(),
+});
+
 // Base schema with all fields
 const baseDecisionSchema = z.object({
   action: z.enum(['record', 'get', 'get_many', 'update', 'list', 'supersede', 'get_history', 'diff']),
@@ -39,6 +44,7 @@ const baseDecisionSchema = z.object({
   decisionIds: z.array(z.string()).optional(),
   decision: decisionDataSchema.optional(),
   updates: decisionUpdatesSchema.optional(),
+  supersede: supersedeSchema.optional(), // BUG-014 FIX: Add supersede parameter for updateDecision
   newDecision: z.record(z.string(), z.unknown()).optional(),
   reason: z.string().optional(),
   status: decisionStatusSchema.optional(),

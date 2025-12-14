@@ -118,14 +118,12 @@ describe('BatchService - Unit Tests', () => {
    * Test 1: executeBatch с пустым массивом операций
    * RED → GREEN → REFACTOR
    */
-  it('Test 1: executeBatch with empty operations array returns empty result', async () => {
-    const result = await batchService.executeBatch({
+  it('Test 1: executeBatch with empty operations array throws ValidationError', async () => {
+    // BUG-026 now covered by E2E test in tool-handlers.test.ts
+    await expect(batchService.executeBatch({
       planId,
       operations: []
-    });
-
-    expect(result.results).toEqual([]);
-    expect(result.tempIdMapping).toEqual({});
+    })).rejects.toThrow('operations array cannot be empty');
   });
 
   /**
@@ -542,7 +540,19 @@ describe('BatchService - Unit Tests', () => {
     await expect(
       batchService.executeBatch({
         planId: 'non-existent-plan-id',
-        operations: []
+        operations: [
+          {
+            entityType: 'requirement',
+            payload: {
+              title: 'Test',
+              description: 'Test',
+              source: { type: 'user-request' },
+              acceptanceCriteria: [],
+              priority: 'low',
+              category: 'functional'
+            }
+          }
+        ]
       })
     ).rejects.toThrow(/plan.*not.*found/i);
   });

@@ -378,7 +378,9 @@ export class DecisionService {
         context: decision.context,
         decision: input.supersede.newDecision,
         alternativesConsidered: [
-          ...decision.alternativesConsidered,
+          // BUG-014 FIX: Defensive guard for legacy data with missing alternativesConsidered
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          ...(decision.alternativesConsidered ?? []),
           {
             option: decision.decision,
             reasoning: 'Previous decision',
