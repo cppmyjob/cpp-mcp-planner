@@ -803,8 +803,11 @@ export class BatchService {
     for (const op of input.operations) {
         let result: { id?: string; requirementId?: string; solutionId?: string; phaseId?: string; linkId?: string; decisionId?: string; artifactId?: string } | undefined;
 
+        // Extract entity payload from nested format if present
+        const extractedPayload = this.extractEntityPayload(op.payload, op.entityType);
+
         // Resolve temp IDs in payload
-        const resolvedPayload = this.resolveTempIds(op.payload, tempIdMapping, op.entityType);
+        const resolvedPayload = this.resolveTempIds(extractedPayload, tempIdMapping, op.entityType);
 
         // Check if this is an update operation
         const isUpdate = (resolvedPayload as { action?: string }).action === 'update';
@@ -957,6 +960,58 @@ export class BatchService {
     await this.planService.updateStatistics(input.planId);
 
     return { results, tempIdMapping };
+  }
+
+  /**
+   * Extract entity payload from nested tool handler format
+   * Supports both flat format and nested format (tool handler style)
+   *
+   * Flat format (current):
+   *   { tempId: '$0', title: 'Foo', ... }
+   *
+   * Nested format (tool handler style):
+   *   { action: 'add', requirement: { tempId: '$0', title: 'Foo', ... } }
+   *
+   * @param payload - Raw payload from batch operation
+   * @param entityType - Type of entity being created
+   * @returns Extracted entity data
+   */
+  private extractEntityPayload(payload: Record<string, unknown>, entityType: BatchEntityType): Record<string, unknown> {
+    const action = payload.action;
+
+    // If no action field, assume flat format
+    if (action === undefined || typeof action !== 'string') {
+      return payload;
+    }
+
+    // If action is 'update', payload is already in correct format
+    if (action === 'update') {
+      return payload;
+    }
+
+    // Map entity types to their nested field names in tool handler format
+    const entityFieldMap: Record<BatchEntityType, string> = {
+      requirement: 'requirement',
+      solution: 'solution',
+      phase: 'phase',
+      decision: 'decision',
+      artifact: 'artifact',
+      link: '' // Links don't have nested format
+    };
+
+    // Extract nested entity data if present
+    const entityField = entityFieldMap[entityType];
+    if (entityField !== '' && entityField in payload) {
+      const entityData = payload[entityField];
+      if (typeof entityData === 'object' && entityData !== null && !Array.isArray(entityData)) {
+        return entityData as Record<string, unknown>;
+      }
+    }
+
+    // Fallback to flat format (remove action field)
+    const { action: extractedAction, ...restPayload } = payload;
+    void extractedAction; // Excluded from payload, extracted for inspection only
+    return restPayload;
   }
 
   /**

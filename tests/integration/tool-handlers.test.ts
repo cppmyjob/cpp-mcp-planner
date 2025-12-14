@@ -2101,5 +2101,75 @@ describe('Tool Handlers Integration', () => {
       expect(parsed.tempIdMapping.$0).toMatch(/^[a-f0-9-]{36}$/i);
       expect(parsed.tempIdMapping.$1).toMatch(/^[a-f0-9-]{36}$/i);
     });
+
+    /**
+     * BUG-001 REAL ISSUE E2E Test: Nested payload format (requirement handler style)
+     * Verify batch supports nested format with action + entity object
+     * This is the format users expect based on individual tool handlers
+     */
+    it('BUG-001 REAL: batch should support nested payload format with action', async () => {
+      const result = await handleToolCall(
+        'batch',
+        {
+          planId: ctx.planId,
+          operations: [
+            {
+              entityType: 'requirement',
+              payload: {
+                action: 'add',
+                requirement: {
+                  tempId: '$0',
+                  title: 'Test Requirement',
+                  description: 'Test requirement description',
+                  source: { type: 'user-request' },
+                  acceptanceCriteria: [],
+                  priority: 'high',
+                  category: 'functional'
+                }
+              }
+            },
+            {
+              entityType: 'solution',
+              payload: {
+                action: 'propose',
+                solution: {
+                  tempId: '$1',
+                  title: 'Test Solution',
+                  description: 'Addresses requirement',
+                  approach: 'Use library X',
+                  addressing: ['$0']
+                }
+              }
+            }
+          ]
+        },
+        ctx.services
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.results).toHaveLength(2);
+      expect(parsed.results[0].success).toBe(true);
+      expect(parsed.results[1].success).toBe(true);
+
+      // Verify tempIdMapping populated
+      expect(parsed.tempIdMapping).toHaveProperty('$0');
+      expect(parsed.tempIdMapping).toHaveProperty('$1');
+      expect(parsed.tempIdMapping.$0).toMatch(/^[a-f0-9-]{36}$/i);
+      expect(parsed.tempIdMapping.$1).toMatch(/^[a-f0-9-]{36}$/i);
+
+      // Verify temp ID resolution in addressing
+      const solutionResult = await handleToolCall(
+        'solution',
+        {
+          action: 'get',
+          planId: ctx.planId,
+          solutionId: parsed.results[1].id
+        },
+        ctx.services
+      );
+      const solution = JSON.parse(solutionResult.content[0].text);
+      expect(solution.solution.addressing).toContain(parsed.tempIdMapping.$0);
+      expect(solution.solution.addressing).not.toContain('$0');
+    });
   });
 });
