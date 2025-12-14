@@ -3,6 +3,7 @@ import type { RepositoryFactory } from '../../domain/repositories/interfaces.js'
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { DecisionService } from './decision-service.js';
+import type { LinkingService } from './linking-service.js';
 import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag, VersionHistory, VersionDiff, Requirement } from '../entities/types.js';
 import { NotFoundError } from '../repositories/errors.js';
 import { validateEffortEstimate, validateTags, validateRequiredString, validateOptionalString } from './validators.js';
@@ -213,7 +214,8 @@ export class SolutionService {
     private readonly repositoryFactory: RepositoryFactory,
     private readonly planService: PlanService,
     private readonly versionHistoryService?: VersionHistoryService,
-    private readonly decisionService?: DecisionService // TDD Sprint: Optional DecisionService for auto-creating Decision records
+    private readonly decisionService?: DecisionService, // TDD Sprint: Optional DecisionService for auto-creating Decision records
+    private readonly linkingService?: LinkingService // REQ-5: Optional for cascade delete
   ) {}
 
   public async getSolution(input: GetSolutionInput): Promise<GetSolutionResult> {
@@ -609,6 +611,11 @@ export class SolutionService {
     // Verify exists (throws NotFoundError if not found)
     await repo.findById(input.solutionId);
 
+    // REQ-5: Cascade delete all links for this solution
+    if (this.linkingService) {
+      await this.linkingService.deleteLinksForEntity(input.planId, input.solutionId);
+    }
+
     await repo.delete(input.solutionId);
     await this.planService.updateStatistics(input.planId);
 
@@ -681,6 +688,16 @@ export class SolutionService {
       throw new Error('Plan not found');
     }
 
+    // REQ-6: Load current entity to get accurate currentVersion
+    const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
+    let currentVersion = 1;
+    try {
+      const currentSolution = await repo.findById(input.solutionId);
+      currentVersion = currentSolution.version;
+    } catch {
+      // Entity might be deleted - use version from history file
+    }
+
     const history = await this.versionHistoryService.getHistory({
       planId: input.planId,
       entityId: input.solutionId,
@@ -688,6 +705,10 @@ export class SolutionService {
       limit: input.limit,
       offset: input.offset,
     });
+
+    // REQ-6: Override currentVersion with actual entity version
+    history.currentVersion = currentVersion;
+
     return history as VersionHistory<Solution>;
   }
 

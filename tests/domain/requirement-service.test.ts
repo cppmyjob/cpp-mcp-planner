@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { RequirementService } from '../../src/domain/services/requirement-service.js';
 import { PlanService } from '../../src/domain/services/plan-service.js';
+import { SolutionService } from '../../src/domain/services/solution-service.js';
+import { LinkingService } from '../../src/domain/services/linking-service.js';
 import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
 import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
 import type { Requirement } from '../../src/domain/entities/types.js';
@@ -11,6 +13,7 @@ import * as os from 'os';
 describe('RequirementService', () => {
   let service: RequirementService;
   let planService: PlanService;
+  let linkingService: LinkingService;
   let repositoryFactory: RepositoryFactory;
   let lockManager: FileLockManager;
   let testDir: string;
@@ -33,7 +36,8 @@ describe('RequirementService', () => {
     await planRepo.initialize();
 
     planService = new PlanService(repositoryFactory);
-    service = new RequirementService(repositoryFactory, planService);
+    linkingService = new LinkingService(repositoryFactory);
+    service = new RequirementService(repositoryFactory, planService, undefined, linkingService);
 
     // Create a test plan
     const plan = await planService.createPlan({
@@ -1755,6 +1759,211 @@ describe('RequirementService', () => {
       expect(updated.requirement.description).toBe('Updated Description');
       expect(updated.requirement.priority).toBe('critical');
       expect(updated.requirement.acceptanceCriteria).toEqual(['Updated AC1', 'Updated AC2']);
+    });
+  });
+
+  // REQ-5: Data Integrity - Cascading Delete and Cleanup
+  describe('delete_requirement cascading (REQ-5)', () => {
+    let solutionService: SolutionService;
+
+    beforeEach(() => {
+      solutionService = new SolutionService(repositoryFactory, planService);
+    });
+
+    it('RED: should cascade delete all links when requirement is deleted', async () => {
+      // Create requirement
+      const req = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      // Create solution
+      const sol = await solutionService.proposeSolution({
+        planId,
+        solution: { title: 'Test Solution' },
+      });
+
+      // Create link: solution implements requirement
+      await linkingService.linkEntities({
+        planId,
+        sourceId: sol.solutionId,
+        targetId: req.requirementId,
+        relationType: 'implements',
+      });
+
+      // Verify link exists
+      const linksBefore = await linkingService.getEntityLinks({
+        planId,
+        entityId: req.requirementId,
+      });
+      expect(linksBefore.links).toHaveLength(1);
+
+      // Delete requirement
+      await service.deleteRequirement({
+        planId,
+        requirementId: req.requirementId,
+      });
+
+      // Verify link was deleted
+      const linksAfter = await linkingService.getEntityLinks({
+        planId,
+        entityId: req.requirementId,
+      });
+      expect(linksAfter.links).toHaveLength(0);
+    });
+
+    it('RED: should clean solution.addressing when requirement is deleted', async () => {
+      // Create requirement
+      const req = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      // Create solution that addresses this requirement
+      const sol = await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Test Solution',
+          addressing: [req.requirementId],
+        },
+      });
+
+      // Verify solution.addressing contains requirement ID
+      const solBefore = await solutionService.getSolution({
+        planId,
+        solutionId: sol.solutionId,
+      });
+      expect(solBefore.solution.addressing).toContain(req.requirementId);
+
+      // Delete requirement
+      await service.deleteRequirement({
+        planId,
+        requirementId: req.requirementId,
+      });
+
+      // Verify solution.addressing was cleaned
+      const solAfter = await solutionService.getSolution({
+        planId,
+        solutionId: sol.solutionId,
+      });
+      expect(solAfter.solution.addressing).not.toContain(req.requirementId);
+      expect(solAfter.solution.addressing).toHaveLength(0);
+    });
+
+    it('RED: should clean multiple solutions when requirement is deleted', async () => {
+      // Create requirement
+      const req = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Test Requirement',
+          description: 'Test',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      // Create multiple solutions addressing this requirement
+      const sol1 = await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Solution 1',
+          addressing: [req.requirementId],
+        },
+      });
+
+      const sol2 = await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Solution 2',
+          addressing: [req.requirementId],
+        },
+      });
+
+      // Delete requirement
+      await service.deleteRequirement({
+        planId,
+        requirementId: req.requirementId,
+      });
+
+      // Verify both solutions were cleaned
+      const sol1After = await solutionService.getSolution({
+        planId,
+        solutionId: sol1.solutionId,
+      });
+      expect(sol1After.solution.addressing).toHaveLength(0);
+
+      const sol2After = await solutionService.getSolution({
+        planId,
+        solutionId: sol2.solutionId,
+      });
+      expect(sol2After.solution.addressing).toHaveLength(0);
+    });
+
+    it('GREEN: should preserve other requirement IDs in solution.addressing', async () => {
+      // Create two requirements
+      const req1 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Requirement 1',
+          description: 'Test',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      const req2 = await service.addRequirement({
+        planId,
+        requirement: {
+          title: 'Requirement 2',
+          description: 'Test',
+          category: 'functional',
+          priority: 'high',
+          acceptanceCriteria: [],
+          source: { type: 'user-request' },
+        },
+      });
+
+      // Create solution addressing both requirements
+      const sol = await solutionService.proposeSolution({
+        planId,
+        solution: {
+          title: 'Test Solution',
+          addressing: [req1.requirementId, req2.requirementId],
+        },
+      });
+
+      // Delete only req1
+      await service.deleteRequirement({
+        planId,
+        requirementId: req1.requirementId,
+      });
+
+      // Verify req2 ID is preserved
+      const solAfter = await solutionService.getSolution({
+        planId,
+        solutionId: sol.solutionId,
+      });
+      expect(solAfter.solution.addressing).toHaveLength(1);
+      expect(solAfter.solution.addressing).toContain(req2.requirementId);
+      expect(solAfter.solution.addressing).not.toContain(req1.requirementId);
     });
   });
 });

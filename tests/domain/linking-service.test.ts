@@ -471,4 +471,36 @@ describe('LinkingService', () => {
       });
     });
   });
+
+  // REQ-5: Data Integrity - Self-Reference Validation
+  describe('self-reference validation (REQ-5)', () => {
+    it('RED: should reject self-referencing link', async () => {
+      await expect(service.linkEntities({
+        planId,
+        sourceId: req1Id,
+        targetId: req1Id,
+        relationType: 'references',
+      })).rejects.toThrow('Cannot create self-referencing link');
+    });
+
+    it('RED: should reject self-referencing depends_on link', async () => {
+      await expect(service.linkEntities({
+        planId,
+        sourceId: phaseAId,
+        targetId: phaseAId,
+        relationType: 'depends_on',
+      })).rejects.toThrow('Cannot create self-referencing link');
+    });
+
+    it('GREEN: should allow link between different entities', async () => {
+      const result = await service.linkEntities({
+        planId,
+        sourceId: req1Id,
+        targetId: req2Id,
+        relationType: 'derived_from',
+      });
+
+      expect(result.linkId).toBeDefined();
+    });
+  });
 });

@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { RepositoryFactory } from '../../infrastructure/factory/repository-factory.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
+import type { LinkingService } from './linking-service.js';
 import type {
   Requirement,
   RequirementSource,
@@ -11,6 +12,7 @@ import type {
   Tag,
   VersionHistory,
   VersionDiff,
+  Solution,
 } from '../entities/types.js';
 import { NotFoundError } from '../repositories/errors.js';
 import { validateTags, validateRequiredString, validateRequiredEnum, validateOptionalString } from './validators.js';
@@ -264,7 +266,8 @@ export class RequirementService {
   constructor(
     private readonly repositoryFactory: RepositoryFactory,
     private readonly planService: PlanService,
-    private readonly versionHistoryService?: VersionHistoryService // Sprint 7: Optional for backward compatibility
+    private readonly versionHistoryService?: VersionHistoryService, // Sprint 7: Optional for backward compatibility
+    private readonly linkingService?: LinkingService // REQ-5: Optional for backward compatibility
   ) {}
 
   public async addRequirement(input: AddRequirementInput): Promise<AddRequirementResult> {
@@ -569,8 +572,15 @@ export class RequirementService {
     // Verify exists (throws NotFoundError if not found)
     await repo.findById(input.requirementId);
 
-    // TODO: Check for links if not force
-    // For now, just delete
+    // REQ-5: Cascade delete all links for this requirement
+    if (this.linkingService) {
+      await this.linkingService.deleteLinksForEntity(input.planId, input.requirementId);
+    }
+
+    // REQ-5: Clean solution.addressing arrays that reference this requirement
+    await this.cleanSolutionAddressing(input.planId, input.requirementId);
+
+    // Delete the requirement
     await repo.delete(input.requirementId);
 
     // Update statistics
@@ -580,6 +590,23 @@ export class RequirementService {
       success: true,
       message: 'Requirement deleted',
     };
+  }
+
+  /**
+   * REQ-5: Remove deleted requirement ID from all solution.addressing arrays
+   */
+  private async cleanSolutionAddressing(planId: string, requirementId: string): Promise<void> {
+    const solutionRepo = this.repositoryFactory.createRepository<Solution>('solution', planId);
+    const allSolutions = await solutionRepo.findAll();
+
+    // Find solutions that reference this requirement
+    const toUpdate = allSolutions.filter((sol) => sol.addressing.includes(requirementId));
+
+    // Remove requirement ID from addressing arrays
+    for (const solution of toUpdate) {
+      solution.addressing = solution.addressing.filter((id) => id !== requirementId);
+      await solutionRepo.update(solution.id, solution);
+    }
   }
 
   public async voteForRequirement(
@@ -778,6 +805,16 @@ export class RequirementService {
       throw new Error('Plan not found');
     }
 
+    // REQ-6: Load current entity to get accurate currentVersion
+    const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
+    let currentVersion = 1;
+    try {
+      const currentRequirement = await repo.findById(input.requirementId);
+      currentVersion = currentRequirement.version;
+    } catch {
+      // Entity might be deleted - use version from history file
+    }
+
     const history = await this.versionHistoryService.getHistory({
       planId: input.planId,
       entityId: input.requirementId,
@@ -785,6 +822,10 @@ export class RequirementService {
       limit: input.limit,
       offset: input.offset,
     });
+
+    // REQ-6: Override currentVersion with actual entity version
+    history.currentVersion = currentVersion;
+
     return history as VersionHistory<Requirement>;
   }
 

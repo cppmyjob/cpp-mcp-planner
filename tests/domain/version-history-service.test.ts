@@ -2281,4 +2281,92 @@ describe('Version History Service (Sprint 7)', () => {
       expect(page2.versions).toHaveLength(3);
     });
   });
+
+  // REQ-6: Version History Bugs
+  describe('version history bugs (REQ-6)', () => {
+    it('RED: diff should find version 1 within maxHistoryDepth', async () => {
+      const plan = await planService.createPlan({
+        name: 'Test',
+        description: 'Test',
+        maxHistoryDepth: 10
+      });
+
+      const req = await requirementService.addRequirement({
+        planId: plan.planId,
+        requirement: createRequirement('V1', { description: 'Test', priority: 'high', category: 'functional' })
+      });
+
+      // Create versions 2, 3, 4
+      await requirementService.updateRequirement({
+        planId: plan.planId,
+        requirementId: req.requirementId,
+        updates: { title: 'V2' }
+      });
+      await requirementService.updateRequirement({
+        planId: plan.planId,
+        requirementId: req.requirementId,
+        updates: { title: 'V3' }
+      });
+      await requirementService.updateRequirement({
+        planId: plan.planId,
+        requirementId: req.requirementId,
+        updates: { title: 'V4' }
+      });
+
+      // Should be able to diff version 1 and 4 (maxHistoryDepth=10, only 4 versions total)
+      const diff = await requirementService.diff({
+        planId: plan.planId,
+        requirementId: req.requirementId,
+        version1: 1,
+        version2: 4
+      });
+
+      expect(diff.version1.version).toBe(1);
+      expect(diff.version2.version).toBe(4);
+      expect(diff.changes.title).toBeDefined();
+      expect(diff.changes.title.from).toBe('V1');
+      expect(diff.changes.title.to).toBe('V4');
+    });
+
+    it('RED: getHistory should return correct currentVersion', async () => {
+      const plan = await planService.createPlan({
+        name: 'Test',
+        description: 'Test',
+        maxHistoryDepth: 10
+      });
+
+      const req = await requirementService.addRequirement({
+        planId: plan.planId,
+        requirement: createRequirement('V1', { description: 'Test', priority: 'high', category: 'functional' })
+      });
+
+      // Create versions 2, 3, 4
+      await requirementService.updateRequirement({
+        planId: plan.planId,
+        requirementId: req.requirementId,
+        updates: { title: 'V2' }
+      });
+      await requirementService.updateRequirement({
+        planId: plan.planId,
+        requirementId: req.requirementId,
+        updates: { title: 'V3' }
+      });
+
+      // Get current requirement to verify actual version
+      const current = await requirementService.getRequirement({
+        planId: plan.planId,
+        requirementId: req.requirementId
+      });
+
+      // Get history
+      const history = await requirementService.getHistory({
+        planId: plan.planId,
+        requirementId: req.requirementId
+      });
+
+      // currentVersion in history should match the actual entity version
+      expect(history.currentVersion).toBe(current.requirement.version);
+      expect(history.currentVersion).toBe(3); // Should be 3, not 2
+    });
+  });
 });

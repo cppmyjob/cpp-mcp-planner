@@ -55,6 +55,11 @@ export class LinkingService {
     await this.validateEntityExists(input.planId, input.sourceId, 'sourceId');
     await this.validateEntityExists(input.planId, input.targetId, 'targetId');
 
+    // REQ-5: Prevent self-referencing links
+    if (input.sourceId === input.targetId) {
+      throw new Error('Cannot create self-referencing link');
+    }
+
     // Check for cycle if depends_on
     if (input.relationType === 'depends_on') {
       const links = await linkRepo.findAllLinks('depends_on');
