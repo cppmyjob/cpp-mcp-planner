@@ -80,11 +80,12 @@ describe('QueryService', () => {
     await planRepo.initialize();
 
     planService = new PlanService(repositoryFactory);
-    requirementService = new RequirementService(repositoryFactory, planService);
-    solutionService = new SolutionService(repositoryFactory, planService);
-    phaseService = new PhaseService(repositoryFactory, planService);
-    artifactService = new ArtifactService(repositoryFactory, planService);
     linkingService = new LinkingService(repositoryFactory);
+    // BUG-046 FIX: Pass linkingService to services for proper cascading deletion
+    requirementService = new RequirementService(repositoryFactory, planService, undefined, linkingService);
+    solutionService = new SolutionService(repositoryFactory, planService, undefined, undefined, linkingService);
+    phaseService = new PhaseService(repositoryFactory, planService, undefined, linkingService);
+    artifactService = new ArtifactService(repositoryFactory, planService, undefined, linkingService);
     queryService = new QueryService(repositoryFactory, planService, linkingService);
 
     const plan = await planService.createPlan({
@@ -2747,6 +2748,99 @@ describe('QueryService', () => {
         expect(solutionIds).toContain(sol3Id);
       });
     });
-     
+  });
+
+  describe('BUG-046: Validate must not show deleted links as broken', () => {
+    it('RED: After deleting entity with links, validate should return isValid: true', async () => {
+      // Test Case from QA-REGRESSION-REPORT-2025-12-14.md
+
+      // 1. Create Phase A
+      const phaseA = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Phase A for link test',
+          objectives: ['Test link deletion'],
+        },
+      });
+
+      // 2. Create Phase B
+      const phaseB = await phaseService.addPhase({
+        planId,
+        phase: {
+          title: 'Phase B for link test',
+          objectives: ['Be target'],
+        },
+      });
+
+      // 3. Create Link (A depends_on B)
+      await linkingService.linkEntities({
+        planId,
+        sourceId: phaseA.phaseId,
+        targetId: phaseB.phaseId,
+        relationType: 'depends_on',
+      });
+
+      // 4. Delete Phase A (should cascade delete link)
+      await phaseService.deletePhase({
+        planId,
+        phaseId: phaseA.phaseId,
+      });
+
+      // 5. Verify Link was deleted via get
+      const linkResult = await linkingService.getEntityLinks({
+        planId,
+        entityId: phaseA.phaseId,
+        direction: 'both',
+      });
+      expect(linkResult.links).toHaveLength(0); // Link correctly deleted ✅
+
+      // 6. Run Validate - should return isValid: true (NO broken_link errors)
+      const validateResult = await queryService.validatePlan({ planId });
+
+      // CRITICAL ASSERTION: Should not show broken_link for deleted link
+      expect(validateResult.isValid).toBe(true);
+      expect(validateResult.issues).toEqual([]);
+
+      // Additional check: no broken_link errors at all
+      const brokenLinks = validateResult.issues.filter((i) => i.type === 'broken_link');
+      expect(brokenLinks).toHaveLength(0);
+    });
+
+    it('RED: Multiple deleted links should not accumulate in validate errors', async () => {
+      // Test Case #2 from QA report - verify links don't accumulate
+
+      // Create Phase X and Y
+      const phaseX = await phaseService.addPhase({
+        planId,
+        phase: { title: 'Phase X', objectives: ['Test'] },
+      });
+      const phaseY = await phaseService.addPhase({
+        planId,
+        phase: { title: 'Phase Y', objectives: ['Test'] },
+      });
+
+      // Create link X → Y
+      await linkingService.linkEntities({
+        planId,
+        sourceId: phaseX.phaseId,
+        targetId: phaseY.phaseId,
+        relationType: 'depends_on',
+      });
+
+      // Delete Phase X
+      await phaseService.deletePhase({
+        planId,
+        phaseId: phaseX.phaseId,
+      });
+
+      // Run validate - should not show broken links
+      const validateResult = await queryService.validatePlan({ planId });
+
+      const brokenLinks = validateResult.issues.filter((i) => i.type === 'broken_link');
+      expect(brokenLinks).toHaveLength(0);
+
+      // If this fails, it means deleted links are accumulating from previous test runs
+      expect(validateResult.isValid).toBe(true);
+    });
   });
 });
