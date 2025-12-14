@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { RepositoryFactory } from '../repositories/interfaces.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
+import type { LinkingService } from './linking-service.js';
 import type {
   Artifact,
   ArtifactType,
@@ -147,7 +148,8 @@ export class ArtifactService {
   constructor(
     private readonly repositoryFactory: RepositoryFactory,
     private readonly planService: PlanService,
-    private readonly versionHistoryService?: VersionHistoryService
+    private readonly versionHistoryService?: VersionHistoryService,
+    private readonly linkingService?: LinkingService // BUG-015 FIX: Optional for cascading link deletion
   ) {}
 
   private async ensurePlanExists(planId: string): Promise<void> {
@@ -438,6 +440,12 @@ export class ArtifactService {
     await this.ensurePlanExists(input.planId);
 
     const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
+
+    // BUG-015 FIX: Cascade delete all links for this artifact
+    if (this.linkingService) {
+      await this.linkingService.deleteLinksForEntity(input.planId, input.artifactId);
+    }
+
     await repo.delete(input.artifactId);
     await this.planService.updateStatistics(input.planId);
 

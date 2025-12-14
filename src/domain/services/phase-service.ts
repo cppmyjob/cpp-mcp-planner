@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { RepositoryFactory } from '../../infrastructure/factory/repository-factory.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
+import type { LinkingService } from './linking-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
 import { validateEffortEstimate, validateTags, validatePriority, validateRequiredString, validateRequiredEnum, validateProgress, validateOptionalString, validatePhaseOrder } from './validators.js';
 import { filterPhase } from '../utils/field-filter.js';
@@ -330,7 +331,8 @@ export class PhaseService {
   constructor(
     private readonly repositoryFactory: RepositoryFactory,
     private readonly planService: PlanService,
-    private readonly versionHistoryService?: VersionHistoryService
+    private readonly versionHistoryService?: VersionHistoryService,
+    private readonly linkingService?: LinkingService // BUG-015 FIX: Optional for cascading link deletion
   ) {}
 
   private async ensurePlanExists(planId: string): Promise<void> {
@@ -771,6 +773,13 @@ export class PhaseService {
         for (const affectedPhase of [...directChildren, ...affectedPhases]) {
           await repo.update(affectedPhase.id, affectedPhase);
         }
+      }
+    }
+
+    // BUG-015 FIX: Cascade delete all links for deleted phases
+    if (this.linkingService) {
+      for (const id of deletedIds) {
+        await this.linkingService.deleteLinksForEntity(input.planId, id);
       }
     }
 

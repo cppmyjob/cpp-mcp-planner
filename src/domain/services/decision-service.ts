@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { RepositoryFactory } from '../repositories/interfaces.js';
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
+import type { LinkingService } from './linking-service.js';
 import type { Decision, DecisionStatus, AlternativeConsidered, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
 import { NotFoundError } from '../repositories/errors.js';
 import { validateAlternativesConsidered, validateTags, validateRequiredString, validateOptionalString } from './validators.js';
@@ -124,7 +125,8 @@ export class DecisionService {
   constructor(
     private readonly repositoryFactory: RepositoryFactory,
     private readonly planService: PlanService,
-    private readonly versionHistoryService?: VersionHistoryService
+    private readonly versionHistoryService?: VersionHistoryService,
+    private readonly linkingService?: LinkingService // BUG-015 FIX: Optional for cascading link deletion
   ) {}
 
   public async getDecision(input: GetDecisionInput): Promise<GetDecisionResult> {
