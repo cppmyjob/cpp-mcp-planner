@@ -7,6 +7,102 @@ const VALID_CONFIDENCE_LEVELS = ['low', 'medium', 'high'] as const;
 const VALID_ARTIFACT_TYPES = ['code', 'config', 'migration', 'documentation', 'test', 'script', 'other'] as const;
 const VALID_FILE_ACTIONS = ['create', 'modify', 'delete'] as const;
 
+/**
+ * Sanitizes text input by rejecting dangerous characters.
+ * Rejects: HTML tags (XSS), null bytes, control characters (except newline, tab, carriage return).
+ * @param text - The text to sanitize
+ * @param fieldName - Field name for error messages
+ * @throws Error if dangerous content detected
+ */
+export function sanitizeText(text: string, fieldName: string): void {
+  // Check for null bytes (BUG-029)
+  if (text.includes('\0')) {
+    throw new Error(`${fieldName} contains null bytes which are not allowed`);
+  }
+
+  // Check for HTML/Script tags (BUG-003 - XSS)
+  const htmlTagPattern = /<[^>]*>/;
+  if (htmlTagPattern.test(text)) {
+    throw new Error(`${fieldName} contains HTML tags which are not allowed`);
+  }
+
+  // Check for control characters (except newline, tab, carriage return)
+  // Control characters are \x00-\x1F and \x7F-\x9F
+  // Allow: \n (0x0A), \r (0x0D), \t (0x09)
+  // eslint-disable-next-line no-control-regex
+  const controlCharsPattern = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/;
+  if (controlCharsPattern.test(text)) {
+    throw new Error(`${fieldName} contains control characters which are not allowed`);
+  }
+}
+
+/**
+ * Sanitizes tag keys by rejecting dangerous characters and whitespace-only keys.
+ * Rejects: null bytes, whitespace-only, control characters.
+ * @param key - The tag key to sanitize
+ * @param index - Array index for error messages
+ * @throws Error if dangerous content detected
+ */
+export function sanitizeTagKey(key: string, index: number): void {
+  // Check for null bytes (BUG-032)
+  if (key.includes('\0')) {
+    throw new Error(`Tag key at index ${String(index)} contains null bytes which are not allowed`);
+  }
+
+  // Check for whitespace-only (BUG-035)
+  if (key.trim() === '') {
+    throw new Error(`Tag key at index ${String(index)} must not be whitespace-only`);
+  }
+
+  // Check for control characters
+  // eslint-disable-next-line no-control-regex
+  const controlCharsPattern = /[\x00-\x1F\x7F-\x9F]/;
+  if (controlCharsPattern.test(key)) {
+    throw new Error(`Tag key at index ${String(index)} contains control characters which are not allowed`);
+  }
+}
+
+/**
+ * Sanitizes file paths by rejecting path traversal attempts.
+ * Rejects: path traversal (../, ..\), absolute paths, null bytes.
+ * @param path - The path to sanitize
+ * @param fieldName - Field name for error messages
+ * @throws Error if path traversal detected
+ */
+export function sanitizePath(path: string, fieldName: string): void {
+  // Check for null bytes
+  if (path.includes('\0')) {
+    throw new Error(`${fieldName} contains null bytes which are not allowed`);
+  }
+
+  // Check for path traversal patterns (BUG-030)
+  // Patterns: ../, ..\\, /../, /..\\, etc.
+  const traversalPatterns = [
+    '../',
+    '..\\',
+    '/../',
+    '\\..\\',
+    '/..',
+    '\\..',
+  ];
+
+  for (const pattern of traversalPatterns) {
+    if (path.includes(pattern)) {
+      throw new Error(`${fieldName} contains path traversal sequence '${pattern}' which is not allowed`);
+    }
+  }
+
+  // Reject absolute paths on Windows (C:, D:, etc.)
+  if (/^[a-zA-Z]:/.test(path)) {
+    throw new Error(`${fieldName} must be a relative path (absolute paths not allowed)`);
+  }
+
+  // Reject absolute paths on Unix (/path)
+  if (path.startsWith('/')) {
+    throw new Error(`${fieldName} must be a relative path (absolute paths not allowed)`);
+  }
+}
+
 export function validateEffortEstimate(effort: unknown, fieldName = 'effortEstimate'): void {
   if (effort === undefined || effort === null) {
     return; // Optional field
@@ -81,10 +177,18 @@ export function validateTags(tags: unknown[]): void {
       );
     }
 
+    // Sanitize tag key (BUG-032, BUG-035)
+    sanitizeTagKey(tag.key, i);
+
     if (typeof tag.value !== 'string') {
       throw new Error(
         `Invalid tag at index ${String(i)}: 'value' must be a string`
       );
+    }
+
+    // Sanitize tag value (BUG-003, BUG-029)
+    if (tag.value !== '') {
+      sanitizeText(tag.value, `Tag value at index ${String(i)}`);
     }
   }
 }
@@ -145,6 +249,9 @@ export function validateTargets(targets: unknown[]): void {
         `Invalid target at index ${String(i)}: path must be a non-empty string`
       );
     }
+
+    // Sanitize path (BUG-030)
+    sanitizePath(trimmedPath, `Target path at index ${String(i)}`);
 
     // Validate action
     if (!VALID_FILE_ACTIONS.includes(target.action as typeof VALID_FILE_ACTIONS[number])) {
@@ -315,6 +422,8 @@ export function validateRequiredString(value: unknown, fieldName: string): void 
   if (value.trim() === '') {
     throw new Error(`${fieldName} must be a non-empty string`);
   }
+  // Sanitize text content (BUG-003, BUG-029)
+  sanitizeText(value, fieldName);
 }
 
 /**
@@ -443,5 +552,25 @@ export function validateSlug(slug: unknown): void {
     throw new Error(
       'slug must be lowercase alphanumeric with dashes (e.g., "my-valid-slug-123")'
     );
+  }
+}
+
+/**
+ * Validates optional string field (like description, approach, context, etc.)
+ * Allows undefined, null, or empty string, but sanitizes non-empty values.
+ * @param value - The optional string to validate
+ * @param fieldName - Field name for error messages
+ * @throws Error if value contains dangerous content
+ */
+export function validateOptionalString(value: unknown, fieldName: string): void {
+  if (value === undefined || value === null) {
+    return; // Optional field
+  }
+  if (typeof value !== 'string') {
+    throw new Error(`${fieldName} must be a string`);
+  }
+  // Allow empty string but sanitize if not empty
+  if (value !== '') {
+    sanitizeText(value, fieldName);
   }
 }

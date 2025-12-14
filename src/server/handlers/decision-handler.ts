@@ -49,7 +49,7 @@ export async function handleDecision(args: DecisionArgs, services: Services): Pr
       break;
     case 'list': {
       // BUG-004 FIX: Map MCP API (status in root) to Service API (status in filters)
-      const { status, tags, planId, limit, offset, fields, excludeMetadata } = args as {
+      const { status, tags, planId, limit, offset, fields, excludeMetadata } = args as unknown as {
         status?: string;
         tags?: unknown[];
         planId: string;

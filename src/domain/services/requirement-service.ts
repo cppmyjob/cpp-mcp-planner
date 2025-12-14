@@ -13,7 +13,7 @@ import type {
   VersionDiff,
 } from '../entities/types.js';
 import { NotFoundError } from '../repositories/errors.js';
-import { validateTags, validateRequiredString, validateRequiredEnum } from './validators.js';
+import { validateTags, validateRequiredString, validateRequiredEnum, validateOptionalString } from './validators.js';
 import { filterEntities, filterEntity } from '../utils/field-filter.js';
 
 // Constants
@@ -305,6 +305,10 @@ export class RequirementService {
 
     // Validate tags format
     validateTags(input.requirement.tags ?? []);
+
+    // Validate optional string fields (BUG-003, BUG-029)
+    validateOptionalString(input.requirement.description, 'description');
+    validateOptionalString(input.requirement.rationale, 'rationale');
 
     const requirementId = uuidv4();
     const now = new Date().toISOString();

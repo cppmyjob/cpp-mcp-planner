@@ -14,7 +14,7 @@ import type {
   Requirement,
   Solution,
 } from '../entities/types.js';
-import { validateTags, validateTargets, validateCodeRefs, validateRequiredString, validateRequiredEnum, validateSlug } from './validators.js';
+import { validateTags, validateTargets, validateCodeRefs, validateRequiredString, validateRequiredEnum, validateSlug, validateOptionalString } from './validators.js';
 import { filterArtifact } from '../utils/field-filter.js';
 
 // Constants
@@ -236,6 +236,7 @@ export class ArtifactService {
 
     // Validate optional fields
     validateTags(input.artifact.tags ?? []);
+    validateOptionalString(input.artifact.description, 'description');
     if (input.artifact.targets) {
       validateTargets(input.artifact.targets);
     }

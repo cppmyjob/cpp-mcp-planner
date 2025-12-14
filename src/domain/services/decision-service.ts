@@ -4,7 +4,7 @@ import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { Decision, DecisionStatus, AlternativeConsidered, Tag, VersionHistory, VersionDiff } from '../entities/types.js';
 import { NotFoundError } from '../repositories/errors.js';
-import { validateAlternativesConsidered, validateTags, validateRequiredString } from './validators.js';
+import { validateAlternativesConsidered, validateTags, validateRequiredString, validateOptionalString } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
 // Constants
@@ -262,6 +262,10 @@ export class DecisionService {
     validateAlternativesConsidered(input.decision.alternativesConsidered ?? []);
     // Validate tags format
     validateTags(input.decision.tags ?? []);
+
+    // Validate optional string fields (BUG-003, BUG-029)
+    validateOptionalString(input.decision.context, 'context');
+    validateOptionalString(input.decision.consequences, 'consequences');
 
     const decisionId = uuidv4();
     const now = new Date().toISOString();

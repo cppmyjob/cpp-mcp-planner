@@ -606,7 +606,7 @@ describe('QueryService', () => {
           description: 'Implementation',
           artifactType: 'code',
           targets: [
-            { path: '/absolute/nonexistent.ts', action: 'modify', description: 'Nonexistent file' },
+            { path: 'src/nonexistent.ts', action: 'modify', description: 'Nonexistent file' },
           ],
         },
       });
@@ -617,8 +617,8 @@ describe('QueryService', () => {
       expect(issue).toBeDefined();
       if (issue === undefined) throw new Error('issue is required');
       expect(issue.severity).toBe('warning');
-      expect(issue.filePath).toBe('/absolute/nonexistent.ts');
-      expect(issue.message).toContain('/absolute/nonexistent.ts');
+      expect(issue.filePath).toBe('src/nonexistent.ts');
+      expect(issue.message).toContain('src/nonexistent.ts');
       expect(issue.message).toContain('modify');
     });
 
@@ -633,7 +633,7 @@ describe('QueryService', () => {
           description: 'New implementation',
           artifactType: 'code',
           targets: [
-            { path: '/new-file.ts', action: 'create', description: 'Will be created' },
+            { path: 'src/new-file.ts', action: 'create', description: 'Will be created' },
           ],
         },
       });
@@ -649,10 +649,10 @@ describe('QueryService', () => {
       const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(repositoryFactory, planService);
       const fs = await import('fs/promises');
       const path = await import('path');
-      const os = await import('os');
 
-      // Create a real temp file
-      const tmpDir = path.join(os.tmpdir(), `mcp-test-${String(Date.now())}`);
+      // Create a file in a relative path location
+      const relativePath = 'test-data/existing.ts';
+      const tmpDir = path.join(process.cwd(), 'test-data');
       await fs.mkdir(tmpDir, { recursive: true });
       const tmpFile = path.join(tmpDir, 'existing.ts');
       await fs.writeFile(tmpFile, 'content');
@@ -665,14 +665,14 @@ describe('QueryService', () => {
             description: 'Modify existing file',
             artifactType: 'code',
             targets: [
-              { path: tmpFile, action: 'modify', description: 'Existing file' },
+              { path: relativePath, action: 'modify', description: 'Existing file' },
             ],
           },
         });
 
         const result = await queryService.validatePlan({ planId });
 
-        const missingFileIssue = result.issues.find(i => i.type === 'missing_file' && i.filePath === tmpFile);
+        const missingFileIssue = result.issues.find(i => i.type === 'missing_file' && i.filePath === relativePath);
         expect(missingFileIssue).toBeUndefined();
       } finally {
         await fs.rm(tmpDir, { recursive: true, force: true });

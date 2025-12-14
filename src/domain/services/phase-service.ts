@@ -3,7 +3,7 @@ import type { RepositoryFactory } from '../../infrastructure/factory/repository-
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
-import { validateEffortEstimate, validateTags, validatePriority, validateRequiredString, validateRequiredEnum, validateProgress } from './validators.js';
+import { validateEffortEstimate, validateTags, validatePriority, validateRequiredString, validateRequiredEnum, validateProgress, validateOptionalString } from './validators.js';
 import { filterPhase } from '../utils/field-filter.js';
 import { bulkUpdateEntities } from '../utils/bulk-operations.js';
 
@@ -410,6 +410,9 @@ export class PhaseService {
     validateEffortEstimate(effort, 'estimatedEffort');
     // Validate tags format
     validateTags(input.phase.tags ?? []);
+    // Validate optional string fields (BUG-003, BUG-029)
+    validateOptionalString(input.phase.description, 'description');
+    validateOptionalString(input.phase.implementationNotes, 'implementationNotes');
     // Validate priority if provided
     if (input.phase.priority !== undefined) {
       validatePriority(input.phase.priority);
@@ -538,6 +541,7 @@ export class PhaseService {
       phase.metadata.tags = input.updates.tags;
     }
     if (input.updates.implementationNotes !== undefined) {
+      validateOptionalString(input.updates.implementationNotes, 'implementationNotes');
       phase.implementationNotes = input.updates.implementationNotes;
     }
     if (input.updates.priority !== undefined) {

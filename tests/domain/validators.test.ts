@@ -134,12 +134,12 @@ describe('validateTargets', () => {
       expect(() => { validateTargets([{ path: 'src\\services\\user.ts', action: 'create' }]); }).not.toThrow();
     });
 
-    it('RED: should accept absolute Unix paths', () => {
-      expect(() => { validateTargets([{ path: '/home/user/project/file.ts', action: 'create' }]); }).not.toThrow();
+    it('RED: should reject absolute Unix paths (BUG-030 security fix)', () => {
+      expect(() => { validateTargets([{ path: '/home/user/project/file.ts', action: 'create' }]); }).toThrow('must be a relative path');
     });
 
-    it('RED: should accept absolute Windows paths', () => {
-      expect(() => { validateTargets([{ path: 'C:\\Projects\\file.ts', action: 'create' }]); }).not.toThrow();
+    it('RED: should reject absolute Windows paths (BUG-030 security fix)', () => {
+      expect(() => { validateTargets([{ path: 'C:\\Projects\\file.ts', action: 'create' }]); }).toThrow('must be a relative path');
     });
 
     it('RED: should accept paths with spaces', () => {
@@ -150,9 +150,9 @@ describe('validateTargets', () => {
       expect(() => { validateTargets([{ path: 'src/файл.ts', action: 'create' }]); }).not.toThrow();
     });
 
-    it('RED: should accept paths with parent directory references', () => {
-      expect(() => { validateTargets([{ path: '../file.ts', action: 'create' }]); }).not.toThrow();
-      expect(() => { validateTargets([{ path: '../../parent/file.ts', action: 'create' }]); }).not.toThrow();
+    it('RED: should reject paths with parent directory references (BUG-030 security fix)', () => {
+      expect(() => { validateTargets([{ path: '../file.ts', action: 'create' }]); }).toThrow('path traversal');
+      expect(() => { validateTargets([{ path: '../../parent/file.ts', action: 'create' }]); }).toThrow('path traversal');
     });
   });
 

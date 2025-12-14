@@ -4,7 +4,7 @@ import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { DecisionService } from './decision-service.js';
 import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag, VersionHistory, VersionDiff, Requirement } from '../entities/types.js';
-import { validateEffortEstimate, validateTags, validateRequiredString } from './validators.js';
+import { validateEffortEstimate, validateTags, validateRequiredString, validateOptionalString } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
 // Constants
@@ -281,6 +281,10 @@ export class SolutionService {
     }
     // Validate tags format
     validateTags(input.solution.tags ?? []);
+
+    // Validate optional string fields (BUG-003, BUG-029)
+    validateOptionalString(input.solution.description, 'description');
+    validateOptionalString(input.solution.approach, 'approach');
 
     // BUG #5 FIX: Validate addressing[] references exist
     const addressingIds = input.solution.addressing ?? [];
