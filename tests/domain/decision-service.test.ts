@@ -478,7 +478,7 @@ describe('DecisionService', () => {
 
       // BUG-014 FIX: supersede should REUSE existing decision when UUID is provided
       describe('BUG-014: supersede with existing decision ID (ADR pattern)', () => {
-        it('RED: should reuse existing decision when UUID is provided, not create duplicate', async () => {
+        it('GREEN: should reuse existing decision when UUID is provided, not create duplicate', async () => {
           // Create Decision 1 (to be superseded)
           const decision1 = await service.recordDecision({
             planId,
@@ -561,7 +561,7 @@ describe('DecisionService', () => {
           expect(allDecisions.total).toBe(2); // Only Decision 1 and Decision 2, NO third decision
         });
 
-        it('RED: should throw error if provided decision UUID does not exist', async () => {
+        it('GREEN: should throw error if provided decision UUID does not exist', async () => {
           const decision1 = await service.recordDecision({
             planId,
             decision: {

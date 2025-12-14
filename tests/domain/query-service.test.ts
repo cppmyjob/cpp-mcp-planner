@@ -2751,7 +2751,7 @@ describe('QueryService', () => {
   });
 
   describe('BUG-046: Validate must not show deleted links as broken', () => {
-    it('RED: After deleting entity with links, validate should return isValid: true', async () => {
+    it('GREEN: After deleting entity with links, validate should return isValid: true', async () => {
       // Test Case from QA-REGRESSION-REPORT-2025-12-14.md
 
       // 1. Create Phase A
@@ -2806,7 +2806,7 @@ describe('QueryService', () => {
       expect(brokenLinks).toHaveLength(0);
     });
 
-    it('RED: Multiple deleted links should not accumulate in validate errors', async () => {
+    it('GREEN: Multiple deleted links should not accumulate in validate errors', async () => {
       // Test Case #2 from QA report - verify links don't accumulate
 
       // Create Phase X and Y

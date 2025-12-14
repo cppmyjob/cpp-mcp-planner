@@ -296,7 +296,7 @@ export class DecisionService {
       context: input.newDecision.context ?? oldDecision.context,
       decision: input.newDecision.decision,
       alternativesConsidered: [
-        // BUG-014 FIX: Defensive guard for legacy data with missing alternativesConsidered
+        // BUG-008 FIX: Defensive guard for legacy data with missing alternativesConsidered
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         ...(oldDecision.alternativesConsidered ?? []),
         {
@@ -453,7 +453,7 @@ export class DecisionService {
         context: decision.context,
         decision: input.supersede.newDecision,
         alternativesConsidered: [
-          // BUG-014 FIX: Defensive guard for legacy data with missing alternativesConsidered
+          // BUG-008 FIX: Defensive guard for legacy data with missing alternativesConsidered
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           ...(decision.alternativesConsidered ?? []),
           {

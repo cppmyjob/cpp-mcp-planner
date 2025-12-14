@@ -1287,7 +1287,7 @@ describe('BatchService - Unit Tests', () => {
 
   describe('BUG-001 & BUG-008: Nested payload format from MCP tool handler', () => {
     // QA Report Test Attempt #2: Batch without temp IDs fails with nested format
-    it('RED: should handle nested format - phase with action and nested phase object', async () => {
+    it('GREEN: should handle nested format - phase with action and nested phase object', async () => {
       const result = await batchService.executeBatch({
         planId,
         operations: [
@@ -1322,7 +1322,7 @@ describe('BatchService - Unit Tests', () => {
     });
 
     // QA Report Test Attempt #1: Batch with temp IDs in nested format
-    it('RED: should handle nested format with temp ID resolution - requirement and solution', async () => {
+    it('GREEN: should handle nested format with temp ID resolution - requirement and solution', async () => {
       const result = await batchService.executeBatch({
         planId,
         operations: [
