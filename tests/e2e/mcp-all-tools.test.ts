@@ -157,7 +157,6 @@ describe('E2E: All MCP Tools Validation', () => {
           action: 'get',
           planId,
           includeEntities: true,
-          includeLinks: true,
         },
       });
 

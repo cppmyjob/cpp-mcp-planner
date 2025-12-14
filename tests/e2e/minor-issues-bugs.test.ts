@@ -368,11 +368,11 @@ describe('E2E: Minor Issues Bug Fixes (RED Phase)', () => {
     expect(linkIds.length).toBe(uniqueLinkIds.length); // No duplicates
   });
 
-  // BUG-010: includeGuide returns no guide content in getSummary
+  // BUG-010: includeGuide returns no guide content in getSummary - FIXED
   it('BUG-010: should reject includeGuide parameter in get_summary (not supported)', async () => {
-    // Attempt to get summary with includeGuide parameter
-    // This parameter should either work or be rejected (not silently ignored)
-    const summaryResult = await client.callTool({
+    // includeGuide is only supported for get_active action
+    // get_summary should explicitly reject this parameter with clear error message
+    const result = await client.callTool({
       name: 'plan',
       arguments: {
         action: 'get_summary',
@@ -380,19 +380,17 @@ describe('E2E: Minor Issues Bug Fixes (RED Phase)', () => {
         includeGuide: true,
       },
     });
-    const summary = parseResult<{ usageGuide?: unknown }>(summaryResult);
 
-    // Either usageGuide should be present, or parameter should be rejected
-    // For now, we expect it to NOT be silently ignored
-    // The fix should either add usageGuide field OR reject the parameter
-    expect(summary).toBeDefined();
-    // This test documents current behavior - fix will determine correct behavior
+    // MCP returns error response (isError: true) rather than throwing
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/includeGuide is not supported for get_summary action/i);
   });
 
-  // BUG-025: get_summary includeLinks returns no links
+  // BUG-025: get_summary includeLinks returns no links - FIXED
   it('BUG-025: should reject includeLinks parameter in get_summary (not supported)', async () => {
-    // Attempt to get summary with includeLinks parameter
-    const summaryResult = await client.callTool({
+    // includeLinks has been removed from schema as it was never implemented
+    // Schema validation (strict mode) should reject unrecognized fields
+    const result = await client.callTool({
       name: 'plan',
       arguments: {
         action: 'get_summary',
@@ -400,11 +398,10 @@ describe('E2E: Minor Issues Bug Fixes (RED Phase)', () => {
         includeLinks: true,
       },
     });
-    const summary = parseResult<{ links?: unknown }>(summaryResult);
 
-    // Either links should be present, or parameter should be rejected
-    expect(summary).toBeDefined();
-    // This test documents current behavior - fix will determine correct behavior
+    // MCP returns error response for unrecognized field
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/unrecognized|includeLinks/i);
   });
 
   // BUG-009: maxHistoryDepth validation not documented

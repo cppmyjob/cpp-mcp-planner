@@ -16,25 +16,26 @@ const planUpdatesSchema = z.object({
 });
 
 // Base schema with all fields
-const basePlanSchema = z.object({
-  action: z.enum(['create', 'list', 'get', 'update', 'archive', 'set_active', 'get_active', 'get_summary']),
-  planId: z.string().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  status: planStatusSchema.optional(),
-  updates: planUpdatesSchema.optional(),
-  tags: z.array(tagSchema).optional(),
-  reason: z.string().optional(),
-  workspacePath: z.string().optional(),
-  includeGuide: z.boolean().optional(),
-  includeEntities: z.boolean().optional(),
-  includeLinks: z.boolean().optional(),
-  limit: z.number().optional(),
-  offset: z.number().optional(),
-  // Sprint 7: Version history settings
-  enableHistory: z.boolean().optional(),
-  maxHistoryDepth: z.number().optional(),
-});
+const basePlanSchema = z
+  .object({
+    action: z.enum(['create', 'list', 'get', 'update', 'archive', 'set_active', 'get_active', 'get_summary']),
+    planId: z.string().optional(),
+    name: z.string().optional(),
+    description: z.string().optional(),
+    status: planStatusSchema.optional(),
+    updates: planUpdatesSchema.optional(),
+    tags: z.array(tagSchema).optional(),
+    reason: z.string().optional(),
+    workspacePath: z.string().optional(),
+    includeGuide: z.boolean().optional(),
+    includeEntities: z.boolean().optional(),
+    limit: z.number().optional(),
+    offset: z.number().optional(),
+    // Sprint 7: Version history settings
+    enableHistory: z.boolean().optional(),
+    maxHistoryDepth: z.number().optional(),
+  })
+  .strict(); // Reject unknown fields like includeLinks
 
 // Type for the base schema
 type PlanInput = z.infer<typeof basePlanSchema>;
@@ -56,13 +57,32 @@ export const planSchema = basePlanSchema.superRefine((data: PlanInput, ctx) => {
     case 'get':
     case 'update':
     case 'archive':
-    case 'get_summary':
       // planId is required
       if (typeof data.planId !== 'string' || data.planId === '') {
         ctx.addIssue({
           code: 'custom',
           message: `planId is required for ${data.action} action`,
           path: ['planId'],
+        });
+      }
+      break;
+
+    case 'get_summary':
+      // planId is required
+      if (typeof data.planId !== 'string' || data.planId === '') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'planId is required for get_summary action',
+          path: ['planId'],
+        });
+      }
+
+      // Explicitly reject includeGuide (not implemented for get_summary)
+      if (data.includeGuide !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'includeGuide is not supported for get_summary action. Use get_active instead.',
+          path: ['includeGuide'],
         });
       }
       break;
