@@ -1,38 +1,38 @@
-# MCP Planning Server — Best Practices
+# MCP Planning Server -- Best Practices
 
 ## Code Style & Conventions
 
 ### TypeScript Naming
-- **NO** `I` prefix for interfaces — use `User`, not `IUser`
-- **NO** `_` prefix for private members — use `private` modifier alone
+- **NO** `I` prefix for interfaces -- use `User`, not `IUser`
+- **NO** `_` prefix for private members -- use `private` modifier alone
 - **Exception:** `_` prefix allowed for intentionally unused variables (e.g., `_exhaustive` in switch)
-- **Explicit visibility** — always specify `public`/`private`/`protected` on all class members
+- **Explicit visibility** -- always specify `public`/`private`/`protected` on all class members
 - File names: `kebab-case.ts` (e.g., `plan-service.ts`)
 - Classes/Interfaces: `PascalCase`
 - Functions/variables: `camelCase`
 - Constants: `SCREAMING_SNAKE_CASE` for true constants, `camelCase` for const references
 
 ### Type Safety (Strict)
-- **NO** `any` — ever. Use specific types or generics
-- **NO** `unknown` where avoidable — prefer type guards and discriminated unions
+- **NO** `any` -- ever. Use specific types or generics
+- **NO** `unknown` where avoidable -- prefer type guards and discriminated unions
 - Enable `strict: true` in tsconfig (includes `noImplicitAny`, `strictNullChecks`)
 - Use `as const` for literal types
 - Use `readonly` for immutable data
 - Prefer `type` for unions/intersections, `interface` for object shapes
 
 ```typescript
-// ❌ Bad
+// BAD:
 private _cache: any;
 function process(data: unknown) { ... }
 
-// ✅ Good
+// GOOD:
 private cache: Map<string, Entity>;
 function process(data: ProcessInput) { ... }
 ```
 
 ### Exhaustiveness & Safety
 - Use exhaustive switch with `never` for discriminated unions
-- Early return pattern — reduce nesting
+- Early return pattern -- reduce nesting
 - Nullish coalescing (`??`) over logical OR (`||`) for defaults
 - Optional chaining (`?.`) for safe property access
 
@@ -53,34 +53,34 @@ function getStatus(s: Status): string {
 ### Module Organization
 - One primary export per file (class, interface, or related group)
 - Barrel exports (`index.ts`) for public API
-- Named exports only — **NO** default exports
-- Imports order: node builtins → external packages → internal modules
+- Named exports only -- **NO** default exports
+- Imports order: node builtins -> external packages -> internal modules
 
 ### Code Quality
 - Functions: single responsibility, max ~50 lines
 - Max 3-4 parameters; use options object for more
-- Avoid nested callbacks — use async/await
-- No magic numbers — use named constants
+- Avoid nested callbacks -- use async/await
+- No magic numbers -- use named constants
 - Prefer composition over inheritance
 
 ---
 
-## ESLint Configuration — STRICT ENFORCEMENT
+## ESLint Configuration -- STRICT ENFORCEMENT
 
 ### MANDATORY WORKFLOW
 **BEFORE writing ANY code:**
 1. Review `eslint.config.js` for active rules
 2. Follow ALL rules without exception
 3. After code changes: `npm run lint:fix`
-4. Fix ALL errors before proceeding — **ZERO TOLERANCE**
+4. Fix ALL errors before proceeding -- **ZERO TOLERANCE**
 
 ### Critical Rules (eslint.config.js)
 - **Type Safety:**
-  - `@typescript-eslint/no-explicit-any: error` — NO `any` type, EVER
-  - `@typescript-eslint/no-unsafe-*: error` — NO unsafe operations
+  - `@typescript-eslint/no-explicit-any: error` -- NO `any` type, EVER
+  - `@typescript-eslint/no-unsafe-*: error` -- NO unsafe operations
 
 - **Explicit Visibility:**
-  - `@typescript-eslint/explicit-member-accessibility: error` — ALL class members MUST have `public`/`private`/`protected`
+  - `@typescript-eslint/explicit-member-accessibility: error` -- ALL class members MUST have `public`/`private`/`protected`
 
 - **Naming Conventions:**
   - Interfaces: `PascalCase`, NO `I` prefix
@@ -88,22 +88,22 @@ function getStatus(s: Status): string {
   - Variables: `camelCase` or `UPPER_CASE` for constants
 
 - **Module Organization:**
-  - `import/no-default-export: error` — ONLY named exports
+  - `import/no-default-export: error` -- ONLY named exports
 
 - **Safety Patterns:**
-  - `@typescript-eslint/no-non-null-assertion: error` — NO `!` operator
-  - `@typescript-eslint/prefer-nullish-coalescing: error` — Use `??` NOT `||`
-  - `@typescript-eslint/prefer-optional-chain: error` — Use `?.` for safe access
-  - `@typescript-eslint/switch-exhaustiveness-check: error` — Exhaustive switches
+  - `@typescript-eslint/no-non-null-assertion: error` -- NO `!` operator
+  - `@typescript-eslint/prefer-nullish-coalescing: error` -- Use `??` NOT `||`
+  - `@typescript-eslint/prefer-optional-chain: error` -- Use `?.` for safe access
+  - `@typescript-eslint/switch-exhaustiveness-check: error` -- Exhaustive switches
 
 - **Code Quality:**
-  - `@typescript-eslint/no-magic-numbers: error` — NO magic numbers (except -1, 0, 1, 2, 100)
-  - `@typescript-eslint/explicit-function-return-type: error` — Explicit return types
-  - `@typescript-eslint/strict-boolean-expressions: error` — NO truthy/falsy coercion
+  - `@typescript-eslint/no-magic-numbers: error` -- NO magic numbers (except -1, 0, 1, 2, 100)
+  - `@typescript-eslint/explicit-function-return-type: error` -- Explicit return types
+  - `@typescript-eslint/strict-boolean-expressions: error` -- NO truthy/falsy coercion
 
 ### Quick Reference
 ```typescript
-// ❌ FORBIDDEN
+// FORBIDDEN:
 export default class Foo {}           // NO default exports
 interface IUser {}                     // NO I prefix
 private _cache: any;                   // NO _ prefix, NO any
@@ -111,7 +111,7 @@ if (str) {}                            // NO truthy/falsy
 value || fallback                      // Use ?? instead
 value!                                 // NO non-null assertion
 
-// ✅ REQUIRED
+// REQUIRED:
 export class Foo {}                    // Named export
 interface User {}                      // NO I prefix
 private cache: Map<string, Entity>;    // Explicit type
@@ -133,21 +133,21 @@ Reference: `eslint.config.js` for full configuration
 
 ```
 src/
-├── domain/
-│   ├── entities/     # Entity types with versioning
-│   ├── repositories/ # Repository interfaces + errors
-│   └── services/     # Business logic (9 services)
-├── infrastructure/
-│   ├── file-storage.ts           # Low-level I/O
-│   └── repositories/file/        # File-based persistence
-└── server/           # MCP protocol handlers
++-- domain/
+|   +-- entities/     # Entity types with versioning
+|   +-- repositories/ # Repository interfaces + errors
+|   +-- services/     # Business logic (10 services)
++-- infrastructure/
+|   +-- file-storage.ts           # Low-level I/O
+|   +-- repositories/file/        # File-based persistence
++-- server/           # MCP protocol handlers
 ```
 
 **Validation Layers:**
 
 | Layer | Responsibility |
 |-------|----------------|
-| **ZOD** (tool-definitions.ts) | Input parsing, types, formats — API contract |
+| **ZOD** (tool-definitions.ts) | Input parsing, types, formats -- API contract |
 | **Services** | Business rules, entity checks, state transitions |
 
 > **Rule:** ZOD = interface mapping only. Services = all validation logic.
@@ -180,17 +180,17 @@ src/
 ### Links
 9 relation types with cycle detection for `depends_on`:
 
-| Relation | Source → Target | Use case |
+| Relation | Source -> Target | Use case |
 |----------|-----------------|----------|
-| `implements` | Solution → Requirement | Solution fulfills requirement |
-| `addresses` | Phase → Requirement | Phase works on requirement |
-| `depends_on` | Phase → Phase | Execution order dependency |
-| `blocks` | Phase → Phase | Blocker relationship |
-| `alternative_to` | Solution → Solution | Competing approaches |
-| `supersedes` | Decision → Decision | ADR replacement |
-| `references` | Any → Any | General reference |
-| `derived_from` | Requirement → Requirement | Breakdown/derivation |
-| `has_artifact` | Phase → Artifact | Phase produces artifact |
+| `implements` | Solution -> Requirement | Solution fulfills requirement |
+| `addresses` | Phase -> Requirement | Phase works on requirement |
+| `depends_on` | Phase -> Phase | Execution order dependency |
+| `blocks` | Phase -> Phase | Blocker relationship |
+| `alternative_to` | Solution -> Solution | Competing approaches |
+| `supersedes` | Decision -> Decision | ADR replacement |
+| `references` | Any -> Any | General reference |
+| `derived_from` | Requirement -> Requirement | Breakdown/derivation |
+| `has_artifact` | Phase -> Artifact | Phase produces artifact |
 
 Reference: `src/domain/entities/types.ts`
 
@@ -201,10 +201,10 @@ Reference: `src/domain/entities/types.ts`
 ### Service Dependencies
 ```
 PlanService (base)
-├── RequirementService, SolutionService, DecisionService
-├── PhaseService, ArtifactService
-├── LinkingService, QueryService, BatchService
-└── VersionHistoryService
++-- RequirementService, SolutionService, DecisionService
++-- PhaseService, ArtifactService
++-- LinkingService, QueryService, BatchService
++-- VersionHistoryService
 ```
 
 All services depend on `PlanService` + `FileStorage`. Order matters in initialization.
@@ -218,9 +218,9 @@ interface AddRequirementResult { requirementId, requirement }
 ```
 
 **Field filtering (all get/list operations):**
-- `fields?: string[]` — custom fields or `['*']` for all
-- `excludeMetadata?: boolean` — remove createdAt, updatedAt, version (~162 bytes)
-- `excludeComputed?: boolean` — for phases: remove depth, path, childCount (~50 bytes)
+- `fields?: string[]` -- custom fields or `['*']` for all
+- `excludeMetadata?: boolean` -- remove createdAt, updatedAt, version (~162 bytes)
+- `excludeComputed?: boolean` -- for phases: remove depth, path, childCount (~50 bytes)
 
 **Validation at service boundary:**
 - Use validators from `validators.ts`
@@ -243,7 +243,7 @@ Reference: `src/domain/services/`
 
 ### Error Handling
 - Use custom errors from `src/domain/repositories/errors.ts`: `NotFoundError`, `ValidationError`, `ConflictError`, `LockError`
-- **NOT** `McpError` — SDK auto-wraps; double-wrapping causes "MCP error -32603: MCP error -32603"
+- **NOT** `McpError` -- SDK auto-wraps; double-wrapping causes "MCP error -32603: MCP error -32603"
 - Custom errors extend `RepositoryError` (which extends `Error`), not MCP types
 
 ### Response Format
@@ -302,11 +302,11 @@ Reference: `src/domain/services/batch-service.ts`
 - Regex validation: wrap in try/catch
 
 ### Key Validators
-- `validateEffortEstimate()` — structured format
-- `validateTags()` — key-value pairs
-- `validateTargets()` — file targets with line precision
-- `validateCodeRefs()` — format "file_path:line_number"
-- `validatePriority()` — enum whitelist
+- `validateEffortEstimate()` -- structured format
+- `validateTags()` -- key-value pairs
+- `validateTargets()` -- file targets with line precision
+- `validateCodeRefs()` -- format "file_path:line_number"
+- `validatePriority()` -- enum whitelist
 
 Reference: `src/domain/services/validators.ts`
 
@@ -317,13 +317,16 @@ Reference: `src/domain/services/validators.ts`
 ### Error Hierarchy
 ```
 RepositoryError
-├── NotFoundError
-├── ValidationError (with details[])
-├── ConflictError ('duplicate' | 'version' | 'constraint' | 'state')
-├── LockError
-├── TransactionError
-├── StorageError
-└── BulkOperationError
++-- NotFoundError
++-- ValidationError (with details[])
++-- ConflictError ('duplicate' | 'version' | 'constraint' | 'state')
++-- LockError
++-- TransactionError
++-- StorageError
++-- QueryError
++-- IndexError
++-- BulkOperationError
++-- MigrationError
 ```
 
 ### Patterns
@@ -353,12 +356,12 @@ afterEach(async () => {
 ```
 
 ### TDD Markers
-- `RED:` — failing test first
-- `GREEN:` — minimal implementation
-- `REFACTOR:` — optimize
-- `REVIEW:` — final verification
+- `RED:` -- failing test first
+- `GREEN:` -- minimal implementation
+- `REFACTOR:` -- optimize
+- `REVIEW:` -- final verification
 
-### DOCTOR — Bug Fix Methodology
+### DOCTOR -- Bug Fix Methodology
 
 TDD-based systematic approach for fixing bugs:
 
