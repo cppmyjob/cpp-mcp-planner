@@ -2,60 +2,30 @@
  * File Utilities - Shared file operations for repositories
  *
  * Provides atomic file operations used across all file-based repositories
- * and managers. Centralizes Windows-compatible graceful-fs logic.
+ * and managers. Uses write-file-atomic for Windows-compatible atomic writes.
  */
 
 import * as fs from 'fs/promises';
-import * as crypto from 'crypto';
-import * as util from 'util';
-import gracefulFs from 'graceful-fs';
-
-/**
- * Number of random bytes for temp file name uniqueness
- */
-const TEMP_FILE_RANDOM_BYTES = 4; // 8 hex chars = 32 bits of randomness
-
-// graceful-fs provides retry logic for Windows file locking issues (EPERM/EBUSY/EACCES)
-const gracefulRename = util.promisify(gracefulFs.rename);
+import writeFileAtomic from 'write-file-atomic';
 
 /**
  * Write JSON data to file atomically
  *
- * Uses temp file + rename pattern for crash safety:
- * 1. Write to temp file
- * 2. Verify JSON is valid
- * 3. Atomic rename to target (using graceful-fs for Windows compatibility)
+ * Uses write-file-atomic package which:
+ * 1. Writes to temp file with unique name (pid + threadId + invocation counter)
+ * 2. Atomically renames to target
+ * 3. Handles Windows file locking issues (EPERM/EBUSY/EACCES)
  *
- * WINDOWS EPERM ISSUE:
- * On Windows, fs.rename() often fails with "EPERM: operation not permitted" when:
- * - Windows Defender is scanning the file
- * - Windows Search Indexer has the file open
- * - IDE (VS Code, etc.) holds file handles
- *
- * We use graceful-fs which provides retry logic (up to 60s) for these errors.
+ * WHY write-file-atomic instead of graceful-fs:
+ * graceful-fs retries rename() with THE SAME temp file path, causing stale
+ * error messages when Windows holds file locks. write-file-atomic generates
+ * a unique temp path for EACH call via ++invocations counter.
  *
  * @param filePath - Target file path
  * @param data - Data to write (will be JSON.stringify'd)
  */
 export async function atomicWriteJSON(filePath: string, data: unknown): Promise<void> {
-  const tmpPath = `${filePath}.tmp.${String(Date.now())}.${crypto.randomBytes(TEMP_FILE_RANDOM_BYTES).toString('hex')}`;
-
-  try {
-    // Write to temp file
-    await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
-
-    // Verify JSON is valid before committing
-    const written = await fs.readFile(tmpPath, 'utf-8');
-    JSON.parse(written);
-
-    // Atomic rename using graceful-fs (retries on EPERM/EBUSY/EACCES)
-    await gracefulRename(tmpPath, filePath);
-  } catch (error) {
-    // Cleanup temp file on error
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentionally swallow cleanup errors
-    await fs.unlink(tmpPath).catch(() => {});
-    throw error;
-  }
+  await writeFileAtomic(filePath, JSON.stringify(data, null, 2), { encoding: 'utf-8' });
 }
 
 /**

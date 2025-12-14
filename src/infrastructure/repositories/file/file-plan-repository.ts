@@ -6,7 +6,7 @@
  * - Manifest CRUD operations with atomic writes
  * - Active plans index for workspace tracking
  *
- * Uses atomic writes (graceful-fs) for data integrity on Windows.
+ * Uses atomic writes (write-file-atomic) for data integrity on Windows.
  *
  * Extends BaseFileRepository to inherit common functionality:
  * - atomicWriteJSON() for safe file writes

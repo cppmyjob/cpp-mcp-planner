@@ -4,6 +4,11 @@
 >
 > **Version:** 3.4 (Comprehensive Review - 31 Issues Fixed)
 > **Last Updated:** 2025-12-07
+>
+> **NOTE (2025-12-14):** Migrated from `graceful-fs` to `write-file-atomic` for atomic writes.
+> graceful-fs retried rename() with the same temp file path, causing stale error messages on Windows.
+> write-file-atomic generates unique temp paths via `++invocations` counter.
+>
 > **Changes:** v3.4 comprehensive review fixes:
 > - CR-C1 to CR-C4: Entity field alignment, IndexMetadata schedule fields, JSON columns completeness
 > - CR-H1 to CR-H6: Deprecation notes, truncation docs, slug generation, CreateInput docs
@@ -637,16 +642,13 @@ export interface LinkIndexMetadata {
 // src/infrastructure/repositories/file/index-manager.ts
 
 import * as fs from 'fs/promises';
-import * as util from 'util';
 import * as path from 'path';
-import * as crypto from 'crypto';  // FIX C4: Use crypto for collision-free temp files
-import gracefulFs from 'graceful-fs';
+import writeFileAtomic from 'write-file-atomic';
 import lockfile from 'proper-lockfile';
 import { Entity } from '../../../domain/entities/types.js';
 import { EntityIndex, IndexMetadata, BaseIndex } from './types.js';
 
-// graceful-fs provides retry logic for Windows file locking issues (EPERM/EBUSY/EACCES)
-const gracefulRename = util.promisify(gracefulFs.rename);
+// write-file-atomic generates unique temp file per call via ++invocations counter
 
 const INDEX_CACHE_TTL = 5000; // 5 seconds
 
@@ -818,23 +820,9 @@ export class IndexManager<TMetadata> {
    * FIX C4: Use crypto.randomBytes for collision-free temp file names
    */
   private async atomicWrite(filePath: string, data: unknown): Promise<void> {
-    // FIX C4: Use crypto.randomBytes(8) = 16 hex chars = 2^64 combinations (virtually collision-free)
-    const tmpPath = `${filePath}.tmp.${Date.now()}.${crypto.randomBytes(8).toString('hex')}`;
-
-    try {
-      await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
-
-      // Verify JSON is valid
-      const written = await fs.readFile(tmpPath, 'utf-8');
-      JSON.parse(written);
-
-      // Atomic rename using graceful-fs (Windows compatibility)
-      await gracefulRename(tmpPath, filePath);
-    } catch (error) {
-      // Cleanup temp file on error
-      await fs.unlink(tmpPath).catch(() => {});
-      throw error;
-    }
+    // write-file-atomic handles temp file naming and atomic rename internally
+    // Each call gets unique temp path via ++invocations counter (Windows-safe)
+    await writeFileAtomic(filePath, JSON.stringify(data, null, 2), { encoding: 'utf-8' });
   }
 
   /**
@@ -931,10 +919,8 @@ export class LockManager {
 // src/infrastructure/repositories/file/file-repository.ts
 
 import * as fs from 'fs/promises';
-import * as util from 'util';
 import * as path from 'path';
-import * as crypto from 'crypto';  // FIX C4: Use crypto for collision-free temp files
-import gracefulFs from 'graceful-fs';
+import writeFileAtomic from 'write-file-atomic';
 import { LRUCache } from 'lru-cache';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -959,8 +945,7 @@ import {
 import { IndexManager } from './index-manager.js';
 import { IndexMetadata } from './types.js';
 
-// graceful-fs provides retry logic for Windows file locking issues (EPERM/EBUSY/EACCES)
-const gracefulRename = util.promisify(gracefulFs.rename);
+// write-file-atomic generates unique temp file per call via ++invocations counter
 
 // Default cache sizes per entity type
 const DEFAULT_CACHE_SIZES: Record<string, number> = {
@@ -1386,23 +1371,12 @@ export class FileRepository<T extends Entity> implements Repository<T> {
     await fs.mkdir(this.basePath, { recursive: true });
 
     const filePath = this.getEntityPath(id);
-    // FIX C4: Use crypto.randomBytes(8) = 16 hex chars = 2^64 combinations (virtually collision-free)
-    const tmpPath = `${filePath}.tmp.${Date.now()}.${crypto.randomBytes(8).toString('hex')}`;
 
     try {
-      // Write to temp file
-      await fs.writeFile(tmpPath, JSON.stringify(entity, null, 2), 'utf-8');
-
-      // Verify JSON is valid
-      const written = await fs.readFile(tmpPath, 'utf-8');
-      JSON.parse(written);
-
-      // Atomic rename using graceful-fs (Windows compatibility)
-      await gracefulRename(tmpPath, filePath);
+      // write-file-atomic handles temp file naming and atomic rename internally
+      // Each call gets unique temp path via ++invocations counter (Windows-safe)
+      await writeFileAtomic(filePath, JSON.stringify(entity, null, 2), { encoding: 'utf-8' });
     } catch (error: any) {
-      // Cleanup temp file on error
-      await fs.unlink(tmpPath).catch(() => {});
-
       // FIX #20: Handle disk full error with specific error type
       if (error.code === 'ENOSPC') {
         throw new StorageError(
@@ -2922,7 +2896,7 @@ describe('FileRepository', () => {
 ```json
 {
   "dependencies": {
-    "graceful-fs": "^4.2.11",
+    "write-file-atomic": "^7.0.0",
     "lru-cache": "^10.0.0",
     "proper-lockfile": "^4.1.2",
     "uuid": "^9.0.0"
@@ -2933,7 +2907,7 @@ describe('FileRepository', () => {
     "mongoose": "^8.0.0"
   },
   "devDependencies": {
-    "@types/graceful-fs": "^4.1.9",
+    "@types/write-file-atomic": "^4.0.3",
     "@types/node": "^20.0.0",
     "@types/uuid": "^9.0.0",
     "@types/proper-lockfile": "^4.1.4",
@@ -2943,7 +2917,7 @@ describe('FileRepository', () => {
 ```
 
 **Notes:**
-- `graceful-fs` provides Windows-compatible atomic file operations (retry on EPERM/EBUSY/EACCES)
+- `write-file-atomic` provides Windows-compatible atomic file operations (unique temp file per call via ++invocations counter)
 - `proper-lockfile` requires `realpath: false` option for Windows compatibility (FIX #16)
 
 ### 8.3 Implementation Phases
@@ -2951,7 +2925,7 @@ describe('FileRepository', () => {
 | Phase | Description | Status |
 |-------|-------------|--------|
 | **Sprint 9.1** | Core interfaces + Error handling | Ready |
-| **Sprint 9.2** | FileRepository + IndexManager + graceful-fs | Ready |
+| **Sprint 9.2** | FileRepository + IndexManager + write-file-atomic | Ready |
 | **Sprint 9.3** | Services integration (backward compatible) | Ready |
 | **Sprint 10** | SQLite support | Planned |
 
@@ -3014,7 +2988,7 @@ All 47 issues from the code review have been addressed:
 - Total reduction: ~1000 lines for focused implementation on Repository interface + File implementation
 
 **Windows Compatibility:**
-- Added `gracefulRename` using `graceful-fs` library (^4.2.11)
+- Using `write-file-atomic` library (^7.0.0) with unique temp file per call via ++invocations counter
 - Fixes EPERM/EBUSY/EACCES errors on Windows (antivirus, indexer, IDE file locks)
 - Applied to IndexManager.atomicWrite
 - Applied to FileRepository.writeEntityFile

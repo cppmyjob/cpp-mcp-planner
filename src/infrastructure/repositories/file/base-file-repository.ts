@@ -2,14 +2,13 @@
  * BaseFileRepository - Abstract base class for file-based repositories
  *
  * Provides common functionality shared across all file repositories:
- * - Atomic JSON writes with graceful-fs (Windows EPERM/EBUSY handling)
+ * - Atomic JSON writes with write-file-atomic (Windows EPERM/EBUSY handling)
  * - JSON file loading
  * - LRU cache operations
  * - Lazy initialization pattern
  *
  * This eliminates code duplication across FileRepository, FileLinkRepository,
- * and FilePlanRepository while ensuring consistent behavior (especially
- * gracefulRename for Windows compatibility).
+ * and FilePlanRepository while ensuring consistent behavior.
  */
 
 import { DEFAULT_CACHE_OPTIONS, type CacheOptions } from './types.js';
@@ -85,8 +84,7 @@ export abstract class BaseFileRepository {
    *
    * Delegates to shared utility in file-utils.ts which handles:
    * - Temp file + rename pattern for crash safety
-   * - JSON validation before commit
-   * - Windows EPERM/EBUSY handling via graceful-fs
+   * - Windows EPERM/EBUSY handling via write-file-atomic
    *
    * @param filePath - Target file path
    * @param data - Data to write (will be JSON.stringify'd)

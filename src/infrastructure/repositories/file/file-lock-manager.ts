@@ -56,9 +56,9 @@ export interface FileLockManagerOptions {
    * Stale lock detection threshold (ms)
    * If lock file is older than this, it's considered stale.
    *
-   * IMPORTANT: On Windows, file operations can take up to 60 seconds
-   * due to graceful-fs retries when Windows Defender or Search Indexer
-   * holds file handles. Default is set accordingly.
+   * IMPORTANT: On Windows, file operations can take longer when
+   * Windows Defender or Search Indexer holds file handles.
+   * Default is set accordingly.
    *
    * @default 120000 on Windows, 30000 on other platforms
    */
@@ -144,7 +144,7 @@ export class FileLockManager {
 
   /**
    * Platform-aware default stale threshold.
-   * Windows needs longer due to graceful-fs retries (up to 60s).
+   * Windows needs longer due to file system locking by Defender/Indexer.
    */
   private static readonly defaultStaleThresholdWindows = 120000; // 2 minutes
   private static readonly defaultStaleThresholdOther = 30000; // 30 seconds

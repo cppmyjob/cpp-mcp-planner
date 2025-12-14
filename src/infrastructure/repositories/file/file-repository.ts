@@ -5,7 +5,7 @@
  * - Entity files stored as JSON in entities/ directory
  * - IndexManager for fast lookups with caching
  * - FileLockManager for cross-process concurrent access control
- * - Atomic writes with graceful-fs
+ * - Atomic writes with write-file-atomic
  * - Validation with Zod schemas
  * - Query operations with filtering, sorting, pagination
  * - Bulk operations with transaction semantics

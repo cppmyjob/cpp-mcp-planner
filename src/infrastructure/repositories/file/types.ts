@@ -284,7 +284,7 @@ export interface FileStorageConfig {
   /** Lock timeout in milliseconds */
   lockTimeout?: number;
 
-  /** Enable atomic writes with graceful-fs */
+  /** Enable atomic writes with write-file-atomic */
   atomicWrites?: boolean;
 
   /** Index rebuild interval in milliseconds (0 = never) */

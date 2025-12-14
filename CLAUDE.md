@@ -236,7 +236,7 @@ Reference: `src/server/tool-handlers.ts`, `src/server/create-server.ts`
 ## 4. INFRASTRUCTURE
 
 ### File Storage
-- **Atomic writes** with graceful-fs (retry logic for Windows)
+- **Atomic writes** with write-file-atomic (unique temp file per call for Windows)
 - Write to temp file, then atomic rename
 - Directory structure: `plans/{planId}/manifest.json`, `entities/`, `links.json`, `history/`, `indexes/`
 
