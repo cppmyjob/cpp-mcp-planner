@@ -1274,7 +1274,8 @@ describe('PhaseService', () => {
       expect(phase.childCount).toBe(0);
     });
 
-    it('should ignore unknown fields without error', async () => {
+    // BUG-040: Changed behavior - unknown fields now throw ValidationError
+    it('should reject unknown fields with ValidationError', async () => {
       await service.addPhase({
         planId,
         phase: {
@@ -1286,16 +1287,13 @@ describe('PhaseService', () => {
         },
       });
 
-      // Should not throw
-      const result = await service.getPhaseTree({
-        planId,
-        fields: ['objectives', 'unknownField123', 'anotherBadField'],
-      });
-      const phase = result.tree[0].phase as Record<string, unknown>;
-
-      expect(phase.objectives).toEqual(['obj1']);
-      expect(phase.unknownField123).toBeUndefined();
-      expect(result.tree).toHaveLength(1);
+      // Should throw ValidationError for unknown fields
+      await expect(async () => {
+        await service.getPhaseTree({
+          planId,
+          fields: ['objectives', 'unknownField123', 'anotherBadField'],
+        });
+      }).rejects.toThrow(/Invalid field.*unknownField123.*anotherBadField/i);
     });
 
     it('should respect maxDepth=0 to return only root phases', async () => {

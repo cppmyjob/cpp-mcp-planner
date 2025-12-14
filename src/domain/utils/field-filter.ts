@@ -11,6 +11,7 @@
  */
 
 import type { EntityType } from '../entities/types.js';
+import { ValidationError } from '../repositories/errors.js';
 
 /**
  * Metadata fields present in all entities.
@@ -25,9 +26,28 @@ export const METADATA_FIELDS = ['createdAt', 'updatedAt', 'version', 'metadata',
 export const COMPUTED_FIELDS = ['depth', 'path', 'childCount'];
 
 /**
- * All valid fields for Phase entity (whitelist for backward compatibility).
- * Any fields from legacy data NOT in this list will be stripped.
+ * All valid fields for each entity type.
+ * Used for field validation (BUG-040 fix) and backward compatibility.
  */
+const VALID_REQUIREMENT_FIELDS = new Set([
+  'id', 'type', 'createdAt', 'updatedAt', 'version', 'metadata',
+  'title', 'description', 'rationale', 'category', 'priority', 'status',
+  'acceptanceCriteria', 'impact', 'source', 'votes',
+]);
+
+const VALID_SOLUTION_FIELDS = new Set([
+  'id', 'type', 'createdAt', 'updatedAt', 'version', 'metadata',
+  'title', 'description', 'approach', 'addressing', 'tradeoffs',
+  'evaluation', 'implementationNotes', 'status', 'selectionReason',
+]);
+
+const VALID_DECISION_FIELDS = new Set([
+  'id', 'type', 'createdAt', 'updatedAt', 'version', 'metadata',
+  'title', 'question', 'context', 'decision', 'consequences',
+  'alternativesConsidered', 'impactScope', 'status', 'supersedes',
+  'supersededBy',
+]);
+
 const VALID_PHASE_FIELDS = new Set([
   'id', 'type', 'createdAt', 'updatedAt', 'version', 'metadata',
   'title', 'description', 'parentId', 'order', 'depth', 'path',
@@ -36,6 +56,24 @@ const VALID_PHASE_FIELDS = new Set([
   'milestones', 'blockers', 'blockingReason', 'implementationNotes', 'priority',
   'childCount', // computed field
 ]);
+
+const VALID_ARTIFACT_FIELDS = new Set([
+  'id', 'type', 'createdAt', 'updatedAt', 'version', 'metadata',
+  'title', 'slug', 'description', 'artifactType', 'status',
+  'content', 'targets', 'fileTable', 'codeRefs', // fileTable is deprecated but kept for backward compatibility
+  'relatedPhaseId', 'relatedSolutionId', 'relatedRequirementIds',
+]);
+
+/**
+ * Map of entity types to their valid fields.
+ */
+const VALID_FIELDS: Record<EntityType, Set<string>> = {
+  requirement: VALID_REQUIREMENT_FIELDS,
+  solution: VALID_SOLUTION_FIELDS,
+  decision: VALID_DECISION_FIELDS,
+  phase: VALID_PHASE_FIELDS,
+  artifact: VALID_ARTIFACT_FIELDS,
+};
 
 /**
  * Summary field presets for each entity type.
@@ -48,6 +86,26 @@ export const SUMMARY_FIELDS: Record<EntityType, string[]> = {
   phase: ['id', 'title', 'status', 'progress', 'path', 'priority', 'parentId', 'order', 'depth', 'childCount', 'startedAt', 'completedAt', 'blockingReason'],
   artifact: ['id', 'title', 'slug', 'artifactType', 'status', 'description', 'content', 'targets', 'relatedPhaseId', 'relatedSolutionId', 'relatedRequirementIds', 'codeRefs'],
 };
+
+/**
+ * BUG-040 FIX: Validate that requested fields are valid for the entity type.
+ * Throws ValidationError if any invalid fields are requested.
+ *
+ * @param fields - Array of field names to validate
+ * @param entityType - Type of entity
+ * @throws ValidationError if any fields are invalid
+ */
+function validateFields(fields: string[], entityType: EntityType): void {
+  const validFields = VALID_FIELDS[entityType];
+  const invalidFields = fields.filter((field) => !validFields.has(field));
+
+  if (invalidFields.length > 0) {
+    throw new ValidationError(
+      `Invalid field(s) for ${entityType}: ${invalidFields.join(', ')}. ` +
+        `Valid fields: ${Array.from(validFields).join(', ')}`
+    );
+  }
+}
 
 /**
  * Filter an entity object to include only specified fields.
@@ -91,6 +149,12 @@ export function filterEntity<T>(
   excludeMetadata = false,
   excludeComputed = false
 ): T | Partial<T> {
+  // BUG-040 FIX: Validate custom fields before filtering
+  // Only validate when fields are explicitly provided (not undefined, not empty, not ['*'])
+  if (fields !== undefined && fields.length > 0 && !fields.includes('*')) {
+    validateFields(fields, entityType);
+  }
+
   // Determine which fields to include
   let filtered: Partial<T>;
   const entityObj = entity as Record<string, unknown>;

@@ -232,8 +232,7 @@ describe('E2E: Minor Issues Bug Fixes (RED Phase)', () => {
   });
 
   // BUG-040: Non-existent fields return empty object
-  // SKIP: Complex to implement - requires defining valid fields for each entity type
-  it.skip('BUG-040: should reject non-existent fields parameter', async () => {
+  it('BUG-040: should reject non-existent fields parameter', async () => {
     // Create a requirement
     const reqResult = await client.callTool({
       name: 'requirement',
