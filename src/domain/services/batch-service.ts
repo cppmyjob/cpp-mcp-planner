@@ -800,7 +800,8 @@ export class BatchService {
     // 3. Execute operations sequentially in memory
     // Note: If any operation fails, the error bubbles up and flushToDisk() is never called,
     // so changes remain in memory only and are rolled back through garbage collection
-    for (const op of input.operations) {
+    for (let operationIndex = 0; operationIndex < input.operations.length; operationIndex++) {
+        const op = input.operations[operationIndex];
         let result: { id?: string; requirementId?: string; solutionId?: string; phaseId?: string; linkId?: string; decisionId?: string; artifactId?: string } | undefined;
 
         // Extract entity payload from nested format if present
@@ -831,7 +832,12 @@ export class BatchService {
               } as unknown as Parameters<typeof memReqService.addRequirement>[0]);
               results.push({ success: true, id: result.requirementId });
 
-              // Track temp ID mapping
+              // BUG-001 & BUG-008 FIX: ALWAYS add automatic temp ID $N based on operation index
+              if (result.requirementId !== undefined) {
+                tempIdMapping[`$${String(operationIndex)}`] = result.requirementId;
+              }
+
+              // Also track explicit tempId if provided (backward compatibility)
               const payloadWithTempId = resolvedPayload as { tempId?: string };
               const tempId = payloadWithTempId.tempId;
               if (typeof tempId === 'string' && result.requirementId !== undefined) {
@@ -857,6 +863,12 @@ export class BatchService {
               } as unknown as Parameters<typeof memSolService.proposeSolution>[0]);
               results.push({ success: true, id: result.solutionId });
 
+              // BUG-001 & BUG-008 FIX: Automatic temp ID mapping
+              if (result.solutionId !== undefined) {
+                tempIdMapping[`$${String(operationIndex)}`] = result.solutionId;
+              }
+
+              // Explicit tempId mapping (backward compatibility)
               const payloadWithTempId = resolvedPayload as { tempId?: string };
               const tempId = payloadWithTempId.tempId;
               if (typeof tempId === 'string' && result.solutionId !== undefined) {
@@ -882,6 +894,12 @@ export class BatchService {
               } as unknown as Parameters<typeof memPhaseService.addPhase>[0]);
               results.push({ success: true, id: result.phaseId });
 
+              // BUG-001 & BUG-008 FIX: Automatic temp ID mapping
+              if (result.phaseId !== undefined) {
+                tempIdMapping[`$${String(operationIndex)}`] = result.phaseId;
+              }
+
+              // Explicit tempId mapping (backward compatibility)
               const payloadWithTempId = resolvedPayload as { tempId?: string };
               const tempId = payloadWithTempId.tempId;
               if (typeof tempId === 'string' && result.phaseId !== undefined) {
@@ -896,6 +914,11 @@ export class BatchService {
               ...(resolvedPayload as unknown as LinkPayload)
             } as unknown as Parameters<typeof memLinkService.linkEntities>[0]);
             results.push({ success: true, id: result.linkId });
+
+            // BUG-001 & BUG-008 FIX: Automatic temp ID mapping for link
+            if (result.linkId !== undefined) {
+              tempIdMapping[`$${String(operationIndex)}`] = result.linkId;
+            }
             break;
 
           case 'decision':
@@ -915,6 +938,12 @@ export class BatchService {
               } as unknown as Parameters<typeof memDecService.recordDecision>[0]);
               results.push({ success: true, id: result.decisionId });
 
+              // BUG-001 & BUG-008 FIX: Automatic temp ID mapping
+              if (result.decisionId !== undefined) {
+                tempIdMapping[`$${String(operationIndex)}`] = result.decisionId;
+              }
+
+              // Explicit tempId mapping (backward compatibility)
               const payloadWithTempId = resolvedPayload as { tempId?: string };
               const tempId = payloadWithTempId.tempId;
               if (typeof tempId === 'string' && result.decisionId !== undefined) {
@@ -940,6 +969,12 @@ export class BatchService {
               } as unknown as Parameters<typeof memArtService.addArtifact>[0]);
               results.push({ success: true, id: result.artifactId });
 
+              // BUG-001 & BUG-008 FIX: Automatic temp ID mapping
+              if (result.artifactId !== undefined) {
+                tempIdMapping[`$${String(operationIndex)}`] = result.artifactId;
+              }
+
+              // Explicit tempId mapping (backward compatibility)
               const payloadWithTempId = resolvedPayload as { tempId?: string };
               const tempId = payloadWithTempId.tempId;
               if (typeof tempId === 'string' && result.artifactId !== undefined) {

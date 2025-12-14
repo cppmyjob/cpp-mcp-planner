@@ -1284,4 +1284,89 @@ describe('BatchService - Unit Tests', () => {
       ).rejects.toThrow(/title is required/i);
     });
   });
+
+  describe('BUG-001 & BUG-008: Nested payload format from MCP tool handler', () => {
+    // QA Report Test Attempt #2: Batch without temp IDs fails with nested format
+    it('RED: should handle nested format - phase with action and nested phase object', async () => {
+      const result = await batchService.executeBatch({
+        planId,
+        operations: [
+          {
+            entityType: 'phase',
+            payload: {
+              action: 'add',
+              phase: {
+                title: 'Batch phase 1',
+                objectives: ['test']
+              }
+            }
+          },
+          {
+            entityType: 'phase',
+            payload: {
+              action: 'add',
+              phase: {
+                title: 'Batch phase 2',
+                objectives: ['test']
+              }
+            }
+          }
+        ]
+      });
+
+      expect(result.results).toHaveLength(2);
+      expect(result.results[0].success).toBe(true);
+      expect(result.results[0].id).toBeDefined();
+      expect(result.results[1].success).toBe(true);
+      expect(result.results[1].id).toBeDefined();
+    });
+
+    // QA Report Test Attempt #1: Batch with temp IDs in nested format
+    it('RED: should handle nested format with temp ID resolution - requirement and solution', async () => {
+      const result = await batchService.executeBatch({
+        planId,
+        operations: [
+          {
+            entityType: 'requirement',
+            payload: {
+              action: 'add',
+              requirement: {
+                title: 'BUG-001: Test Requirement for Temp ID',
+                description: 'Testing if $0 will be resolved in next operation',
+                category: 'functional',
+                priority: 'high',
+                source: { type: 'user-request' },
+                impact: {
+                  scope: ['testing'],
+                  complexityEstimate: 3,
+                  riskLevel: 'low'
+                }
+              }
+            }
+          },
+          {
+            entityType: 'solution',
+            payload: {
+              action: 'propose',
+              solution: {
+                title: 'Solution addressing temp ID $0',
+                description: 'This solution should reference the first requirement via temp ID',
+                approach: 'Use temp ID resolution',
+                addressing: ['$0']
+              }
+            }
+          }
+        ]
+      });
+
+      // Should succeed and resolve temp ID
+      expect(result.results).toHaveLength(2);
+      expect(result.results[0].success).toBe(true);
+      expect(result.results[1].success).toBe(true);
+
+      // BUG-008: tempIdMapping should be populated
+      expect(result.tempIdMapping).toBeDefined();
+      expect(result.tempIdMapping.$0).toBe(result.results[0].id);
+    });
+  });
 });
