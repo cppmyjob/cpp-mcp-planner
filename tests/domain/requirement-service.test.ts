@@ -295,7 +295,7 @@ describe('RequirementService', () => {
           title: 'Performance',
           description: 'API < 200ms',
           rationale: 'User experience',
-          source: { type: 'derived', parentId: 'req-001' },
+          source: { type: 'discovered', context: 'Performance testing' },
           acceptanceCriteria: ['Measured'],
           priority: 'high',
           category: 'non-functional',

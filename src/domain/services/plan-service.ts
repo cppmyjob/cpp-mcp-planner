@@ -12,7 +12,7 @@ import type {
 } from '../entities/types.js';
 import type { UsageGuide } from '../entities/usage-guide.js';
 import { DEFAULT_USAGE_GUIDE } from '../constants/default-usage-guide.js';
-import { validatePlanName, validatePlanStatus } from './validators.js';
+import { validatePlanName, validatePlanStatus, validateListParams } from './validators.js';
 
 // Constants
 const MAX_HISTORY_DEPTH = 10;
@@ -229,6 +229,9 @@ export class PlanService {
   }
 
   public async listPlans(input: ListPlansInput): Promise<ListPlansResult> {
+    // BUG-018, BUG-019 FIX: Validate list params
+    validateListParams(input.limit, input.offset);
+
     const planIds = await this.planRepo.listPlans();
     const manifests: PlanManifest[] = [];
 

@@ -387,14 +387,15 @@ describe('E2E: All MCP Tools Validation', () => {
     });
 
     it('action: list with status filter', async () => {
-      // Test filtering by status (active, completed, etc.)
+      // Test filtering by status (draft, approved, implemented, deferred, rejected)
+      // BUG-022 FIX: Use valid requirement status, not plan status
       const result = await client.callTool({
         name: 'requirement',
         arguments: {
           action: 'list',
           planId,
           filters: {
-            status: 'active',
+            status: 'draft',
           },
         },
       });

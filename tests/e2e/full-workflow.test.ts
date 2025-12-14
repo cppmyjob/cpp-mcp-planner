@@ -108,7 +108,7 @@ describe('E2E: Complete Planning Workflow', () => {
         {
           title: 'Session Management',
           description: 'Secure session handling with JWT tokens',
-          source: { type: 'derived' },
+          source: { type: 'discovered', context: 'Authentication security analysis' }, // BUG-011 FIX: Changed from 'derived' without parentId
           acceptanceCriteria: [
             'JWT tokens issued on login',
             'Refresh token rotation',

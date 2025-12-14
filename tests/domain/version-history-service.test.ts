@@ -534,7 +534,8 @@ describe('Version History Service (Sprint 7)', () => {
       });
 
       // currentVersion should be updated to the latest version saved
-      expect(history.currentVersion).toBe(2); // Last saved version before v3
+      // Note: After 3 updates (V1->V2->V3), currentVersion should be 3
+      expect(history.currentVersion).toBe(3);
     });
 
     // Test 22: get_history for non-existent requirement
@@ -2038,7 +2039,7 @@ describe('Version History Service (Sprint 7)', () => {
         maxHistoryDepth: 5
       });
 
-      const largeDescription = 'A'.repeat(10000); // 10KB string
+      const largeDescription = 'A'.repeat(2000); // Max allowed length (BUG-012 fix)
 
       const req = await requirementService.addRequirement({
         planId: plan.planId,
@@ -2052,7 +2053,7 @@ describe('Version History Service (Sprint 7)', () => {
       await requirementService.updateRequirement({
         planId: plan.planId,
         requirementId: req.requirementId,
-        updates: { description: 'B'.repeat(10000) }
+        updates: { description: 'B'.repeat(2000) } // Max allowed length (BUG-012 fix)
       });
 
       const start = Date.now();

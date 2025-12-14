@@ -14,8 +14,21 @@ import type {
   VersionDiff,
   Solution,
 } from '../entities/types.js';
-import { NotFoundError } from '../repositories/errors.js';
-import { validateTags, validateRequiredString, validateRequiredEnum, validateOptionalString } from './validators.js';
+import { NotFoundError, ValidationError } from '../repositories/errors.js';
+import {
+  validateTags,
+  validateRequiredString,
+  validateRequiredEnum,
+  validateOptionalString,
+  validateListParams,
+  validateFilterPriority,
+  validateFilterCategory,
+  validateFilterStatus,
+  validateTextLength,
+  MAX_TITLE_LENGTH,
+  MAX_DESCRIPTION_LENGTH,
+  MAX_RATIONALE_LENGTH,
+} from './validators.js';
 import { filterEntities, filterEntity } from '../utils/field-filter.js';
 
 // Constants
@@ -37,6 +50,7 @@ export interface AddRequirementInput {
     acceptanceCriteria?: string[];  // Optional - default: []
     priority?: RequirementPriority;  // Optional - default: 'medium'
     category?: RequirementCategory;  // Optional - default: 'functional'
+    status?: RequirementStatus;  // Optional - default: 'draft' (BUG-013 fix)
     impact?: {
       scope: string[];
       complexityEstimate: number;
@@ -290,6 +304,63 @@ export class RequirementService {
       ['user-request', 'discovered', 'derived']
     );
 
+    // BUG-011 FIX: Validate parentId for derived requirements
+    if (input.requirement.source.type === 'derived') {
+      if (
+        input.requirement.source.parentId === undefined ||
+        input.requirement.source.parentId === ''
+      ) {
+        throw new ValidationError(
+          'parentId is required when source.type is "derived"',
+          [
+            {
+              field: 'source.parentId',
+              message: 'parentId is required when source.type is "derived"',
+            },
+          ]
+        );
+      }
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(input.requirement.source.parentId)) {
+        throw new ValidationError(
+          'parentId must be a valid UUID',
+          [
+            {
+              field: 'source.parentId',
+              message: 'parentId must be a valid UUID',
+            },
+          ]
+        );
+      }
+
+      // Validate parent requirement exists
+      const repo = this.repositoryFactory.createRepository<Requirement>(
+        'requirement',
+        input.planId
+      );
+      try {
+        await repo.findById(input.requirement.source.parentId);
+      } catch (error: unknown) {
+        if (
+          error instanceof NotFoundError ||
+          (error instanceof Error && error.constructor.name === 'NotFoundError')
+        ) {
+          throw new ValidationError(
+            `Parent requirement '${input.requirement.source.parentId}' not found`,
+            [
+              {
+                field: 'source.parentId',
+                message: `Parent requirement '${input.requirement.source.parentId}' not found`,
+              },
+            ]
+          );
+        }
+        throw error;
+      }
+    }
+
     // BUGS #2, #3: Validate priority and category if provided
     if (input.requirement.priority !== undefined) {
       validateRequiredEnum(
@@ -305,13 +376,30 @@ export class RequirementService {
         ['functional', 'non-functional', 'technical', 'business']
       );
     }
+    // BUG-013 FIX: Validate status if provided
+    if (input.requirement.status !== undefined) {
+      validateRequiredEnum(
+        input.requirement.status,
+        'status',
+        ['draft', 'approved', 'implemented', 'deferred', 'rejected']
+      );
+    }
 
     // Validate tags format
     validateTags(input.requirement.tags ?? []);
 
-    // Validate optional string fields (BUG-003, BUG-029)
+    // Validate optional string fields (BUG-003, BUG-029, BUG-042)
     validateOptionalString(input.requirement.description, 'description');
     validateOptionalString(input.requirement.rationale, 'rationale');
+
+    // BUG-012 FIX: Validate text length limits
+    validateTextLength(input.requirement.title, 'title', MAX_TITLE_LENGTH);
+    if (input.requirement.description !== undefined) {
+      validateTextLength(input.requirement.description, 'description', MAX_DESCRIPTION_LENGTH);
+    }
+    if (input.requirement.rationale !== undefined) {
+      validateTextLength(input.requirement.rationale, 'rationale', MAX_RATIONALE_LENGTH);
+    }
 
     const requirementId = uuidv4();
     const now = new Date().toISOString();
@@ -334,7 +422,7 @@ export class RequirementService {
       acceptanceCriteria: input.requirement.acceptanceCriteria ?? [],  // DEFAULT: empty array
       priority: input.requirement.priority ?? 'medium',  // DEFAULT: medium
       category: input.requirement.category ?? 'functional',  // DEFAULT: functional
-      status: 'draft',
+      status: input.requirement.status ?? 'draft',  // DEFAULT: draft (BUG-013 fix)
       votes: 0,
       impact: input.requirement.impact,  // undefined OK
     };
@@ -443,19 +531,38 @@ export class RequirementService {
       );
     }
 
+    // BUG-021 FIX: Validate readonly fields
+    if ('votes' in input.updates) {
+      throw new ValidationError(
+        'votes is a read-only field. Use vote/unvote actions instead',
+        [
+          {
+            field: 'votes',
+            message: 'votes is a read-only field. Use vote/unvote actions instead',
+          },
+        ]
+      );
+    }
+
     // BUG #18: Validate title if provided in updates
     if (input.updates.title !== undefined) {
       validateRequiredString(input.updates.title, 'title');
+      // BUG-012 FIX: Validate title length
+      validateTextLength(input.updates.title, 'title', MAX_TITLE_LENGTH);
       requirement.title = input.updates.title;
     }
     if (input.updates.description !== undefined) {
-      // M-2 FIX: Validate optional string fields in update path (BUG-003, BUG-029)
+      // M-2 FIX: Validate optional string fields in update path (BUG-003, BUG-029, BUG-042)
       validateOptionalString(input.updates.description, 'description');
+      // BUG-012 FIX: Validate description length
+      validateTextLength(input.updates.description, 'description', MAX_DESCRIPTION_LENGTH);
       requirement.description = input.updates.description;
     }
     if (input.updates.rationale !== undefined) {
-      // M-2 FIX: Validate optional string fields in update path (BUG-003, BUG-029)
+      // M-2 FIX: Validate optional string fields in update path (BUG-003, BUG-029, BUG-042)
       validateOptionalString(input.updates.rationale, 'rationale');
+      // BUG-012 FIX: Validate rationale length
+      validateTextLength(input.updates.rationale, 'rationale', MAX_RATIONALE_LENGTH);
       requirement.rationale = input.updates.rationale;
     }
     if (input.updates.acceptanceCriteria !== undefined) {
@@ -500,6 +607,16 @@ export class RequirementService {
   public async listRequirements(
     input: ListRequirementsInput
   ): Promise<ListRequirementsResult> {
+    // BUG-018, BUG-019 FIX: Validate list params
+    validateListParams(input.limit, input.offset);
+
+    // BUG-022 FIX: Validate filter values
+    if (input.filters !== undefined) {
+      validateFilterPriority(input.filters.priority);
+      validateFilterCategory(input.filters.category);
+      validateFilterStatus(input.filters.status);
+    }
+
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
 
     // Build query options (currently unused, reserved for future pagination implementation)

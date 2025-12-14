@@ -223,10 +223,15 @@ export function validateTags(tags: unknown[]): void {
       );
     }
 
-    // Sanitize tag value (BUG-003, BUG-029)
-    if (tag.value !== '') {
-      sanitizeText(tag.value, `Tag value at index ${String(i)}`);
+    // BUG-035 FIX: Reject whitespace-only tag values
+    if (tag.value.trim() === '') {
+      throw new Error(
+        `Invalid tag at index ${String(i)}: 'value' must not be whitespace-only`
+      );
     }
+
+    // Sanitize tag value (BUG-003, BUG-029)
+    sanitizeText(tag.value, `Tag value at index ${String(i)}`);
   }
 }
 
@@ -631,10 +636,10 @@ export function validateSlug(slug: unknown): void {
 
 /**
  * Validates optional string field (like description, approach, context, etc.)
- * Allows undefined, null, or empty string, but sanitizes non-empty values.
+ * BUG-042 FIX: Rejects empty strings. Allows undefined/null, but if provided must be non-empty.
  * @param value - The optional string to validate
  * @param fieldName - Field name for error messages
- * @throws Error if value contains dangerous content
+ * @throws Error if value is empty string or contains dangerous content
  */
 export function validateOptionalString(value: unknown, fieldName: string): void {
   if (value === undefined || value === null) {
@@ -643,8 +648,132 @@ export function validateOptionalString(value: unknown, fieldName: string): void 
   if (typeof value !== 'string') {
     throw new Error(`${fieldName} must be a string`);
   }
-  // Allow empty string but sanitize if not empty
-  if (value !== '') {
-    sanitizeText(value, fieldName);
+  // BUG-042 FIX: Reject empty strings for optional fields
+  if (value === '') {
+    throw new Error(`${fieldName} must be a non-empty string or undefined`);
+  }
+  // Sanitize non-empty values
+  sanitizeText(value, fieldName);
+}
+
+// BUG-012: Text length limits
+const MAX_TITLE_LENGTH = 200;
+const MAX_DESCRIPTION_LENGTH = 2000;
+const MAX_RATIONALE_LENGTH = 1000;
+
+/**
+ * Validates text length against maximum limit.
+ * BUG-012 FIX: Enforces max length for title, description, rationale fields.
+ * @param value - The text to validate
+ * @param fieldName - Field name for error messages
+ * @param maxLength - Maximum allowed length
+ * @throws Error if value exceeds maxLength
+ */
+export function validateTextLength(value: string, fieldName: string, maxLength: number): void {
+  if (value.length > maxLength) {
+    throw new Error(
+      `${fieldName} exceeds maximum length of ${String(maxLength)} characters (current: ${String(value.length)})`
+    );
   }
 }
+
+/**
+ * Validates list pagination parameters.
+ * BUG-018 FIX: Rejects negative limit/offset values.
+ * BUG-019 FIX: Rejects limit=0 (must be >= 1).
+ * @param limit - Maximum number of items to return
+ * @param offset - Number of items to skip
+ * @throws Error if limit or offset is invalid
+ */
+export function validateListParams(limit?: number, offset?: number): void {
+  if (limit !== undefined) {
+    if (typeof limit !== 'number') {
+      throw new Error('limit must be a number');
+    }
+    // BUG-018 FIX: Reject negative limit
+    if (limit < 0) {
+      throw new Error('limit must be a non-negative integer');
+    }
+    // BUG-019 FIX: Reject limit=0
+    if (limit === 0) {
+      throw new Error('limit must be a positive integer (>= 1)');
+    }
+  }
+
+  if (offset !== undefined) {
+    if (typeof offset !== 'number') {
+      throw new Error('offset must be a number');
+    }
+    // BUG-018 FIX: Reject negative offset
+    if (offset < 0) {
+      throw new Error('offset must be a non-negative integer');
+    }
+  }
+}
+
+// BUG-022: Filter validation constants
+const VALID_REQUIREMENT_CATEGORIES = ['functional', 'non-functional', 'technical', 'business'] as const;
+const VALID_REQUIREMENT_STATUSES = ['draft', 'approved', 'implemented', 'deferred', 'rejected'] as const;
+
+/**
+ * Validates filter priority value.
+ * BUG-022 FIX: Rejects invalid priority filter values.
+ * @param priority - Priority filter value
+ * @throws Error if priority is not in valid list
+ */
+export function validateFilterPriority(priority: unknown): void {
+  if (priority === undefined) {
+    return; // Optional filter
+  }
+  if (typeof priority !== 'string') {
+    throw new Error('filters.priority must be a string');
+  }
+  if (!VALID_PRIORITIES.includes(priority as typeof VALID_PRIORITIES[number])) {
+    throw new Error(
+      `filters.priority must be one of: ${VALID_PRIORITIES.join(', ')} (got: '${priority}')`
+    );
+  }
+}
+
+/**
+ * Validates filter category value.
+ * BUG-022 FIX: Rejects invalid category filter values.
+ * @param category - Category filter value
+ * @throws Error if category is not in valid list
+ */
+export function validateFilterCategory(category: unknown): void {
+  if (category === undefined) {
+    return; // Optional filter
+  }
+  if (typeof category !== 'string') {
+    throw new Error('filters.category must be a string');
+  }
+  if (!VALID_REQUIREMENT_CATEGORIES.includes(category as typeof VALID_REQUIREMENT_CATEGORIES[number])) {
+    throw new Error(
+      `filters.category must be one of: ${VALID_REQUIREMENT_CATEGORIES.join(', ')} (got: '${category}')`
+    );
+  }
+}
+
+/**
+ * Validates filter status value.
+ * BUG-022 FIX: Rejects invalid status filter values.
+ * @param status - Status filter value
+ * @throws Error if status is not in valid list
+ */
+export function validateFilterStatus(status: unknown): void {
+  if (status === undefined) {
+    return; // Optional filter
+  }
+  if (typeof status !== 'string') {
+    throw new Error('filters.status must be a string');
+  }
+  if (!VALID_REQUIREMENT_STATUSES.includes(status as typeof VALID_REQUIREMENT_STATUSES[number])) {
+    throw new Error(
+      `filters.status must be one of: ${VALID_REQUIREMENT_STATUSES.join(', ')} (got: '${status}')`
+    );
+  }
+}
+
+// Export length constants for use in services
+export { MAX_TITLE_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_RATIONALE_LENGTH };

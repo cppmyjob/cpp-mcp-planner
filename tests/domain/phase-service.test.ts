@@ -213,7 +213,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Phase 1',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -224,7 +224,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Phase 2',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -244,7 +244,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Phase 1',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -255,7 +255,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Phase 1.1',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -267,7 +267,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Phase 1.2',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -279,7 +279,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Phase 2',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -434,7 +434,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Test',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -457,7 +457,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Test',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -481,7 +481,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Test',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -502,7 +502,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Test',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -526,7 +526,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Test',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -703,7 +703,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'To Delete',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -724,7 +724,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Parent',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -735,7 +735,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Child',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -869,7 +869,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Root',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -880,7 +880,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Parent',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -892,7 +892,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Child',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -904,7 +904,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Grandchild',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -940,7 +940,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Parent',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -951,7 +951,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Child 1',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -963,7 +963,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Child 2',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -975,7 +975,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Child 3',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1009,7 +1009,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Parent',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1020,7 +1020,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Child',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1048,7 +1048,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Phase 1',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1059,7 +1059,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Phase 2',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1113,7 +1113,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Test',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1303,7 +1303,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Parent',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1314,7 +1314,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Child',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1327,7 +1327,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Grandchild',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1349,7 +1349,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'P1',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1360,7 +1360,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'P1.1',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1372,7 +1372,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'P1.1.1',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1402,7 +1402,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Parent',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1413,7 +1413,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Child1',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1425,7 +1425,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Child2',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1437,7 +1437,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'Child3',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1450,7 +1450,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'GC1',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1462,7 +1462,7 @@ describe('PhaseService', () => {
         planId,
         phase: {
           title: 'GC2',
-          description: '',
+          description: undefined,
           objectives: [],
           deliverables: [],
           successCriteria: [],
@@ -1568,7 +1568,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'First',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1584,7 +1584,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'First',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1594,7 +1594,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Second',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1609,21 +1609,21 @@ describe('PhaseService', () => {
         // Create phases with orders 2, 3, 4 (skipping 1)
         await service.addPhase({
           planId,
-          phase: { title: 'P2', description: '', objectives: [], deliverables: [], successCriteria: [], order: 2 },
+          phase: { title: 'P2', description: undefined, objectives: [], deliverables: [], successCriteria: [], order: 2 },
         });
         await service.addPhase({
           planId,
-          phase: { title: 'P3', description: '', objectives: [], deliverables: [], successCriteria: [], order: 3 },
+          phase: { title: 'P3', description: undefined, objectives: [], deliverables: [], successCriteria: [], order: 3 },
         });
         await service.addPhase({
           planId,
-          phase: { title: 'P4', description: '', objectives: [], deliverables: [], successCriteria: [], order: 4 },
+          phase: { title: 'P4', description: undefined, objectives: [], deliverables: [], successCriteria: [], order: 4 },
         });
 
         // Add new phase without explicit order
         const result = await service.addPhase({
           planId,
-          phase: { title: 'New', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'New', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
 
         // Should be 5, not 4 (siblings.length + 1)
@@ -1636,21 +1636,21 @@ describe('PhaseService', () => {
         // Create phases with orders 1, 5, 10
         await service.addPhase({
           planId,
-          phase: { title: 'P1', description: '', objectives: [], deliverables: [], successCriteria: [], order: 1 },
+          phase: { title: 'P1', description: undefined, objectives: [], deliverables: [], successCriteria: [], order: 1 },
         });
         await service.addPhase({
           planId,
-          phase: { title: 'P5', description: '', objectives: [], deliverables: [], successCriteria: [], order: 5 },
+          phase: { title: 'P5', description: undefined, objectives: [], deliverables: [], successCriteria: [], order: 5 },
         });
         await service.addPhase({
           planId,
-          phase: { title: 'P10', description: '', objectives: [], deliverables: [], successCriteria: [], order: 10 },
+          phase: { title: 'P10', description: undefined, objectives: [], deliverables: [], successCriteria: [], order: 10 },
         });
 
         // Add new phase
         const result = await service.addPhase({
           planId,
-          phase: { title: 'New', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'New', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
 
         // Should be 11, not 4
@@ -1662,13 +1662,13 @@ describe('PhaseService', () => {
       it('should set order=1 for first child phase', async () => {
         const parent = await service.addPhase({
           planId,
-          phase: { title: 'Parent', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Parent', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         const child = await service.addPhase({
           planId,
           phase: {
             title: 'Child',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1684,7 +1684,7 @@ describe('PhaseService', () => {
       it('should calculate child order based on max sibling order', async () => {
         const parent = await service.addPhase({
           planId,
-          phase: { title: 'Parent', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Parent', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
 
         // Create children with orders 2, 5, 8
@@ -1692,7 +1692,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'C2',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1704,7 +1704,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'C5',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1716,7 +1716,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'C8',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1730,7 +1730,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'New Child',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1749,11 +1749,11 @@ describe('PhaseService', () => {
       it('should use explicit order when provided', async () => {
         await service.addPhase({
           planId,
-          phase: { title: 'First', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'First', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         const result = await service.addPhase({
           planId,
-          phase: { title: 'Explicit', description: '', objectives: [], deliverables: [], successCriteria: [], order: 99 },
+          phase: { title: 'Explicit', description: undefined, objectives: [], deliverables: [], successCriteria: [], order: 99 },
         });
 
         const { phase } = await service.getPhase({ planId, phaseId: result.phaseId });
@@ -1764,13 +1764,13 @@ describe('PhaseService', () => {
       it('should throw error when explicit order conflicts with existing', async () => {
         await service.addPhase({
           planId,
-          phase: { title: 'First', description: '', objectives: [], deliverables: [], successCriteria: [], order: 5 },
+          phase: { title: 'First', description: undefined, objectives: [], deliverables: [], successCriteria: [], order: 5 },
         });
 
         await expect(
           service.addPhase({
             planId,
-            phase: { title: 'Conflict', description: '', objectives: [], deliverables: [], successCriteria: [], order: 5 },
+            phase: { title: 'Conflict', description: undefined, objectives: [], deliverables: [], successCriteria: [], order: 5 },
           })
         ).rejects.toThrow(/order.*already exists|duplicate.*order/i);
       });
@@ -1778,18 +1778,18 @@ describe('PhaseService', () => {
       it('should allow same order for different parents', async () => {
         const parent1 = await service.addPhase({
           planId,
-          phase: { title: 'P1', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'P1', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         const parent2 = await service.addPhase({
           planId,
-          phase: { title: 'P2', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'P2', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
 
         const child1 = await service.addPhase({
           planId,
           phase: {
             title: 'C1',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1801,7 +1801,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'C2',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -1825,7 +1825,7 @@ describe('PhaseService', () => {
         for (let i = 0; i < 15; i++) {
           const result = await service.addPhase({
             planId,
-            phase: { title: `Phase ${String(i)}`, description: '', objectives: [], deliverables: [], successCriteria: [] },
+            phase: { title: `Phase ${String(i)}`, description: undefined, objectives: [], deliverables: [], successCriteria: [] },
           });
           phaseIds.push(result.phaseId);
         }
@@ -1843,15 +1843,15 @@ describe('PhaseService', () => {
       it('should maintain path consistency after delete and add', async () => {
         await service.addPhase({
           planId,
-          phase: { title: 'P1', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'P1', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         const p2 = await service.addPhase({
           planId,
-          phase: { title: 'P2', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'P2', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         await service.addPhase({
           planId,
-          phase: { title: 'P3', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'P3', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
 
         // Delete middle phase
@@ -1860,7 +1860,7 @@ describe('PhaseService', () => {
         // Add new phase
         const p4 = await service.addPhase({
           planId,
-          phase: { title: 'P4', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'P4', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
 
         // Should get order 4, not 3 (even though only 2 siblings now)
@@ -2239,7 +2239,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Phase 1',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -2250,7 +2250,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Phase 2',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -2281,7 +2281,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Task 1',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -2307,7 +2307,7 @@ describe('PhaseService', () => {
       it('should set completedAt timestamp on completed phase', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'Task', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Task', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
 
@@ -2325,7 +2325,7 @@ describe('PhaseService', () => {
       it('should save actualEffort in completed phase schedule', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'Task', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Task', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
 
@@ -2346,7 +2346,7 @@ describe('PhaseService', () => {
       it('should add annotation with notes to completed phase', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'Task', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Task', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
 
@@ -2372,7 +2372,7 @@ describe('PhaseService', () => {
       it('should increment version of completed phase', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'Task', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Task', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
 
@@ -2395,7 +2395,7 @@ describe('PhaseService', () => {
       it('should throw error when phase already completed', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'Done', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Done', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'completed' });
 
@@ -2407,7 +2407,7 @@ describe('PhaseService', () => {
       it('should throw error when trying to complete skipped phase', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'Skipped', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Skipped', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'skipped', notes: 'Not needed' });
 
@@ -2419,7 +2419,7 @@ describe('PhaseService', () => {
       it('should allow completing phase that is in_progress', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'Active', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Active', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
 
@@ -2433,7 +2433,7 @@ describe('PhaseService', () => {
       it('should allow completing phase that is still planned', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'Planned', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Planned', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         // status is 'planned' by default
 
@@ -2447,7 +2447,7 @@ describe('PhaseService', () => {
       it('should throw error when trying to complete blocked phase', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'Blocked', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Blocked', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'blocked', notes: 'Dependency issue' });
 
@@ -2462,11 +2462,11 @@ describe('PhaseService', () => {
       it('should find and start next planned sibling phase', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'Phase 1', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Phase 1', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         const p2 = await service.addPhase({
           planId,
-          phase: { title: 'Phase 2', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Phase 2', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
 
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });
@@ -2484,13 +2484,13 @@ describe('PhaseService', () => {
       it('should advance to first planned child when current phase has children', async () => {
         const parent = await service.addPhase({
           planId,
-          phase: { title: 'Parent', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Parent', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         const child1 = await service.addPhase({
           planId,
           phase: {
             title: 'Child 1',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -2501,7 +2501,7 @@ describe('PhaseService', () => {
           planId,
           phase: {
             title: 'Child 2',
-            description: '',
+            description: undefined,
             objectives: [],
             deliverables: [],
             successCriteria: [],
@@ -2522,15 +2522,15 @@ describe('PhaseService', () => {
       it('should skip blocked phases and find next planned', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'P1', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'P1', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         const p2 = await service.addPhase({
           planId,
-          phase: { title: 'P2', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'P2', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
         const p3 = await service.addPhase({
           planId,
-          phase: { title: 'P3', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'P3', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
 
         await service.updatePhaseStatus({ planId, phaseId: p2.phaseId, status: 'blocked', notes: 'Issue' });
@@ -2544,7 +2544,7 @@ describe('PhaseService', () => {
       it('should return null when no more planned phases', async () => {
         const p1 = await service.addPhase({
           planId,
-          phase: { title: 'Only Phase', description: '', objectives: [], deliverables: [], successCriteria: [] },
+          phase: { title: 'Only Phase', description: undefined, objectives: [], deliverables: [], successCriteria: [] },
         });
 
         await service.updatePhaseStatus({ planId, phaseId: p1.phaseId, status: 'in_progress' });

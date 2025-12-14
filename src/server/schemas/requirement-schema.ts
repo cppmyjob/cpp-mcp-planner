@@ -60,6 +60,9 @@ const baseRequirementSchema = z.object({
   force: z.boolean().optional(),
   fields: z.array(z.string()).optional(),
   excludeMetadata: z.boolean().optional(),
+  // BUG-018, BUG-019: For list action
+  limit: z.number().optional(),
+  offset: z.number().optional(),
   // For diff action
   version1: z.number().optional(),
   version2: z.number().optional(),
