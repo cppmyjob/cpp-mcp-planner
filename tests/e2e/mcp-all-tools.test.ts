@@ -52,7 +52,7 @@ describe('E2E: All MCP Tools Validation', () => {
   let cleanup: () => Promise<void>;
 
   // IDs created during tests for cross-referencing
-  let planId: string;
+  let planId: string | undefined;
   let requirementId: string;
   let solutionId: string;
   let solutionId2: string;
@@ -2626,6 +2626,20 @@ describe('E2E: All MCP Tools Validation', () => {
     });
 
     it('action: execute with all entity types (requirement, solution, phase, link, decision, artifact)', async () => {
+      // Ensure planId exists (for isolated test runs)
+      if (planId === undefined || planId === '') {
+        const planResult = await client.callTool({
+          name: 'plan',
+          arguments: {
+            action: 'create',
+            name: 'Batch All Types Test Plan',
+            description: 'Plan for testing batch operations with all entity types',
+          },
+        });
+        const parsed = parseResult<{ planId: string }>(planResult);
+        planId = parsed.planId;
+      }
+
       const result = await client.callTool({
         name: 'batch',
         arguments: {

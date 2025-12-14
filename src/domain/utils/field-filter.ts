@@ -101,9 +101,15 @@ function validateFields(fields: string[], entityType: EntityType): void {
   const invalidFields = fields.filter((field) => !validFields.has(field));
 
   if (invalidFields.length > 0) {
+    const errors = invalidFields.map((field) => ({
+      field,
+      message: `Invalid field '${field}' for entity type '${entityType}'`,
+    }));
+
     throw new ValidationError(
       `Invalid field(s) for ${entityType}: ${invalidFields.join(', ')}. ` +
-        `Valid fields: ${Array.from(validFields).join(', ')}`
+        `Valid fields: ${Array.from(validFields).join(', ')}`,
+      errors
     );
   }
 }
