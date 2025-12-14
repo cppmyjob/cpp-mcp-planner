@@ -446,9 +446,13 @@ export class RequirementService {
       requirement.title = input.updates.title;
     }
     if (input.updates.description !== undefined) {
+      // M-2 FIX: Validate optional string fields in update path (BUG-003, BUG-029)
+      validateOptionalString(input.updates.description, 'description');
       requirement.description = input.updates.description;
     }
     if (input.updates.rationale !== undefined) {
+      // M-2 FIX: Validate optional string fields in update path (BUG-003, BUG-029)
+      validateOptionalString(input.updates.rationale, 'rationale');
       requirement.rationale = input.updates.rationale;
     }
     if (input.updates.acceptanceCriteria !== undefined) {

@@ -417,7 +417,11 @@ export class DecisionService {
         validateRequiredString(input.updates.question, 'question');
         decision.question = input.updates.question;
       }
-      if (input.updates.context !== undefined) decision.context = input.updates.context;
+      if (input.updates.context !== undefined) {
+        // M-1 FIX: Validate optional string fields in update path (BUG-003, BUG-029)
+        validateOptionalString(input.updates.context, 'context');
+        decision.context = input.updates.context;
+      }
       if (input.updates.decision !== undefined) {
         validateRequiredString(input.updates.decision, 'decision');
         decision.decision = input.updates.decision;
@@ -426,8 +430,11 @@ export class DecisionService {
         validateAlternativesConsidered(input.updates.alternativesConsidered);
         decision.alternativesConsidered = input.updates.alternativesConsidered;
       }
-      if (input.updates.consequences !== undefined)
+      if (input.updates.consequences !== undefined) {
+        // M-1 FIX: Validate optional string fields in update path (BUG-003, BUG-029)
+        validateOptionalString(input.updates.consequences, 'consequences');
         decision.consequences = input.updates.consequences;
+      }
       if (input.updates.impactScope !== undefined) decision.impactScope = input.updates.impactScope;
       if (input.updates.tags !== undefined) {
         validateTags(input.updates.tags);

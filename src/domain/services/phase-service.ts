@@ -513,7 +513,11 @@ export class PhaseService {
       validateRequiredString(input.updates.title, 'title');
       phase.title = input.updates.title;
     }
-    if (input.updates.description !== undefined) phase.description = input.updates.description;
+    if (input.updates.description !== undefined) {
+      // M-2 FIX: Validate optional string fields in update path (BUG-003, BUG-029)
+      validateOptionalString(input.updates.description, 'description');
+      phase.description = input.updates.description;
+    }
     if (input.updates.objectives !== undefined) phase.objectives = input.updates.objectives;
     if (input.updates.deliverables !== undefined) phase.deliverables = input.updates.deliverables;
     if (input.updates.successCriteria !== undefined)

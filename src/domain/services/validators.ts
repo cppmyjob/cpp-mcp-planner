@@ -230,27 +230,7 @@ export function validateTags(tags: unknown[]): void {
   }
 }
 
-export function validateCodeExamples(examples: unknown[]): void {
-  if (!Array.isArray(examples)) {
-    return;
-  }
-
-  for (let i = 0; i < examples.length; i++) {
-    const ex = examples[i] as Record<string, unknown>;
-
-    if (typeof ex.language !== 'string' || ex.language === '') {
-      throw new Error(
-        `Invalid codeExample at index ${String(i)}: 'language' must be a non-empty string`
-      );
-    }
-
-    if (typeof ex.code !== 'string') {
-      throw new Error(
-        `Invalid codeExample at index ${String(i)}: 'code' must be a string`
-      );
-    }
-  }
-}
+// L-2 FIX: Removed unused validateCodeExamples function (Sprint 10 removed codeExamples field)
 
 export function validateArtifactType(artifactType: unknown): void {
   if (!VALID_ARTIFACT_TYPES.includes(artifactType as typeof VALID_ARTIFACT_TYPES[number])) {
