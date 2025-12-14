@@ -583,6 +583,80 @@ describe('DecisionService', () => {
             reason: 'Testing error handling',
           })).rejects.toThrow(/decision.*not found/i);
         });
+
+        // M-2 BUG: Version double-increment in reuseExistingDecision
+        it('RED: old decision version should increment by exactly 1 (not 2) when reusing existing decision', async () => {
+          // BUG: reuseExistingDecision() manually increments version AND repo.update() also increments
+          // Result: version jumps by 2 instead of 1
+
+          // Create Decision 1 (will be superseded)
+          const decision1 = await service.recordDecision({
+            planId,
+            decision: {
+              title: 'Decision 1 - version test',
+              question: 'Test version increment?',
+              decision: 'Yes',
+              context: 'Testing M-2 bug',
+              alternativesConsidered: [],
+            },
+          });
+
+          // Create Decision 2 (will be reused as superseding decision)
+          const decision2 = await service.recordDecision({
+            planId,
+            decision: {
+              title: 'Decision 2 - reuse target',
+              question: 'Reuse this?',
+              decision: 'Yes, reuse me',
+              context: 'Will be linked via supersede',
+              alternativesConsidered: [],
+            },
+          });
+
+          // Get initial versions
+          const { decision: d1Before } = await service.getDecision({
+            planId,
+            decisionId: decision1.decisionId,
+            fields: ['*'],
+          });
+          const { decision: d2Before } = await service.getDecision({
+            planId,
+            decisionId: decision2.decisionId,
+            fields: ['*'],
+          });
+
+          expect(d1Before.version).toBe(1);
+          expect(d2Before.version).toBe(1);
+
+          // Supersede Decision 1 WITH Decision 2 (UUID reuse path)
+          await service.supersedeDecision({
+            planId,
+            decisionId: decision1.decisionId,
+            newDecision: {
+              decision: decision2.decisionId, // UUID triggers reuseExistingDecision()
+            },
+            reason: 'Testing version increment',
+          });
+
+          // Verify versions after supersede
+          const { decision: d1After } = await service.getDecision({
+            planId,
+            decisionId: decision1.decisionId,
+            fields: ['*'],
+          });
+          const { decision: d2After } = await service.getDecision({
+            planId,
+            decisionId: decision2.decisionId,
+            fields: ['*'],
+          });
+
+          // M-2 BUG ASSERTION: Old decision version should be 2 (incremented by 1)
+          // BUG: Currently it's 3 because of manual += 1 AND repo.update() += 1
+          expect(d1After.version).toBe(2); // FAILS with actual: 3
+
+          // Decision 2 should also increment by 1 (repo.update() call)
+          expect(d2After.version).toBe(2);
+        });
       });
     });
   });
