@@ -142,6 +142,15 @@ src/
 └── server/           # MCP protocol handlers
 ```
 
+### Validation Layers
+
+| Layer | Responsibility |
+|-------|----------------|
+| **ZOD** (schemas) | Input parsing, types, formats — API contract |
+| **Services** | Business rules, entity checks, state transitions |
+
+> **Rule:** ZOD = interface mapping. Services = all validation logic.
+
 ---
 
 ## 1. DOMAIN ENTITIES
@@ -336,6 +345,21 @@ afterEach(async () => {
 - `GREEN:` — minimal implementation
 - `REFACTOR:` — optimize
 - `REVIEW:` — final verification
+
+### DOCTOR — Bug Fix Methodology
+
+TDD-based systematic approach for fixing bugs:
+
+| Phase | Name | Action |
+|-------|------|--------|
+| **D** | Diagnose | Analyze bug: reproduce, find root cause |
+| **O** | Observe | Write failing test (RED) |
+| **C** | Cure | Minimal fix to pass test (GREEN) |
+| **T** | Transform | Refactor without changing behavior |
+| **O** | Order | Run linter: `npm run lint:fix` |
+| **R** | Run | Full test suite: `npm test` |
+
+**Use for:** Any bug fix requiring code changes (skip for trivial typos).
 
 ### Assertions
 - UUID format: `/^[0-9a-f]{8}-[0-9a-f]{4}-...-[0-9a-f]{12}$/i`
