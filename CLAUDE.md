@@ -5,6 +5,7 @@
 ### TypeScript Naming
 - **NO** `I` prefix for interfaces — use `User`, not `IUser`
 - **NO** `_` prefix for private members — use `private` modifier alone
+- **Exception:** `_` prefix allowed for intentionally unused variables (e.g., `_exhaustive` in switch)
 - **Explicit visibility** — always specify `public`/`private`/`protected` on all class members
 - File names: `kebab-case.ts` (e.g., `plan-service.ts`)
 - Classes/Interfaces: `PascalCase`
@@ -68,34 +69,34 @@ function getStatus(s: Status): string {
 
 ### MANDATORY WORKFLOW
 **BEFORE writing ANY code:**
-1. Review `eslint.config.js:5-200` for active rules
+1. Review `eslint.config.js` for active rules
 2. Follow ALL rules without exception
 3. After code changes: `npm run lint:fix`
 4. Fix ALL errors before proceeding — **ZERO TOLERANCE**
 
 ### Critical Rules (eslint.config.js)
-- **Type Safety (lines 23-30):**
+- **Type Safety:**
   - `@typescript-eslint/no-explicit-any: error` — NO `any` type, EVER
   - `@typescript-eslint/no-unsafe-*: error` — NO unsafe operations
 
-- **Explicit Visibility (lines 35-43):**
+- **Explicit Visibility:**
   - `@typescript-eslint/explicit-member-accessibility: error` — ALL class members MUST have `public`/`private`/`protected`
 
-- **Naming Conventions (lines 52-105):**
-  - Interfaces: `PascalCase`, NO `I` prefix (line 55-61)
-  - Class properties: `camelCase`, NO `_` prefix (line 74-78)
-  - Variables: `camelCase` or `UPPER_CASE` for constants (line 85-88)
+- **Naming Conventions:**
+  - Interfaces: `PascalCase`, NO `I` prefix
+  - Class properties: `camelCase`, NO `_` prefix
+  - Variables: `camelCase` or `UPPER_CASE` for constants
 
-- **Module Organization (lines 110-111):**
+- **Module Organization:**
   - `import/no-default-export: error` — ONLY named exports
 
-- **Safety Patterns (lines 116-136):**
+- **Safety Patterns:**
   - `@typescript-eslint/no-non-null-assertion: error` — NO `!` operator
   - `@typescript-eslint/prefer-nullish-coalescing: error` — Use `??` NOT `||`
   - `@typescript-eslint/prefer-optional-chain: error` — Use `?.` for safe access
   - `@typescript-eslint/switch-exhaustiveness-check: error` — Exhaustive switches
 
-- **Code Quality (lines 142-185):**
+- **Code Quality:**
   - `@typescript-eslint/no-magic-numbers: error` — NO magic numbers (except -1, 0, 1, 2, 100)
   - `@typescript-eslint/explicit-function-return-type: error` — Explicit return types
   - `@typescript-eslint/strict-boolean-expressions: error` — NO truthy/falsy coercion
@@ -142,14 +143,14 @@ src/
 └── server/           # MCP protocol handlers
 ```
 
-### Validation Layers
+**Validation Layers:**
 
 | Layer | Responsibility |
 |-------|----------------|
-| **ZOD** (schemas) | Input parsing, types, formats — API contract |
+| **ZOD** (tool-definitions.ts) | Input parsing, types, formats — API contract |
 | **Services** | Business rules, entity checks, state transitions |
 
-> **Rule:** ZOD = interface mapping. Services = all validation logic.
+> **Rule:** ZOD = interface mapping only. Services = all validation logic.
 
 ---
 
@@ -177,8 +178,19 @@ src/
 - Order based on `max(sibling.order) + 1`, not count (prevents duplicates on delete)
 
 ### Links
-- 9 relation types: `implements`, `addresses`, `depends_on`, `blocks`, `alternative_to`, `supersedes`, `references`, `derived_from`, `has_artifact`
-- Cycle detection for `depends_on`
+9 relation types with cycle detection for `depends_on`:
+
+| Relation | Source → Target | Use case |
+|----------|-----------------|----------|
+| `implements` | Solution → Requirement | Solution fulfills requirement |
+| `addresses` | Phase → Requirement | Phase works on requirement |
+| `depends_on` | Phase → Phase | Execution order dependency |
+| `blocks` | Phase → Phase | Blocker relationship |
+| `alternative_to` | Solution → Solution | Competing approaches |
+| `supersedes` | Decision → Decision | ADR replacement |
+| `references` | Any → Any | General reference |
+| `derived_from` | Requirement → Requirement | Breakdown/derivation |
+| `has_artifact` | Phase → Artifact | Phase produces artifact |
 
 Reference: `src/domain/entities/types.ts`
 
@@ -230,15 +242,15 @@ Reference: `src/domain/services/`
 - One handler per entity type: plan, requirement, solution, decision, phase, artifact, link, query, batch
 
 ### Error Handling
-- Throw plain `Error` with code property, NOT `McpError`
-- SDK auto-wraps errors; double-wrapping causes "MCP error -32603: MCP error -32603"
-- Use custom errors: `NotFoundError`, `ValidationError`, `ConflictError`, `LockError`
+- Use custom errors from `src/domain/repositories/errors.ts`: `NotFoundError`, `ValidationError`, `ConflictError`, `LockError`
+- **NOT** `McpError` — SDK auto-wraps; double-wrapping causes "MCP error -32603: MCP error -32603"
+- Custom errors extend `RepositoryError` (which extends `Error`), not MCP types
 
 ### Response Format
 - Return JSON in `content[0].text`
 - Support field filtering in all responses
 
-Reference: `src/server/tool-handlers.ts`, `src/server/create-server.ts`
+Reference: `src/server/handlers/`, `src/server/create-server.ts`
 
 ---
 
@@ -377,7 +389,7 @@ Reference: `tests/domain/*-service.test.ts`
 | Error hierarchy | `src/domain/repositories/errors.ts` |
 | Validators | `src/domain/services/validators.ts` |
 | Services init | `src/server/services.ts` |
-| Tool handlers | `src/server/tool-handlers.ts` |
+| Tool handlers | `src/server/handlers/` |
 | File storage | `src/infrastructure/file-storage.ts` |
 | File repository | `src/infrastructure/repositories/file/file-repository.ts` |
 | Lock manager | `src/infrastructure/repositories/file/file-lock-manager.ts` |
