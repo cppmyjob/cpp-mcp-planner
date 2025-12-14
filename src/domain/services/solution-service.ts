@@ -342,6 +342,12 @@ export class SolutionService {
       throw new Error('solutionIds must be a non-empty array');
     }
 
+    // BUG-023 FIX: Compare requires at least 2 solutions
+    const MIN_SOLUTIONS_FOR_COMPARE = 2;
+    if (input.solutionIds.length < MIN_SOLUTIONS_FOR_COMPARE) {
+      throw new Error('compare requires at least 2 solutions');
+    }
+
     const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
     const solutions: Solution[] = [];
     for (const id of input.solutionIds) {

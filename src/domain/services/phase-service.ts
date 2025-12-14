@@ -642,6 +642,11 @@ export class PhaseService {
   }
 
   public async getPhaseTree(input: GetPhaseTreeInput): Promise<GetPhaseTreeResult> {
+    // BUG-027 FIX: Validate maxDepth is non-negative
+    if (input.maxDepth !== undefined && input.maxDepth < 0) {
+      throw new Error('maxDepth must be a non-negative integer');
+    }
+
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     let phases = await repo.findAll();
 
@@ -838,7 +843,6 @@ export class PhaseService {
 
     if (input.status === 'completed') {
       phase.completedAt = now;
-      phase.progress = PROGRESS_COMPLETE;
       autoUpdated.completedAt = now;
     }
 
@@ -859,6 +863,12 @@ export class PhaseService {
     if (input.progress !== undefined) {
       validateProgress(input.progress);
       phase.progress = input.progress;
+    }
+
+    // BUG-039 FIX: Auto-set progress=100 when marking phase as completed
+    // This must happen AFTER input.progress assignment to override any user-provided value
+    if (input.status === 'completed') {
+      phase.progress = PROGRESS_COMPLETE;
     }
 
     if (input.actualEffort !== undefined) {
@@ -897,6 +907,11 @@ export class PhaseService {
   }
 
   public async getNextActions(input: GetNextActionsInput): Promise<GetNextActionsResult> {
+    // BUG-041 FIX: Validate limit is a positive integer
+    if (input.limit !== undefined && input.limit < 1) {
+      throw new Error('limit must be a positive integer (>= 1)');
+    }
+
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     const phases = await repo.findAll();
     const limit = input.limit ?? DEFAULT_NEXT_ACTIONS_LIMIT;

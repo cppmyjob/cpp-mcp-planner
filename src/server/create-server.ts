@@ -30,7 +30,6 @@ import {
   handleLink,
   handleQuery,
   handleBatch,
-  ToolError,
 } from './handlers/index.js';
 
 export interface McpServerResult {
@@ -45,94 +44,42 @@ export function createMcpServer(services: Services): McpServerResult {
   });
 
   // Register all 9 tools with Zod schemas
+  // BUG FIX: Remove try-catch blocks to allow errors to propagate naturally to MCP SDK
   server.registerTool('plan', { description: planToolDescription, inputSchema: planSchema }, async (args) => {
-    try {
-      return await handlePlan(args as unknown as { action: string; [key: string]: unknown }, services);
-    } catch (error) {
-      return handleToolError(error);
-    }
+    return await handlePlan(args as unknown as { action: string; [key: string]: unknown }, services);
   });
 
   server.registerTool('requirement', { description: requirementToolDescription, inputSchema: requirementSchema }, async (args) => {
-    try {
-      return await handleRequirement(args as unknown as { action: string; [key: string]: unknown }, services);
-    } catch (error) {
-      return handleToolError(error);
-    }
+    return await handleRequirement(args as unknown as { action: string; [key: string]: unknown }, services);
   });
 
   server.registerTool('solution', { description: solutionToolDescription, inputSchema: solutionSchema }, async (args) => {
-    try {
-      return await handleSolution(args as unknown as { action: string; [key: string]: unknown }, services);
-    } catch (error) {
-      return handleToolError(error);
-    }
+    return await handleSolution(args as unknown as { action: string; [key: string]: unknown }, services);
   });
 
   server.registerTool('decision', { description: decisionToolDescription, inputSchema: decisionSchema }, async (args) => {
-    try {
-      return await handleDecision(args as unknown as { action: string; [key: string]: unknown }, services);
-    } catch (error) {
-      return handleToolError(error);
-    }
+    return await handleDecision(args as unknown as { action: string; [key: string]: unknown }, services);
   });
 
   server.registerTool('phase', { description: phaseToolDescription, inputSchema: phaseSchema }, async (args) => {
-    try {
-      return await handlePhase(args as unknown as { action: string; [key: string]: unknown }, services);
-    } catch (error) {
-      return handleToolError(error);
-    }
+    return await handlePhase(args as unknown as { action: string; [key: string]: unknown }, services);
   });
 
   server.registerTool('artifact', { description: artifactToolDescription, inputSchema: artifactSchema }, async (args) => {
-    try {
-      return await handleArtifact(args as unknown as { action: string; [key: string]: unknown }, services);
-    } catch (error) {
-      return handleToolError(error);
-    }
+    return await handleArtifact(args as unknown as { action: string; [key: string]: unknown }, services);
   });
 
   server.registerTool('link', { description: linkToolDescription, inputSchema: linkSchema }, async (args) => {
-    try {
-      return await handleLink(args as unknown as { action: string; [key: string]: unknown }, services);
-    } catch (error) {
-      return handleToolError(error);
-    }
+    return await handleLink(args as unknown as { action: string; [key: string]: unknown }, services);
   });
 
   server.registerTool('query', { description: queryToolDescription, inputSchema: querySchema }, async (args) => {
-    try {
-      return await handleQuery(args as unknown as { action: string; [key: string]: unknown }, services);
-    } catch (error) {
-      return handleToolError(error);
-    }
+    return await handleQuery(args as unknown as { action: string; [key: string]: unknown }, services);
   });
 
   server.registerTool('batch', { description: batchToolDescription, inputSchema: batchSchema }, async (args) => {
-    try {
-      return await handleBatch(args as unknown as { planId: string; operations: unknown[] }, services);
-    } catch (error) {
-      return handleToolError(error);
-    }
+    return await handleBatch(args as unknown as { planId: string; operations: unknown[] }, services);
   });
 
   return { server, services };
-}
-
-function handleToolError(error: unknown): { content: [{ type: 'text'; text: string }]; isError: true } {
-  let message: string;
-
-  if (error instanceof ToolError) {
-    message = `[${error.code}] ${error.message}`;
-  } else if (error instanceof Error) {
-    message = error.message !== '' ? error.message : 'Error without message';
-  } else {
-    message = 'Unknown error';
-  }
-
-  return {
-    content: [{ type: 'text', text: message }],
-    isError: true,
-  };
 }

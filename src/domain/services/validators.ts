@@ -41,6 +41,17 @@ export function sanitizeText(text: string, fieldName: string): void {
     throw new Error(`${fieldName} contains bidirectional override characters which are not allowed`);
   }
 
+  // BUG-044 FIX: Check for zero-width characters (visual deception, string comparison issues)
+  // U+200B: Zero Width Space (ZWSP)
+  // U+200C: Zero Width Non-Joiner (ZWNJ)
+  // U+200D: Zero Width Joiner (ZWJ)
+  // U+FEFF: Zero Width No-Break Space (BOM)
+  // eslint-disable-next-line no-misleading-character-class -- Unicode escape sequences are intentional
+  const zeroWidthPattern = /[\u200B\u200C\u200D\uFEFF]/u;
+  if (zeroWidthPattern.test(text)) {
+    throw new Error(`${fieldName} contains zero-width characters which are not allowed`);
+  }
+
   // Check for control characters (except newline, tab, carriage return)
   // Control characters are \x00-\x1F and \x7F-\x9F
   // Allow: \n (0x0A), \r (0x0D), \t (0x09)

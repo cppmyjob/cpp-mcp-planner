@@ -88,4 +88,4 @@ export const planSchema = basePlanSchema.superRefine((data: PlanInput, ctx) => {
   }
 });
 
-export const planToolDescription = 'Manage development plans - the top-level container for all planning entities. Create a plan first before using other tools. Set active plan per workspace to avoid passing planId repeatedly. Use get_summary for plan overview (returns plan info, phase tree summary, statistics). Use includeEntities only for full export/backup - it returns large data. Actions: create, list, get, update, archive, set_active, get_active, get_summary.';
+export const planToolDescription = 'Manage development plans - the top-level container for all planning entities. Create a plan first before using other tools. Set active plan per workspace to avoid passing planId repeatedly. Use get_summary for plan overview (returns plan info, phase tree summary, statistics). Use includeEntities only for full export/backup - it returns large data. Version history: enable with enableHistory (default: false), maxHistoryDepth (0-10, default: 5 when enabled). Actions: create, list, get, update, archive, set_active, get_active, get_summary.';
