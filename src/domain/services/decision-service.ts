@@ -192,7 +192,6 @@ export class DecisionService {
     validateRequiredString(input.newDecision.decision, 'decision');
 
     const repo = this.repositoryFactory.createRepository<Decision>('decision', input.planId);
-    // findById throws NotFoundError if decision doesn't exist
     const oldDecision = await repo.findById(input.decisionId);
 
     // Sprint 3: Validate decision is not already superseded
@@ -201,6 +200,83 @@ export class DecisionService {
     }
 
     const now = new Date().toISOString();
+
+    // BUG-014 FIX: Determine if newDecision.decision is UUID reference or new decision text
+    // - If UUID format: REUSE existing decision (ADR pattern - link existing decisions)
+    // - If plain text: CREATE new decision (backward compatibility)
+    const existingDecision = await this.tryLoadExistingDecision(repo, input.newDecision.decision);
+    const newDecisionId = existingDecision !== null
+      ? await this.reuseExistingDecision(repo, oldDecision, existingDecision, now)
+      : await this.createNewDecision(repo, oldDecision, input, now);
+
+    return {
+      success: true,
+      newDecisionId,
+      supersededDecisionId: oldDecision.id,
+    };
+  }
+
+  /**
+   * BUG-014 FIX: Helper to check if decision string is UUID and load existing decision
+   * @returns Existing decision if UUID format and exists, null otherwise
+   */
+  private async tryLoadExistingDecision(
+    repo: ReturnType<RepositoryFactory['createRepository']>,
+    decisionStr: string
+  ): Promise<Decision | null> {
+    // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (8-4-4-4-12 hex digits)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isUuidFormat = uuidRegex.test(decisionStr);
+
+    if (isUuidFormat) {
+      // User provided UUID - try to load existing decision
+      // If not found, findById will throw NotFoundError (expected behavior)
+      return await repo.findById(decisionStr) as Decision;
+    }
+
+    // Plain text decision, not UUID
+    return null;
+  }
+
+  /**
+   * BUG-014 FIX: Reuse existing decision when superseding (ADR pattern)
+   * Updates existing decision with supersedes link instead of creating duplicate
+   */
+  private async reuseExistingDecision(
+    repo: ReturnType<RepositoryFactory['createRepository']>,
+    oldDecision: Decision,
+    existingDecision: Decision,
+    now: string
+  ): Promise<string> {
+    const newDecisionId = existingDecision.id;
+
+    // Update existing decision to add supersedes link
+    existingDecision.supersedes = oldDecision.id;
+    existingDecision.updatedAt = now;
+    // version will be auto-incremented by repo.update()
+
+    // Mark old decision as superseded FIRST (atomic operation order)
+    oldDecision.status = 'superseded';
+    oldDecision.updatedAt = now;
+    oldDecision.version += 1;
+    oldDecision.supersededBy = newDecisionId;
+    await repo.update(oldDecision.id, oldDecision);
+
+    // Update existing decision with supersedes link
+    await repo.update(existingDecision.id, existingDecision);
+
+    return newDecisionId;
+  }
+
+  /**
+   * Create new decision when superseding (original behavior, backward compatibility)
+   */
+  private async createNewDecision(
+    repo: ReturnType<RepositoryFactory['createRepository']>,
+    oldDecision: Decision,
+    input: SupersedeDecisionInput,
+    now: string
+  ): Promise<string> {
     const newDecisionId = uuidv4();
 
     // Create new decision FIRST (before modifying old decision for atomicity)
@@ -219,10 +295,8 @@ export class DecisionService {
       question: oldDecision.question,
       context: input.newDecision.context ?? oldDecision.context,
       decision: input.newDecision.decision,
-      // LEGACY SUPPORT: Keep defensive guard for backward compatibility with old data
-      // TODO Sprint 3: Remove after data migration applies defaults to all existing entities
-      // New decisions created with recordDecision() will always have alternativesConsidered=[]
       alternativesConsidered: [
+        // BUG-014 FIX: Defensive guard for legacy data with missing alternativesConsidered
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         ...(oldDecision.alternativesConsidered ?? []),
         {
@@ -237,7 +311,6 @@ export class DecisionService {
       supersedes: oldDecision.id,
     };
 
-    // Sprint 3: Create new decision first, then update old - if create fails, old is unchanged
     await repo.create(newDecision);
 
     // Mark old decision as superseded (only after new decision is created)
@@ -247,11 +320,7 @@ export class DecisionService {
     oldDecision.supersededBy = newDecisionId;
     await repo.update(oldDecision.id, oldDecision);
 
-    return {
-      success: true,
-      newDecisionId: newDecisionId,
-      supersededDecisionId: oldDecision.id,
-    };
+    return newDecisionId;
   }
 
   public async recordDecision(input: RecordDecisionInput): Promise<RecordDecisionResult> {

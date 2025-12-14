@@ -475,6 +475,115 @@ describe('DecisionService', () => {
         expect(newDecision.status).toBe('active');
         expect(newDecision.supersedes).toBe(original.decisionId);
       });
+
+      // BUG-014 FIX: supersede should REUSE existing decision when UUID is provided
+      describe('BUG-014: supersede with existing decision ID (ADR pattern)', () => {
+        it('RED: should reuse existing decision when UUID is provided, not create duplicate', async () => {
+          // Create Decision 1 (to be superseded)
+          const decision1 = await service.recordDecision({
+            planId,
+            decision: {
+              title: 'Decision 1 for supersede test',
+              question: 'Should we use approach A?',
+              decision: 'Yes, use approach A',
+              context: 'Testing supersede functionality',
+              alternativesConsidered: [
+                { option: 'Approach B', reasoning: 'Alternative', whyNotChosen: 'Not chosen' },
+              ],
+              consequences: 'Will be superseded',
+            },
+          });
+
+          // Create Decision 2 (the new/better approach)
+          const decision2 = await service.recordDecision({
+            planId,
+            decision: {
+              title: 'Decision 2 - new approach',
+              question: 'Should we use approach B instead?',
+              decision: 'Yes, approach B is better',
+              context: 'New decision to supersede old one',
+              alternativesConsidered: [],
+              consequences: 'Better outcome',
+            },
+          });
+
+          // Get initial state of Decision 2 before supersede
+          const { decision: decision2Before } = await service.getDecision({
+            planId,
+            decisionId: decision2.decisionId,
+            fields: ['*'],
+          });
+
+          // Supersede Decision 1 WITH Decision 2 (provide UUID, not string)
+          const result = await service.supersedeDecision({
+            planId,
+            decisionId: decision1.decisionId,
+            newDecision: {
+              decision: decision2.decisionId, // UUID of existing decision
+            },
+            reason: 'Testing if BUG-014 is fixed',
+          });
+
+          // CRITICAL ASSERTIONS: Should reuse existing decision, not create new one
+          expect(result.newDecisionId).toBe(decision2.decisionId);
+          expect(result.supersededDecisionId).toBe(decision1.decisionId);
+
+          // Verify Decision 1 is marked as superseded
+          const { decision: decision1After } = await service.getDecision({
+            planId,
+            decisionId: decision1.decisionId,
+            fields: ['*'],
+          });
+          expect(decision1After.status).toBe('superseded');
+          expect(decision1After.supersededBy).toBe(decision2.decisionId);
+
+          // Verify Decision 2 is updated with supersedes field (REUSED, not created)
+          const { decision: decision2After } = await service.getDecision({
+            planId,
+            decisionId: decision2.decisionId,
+            fields: ['*'],
+          });
+          expect(decision2After.status).toBe('active');
+          expect(decision2After.supersedes).toBe(decision1.decisionId);
+
+          // Verify Decision 2 retains its ORIGINAL data (not copied from Decision 1)
+          expect(decision2After.title).toBe('Decision 2 - new approach');
+          expect(decision2After.question).toBe('Should we use approach B instead?');
+          expect(decision2After.decision).toBe('Yes, approach B is better'); // NOT the UUID string
+          expect(decision2After.context).toBe('New decision to supersede old one');
+          expect(decision2After.consequences).toBe('Better outcome');
+
+          // Verify Decision 2 version incremented (it was updated, not created)
+          expect(decision2After.version).toBe(decision2Before.version + 1);
+
+          // Verify NO third decision was created
+          const allDecisions = await service.listDecisions({ planId, fields: ['*'] });
+          expect(allDecisions.total).toBe(2); // Only Decision 1 and Decision 2, NO third decision
+        });
+
+        it('RED: should throw error if provided decision UUID does not exist', async () => {
+          const decision1 = await service.recordDecision({
+            planId,
+            decision: {
+              title: 'Decision to supersede',
+              question: 'Question',
+              decision: 'Original',
+              context: 'Context',
+              alternativesConsidered: [],
+            },
+          });
+
+          // Try to supersede with non-existent decision ID (valid UUID format, but doesn't exist)
+          await expect(service.supersedeDecision({
+            planId,
+            decisionId: decision1.decisionId,
+            newDecision: {
+              decision: '12345678-1234-1234-1234-123456789012', // Valid UUID format but non-existent
+            },
+            reason: 'Testing error handling',
+          })).rejects.toThrow(/decision.*not found/i);
+        });
+      });
     });
   });
 
