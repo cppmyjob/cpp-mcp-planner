@@ -10,6 +10,11 @@ import type {
   DeleteSolutionInput,
 } from '../../domain/services/solution-service.js';
 import { ToolError, createSuccessResponse, type ToolResult } from './types.js';
+import {
+  VALID_SOLUTION_FIELDS,
+  METADATA_FIELDS,
+  SUMMARY_FIELDS,
+} from '../../domain/utils/field-filter.js';
 
 interface SolutionArgs {
   action: string;
@@ -66,6 +71,16 @@ export async function handleSolution(args: SolutionArgs, services: Services): Pr
       break;
     case 'diff':
       result = await solutionService.diff(args as unknown as DiffArgs);
+      break;
+    case 'list_fields':
+      // Introspection: return field metadata for solution entity
+      result = {
+        entity: 'solution',
+        summary: SUMMARY_FIELDS.solution,
+        all: Array.from(VALID_SOLUTION_FIELDS),
+        metadata: METADATA_FIELDS,
+        computed: [],
+      };
       break;
     default:
       throw new ToolError('InvalidAction', `Unknown action for solution: ${action}`);

@@ -8,6 +8,11 @@ import type {
   SupersedeDecisionInput,
 } from '../../domain/services/decision-service.js';
 import { ToolError, createSuccessResponse, type ToolResult } from './types.js';
+import {
+  VALID_DECISION_FIELDS,
+  METADATA_FIELDS,
+  SUMMARY_FIELDS,
+} from '../../domain/utils/field-filter.js';
 
 interface DecisionArgs {
   action: string;
@@ -89,6 +94,16 @@ export async function handleDecision(args: DecisionArgs, services: Services): Pr
       break;
     case 'diff':
       result = await decisionService.diff(args as unknown as DiffArgs);
+      break;
+    case 'list_fields':
+      // Introspection: return field metadata for decision entity
+      result = {
+        entity: 'decision',
+        summary: SUMMARY_FIELDS.decision,
+        all: Array.from(VALID_DECISION_FIELDS),
+        metadata: METADATA_FIELDS,
+        computed: [],
+      };
       break;
     default:
       throw new ToolError('InvalidAction', `Unknown action for decision: ${action}`);

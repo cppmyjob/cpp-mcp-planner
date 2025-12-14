@@ -11,6 +11,11 @@ import type {
   ResetAllVotesInput,
 } from '../../domain/services/requirement-service.js';
 import { ToolError, createSuccessResponse, type ToolResult } from './types.js';
+import {
+  VALID_REQUIREMENT_FIELDS,
+  METADATA_FIELDS,
+  SUMMARY_FIELDS,
+} from '../../domain/utils/field-filter.js';
 
 interface RequirementArgs {
   action: string;
@@ -70,6 +75,16 @@ export async function handleRequirement(args: RequirementArgs, services: Service
       break;
     case 'reset_all_votes':
       result = await requirementService.resetAllVotes(args as unknown as ResetAllVotesInput);
+      break;
+    case 'list_fields':
+      // Introspection: return field metadata for requirement entity
+      result = {
+        entity: 'requirement',
+        summary: SUMMARY_FIELDS.requirement,
+        all: Array.from(VALID_REQUIREMENT_FIELDS),
+        metadata: METADATA_FIELDS,
+        computed: [], // Requirements have no computed fields
+      };
       break;
     default:
       throw new ToolError('InvalidAction', `Unknown action for requirement: ${action}`);

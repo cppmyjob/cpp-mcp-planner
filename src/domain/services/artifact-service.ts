@@ -311,18 +311,6 @@ export class ArtifactService {
     const repo = this.repositoryFactory.createRepository<Artifact>('artifact', input.planId);
     const artifact = await repo.findById(input.artifactId);
 
-    // Auto-migrate fileTable to targets if needed
-    // If artifact has fileTable but no targets, convert fileTable to targets
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
-    if (artifact.fileTable !== undefined && artifact.targets === undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-deprecated
-      artifact.targets = artifact.fileTable.map((entry) => ({
-        path: entry.path,
-        action: entry.action,
-        description: entry.description,
-      }));
-    }
-
     // Apply field filtering with Lazy-Load support
     const filtered = filterArtifact(
       artifact,

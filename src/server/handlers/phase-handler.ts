@@ -12,6 +12,12 @@ import type {
   CompleteAndAdvanceInput,
 } from '../../domain/services/phase-service.js';
 import { ToolError, createSuccessResponse, type ToolResult } from './types.js';
+import {
+  VALID_PHASE_FIELDS,
+  METADATA_FIELDS,
+  SUMMARY_FIELDS,
+  COMPUTED_FIELDS,
+} from '../../domain/utils/field-filter.js';
 
 interface PhaseArgs {
   action: string;
@@ -74,6 +80,16 @@ export async function handlePhase(args: PhaseArgs, services: Services): Promise<
       break;
     case 'diff':
       result = await phaseService.diff(args as unknown as DiffArgs);
+      break;
+    case 'list_fields':
+      // Introspection: return field metadata for phase entity
+      result = {
+        entity: 'phase',
+        summary: SUMMARY_FIELDS.phase,
+        all: Array.from(VALID_PHASE_FIELDS),
+        metadata: METADATA_FIELDS,
+        computed: COMPUTED_FIELDS, // Phases have computed fields: depth, path, childCount
+      };
       break;
     default:
       throw new ToolError('InvalidAction', `Unknown action for phase: ${action}`);

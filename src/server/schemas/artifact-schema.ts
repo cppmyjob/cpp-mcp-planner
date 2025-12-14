@@ -60,7 +60,7 @@ const artifactFiltersSchema = z.object({
 
 // Base schema with all fields
 const baseArtifactSchema = z.object({
-  action: z.enum(['add', 'get', 'update', 'list', 'delete', 'get_history', 'diff']),
+  action: z.enum(['add', 'get', 'update', 'list', 'delete', 'get_history', 'diff', 'list_fields']),
   planId: z.string(),
   artifactId: z.string().optional(),
   artifact: artifactDataSchema.optional(),
@@ -122,6 +122,7 @@ export const artifactSchema = baseArtifactSchema.superRefine((data: ArtifactInpu
       break;
 
     case 'list':
+    case 'list_fields':
       // Only planId is required (already validated by base schema)
       break;
   }

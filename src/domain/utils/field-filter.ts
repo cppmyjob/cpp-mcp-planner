@@ -28,27 +28,28 @@ export const COMPUTED_FIELDS = ['depth', 'path', 'childCount'];
 /**
  * All valid fields for each entity type.
  * Used for field validation (BUG-040 fix) and backward compatibility.
+ * Exported for list_fields introspection feature.
  */
-const VALID_REQUIREMENT_FIELDS = new Set([
+export const VALID_REQUIREMENT_FIELDS = new Set([
   'id', 'type', 'createdAt', 'updatedAt', 'version', 'metadata',
   'title', 'description', 'rationale', 'category', 'priority', 'status',
   'acceptanceCriteria', 'impact', 'source', 'votes',
 ]);
 
-const VALID_SOLUTION_FIELDS = new Set([
+export const VALID_SOLUTION_FIELDS = new Set([
   'id', 'type', 'createdAt', 'updatedAt', 'version', 'metadata',
   'title', 'description', 'approach', 'addressing', 'tradeoffs',
   'evaluation', 'implementationNotes', 'status', 'selectionReason',
 ]);
 
-const VALID_DECISION_FIELDS = new Set([
+export const VALID_DECISION_FIELDS = new Set([
   'id', 'type', 'createdAt', 'updatedAt', 'version', 'metadata',
   'title', 'question', 'context', 'decision', 'consequences',
   'alternativesConsidered', 'impactScope', 'status', 'supersedes',
   'supersededBy',
 ]);
 
-const VALID_PHASE_FIELDS = new Set([
+export const VALID_PHASE_FIELDS = new Set([
   'id', 'type', 'createdAt', 'updatedAt', 'version', 'metadata',
   'title', 'description', 'parentId', 'order', 'depth', 'path',
   'objectives', 'deliverables', 'successCriteria', 'schedule',
@@ -57,10 +58,10 @@ const VALID_PHASE_FIELDS = new Set([
   'childCount', // computed field
 ]);
 
-const VALID_ARTIFACT_FIELDS = new Set([
+export const VALID_ARTIFACT_FIELDS = new Set([
   'id', 'type', 'createdAt', 'updatedAt', 'version', 'metadata',
   'title', 'slug', 'description', 'artifactType', 'status',
-  'content', 'targets', 'fileTable', 'codeRefs', // fileTable is deprecated but kept for backward compatibility
+  'content', 'targets', 'codeRefs',
   'relatedPhaseId', 'relatedSolutionId', 'relatedRequirementIds',
 ]);
 

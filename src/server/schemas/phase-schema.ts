@@ -65,7 +65,7 @@ const phaseUpdatesSchema = z.object({
 
 // Base schema with all fields
 const basePhaseSchema = z.object({
-  action: z.enum(['add', 'get', 'get_many', 'get_tree', 'update', 'update_status', 'move', 'delete', 'get_next_actions', 'complete_and_advance', 'get_history', 'diff']),
+  action: z.enum(['add', 'get', 'get_many', 'get_tree', 'update', 'update_status', 'move', 'delete', 'get_next_actions', 'complete_and_advance', 'get_history', 'diff', 'list_fields']),
   planId: z.string(),
   phaseId: z.string().optional(),
   phaseIds: z.array(z.string()).optional(),
@@ -145,6 +145,7 @@ export const phaseSchema = basePhaseSchema.superRefine((data: PhaseInput, ctx) =
 
     case 'get_tree':
     case 'get_next_actions':
+    case 'list_fields':
       // Only planId is required (already validated by base schema)
       break;
   }

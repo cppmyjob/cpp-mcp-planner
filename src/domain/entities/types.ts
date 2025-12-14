@@ -202,14 +202,6 @@ export interface ArtifactTarget {
   description?: string;            // Human-readable description
 }
 
-/**
- * @deprecated Use ArtifactTarget instead. This type is kept for backward compatibility.
- */
-export interface FileEntry {
-  path: string;
-  action: 'create' | 'modify' | 'delete';
-  description?: string;
-}
 
 export interface Artifact extends Entity {
   type: 'artifact';
@@ -229,13 +221,7 @@ export interface Artifact extends Entity {
   };
 
   // File targets - list of files to be created/modified with precision
-  targets?: ArtifactTarget[];      // NEW: replaces fileTable
-
-  /**
-   * @deprecated Use targets instead. This field is kept for reading legacy data only.
-   */
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  fileTable?: FileEntry[];         // DEPRECATED: auto-migrated to targets on read
+  targets?: ArtifactTarget[];
 
   // Context - what this artifact relates to
   relatedPhaseId?: string;     // The phase this artifact belongs to

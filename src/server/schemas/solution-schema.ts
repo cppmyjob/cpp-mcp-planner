@@ -48,7 +48,7 @@ const solutionDataSchema = z.object({
 
 // Base schema with all fields
 const baseSolutionSchema = z.object({
-  action: z.enum(['propose', 'get', 'get_many', 'update', 'list', 'compare', 'select', 'delete', 'get_history', 'diff']),
+  action: z.enum(['propose', 'get', 'get_many', 'update', 'list', 'compare', 'select', 'delete', 'get_history', 'diff', 'list_fields']),
   planId: z.string(),
   solutionId: z.string().optional(),
   solutionIds: z.array(z.string()).optional(),
@@ -135,6 +135,7 @@ export const solutionSchema = baseSolutionSchema.superRefine((data: SolutionInpu
       break;
 
     case 'list':
+    case 'list_fields':
       // Only planId is required (already validated by base schema)
       break;
   }

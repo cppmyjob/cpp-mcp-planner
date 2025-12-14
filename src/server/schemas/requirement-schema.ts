@@ -49,7 +49,7 @@ const requirementFiltersSchema = z.object({
 
 // Base schema with all fields
 const baseRequirementSchema = z.object({
-  action: z.enum(['add', 'get', 'get_many', 'update', 'list', 'delete', 'vote', 'unvote', 'get_history', 'diff', 'reset_all_votes']),
+  action: z.enum(['add', 'get', 'get_many', 'update', 'list', 'delete', 'vote', 'unvote', 'get_history', 'diff', 'reset_all_votes', 'list_fields']),
   planId: z.string(),
   requirementId: z.string().optional(),
   requirementIds: z.array(z.string()).optional(),
@@ -140,6 +140,7 @@ export const requirementSchema = baseRequirementSchema.superRefine((data: Requir
 
     case 'list':
     case 'reset_all_votes':
+    case 'list_fields':
       // Only planId is required (already validated by base schema)
       break;
   }

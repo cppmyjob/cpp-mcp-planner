@@ -7,6 +7,11 @@ import type {
   DeleteArtifactInput,
 } from '../../domain/services/artifact-service.js';
 import { ToolError, createSuccessResponse, type ToolResult } from './types.js';
+import {
+  VALID_ARTIFACT_FIELDS,
+  METADATA_FIELDS,
+  SUMMARY_FIELDS,
+} from '../../domain/utils/field-filter.js';
 
 interface ArtifactArgs {
   action: string;
@@ -55,8 +60,18 @@ export async function handleArtifact(args: ArtifactArgs, services: Services): Pr
     case 'diff':
       result = await artifactService.diff(args as unknown as DiffArgs);
       break;
+    case 'list_fields':
+      // Introspection: return field metadata for artifact entity
+      result = {
+        entity: 'artifact',
+        summary: SUMMARY_FIELDS.artifact,
+        all: Array.from(VALID_ARTIFACT_FIELDS),
+        metadata: METADATA_FIELDS,
+        computed: [],
+      };
+      break;
     default:
-      throw new ToolError('InvalidAction', `Unknown action for artifact: ${action}`);
+      throw new ToolError('Invalid Action', `Unknown action for artifact: ${action}`);
   }
 
   return createSuccessResponse(result);

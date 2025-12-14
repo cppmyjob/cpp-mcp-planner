@@ -38,7 +38,7 @@ const supersedeSchema = z.object({
 
 // Base schema with all fields
 const baseDecisionSchema = z.object({
-  action: z.enum(['record', 'get', 'get_many', 'update', 'list', 'supersede', 'get_history', 'diff']),
+  action: z.enum(['record', 'get', 'get_many', 'update', 'list', 'supersede', 'get_history', 'diff', 'list_fields']),
   planId: z.string(),
   decisionId: z.string().optional(),
   decisionIds: z.array(z.string()).optional(),
@@ -132,6 +132,7 @@ export const decisionSchema = baseDecisionSchema.superRefine((data: DecisionInpu
       break;
 
     case 'list':
+    case 'list_fields':
       // Only planId is required (already validated by base schema)
       break;
   }
