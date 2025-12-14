@@ -41,4 +41,5 @@ PLAN.md
 # Claude Code local settings
 .claude/*
 !.claude/commands/
+!.claude/ARCHITECTURE.md
 .mcp.json
