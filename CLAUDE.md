@@ -2,8 +2,8 @@
 
 ## WHAT
 
-TypeScript MCP server implementing structured planning workflow with Domain-Driven Design.
-File-based persistence with atomic writes and cross-process locking.
+TypeScript MCP server implementing structured planning workflow.
+Layered architecture (domain/infrastructure/server) with file-based persistence, atomic writes, and cross-process locking.
 
 ## WHY
 
