@@ -5,7 +5,7 @@
  * - Uses proper-lockfile for cross-process synchronization
  * - Supports lock timeouts and retries
  * - Automatic stale lock detection and recovery
- * - Integrates with LockManager for in-process + cross-process safety
+ * - Ensures safety across multiple processes
  *
  * IMPORTANT: This lock manager does NOT support reentrant locks.
  * Calling acquire() twice on the same resource from the same process
