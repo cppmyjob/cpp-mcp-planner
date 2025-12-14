@@ -258,7 +258,7 @@ export class DecisionService {
     // Mark old decision as superseded FIRST (atomic operation order)
     oldDecision.status = 'superseded';
     oldDecision.updatedAt = now;
-    oldDecision.version += 1;
+    // M-2 FIX: Don't manually increment version - repo.update() does it automatically
     oldDecision.supersededBy = newDecisionId;
     await repo.update(oldDecision.id, oldDecision);
 
@@ -316,7 +316,7 @@ export class DecisionService {
     // Mark old decision as superseded (only after new decision is created)
     oldDecision.status = 'superseded';
     oldDecision.updatedAt = now;
-    oldDecision.version += 1;
+    // M-2 FIX: Don't manually increment version - repo.update() does it automatically
     oldDecision.supersededBy = newDecisionId;
     await repo.update(oldDecision.id, oldDecision);
 

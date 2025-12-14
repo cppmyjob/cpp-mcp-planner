@@ -584,10 +584,9 @@ describe('DecisionService', () => {
           })).rejects.toThrow(/decision.*not found/i);
         });
 
-        // M-2 BUG: Version double-increment in reuseExistingDecision
-        it('RED: old decision version should increment by exactly 1 (not 2) when reusing existing decision', async () => {
-          // BUG: reuseExistingDecision() manually increments version AND repo.update() also increments
-          // Result: version jumps by 2 instead of 1
+        // M-2 FIX: Version double-increment in reuseExistingDecision
+        it('GREEN: old decision version should increment by exactly 1 (not 2) when reusing existing decision', async () => {
+          // FIXED: Removed manual version += 1, repo.update() handles it automatically
 
           // Create Decision 1 (will be superseded)
           const decision1 = await service.recordDecision({
@@ -650,9 +649,9 @@ describe('DecisionService', () => {
             fields: ['*'],
           });
 
-          // M-2 BUG ASSERTION: Old decision version should be 2 (incremented by 1)
-          // BUG: Currently it's 3 because of manual += 1 AND repo.update() += 1
-          expect(d1After.version).toBe(2); // FAILS with actual: 3
+          // M-2 FIX ASSERTION: Old decision version should be 2 (incremented by 1)
+          // FIXED: repo.update() handles version increment automatically
+          expect(d1After.version).toBe(2);
 
           // Decision 2 should also increment by 1 (repo.update() call)
           expect(d2After.version).toBe(2);
