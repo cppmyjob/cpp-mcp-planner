@@ -540,6 +540,45 @@ export function validateProgress(progress: unknown): void {
   }
 }
 
+// Phase order validation constants (BUG-017, BUG-033, BUG-034, BUG-045)
+const PHASE_ORDER_MIN = 1;
+const PHASE_ORDER_MAX = 10000;
+
+/**
+ * Validates phase order value.
+ * Order must be a positive integer between 1 and 10000.
+ * Rejects: negative values, zero, floats, and values exceeding max limit.
+ * @param order - The order value to validate
+ * @param fieldName - Field name for error messages (default: 'order')
+ * @throws Error if order is invalid
+ */
+export function validatePhaseOrder(order: unknown, fieldName = 'order'): void {
+  // Optional field - skip if undefined
+  if (order === undefined) {
+    return;
+  }
+
+  // Must be a number
+  if (typeof order !== 'number') {
+    throw new Error(`${fieldName} must be a number`);
+  }
+
+  // Must be an integer (not float)
+  if (!Number.isInteger(order)) {
+    throw new Error(`${fieldName} must be an integer, got ${String(order)}`);
+  }
+
+  // Must be >= 1 (BUG-017: negative, BUG-034: zero)
+  if (order < PHASE_ORDER_MIN) {
+    throw new Error(`${fieldName} must be >= ${String(PHASE_ORDER_MIN)}, got ${String(order)}`);
+  }
+
+  // Must be <= max limit (BUG-045: huge values)
+  if (order > PHASE_ORDER_MAX) {
+    throw new Error(`${fieldName} must be <= ${String(PHASE_ORDER_MAX)}, got ${String(order)}`);
+  }
+}
+
 // Sprint 6: Slug validation constants
 const SLUG_MAX_LENGTH = 100;
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

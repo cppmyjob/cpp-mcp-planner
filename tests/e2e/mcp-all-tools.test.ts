@@ -1450,7 +1450,7 @@ describe('E2E: All MCP Tools Validation', () => {
           planId,
           phaseId: childPhaseId,
           newParentId: newParent.phaseId,
-          newOrder: 0,
+          newOrder: 1, // BUG-034 fix: order must be >= 1
         },
       });
 

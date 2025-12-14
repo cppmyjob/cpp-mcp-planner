@@ -3,7 +3,7 @@ import type { RepositoryFactory } from '../../infrastructure/factory/repository-
 import type { PlanService } from './plan-service.js';
 import type { VersionHistoryService } from './version-history-service.js';
 import type { Phase, PhaseStatus, EffortEstimate, Tag, Milestone, PhasePriority, VersionHistory, VersionDiff } from '../entities/types.js';
-import { validateEffortEstimate, validateTags, validatePriority, validateRequiredString, validateRequiredEnum, validateProgress, validateOptionalString } from './validators.js';
+import { validateEffortEstimate, validateTags, validatePriority, validateRequiredString, validateRequiredEnum, validateProgress, validateOptionalString, validatePhaseOrder } from './validators.js';
 import { filterPhase } from '../utils/field-filter.js';
 import { bulkUpdateEntities } from '../utils/bulk-operations.js';
 
@@ -425,6 +425,8 @@ export class PhaseService {
         ['planned', 'in_progress', 'completed', 'blocked', 'skipped']
       );
     }
+    // BUG-017, BUG-033, BUG-034, BUG-045: Validate order if provided
+    validatePhaseOrder(input.phase.order);
 
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     const phases = await repo.findAll();
@@ -560,6 +562,9 @@ export class PhaseService {
   }
 
   public async movePhase(input: MovePhaseInput): Promise<MovePhaseResult> {
+    // BUG-017, BUG-033, BUG-034, BUG-045: Validate newOrder if provided
+    validatePhaseOrder(input.newOrder, 'newOrder');
+
     const repo = this.repositoryFactory.createRepository<Phase>('phase', input.planId);
     const phases = await repo.findAll();
     const phase = phases.find((p) => p.id === input.phaseId);
@@ -569,6 +574,8 @@ export class PhaseService {
     }
 
     const affectedPhases: Phase[] = [];
+    const oldParentId = phase.parentId;
+    const parentChanged = input.newParentId !== undefined && input.newParentId !== oldParentId;
 
     // Update parent if specified
     if (input.newParentId !== undefined) {
@@ -583,9 +590,15 @@ export class PhaseService {
       }
     }
 
-    // Update order if specified
+    // Update order if specified OR recalculate if parent changed (BUG-005)
     if (input.newOrder !== undefined) {
       phase.order = input.newOrder;
+    } else if (parentChanged) {
+      // BUG-005: Recalculate order when moving to new parent without explicit order
+      const newSiblings = phases.filter(
+        (p) => p.parentId === phase.parentId && p.id !== phase.id
+      );
+      phase.order = calculateNextOrder(newSiblings);
     }
 
     // Recalculate path
