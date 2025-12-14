@@ -35,11 +35,13 @@ export type RequirementStatus = 'draft' | 'approved' | 'implemented' | 'deferred
 
 export interface Requirement extends Entity {
   type: 'requirement';
-  title: string;  // REQUIRED: Validated in addRequirement
+  /** @required - Must be provided when creating requirement */
+  title: string;
   description: string;
   rationale?: string;
   source: {
-    type: RequirementSource;  // REQUIRED: Validated in addRequirement
+    /** @required - Must be provided when source object is included */
+    type: RequirementSource;
     context?: string;
     parentId?: string;
   };
@@ -73,7 +75,8 @@ export interface EffortEstimate {
 
 export interface Solution extends Entity {
   type: 'solution';
-  title: string;  // REQUIRED: Validated in proposeSolution
+  /** @required - Must be provided when proposing solution */
+  title: string;
   description: string;
   approach: string;
   implementationNotes?: string;
@@ -101,10 +104,13 @@ export interface AlternativeConsidered {
 
 export interface Decision extends Entity {
   type: 'decision';
-  title: string;  // REQUIRED: Validated in recordDecision
-  question: string;  // REQUIRED: Validated in recordDecision
+  /** @required - Must be provided when recording decision */
+  title: string;
+  /** @required - Must be provided when recording decision */
+  question: string;
   context: string;
-  decision: string;  // REQUIRED: Validated in recordDecision
+  /** @required - Must be provided when recording decision */
+  decision: string;
   alternativesConsidered: AlternativeConsidered[];
   consequences?: string;
   impactScope?: string[];
@@ -132,7 +138,8 @@ export interface Blocker {
 
 export interface Phase extends Entity {
   type: 'phase';
-  title: string;  // REQUIRED: Validated in addPhase
+  /** @required - Must be provided when adding phase */
+  title: string;
   description: string;
 
   // Hierarchy
@@ -206,10 +213,12 @@ export interface FileEntry {
 
 export interface Artifact extends Entity {
   type: 'artifact';
-  title: string;  // REQUIRED: Validated in addArtifact
+  /** @required - Must be provided when adding artifact */
+  title: string;
   description: string;
   slug?: string;                 // URL-friendly identifier (auto-generated from title if not provided)
-  artifactType: ArtifactType;  // REQUIRED: Validated in addArtifact
+  /** @required - Must be provided when adding artifact */
+  artifactType: ArtifactType;
   status: ArtifactStatus;
 
   // Content - structured storage for generated content
@@ -264,7 +273,8 @@ export type PlanStatus = 'active' | 'archived' | 'completed';
 
 export interface PlanManifest {
   id: string;
-  name: string;  // REQUIRED: Validated in createPlan
+  /** @required - Must be provided when creating plan */
+  name: string;
   description: string;
   status: PlanStatus;
   author: string;

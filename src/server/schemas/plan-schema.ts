@@ -15,7 +15,8 @@ const planUpdatesSchema = z.object({
   maxHistoryDepth: z.number().optional(),
 });
 
-export const planSchema = z.object({
+// Base schema with all fields
+const basePlanSchema = z.object({
   action: z.enum(['create', 'list', 'get', 'update', 'archive', 'set_active', 'get_active', 'get_summary']),
   planId: z.string().optional(),
   name: z.string().optional(),
@@ -33,6 +34,58 @@ export const planSchema = z.object({
   // Sprint 7: Version history settings
   enableHistory: z.boolean().optional(),
   maxHistoryDepth: z.number().optional(),
+});
+
+// Type for the base schema
+type PlanInput = z.infer<typeof basePlanSchema>;
+
+// Schema with superRefine for required field validation based on action
+export const planSchema = basePlanSchema.superRefine((data: PlanInput, ctx) => {
+  switch (data.action) {
+    case 'create':
+      // name is required
+      if (typeof data.name !== 'string' || data.name === '') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'name is required for create action',
+          path: ['name'],
+        });
+      }
+      break;
+
+    case 'get':
+    case 'update':
+    case 'archive':
+    case 'get_summary':
+      // planId is required
+      if (typeof data.planId !== 'string' || data.planId === '') {
+        ctx.addIssue({
+          code: 'custom',
+          message: `planId is required for ${data.action} action`,
+          path: ['planId'],
+        });
+      }
+      break;
+
+    case 'set_active':
+      // planId is required, workspacePath is optional (defaults to process.cwd() in service)
+      if (typeof data.planId !== 'string' || data.planId === '') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'planId is required for set_active action',
+          path: ['planId'],
+        });
+      }
+      break;
+
+    case 'get_active':
+      // workspacePath is optional (defaults to process.cwd() in service)
+      break;
+
+    case 'list':
+      // No required fields beyond action
+      break;
+  }
 });
 
 export const planToolDescription = 'Manage development plans - the top-level container for all planning entities. Create a plan first before using other tools. Set active plan per workspace to avoid passing planId repeatedly. Use get_summary for plan overview (returns plan info, phase tree summary, statistics). Use includeEntities only for full export/backup - it returns large data. Actions: create, list, get, update, archive, set_active, get_active, get_summary.';
