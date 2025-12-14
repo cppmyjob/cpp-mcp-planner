@@ -9,7 +9,8 @@ const VALID_FILE_ACTIONS = ['create', 'modify', 'delete'] as const;
 
 /**
  * Sanitizes text input by rejecting dangerous characters.
- * Rejects: HTML tags (XSS), null bytes, control characters (except newline, tab, carriage return).
+ * Rejects: HTML tags (XSS), HTML entities, bidirectional override chars,
+ * null bytes, control characters (except newline, tab, carriage return).
  * @param text - The text to sanitize
  * @param fieldName - Field name for error messages
  * @throws Error if dangerous content detected
@@ -24,6 +25,20 @@ export function sanitizeText(text: string, fieldName: string): void {
   const htmlTagPattern = /<[^>]*>/;
   if (htmlTagPattern.test(text)) {
     throw new Error(`${fieldName} contains HTML tags which are not allowed`);
+  }
+
+  // H-1 FIX: Check for HTML entities (&#60; &#x3C; etc.) - encoded XSS
+  const htmlEntityPattern = /&#(x?[0-9a-fA-F]+|[0-9]+);/;
+  if (htmlEntityPattern.test(text)) {
+    throw new Error(`${fieldName} contains HTML entities which are not allowed`);
+  }
+
+  // H-1 FIX: Check for bidirectional override characters (visual spoofing attacks)
+  // U+202A-U+202E: LRE, RLE, PDF, LRO, RLO
+  // U+2066-U+2069: LRI, RLI, FSI, PDI
+  const bidiPattern = /[\u202A-\u202E\u2066-\u2069]/;
+  if (bidiPattern.test(text)) {
+    throw new Error(`${fieldName} contains bidirectional override characters which are not allowed`);
   }
 
   // Check for control characters (except newline, tab, carriage return)
@@ -64,7 +79,7 @@ export function sanitizeTagKey(key: string, index: number): void {
 
 /**
  * Sanitizes file paths by rejecting path traversal attempts.
- * Rejects: path traversal (../, ..\), absolute paths, null bytes.
+ * Rejects: path traversal (../, ..\), URL-encoded traversal, absolute paths, null bytes.
  * @param path - The path to sanitize
  * @param fieldName - Field name for error messages
  * @throws Error if path traversal detected
@@ -89,6 +104,28 @@ export function sanitizePath(path: string, fieldName: string): void {
   for (const pattern of traversalPatterns) {
     if (path.includes(pattern)) {
       throw new Error(`${fieldName} contains path traversal sequence '${pattern}' which is not allowed`);
+    }
+  }
+
+  // H-1 FIX: Check for URL-encoded path traversal (%2e%2e/, %252e%252e/, etc.)
+  let decodedPath = path;
+  try {
+    decodedPath = decodeURIComponent(path);
+    // Try double-decode for double-encoded attacks (%252e -> %2e -> .)
+    try {
+      decodedPath = decodeURIComponent(decodedPath);
+    } catch {
+      // Single encoding only - that's fine
+    }
+  } catch {
+    // Invalid encoding - use raw path
+    decodedPath = path;
+  }
+
+  // Check decoded path for traversal patterns
+  for (const pattern of traversalPatterns) {
+    if (decodedPath !== path && decodedPath.includes(pattern)) {
+      throw new Error(`${fieldName} contains encoded path traversal which is not allowed`);
     }
   }
 
@@ -326,6 +363,24 @@ export function validateTargets(targets: unknown[]): void {
         throw new Error(
           `Invalid target at index ${String(i)}: searchPattern must be a non-empty string`
         );
+      }
+
+      // H-1 FIX: Check for ReDoS vulnerable patterns before creating RegExp
+      // Dangerous patterns: nested quantifiers like (a+)+, (a*)+, (a+)*, (a*)*, (.*){n}
+      const redosPatterns = [
+        /\([^)]*\+[^)]*\)\+/,   // (a+)+ - nested plus
+        /\([^)]*\*[^)]*\)\+/,   // (a*)+ - star then plus
+        /\([^)]*\+[^)]*\)\*/,   // (a+)* - plus then star
+        /\([^)]*\*[^)]*\)\*/,   // (a*)* - nested star
+        /\(\.\*[^)]*\)\{/,      // (.*){n} - dot-star with quantifier
+      ];
+
+      for (const redosPattern of redosPatterns) {
+        if (redosPattern.test(target.searchPattern)) {
+          throw new Error(
+            `Invalid target at index ${String(i)}: searchPattern contains potentially dangerous regex pattern (ReDoS risk)`
+          );
+        }
       }
 
       // Validate regex syntax

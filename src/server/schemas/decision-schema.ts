@@ -62,6 +62,15 @@ type DecisionInput = z.infer<typeof baseDecisionSchema>;
 
 // Schema with superRefine for required field validation based on action
 export const decisionSchema = baseDecisionSchema.superRefine((data: DecisionInput, ctx) => {
+  // H-2 FIX: status parameter is only valid for 'list' action
+  if (data.status !== undefined && data.action !== 'list') {
+    ctx.addIssue({
+      code: 'custom',
+      message: `status parameter is only allowed for 'list' action, not '${data.action}'`,
+      path: ['status'],
+    });
+  }
+
   switch (data.action) {
     case 'record':
       // decision object and decision.title, decision.question, decision.decision are required
