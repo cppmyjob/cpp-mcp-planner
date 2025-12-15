@@ -3,22 +3,24 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "isolatedModules": true,
     "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "composite": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "references": [
-    { "path": "./packages/core" },
-    { "path": "./packages/mcp-server" },
-    { "path": "./packages/web-server" }
+    { "path": "../core" }
   ],
-  "files": [],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
