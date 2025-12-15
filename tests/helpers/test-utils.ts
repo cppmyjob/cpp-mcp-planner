@@ -1,12 +1,14 @@
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
-import { createServices, type Services } from '../../src/server/services.js';
-import type { AddRequirementResult } from '../../src/domain/services/requirement-service.js';
-import type { ProposeSolutionResult } from '../../src/domain/services/solution-service.js';
-import type { AddPhaseResult } from '../../src/domain/services/phase-service.js';
-import type { RecordDecisionResult } from '../../src/domain/services/decision-service.js';
-import type { AddArtifactResult } from '../../src/domain/services/artifact-service.js';
+import type {
+  AddRequirementResult,
+  ProposeSolutionResult,
+  AddPhaseResult,
+  RecordDecisionResult,
+  AddArtifactResult,
+} from '@mcp-planner/core';
+import { createServices, type Services } from '@mcp-planner/mcp-server';
 
 export interface TestContext {
   services: Services;

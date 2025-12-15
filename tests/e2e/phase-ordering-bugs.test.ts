@@ -16,7 +16,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createMcpServer, createServices } from '../../src/server/index.js';
+import { createMcpServer, createServices } from '@mcp-planner/mcp-server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';

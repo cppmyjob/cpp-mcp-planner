@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { FileRepository } from '../../src/infrastructure/repositories/file/file-repository.js';
-import type { Requirement, EntityType } from '../../src/domain/entities/types.js';
+import type { Requirement, EntityType } from '@mcp-planner/core';
+import { FileRepository } from '@mcp-planner/mcp-server';
 
 describe('FileRepository', () => {
   // FIX M-4: Use os.tmpdir() instead of process.cwd()
@@ -633,7 +633,7 @@ describe('FileRepository', () => {
   // ============================================================================
   describe('REVIEW: Shared FileLockManager', () => {
     it('should use injected FileLockManager', async () => {
-      const { FileLockManager: fileLockManagerClass } = await import('../../src/infrastructure/repositories/file/file-lock-manager.js');
+      const { FileLockManager: fileLockManagerClass } = await import('@mcp-planner/mcp-server');
 
       const sharedLockManager = new fileLockManagerClass(path.join(testDir, 'plans', 'shared-plan'));
       await sharedLockManager.initialize();
@@ -658,7 +658,7 @@ describe('FileRepository', () => {
     });
 
     it('should NOT dispose shared FileLockManager when repository disposes', async () => {
-      const { FileLockManager: fileLockManagerClass } = await import('../../src/infrastructure/repositories/file/file-lock-manager.js');
+      const { FileLockManager: fileLockManagerClass } = await import('@mcp-planner/mcp-server');
 
       const sharedLockManager = new fileLockManagerClass(path.join(testDir, 'plans', 'shared-plan-2'));
       await sharedLockManager.initialize();

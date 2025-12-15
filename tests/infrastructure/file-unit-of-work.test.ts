@@ -2,9 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { FileUnitOfWork } from '../../src/infrastructure/repositories/file/file-unit-of-work.js';
-import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
-import type { Requirement } from '../../src/domain/entities/types.js';
+import type { Requirement } from '@mcp-planner/core';
+import { FileUnitOfWork, FileLockManager } from '@mcp-planner/mcp-server';
 
 describe('FileUnitOfWork', () => {
   // FIX M-4: Use os.tmpdir() instead of process.cwd()

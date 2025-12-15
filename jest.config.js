@@ -5,6 +5,8 @@ export default {
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^@mcp-planner/core$': '<rootDir>/packages/core/src/index.ts',
+    '^@mcp-planner/mcp-server$': '<rootDir>/packages/mcp-server/src/index.ts',
   },
   transform: {
     '^.+\\.(ts|tsx)$': [
@@ -26,13 +28,13 @@ export default {
   ],
   modulePathIgnorePatterns: [],
   collectCoverageFrom: [
-    'src/**/*.ts',
+    'packages/core/src/**/*.ts',
+    'packages/mcp-server/src/**/*.ts',
     // Exclude bootstrap/entry point files
-    '!src/index.ts',
+    '!packages/mcp-server/src/cli.ts',
+    '!packages/*/src/index.ts',
     // Exclude MCP SDK wrapper (tested indirectly via tool-handlers)
-    '!src/server/create-server.ts',
-    // Exclude static tool definitions (no logic to test)
-    '!src/server/tool-definitions.ts',
+    '!packages/mcp-server/src/server/create-server.ts',
   ],
   coverageThreshold: {
     global: {

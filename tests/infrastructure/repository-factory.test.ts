@@ -7,9 +7,8 @@
 import * as os from 'os';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
-import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
-import type { Requirement, Solution } from '../../src/domain/entities/types.js';
+import type { Requirement, Solution } from '@mcp-planner/core';
+import { RepositoryFactory, FileLockManager } from '@mcp-planner/mcp-server';
 
 describe('RED: RepositoryFactory', () => {
   let testDir: string;

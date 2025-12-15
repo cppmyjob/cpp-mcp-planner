@@ -13,16 +13,17 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
-import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
-import { PlanService } from '../../src/domain/services/plan-service.js';
-import { RequirementService } from '../../src/domain/services/requirement-service.js';
-import { SolutionService } from '../../src/domain/services/solution-service.js';
-import { PhaseService } from '../../src/domain/services/phase-service.js';
-import { DecisionService } from '../../src/domain/services/decision-service.js';
-import { ArtifactService } from '../../src/domain/services/artifact-service.js';
-import { VersionHistoryService } from '../../src/domain/services/version-history-service.js';
-import type { PlanManifest } from '../../src/domain/entities/types.js';
+import {
+  PlanService,
+  RequirementService,
+  SolutionService,
+  PhaseService,
+  DecisionService,
+  ArtifactService,
+  VersionHistoryService,
+  type PlanManifest,
+} from '@mcp-planner/core';
+import { RepositoryFactory, FileLockManager } from '@mcp-planner/mcp-server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';

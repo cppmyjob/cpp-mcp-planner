@@ -14,7 +14,7 @@ import {
   isRepositoryError,
   isErrorType,
   extractErrorInfo,
-} from '../../../src/domain/repositories/errors.js';
+} from '@mcp-planner/core';
 
 describe('Repository Error System', () => {
   describe('RepositoryError', () => {

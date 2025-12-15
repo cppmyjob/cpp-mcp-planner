@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { handleToolCall } from '../../src/server/handlers/index.js';
+import { handleToolCall } from '@mcp-planner/mcp-server';
 import {
   createTestContext,
   cleanupTestContext,

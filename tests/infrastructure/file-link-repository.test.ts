@@ -2,9 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { FileLinkRepository } from '../../src/infrastructure/repositories/file/file-link-repository.js';
-import type { Link, RelationType } from '../../src/domain/entities/types.js';
-import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
+import type { Link, RelationType } from '@mcp-planner/core';
+import { FileLinkRepository, FileLockManager } from '@mcp-planner/mcp-server';
 
 describe('FileLinkRepository', () => {
   // FIX M-4: Use os.tmpdir() instead of process.cwd()

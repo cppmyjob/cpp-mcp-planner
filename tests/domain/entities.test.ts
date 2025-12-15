@@ -10,7 +10,7 @@ import type {
   RelationType,
   EntityType,
   Link,
-} from '../../src/domain/entities/types.js';
+} from '@mcp-planner/core';
 
 describe('Entity Types', () => {
   describe('Tag', () => {

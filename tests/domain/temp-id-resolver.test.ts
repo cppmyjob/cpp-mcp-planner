@@ -3,7 +3,7 @@ import {
   isTempId,
   resolveTempId,
   resolveFieldTempIds,
-} from '../../src/domain/utils/temp-id-resolver.js';
+} from '@mcp-planner/core';
 
 describe('TempIdResolver', () => {
   describe('isTempId', () => {

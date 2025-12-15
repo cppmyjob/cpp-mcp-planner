@@ -11,7 +11,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { atomicWriteJSON, loadJSON } from '../../src/infrastructure/repositories/file/file-utils';
+import { atomicWriteJSON, loadJSON } from '@mcp-planner/mcp-server';
 
 describe('file-utils', () => {
   let testDir: string;
@@ -29,7 +29,7 @@ describe('file-utils', () => {
   // REVIEW: atomicWriteJSON
   // ============================================================================
 
-  /* eslint-disable @typescript-eslint/no-unsafe-call */
+   
   describe('atomicWriteJSON', () => {
     it('should write JSON file atomically', async () => {
       const filePath = path.join(testDir, 'test.json');
@@ -153,7 +153,7 @@ describe('file-utils', () => {
       // Concurrent writes to DIFFERENT files is the supported pattern
       const writes = Array.from({ length: 10 }, (_, i): Promise<void> => {
         const filePath = path.join(testDir, `concurrent-${i.toString()}.json`);
-        return atomicWriteJSON(filePath, { iteration: i }) as Promise<void>;
+        return atomicWriteJSON(filePath, { iteration: i });
       });
 
       await Promise.all(writes);
@@ -166,13 +166,13 @@ describe('file-utils', () => {
       }
     });
   });
-  /* eslint-enable @typescript-eslint/no-unsafe-call */
+   
 
   // ============================================================================
   // REVIEW: loadJSON
   // ============================================================================
 
-  /* eslint-disable @typescript-eslint/no-unsafe-call */
+   
   describe('loadJSON', () => {
     it('should load and parse JSON file', async () => {
       const filePath = path.join(testDir, 'load.json');
@@ -285,13 +285,13 @@ describe('file-utils', () => {
       expect(result[9999].id).toBe('item-9999');
     });
   });
-  /* eslint-enable @typescript-eslint/no-unsafe-call */
+   
 
   // ============================================================================
   // REVIEW: Integration - atomicWriteJSON + loadJSON roundtrip
   // ============================================================================
 
-  /* eslint-disable @typescript-eslint/no-unsafe-call */
+   
   describe('roundtrip', () => {
     it('should write and read data consistently', async () => {
       const filePath = path.join(testDir, 'roundtrip.json');
@@ -325,5 +325,5 @@ describe('file-utils', () => {
       }
     });
   });
-  /* eslint-enable @typescript-eslint/no-unsafe-call */
+   
 });

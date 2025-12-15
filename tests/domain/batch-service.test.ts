@@ -12,20 +12,25 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { BatchService } from '../../src/domain/services/batch-service.js';
-import { RequirementService } from '../../src/domain/services/requirement-service.js';
-import { SolutionService } from '../../src/domain/services/solution-service.js';
-import { PhaseService } from '../../src/domain/services/phase-service.js';
-import { LinkingService } from '../../src/domain/services/linking-service.js';
-import { DecisionService } from '../../src/domain/services/decision-service.js';
-import { ArtifactService } from '../../src/domain/services/artifact-service.js';
-import { PlanService } from '../../src/domain/services/plan-service.js';
-import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
-import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
+import {
+  BatchService,
+  RequirementService,
+  SolutionService,
+  PhaseService,
+  LinkingService,
+  DecisionService,
+  ArtifactService,
+  PlanService,
+  type Entity,
+  type Link,
+  type Requirement,
+  type Solution,
+  type Phase,
+} from '@mcp-planner/core';
+import { RepositoryFactory, FileLockManager } from '@mcp-planner/mcp-server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import type { Entity, Link, Requirement, Solution, Phase } from '../../src/domain/entities/types.js';
 
 // Helper functions to replace storage.loadEntities/loadLinks
 async function loadEntities<T extends Entity>(

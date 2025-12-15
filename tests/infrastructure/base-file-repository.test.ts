@@ -14,14 +14,13 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { BaseFileRepository } from '../../src/infrastructure/repositories/file/base-file-repository';
-import { DEFAULT_CACHE_OPTIONS, type CacheOptions } from '../../src/infrastructure/repositories/file/types';
+import { BaseFileRepository, DEFAULT_CACHE_OPTIONS, type CacheOptions } from '@mcp-planner/mcp-server';
 
 /**
  * Concrete test implementation of BaseFileRepository
  * Exposes protected methods for testing
  */
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
+ 
 class TestRepository extends BaseFileRepository {
   public testCache = new Map<string, string>();
   public initializeCallCount = 0;
@@ -78,7 +77,7 @@ class TestRepository extends BaseFileRepository {
     return this.loadJSON<T>(filePath);
   }
 }
-/* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
+ 
 
 describe('BaseFileRepository', () => {
   let testDir: string;

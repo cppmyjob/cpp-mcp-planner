@@ -16,7 +16,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
+import { FileLockManager } from '@mcp-planner/mcp-server';
 
 describe('FileLockManager Bug Fixes (Code Review)', () => {
   let testDir: string;

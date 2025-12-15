@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { DecisionService } from '../../src/domain/services/decision-service.js';
-import { PlanService } from '../../src/domain/services/plan-service.js';
-import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
-import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
+import { DecisionService, PlanService } from '@mcp-planner/core';
+import { RepositoryFactory, FileLockManager } from '@mcp-planner/mcp-server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';

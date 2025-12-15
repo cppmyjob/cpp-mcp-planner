@@ -195,6 +195,13 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/', 'node_modules/', '*.js', '!eslint.config.js'],
+    // Ignore build artifacts
+    ignores: [
+      'dist/',
+      'node_modules/',
+      'packages/*/dist/',
+      '*.js',
+      '!eslint.config.js',
+    ],
   }
 );

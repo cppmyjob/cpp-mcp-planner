@@ -1,15 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { QueryService } from '../../src/domain/services/query-service.js';
-import type { ValidatePlanInput } from '../../src/domain/services/query-service.js';
-import { PlanService } from '../../src/domain/services/plan-service.js';
-import { RequirementService } from '../../src/domain/services/requirement-service.js';
-import { SolutionService } from '../../src/domain/services/solution-service.js';
-import { PhaseService } from '../../src/domain/services/phase-service.js';
-import { ArtifactService } from '../../src/domain/services/artifact-service.js';
-import { LinkingService } from '../../src/domain/services/linking-service.js';
-import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
-import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
-import type { Requirement, Solution, Phase, Entity, EntityType } from '../../src/domain/entities/types.js';
+import {
+  QueryService,
+  type ValidatePlanInput,
+  PlanService,
+  RequirementService,
+  SolutionService,
+  PhaseService,
+  ArtifactService,
+  LinkingService,
+  type Requirement,
+  type Solution,
+  type Phase,
+  type Entity,
+  type EntityType,
+} from '@mcp-planner/core';
+import { RepositoryFactory, FileLockManager } from '@mcp-planner/mcp-server';
 
 // Helper functions for loading/saving entities via repository
 async function loadEntities<T extends Entity>(
@@ -598,8 +603,6 @@ describe('QueryService', () => {
 
     // RED TEST 6: File existence - detect missing file in artifact.targets
     it('should detect missing file in artifact.targets', async () => {
-      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(repositoryFactory, planService);
-
       await artifactService.addArtifact({
         planId,
         artifact: {
@@ -625,8 +628,6 @@ describe('QueryService', () => {
 
     // GREEN TEST 7: File existence - skip files with action='create'
     it('should NOT check files with action=create (will be created)', async () => {
-      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(repositoryFactory, planService);
-
       await artifactService.addArtifact({
         planId,
         artifact: {
@@ -647,10 +648,6 @@ describe('QueryService', () => {
 
     // RED TEST 8: File existence - check files with action='modify' exist
     it('should check that files with action=modify exist', async () => {
-      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(repositoryFactory, planService);
-      const fs = await import('fs/promises');
-      const path = await import('path');
-
       // Create a file in a relative path location
       const relativePath = 'test-data/existing.ts';
       const tmpDir = path.join(process.cwd(), 'test-data');
@@ -682,8 +679,6 @@ describe('QueryService', () => {
 
     // GREEN TEST 9: File existence - skip check if artifact.targets is undefined
     it('should skip file check if artifact.targets is undefined', async () => {
-      const artifactService = new (await import('../../src/domain/services/artifact-service.js')).ArtifactService(repositoryFactory, planService);
-
       await artifactService.addArtifact({
         planId,
         artifact: {
@@ -733,7 +728,6 @@ describe('QueryService', () => {
       await solutionService.selectSolution({ planId, solutionId, reason: 'Best approach' });
 
       // Create link
-      const linkingService = new (await import('../../src/domain/services/linking-service.js')).LinkingService(repositoryFactory);
       await linkingService.linkEntities({
         planId,
         sourceId: solutionId,
@@ -798,7 +792,6 @@ describe('QueryService', () => {
       });
 
       // Link phase to requirement
-      const linkingService = new (await import('../../src/domain/services/linking-service.js')).LinkingService(repositoryFactory);
       await linkingService.linkEntities({
         planId,
         sourceId: phaseId,

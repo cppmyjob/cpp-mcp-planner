@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, jest } from '@jest/globals';
-import { bulkUpdateEntities } from '../../../src/domain/utils/bulk-operations';
+import { bulkUpdateEntities } from '@mcp-planner/core';
 
 describe('bulkUpdateEntities utility', () => {
   describe('API contract validation', () => {
@@ -24,7 +24,7 @@ describe('bulkUpdateEntities utility', () => {
 
       // Attempt atomic mode without providing storage
       await expect(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+         
         bulkUpdateEntities({
           entityType: 'requirements',
           entityIdField: 'requirementId',
@@ -43,7 +43,7 @@ describe('bulkUpdateEntities utility', () => {
     it('should work normally in non-atomic mode without storage', async () => {
       const mockUpdateFn = jest.fn().mockResolvedValue(undefined);
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+       
       const result = await bulkUpdateEntities({
         entityType: 'requirements',
         entityIdField: 'requirementId',
@@ -72,7 +72,7 @@ describe('bulkUpdateEntities utility', () => {
         saveEntities: jest.fn().mockResolvedValue(undefined),
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+       
       const result = await bulkUpdateEntities({
         entityType: 'requirements',
         entityIdField: 'requirementId',
@@ -149,7 +149,7 @@ describe('bulkUpdateEntities utility', () => {
 
       // Attempt atomic bulk update that will fail and rollback
       await expect(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+         
         bulkUpdateEntities({
           entityType: 'requirements',
           entityIdField: 'requirementId',
@@ -223,7 +223,7 @@ describe('bulkUpdateEntities utility', () => {
       // 1. The original validation error
       // 2. The rollback failure
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+         
         await bulkUpdateEntities({
           entityType: 'requirements',
           entityIdField: 'requirementId',

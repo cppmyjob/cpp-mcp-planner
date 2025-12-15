@@ -12,12 +12,14 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { RepositoryFactory } from '../../src/infrastructure/factory/repository-factory.js';
-import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
-import { PlanService } from '../../src/domain/services/plan-service.js';
-import { PhaseService } from '../../src/domain/services/phase-service.js';
-import { ArtifactService } from '../../src/domain/services/artifact-service.js';
-import type { Phase, Entity } from '../../src/domain/entities/types.js';
+import {
+  PlanService,
+  PhaseService,
+  ArtifactService,
+  type Phase,
+  type Entity,
+} from '@mcp-planner/core';
+import { RepositoryFactory, FileLockManager } from '@mcp-planner/mcp-server';
 import path from 'path';
 import os from 'os';
 import * as fs from 'fs/promises';
@@ -111,7 +113,7 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
 
     it('1.2 should fail to import CodeExample from types', async () => {
       // Dynamic import test
-      const types = await import('../../src/domain/entities/types.js');
+      const types = await import('@mcp-planner/core');
 
       // CodeExample should not be exported
       expect((types as Record<string, unknown>).CodeExample).toBeUndefined();

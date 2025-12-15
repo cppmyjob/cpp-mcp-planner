@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { tools } from '../../src/server/schemas/index.js';
+import { tools } from '@mcp-planner/mcp-server';
 
 describe('Tool Definitions', () => {
   describe('Plan Tool Description UX', () => {

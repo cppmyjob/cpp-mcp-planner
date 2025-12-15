@@ -18,8 +18,9 @@ import type {
   StorageBackend,
   StorageConfig,
   RepositoryFactory,
-} from '../../../src/domain/repositories/interfaces.js';
-import type { Requirement, Phase } from '../../../src/domain/entities/types.js';
+  Requirement,
+  Phase,
+} from '@mcp-planner/core';
 
 describe('Repository Interfaces - Type System', () => {
   describe('Filter Operators', () => {

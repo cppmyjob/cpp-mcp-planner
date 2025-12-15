@@ -13,7 +13,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import lockfile from 'proper-lockfile';
-import { FileLockManager } from '../../src/infrastructure/repositories/file/file-lock-manager.js';
+import { FileLockManager } from '@mcp-planner/mcp-server';
 
 describe('FileLockManager Issues', () => {
   let testDir: string;

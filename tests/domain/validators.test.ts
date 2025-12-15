@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { validateTargets, validateSlug } from '../../src/domain/services/validators.js';
+import { validateTargets, validateSlug } from '@mcp-planner/core';
 
 describe('validateTargets', () => {
   describe('basic validation', () => {

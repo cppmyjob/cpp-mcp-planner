@@ -2,21 +2,25 @@
   "name": "mcp-planning-server",
   "version": "1.0.0",
   "description": "MCP server for planning and task management with Claude Code",
-  "main": "dist/index.js",
+  "main": "packages/mcp-server/dist/index.js",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "bin": {
-    "mcp-planning-server": "./dist/index.js"
+    "mcp-planning-server": "./packages/mcp-server/dist/cli.js"
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js",
+    "build": "tsc --build",
+    "build:core": "npm run build -w @mcp-planner/core",
+    "dev": "tsx watch packages/mcp-server/src/cli.ts",
+    "start": "node packages/mcp-server/dist/cli.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
-    "lint": "eslint src tests --max-warnings 0",
-    "lint:fix": "eslint src tests --fix",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint packages tests --max-warnings 0",
+    "lint:fix": "eslint packages tests --fix",
+    "typecheck": "tsc --build --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.24.2",
