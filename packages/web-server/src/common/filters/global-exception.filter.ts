@@ -3,6 +3,7 @@ import {
   Catch,
   type ArgumentsHost,
   HttpStatus,
+  HttpException,
   Logger,
 } from '@nestjs/common';
 import { type Response } from 'express';
@@ -60,6 +61,28 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   ): { status: number; errorResponse: ErrorResponse } {
     const timestamp = new Date().toISOString();
 
+    // Handle NestJS HttpException (BadRequestException, NotFoundException, etc.)
+    if (exception instanceof HttpException) {
+      const status = exception.getStatus();
+      const response = exception.getResponse();
+      const message = typeof response === 'string'
+        ? response
+        : (response as { message?: string | string[] }).message ?? exception.message;
+
+      return {
+        status,
+        errorResponse: {
+          success: false,
+          error: {
+            code: HttpStatus[status] ?? 'HTTP_ERROR',
+            message: Array.isArray(message) ? message.join(', ') : message,
+          },
+          timestamp,
+          path,
+        },
+      };
+    }
+
     if (isRepositoryError(exception)) {
       const status = this.mapRepositoryErrorToStatus(exception);
       return {
@@ -77,14 +100,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
 
-    // Handle standard errors
+    // Handle standard errors with message-based mapping
     if (exception instanceof Error) {
+      const status = this.mapErrorMessageToStatus(exception.message);
       return {
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        status,
         errorResponse: {
           success: false,
           error: {
-            code: 'INTERNAL_ERROR',
+            code: status === HttpStatus.NOT_FOUND ? 'NOT_FOUND' : 'INTERNAL_ERROR',
             message: exception.message,
           },
           timestamp,
@@ -124,6 +148,26 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (error instanceof LockError) {
       return HTTP_LOCKED;
     }
+    return HttpStatus.INTERNAL_SERVER_ERROR;
+  }
+
+  /**
+   * Maps common error messages from domain services to HTTP status codes.
+   * Used for errors that don't use the RepositoryError hierarchy.
+   */
+  private mapErrorMessageToStatus(message: string): HttpStatus {
+    const lowerMessage = message.toLowerCase();
+
+    if (lowerMessage.includes('not found')) {
+      return HttpStatus.NOT_FOUND;
+    }
+    if (lowerMessage.includes('validation') || lowerMessage.includes('invalid')) {
+      return HttpStatus.BAD_REQUEST;
+    }
+    if (lowerMessage.includes('already exists') || lowerMessage.includes('conflict')) {
+      return HttpStatus.CONFLICT;
+    }
+
     return HttpStatus.INTERNAL_SERVER_ERROR;
   }
 

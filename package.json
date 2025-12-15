@@ -19,6 +19,8 @@
     "start": "node packages/mcp-server/dist/cli.js",
     "start:web": "npm run start -w @mcp-planner/web-server",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:web": "jest --config packages/web-server/jest.config.js",
+    "test:all": "npm run test && npm run test:web",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "lint": "eslint packages tests --max-warnings 0",

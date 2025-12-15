@@ -195,11 +195,22 @@ export default tseslint.config(
     },
   },
   {
+    // Отключаем некоторые правила для E2E тестов web-server
+    files: ['packages/web-server/test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-magic-numbers': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+    },
+  },
+  {
     // Ignore build artifacts
     ignores: [
       'dist/',
       'node_modules/',
       'packages/*/dist/',
+      'packages/*/jest.config.js',
       '*.js',
       '!eslint.config.js',
     ],

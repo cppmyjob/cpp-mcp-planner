@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from './config/index.js';
 import { CoreModule } from './modules/core/index.js';
+import { PlansModule } from './modules/plans/index.js';
 
 @Module({
   imports: [
     AppConfigModule,
     CoreModule,
+    PlansModule,
   ],
   controllers: [],
   providers: [],
