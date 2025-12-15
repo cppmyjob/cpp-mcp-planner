@@ -16,7 +16,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { FileLockManager } from '@mcp-planner/mcp-server';
+import { FileLockManager } from '@mcp-planner/core';
 
 describe('FileLockManager Multi-Process Fixes', () => {
   let testDir: string;

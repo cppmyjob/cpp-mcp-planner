@@ -11,7 +11,7 @@ const storagePath = process.env.MCP_PLANNING_STORAGE_PATH ?? './.mcp-plans';
 async function cleanup(services: Services): Promise<void> {
   console.error('Shutting down MCP Planning Server...');
   try {
-    await services.repositoryFactory.dispose();
+    await services.repositoryFactory.close();
     await services.lockManager.dispose();
     console.error('Cleanup completed');
   } catch (error: unknown) {

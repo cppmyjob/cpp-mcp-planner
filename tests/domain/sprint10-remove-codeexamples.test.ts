@@ -19,7 +19,7 @@ import {
   type Phase,
   type Entity,
 } from '@mcp-planner/core';
-import { RepositoryFactory, FileLockManager } from '@mcp-planner/mcp-server';
+import { FileRepositoryFactory, FileLockManager, type RepositoryFactory } from '@mcp-planner/core';
 import path from 'path';
 import os from 'os';
 import * as fs from 'fs/promises';
@@ -33,7 +33,7 @@ async function loadEntities<T extends Entity>(
   const typeMap: Record<string, string> = {
     phases: 'phase'
   };
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
   const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
   return repo.findAll();
 }
@@ -47,7 +47,7 @@ async function saveEntities(
   const typeMap: Record<string, string> = {
     phases: 'phase'
   };
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
   const repo = repositoryFactory.createRepository<Entity>(typeMap[entityType] as any, planId);
   for (const entity of entities) {
     await repo.update(entity.id, entity);
@@ -70,7 +70,7 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
 
-    repositoryFactory = new RepositoryFactory({
+    repositoryFactory = new FileRepositoryFactory({
       type: 'file',
       baseDir: testDir,
       lockManager,
@@ -94,7 +94,7 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
   });
 
   afterEach(async () => {
-    await repositoryFactory.dispose();
+    await repositoryFactory.close();
     await lockManager.dispose();
     await fs.rm(testDir, { recursive: true, force: true });
   });

@@ -14,7 +14,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { BaseFileRepository, DEFAULT_CACHE_OPTIONS, type CacheOptions } from '@mcp-planner/mcp-server';
+import { BaseFileRepository, DEFAULT_CACHE_OPTIONS, type CacheOptions } from '@mcp-planner/core';
 
 /**
  * Concrete test implementation of BaseFileRepository

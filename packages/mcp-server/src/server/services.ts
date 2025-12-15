@@ -1,6 +1,6 @@
-import { RepositoryFactory } from '../infrastructure/factory/repository-factory.js';
-import { FileLockManager } from '../infrastructure/repositories/file/file-lock-manager.js';
 import {
+  FileRepositoryFactory,
+  FileLockManager,
   PlanService,
   RequirementService,
   SolutionService,
@@ -10,7 +10,8 @@ import {
   LinkingService,
   QueryService,
   BatchService,
-  VersionHistoryService
+  VersionHistoryService,
+  type RepositoryFactory,
 } from '@mcp-planner/core';
 
 export interface Services {
@@ -33,8 +34,8 @@ export async function createServices(storagePath: string): Promise<Services> {
   const lockManager = new FileLockManager(storagePath);
   await lockManager.initialize();
 
-  // Create RepositoryFactory
-  const repositoryFactory = new RepositoryFactory({
+  // Create FileRepositoryFactory
+  const repositoryFactory = new FileRepositoryFactory({
     type: 'file',
     baseDir: storagePath,
     lockManager,

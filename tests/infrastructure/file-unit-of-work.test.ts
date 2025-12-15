@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import type { Requirement } from '@mcp-planner/core';
-import { FileUnitOfWork, FileLockManager } from '@mcp-planner/mcp-server';
+import { FileUnitOfWork, FileLockManager } from '@mcp-planner/core';
 
 describe('FileUnitOfWork', () => {
   // FIX M-4: Use os.tmpdir() instead of process.cwd()

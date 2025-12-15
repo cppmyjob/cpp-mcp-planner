@@ -19,12 +19,13 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { LinkRepository, Link, RelationType } from '@mcp-planner/core';
+import type { LinkRepository } from '../../../domain/repositories/interfaces.js';
+import type { Link, RelationType } from '../../../domain/entities/types.js';
 import {
   NotFoundError,
   ConflictError,
   ValidationError,
-} from '@mcp-planner/core';
+} from '../../../domain/repositories/errors.js';
 import { IndexManager } from './index-manager.js';
 import { type FileLockManager } from './file-lock-manager.js';
 import { BaseFileRepository } from './base-file-repository.js';

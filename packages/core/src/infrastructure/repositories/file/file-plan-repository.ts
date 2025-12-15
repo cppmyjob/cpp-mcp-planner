@@ -15,7 +15,8 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { PlanRepository, PlanManifest, ActivePlansIndex, VersionHistory } from '@mcp-planner/core';
+import type { PlanRepository } from '../../../domain/repositories/interfaces.js';
+import type { PlanManifest, ActivePlansIndex, VersionHistory } from '../../../domain/entities/types.js';
 import { BaseFileRepository } from './base-file-repository.js';
 
 /**

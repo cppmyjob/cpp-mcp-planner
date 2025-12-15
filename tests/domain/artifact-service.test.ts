@@ -6,7 +6,7 @@ import {
   RequirementService,
   SolutionService,
 } from '@mcp-planner/core';
-import { RepositoryFactory, FileLockManager } from '@mcp-planner/mcp-server';
+import { FileRepositoryFactory, FileLockManager, type RepositoryFactory } from '@mcp-planner/core';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -28,7 +28,7 @@ describe('ArtifactService', () => {
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
 
-    repositoryFactory = new RepositoryFactory({
+    repositoryFactory = new FileRepositoryFactory({
       type: 'file',
       baseDir: testDir,
       lockManager,
@@ -52,7 +52,7 @@ describe('ArtifactService', () => {
   });
 
   afterEach(async () => {
-    await repositoryFactory.dispose();
+    await repositoryFactory.close();
     await lockManager.dispose();
     await fs.rm(testDir, { recursive: true, force: true });
   });

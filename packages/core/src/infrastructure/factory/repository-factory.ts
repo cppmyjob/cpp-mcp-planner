@@ -8,7 +8,8 @@
  * - Unified cache configuration
  */
 
-import type { Repository, LinkRepository, UnitOfWork, PlanRepository, StorageBackend, Entity, EntityType } from '@mcp-planner/core';
+import type { Repository, LinkRepository, UnitOfWork, PlanRepository, StorageBackend } from '../../domain/repositories/interfaces.js';
+import type { Entity, EntityType } from '../../domain/entities/types.js';
 import { FileRepository } from '../repositories/file/file-repository.js';
 import { FileLinkRepository } from '../repositories/file/file-link-repository.js';
 import { FileUnitOfWork } from '../repositories/file/file-unit-of-work.js';
@@ -17,7 +18,11 @@ import type { FileLockManager } from '../repositories/file/file-lock-manager.js'
 import type { CacheOptions } from '../repositories/file/types.js';
 
 /**
- * Storage configuration for RepositoryFactory
+ * Configuration for RepositoryFactory initialization
+ *
+ * Note: This is separate from core's StorageConfig which is an abstract interface
+ * for any storage backend. This config is specific to the factory implementation
+ * and includes runtime dependencies like FileLockManager.
  *
  * @example
  * ```typescript
@@ -32,7 +37,7 @@ import type { CacheOptions } from '../repositories/file/types.js';
  * });
  * ```
  */
-export interface StorageConfig {
+export interface RepositoryFactoryConfig {
   /** Storage backend type. Currently only 'file' is supported. Future: 'sqlite' | 'postgresql' | 'mongodb' */
   type: 'file';
 
@@ -94,14 +99,14 @@ export interface StorageConfig {
  * });
  * ```
  */
-export class RepositoryFactory {
-  private readonly config: StorageConfig;
+export class FileRepositoryFactory {
+  private readonly config: RepositoryFactoryConfig;
   private readonly repositoryCache = new Map<string, Repository<Entity>>();
   private readonly linkRepositoryCache = new Map<string, LinkRepository>();
   private readonly uowCache = new Map<string, UnitOfWork>();
   private planRepository?: PlanRepository;
 
-  constructor(config: StorageConfig) {
+  constructor(config: RepositoryFactoryConfig) {
     // Runtime validation for config parameter (TypeScript types don't prevent null/undefined at runtime)
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (config === undefined || config === null) {

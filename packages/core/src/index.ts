@@ -1,8 +1,9 @@
 /**
  * @mcp-planner/core
  *
- * Core domain services and types for MCP Planning Server.
- * Provides entity types, repository interfaces, and business logic services.
+ * Core planning library for MCP Planning Server.
+ * Provides entity types, repository interfaces, business logic services,
+ * and file-based repository implementations.
  */
 
 // ============================================================================
@@ -45,3 +46,8 @@ export * from './domain/services/validators.js';
 export * from './domain/utils/field-filter.js';
 export * from './domain/utils/temp-id-resolver.js';
 export * from './domain/utils/bulk-operations.js';
+
+// ============================================================================
+// Infrastructure - File-based repository implementations
+// ============================================================================
+export * from './infrastructure/index.js';

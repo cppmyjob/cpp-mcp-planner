@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import type { Requirement, EntityType } from '@mcp-planner/core';
-import { FileRepository } from '@mcp-planner/mcp-server';
+import { FileRepository } from '@mcp-planner/core';
 
 describe('FileRepository', () => {
   // FIX M-4: Use os.tmpdir() instead of process.cwd()
@@ -633,7 +633,7 @@ describe('FileRepository', () => {
   // ============================================================================
   describe('REVIEW: Shared FileLockManager', () => {
     it('should use injected FileLockManager', async () => {
-      const { FileLockManager: fileLockManagerClass } = await import('@mcp-planner/mcp-server');
+      const { FileLockManager: fileLockManagerClass } = await import('@mcp-planner/core');
 
       const sharedLockManager = new fileLockManagerClass(path.join(testDir, 'plans', 'shared-plan'));
       await sharedLockManager.initialize();
@@ -658,7 +658,7 @@ describe('FileRepository', () => {
     });
 
     it('should NOT dispose shared FileLockManager when repository disposes', async () => {
-      const { FileLockManager: fileLockManagerClass } = await import('@mcp-planner/mcp-server');
+      const { FileLockManager: fileLockManagerClass } = await import('@mcp-planner/core');
 
       const sharedLockManager = new fileLockManagerClass(path.join(testDir, 'plans', 'shared-plan-2'));
       await sharedLockManager.initialize();

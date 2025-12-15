@@ -22,9 +22,8 @@ import type {
   UnitOfWork,
   TransactionOptions,
   Repository,
-  Entity,
-  EntityType,
-} from '@mcp-planner/core';
+} from '../../../domain/repositories/interfaces.js';
+import type { Entity, EntityType } from '../../../domain/entities/types.js';
 import { FileRepository } from './file-repository.js';
 import { FileLinkRepository } from './file-link-repository.js';
 import { type FileLockManager } from './file-lock-manager.js';

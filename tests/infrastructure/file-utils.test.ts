@@ -11,7 +11,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { atomicWriteJSON, loadJSON } from '@mcp-planner/mcp-server';
+import { atomicWriteJSON, loadJSON } from '@mcp-planner/core';
 
 describe('file-utils', () => {
   let testDir: string;

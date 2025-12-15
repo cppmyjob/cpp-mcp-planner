@@ -19,14 +19,13 @@ import type {
   QueryResult,
   Filter,
   SortSpec,
-  Entity,
-  EntityType,
-} from '@mcp-planner/core';
+} from '../../../domain/repositories/interfaces.js';
+import type { Entity, EntityType } from '../../../domain/entities/types.js';
 import {
   NotFoundError,
   ConflictError,
   ValidationError,
-} from '@mcp-planner/core';
+} from '../../../domain/repositories/errors.js';
 import { IndexManager } from './index-manager.js';
 import { FileLockManager } from './file-lock-manager.js';
 import { BaseFileRepository } from './base-file-repository.js';

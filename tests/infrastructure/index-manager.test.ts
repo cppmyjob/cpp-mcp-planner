@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { IndexManager, type IndexMetadata, type LinkIndexMetadata } from '@mcp-planner/mcp-server';
+import { IndexManager, type IndexMetadata, type LinkIndexMetadata } from '@mcp-planner/core';
 
 describe('IndexManager', () => {
   const testDir = path.join(process.cwd(), '.test-data', 'index-manager');

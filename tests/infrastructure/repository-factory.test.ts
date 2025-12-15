@@ -8,7 +8,7 @@ import * as os from 'os';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { Requirement, Solution } from '@mcp-planner/core';
-import { RepositoryFactory, FileLockManager } from '@mcp-planner/mcp-server';
+import { FileRepositoryFactory, FileLockManager, type RepositoryFactory } from '@mcp-planner/core';
 
 describe('RED: RepositoryFactory', () => {
   let testDir: string;
@@ -24,7 +24,7 @@ describe('RED: RepositoryFactory', () => {
     await lockManager.initialize();
 
     // Create factory
-    factory = new RepositoryFactory({
+    factory = new FileRepositoryFactory({
       type: 'file',
       baseDir: testDir,
       lockManager,
@@ -33,7 +33,7 @@ describe('RED: RepositoryFactory', () => {
 
   afterEach(async () => {
     // Dispose factory first (doesn't own lockManager)
-    await factory.dispose();
+    await factory.close();
     // Then dispose the shared lockManager (we own it in tests)
     await lockManager.dispose();
     // Finally cleanup file system
@@ -45,14 +45,14 @@ describe('RED: RepositoryFactory', () => {
   // ============================================================================
 
   describe('Factory Creation', () => {
-    it('should create RepositoryFactory instance', () => {
+    it('should create FileRepositoryFactory instance', () => {
       expect(factory).toBeDefined();
-      expect(factory).toBeInstanceOf(RepositoryFactory);
+      expect(factory).toBeInstanceOf(FileRepositoryFactory);
     });
 
     it('should require storage config', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-      expect(() => new RepositoryFactory(null as any)).toThrow();
+      expect(() => new FileRepositoryFactory(null as any)).toThrow();
     });
 
     it('should validate storage type', () => {
@@ -60,7 +60,7 @@ describe('RED: RepositoryFactory', () => {
         () =>
           // Testing invalid type - using type assertion to bypass compile-time check
            
-          new RepositoryFactory({
+          new FileRepositoryFactory({
             type: 'invalid' as 'file',
             baseDir: testDir,
             lockManager,
@@ -250,14 +250,14 @@ describe('RED: RepositoryFactory', () => {
       factory.createLinkRepository(planId);
 
       // Dispose factory
-      await factory.dispose();
+      await factory.close();
 
       // Creating new repository after dispose should fail or create fresh instance
       // (This depends on implementation - factory might be reusable or not)
     });
 
     it('should NOT dispose shared FileLockManager on factory dispose', async () => {
-      await factory.dispose();
+      await factory.close();
 
       // Lock manager should still be usable - factory doesn't own it
       expect(lockManager.isDisposed()).toBe(false);
@@ -325,7 +325,7 @@ describe('RED: RepositoryFactory', () => {
 
   describe('Cache Options', () => {
     it('should pass cache options to repositories', () => {
-      const factoryWithCache = new RepositoryFactory({
+      const factoryWithCache = new FileRepositoryFactory({
         type: 'file',
         baseDir: testDir,
         lockManager,
