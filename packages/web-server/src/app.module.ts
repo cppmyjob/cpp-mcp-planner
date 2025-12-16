@@ -6,6 +6,8 @@ import { RequirementsModule } from './modules/requirements/index.js';
 import { SolutionsModule } from './modules/solutions/index.js';
 import { DecisionsModule } from './modules/decisions/index.js';
 import { PhasesModule } from './modules/phases/index.js';
+import { ArtifactsModule } from './modules/artifacts/index.js';
+import { LinksModule } from './modules/links/index.js';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { PhasesModule } from './modules/phases/index.js';
     SolutionsModule,
     DecisionsModule,
     PhasesModule,
+    ArtifactsModule,
+    LinksModule,
   ],
   controllers: [],
   providers: [],

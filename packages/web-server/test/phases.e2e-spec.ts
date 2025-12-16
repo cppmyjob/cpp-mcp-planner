@@ -118,7 +118,7 @@ describe('Phases API (e2e)', () => {
   let app: INestApplication;
   let testPlanId: string;
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- getHttpServer returns correct type for supertest
+   
   const getServer = (): TestApp => app.getHttpServer();
 
   beforeAll(async () => {
@@ -126,7 +126,7 @@ describe('Phases API (e2e)', () => {
     app = context.app;
 
     // Create a test plan for phases
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- getHttpServer returns correct type for supertest
+     
     const planResponse = await request(app.getHttpServer())
       .post('/api/v1/plans')
       .send({

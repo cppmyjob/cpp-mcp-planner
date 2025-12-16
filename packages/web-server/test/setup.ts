@@ -16,6 +16,8 @@ import { RequirementsModule } from '../src/modules/requirements/requirements.mod
 import { SolutionsModule } from '../src/modules/solutions/solutions.module.js';
 import { DecisionsModule } from '../src/modules/decisions/decisions.module.js';
 import { PhasesModule } from '../src/modules/phases/phases.module.js';
+import { ArtifactsModule } from '../src/modules/artifacts/artifacts.module.js';
+import { LinksModule } from '../src/modules/links/links.module.js';
 import {
   GlobalExceptionFilter,
   TransformInterceptor,
@@ -53,6 +55,8 @@ export async function createTestApp(): Promise<TestContext> {
       SolutionsModule,
       DecisionsModule,
       PhasesModule,
+      ArtifactsModule,
+      LinksModule,
     ],
   }).compile();
 

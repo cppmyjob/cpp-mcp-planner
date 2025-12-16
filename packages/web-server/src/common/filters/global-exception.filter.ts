@@ -174,7 +174,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       lowerMessage.includes('cannot') ||
       lowerMessage.includes('requires') ||
       lowerMessage.includes('must be') ||
-      lowerMessage.includes('non-empty')
+      lowerMessage.includes('non-empty') ||
+      lowerMessage.includes('circular') ||
+      lowerMessage.includes('self-referencing')
     ) {
       return HttpStatus.BAD_REQUEST;
     }

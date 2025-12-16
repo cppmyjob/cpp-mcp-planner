@@ -158,16 +158,23 @@ export const REPOSITORY_FACTORY = 'REPOSITORY_FACTORY';
       },
       inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, LinkingService],
     },
-    // ArtifactService
+    // ArtifactService - with VersionHistoryService and LinkingService for full functionality
     {
       provide: ArtifactService,
       useFactory: (
         repositoryFactory: RepositoryFactory,
-        planService: PlanService
+        planService: PlanService,
+        versionHistoryService: VersionHistoryService,
+        linkingService: LinkingService
       ): ArtifactService => {
-        return new ArtifactService(repositoryFactory, planService);
+        return new ArtifactService(
+          repositoryFactory,
+          planService,
+          versionHistoryService,
+          linkingService
+        );
       },
-      inject: [REPOSITORY_FACTORY, PlanService],
+      inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, LinkingService],
     },
     // QueryService
     {
