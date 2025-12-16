@@ -607,6 +607,13 @@ export class RequirementService {
   public async listRequirements(
     input: ListRequirementsInput
   ): Promise<ListRequirementsResult> {
+    // Check plan exists first
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const exists = await planRepo.planExists(input.planId);
+    if (!exists) {
+      throw new NotFoundError('plan', input.planId);
+    }
+
     // BUG-018, BUG-019 FIX: Validate list params
     validateListParams(input.limit, input.offset);
 
@@ -919,15 +926,17 @@ export class RequirementService {
     const planRepo = this.repositoryFactory.createPlanRepository();
     const exists = await planRepo.planExists(input.planId);
     if (!exists) {
-      throw new Error('Plan not found');
+      throw new NotFoundError('plan', input.planId);
     }
 
     // REQ-6: Load current entity to get accurate currentVersion
     const repo = this.repositoryFactory.createRepository<Requirement>('requirement', input.planId);
     let currentVersion = 1;
+    let requirementExists = false;
     try {
       const currentRequirement = await repo.findById(input.requirementId);
       currentVersion = currentRequirement.version;
+      requirementExists = true;
     } catch {
       // Entity might be deleted - use version from history file
     }
@@ -939,6 +948,11 @@ export class RequirementService {
       limit: input.limit,
       offset: input.offset,
     });
+
+    // If requirement doesn't exist AND has no history → 404
+    if (!requirementExists && history.total === 0) {
+      throw new NotFoundError('requirement', input.requirementId);
+    }
 
     // REQ-6: Override currentVersion with actual entity version
     history.currentVersion = currentVersion;

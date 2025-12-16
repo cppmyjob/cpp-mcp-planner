@@ -161,7 +161,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (lowerMessage.includes('not found')) {
       return HttpStatus.NOT_FOUND;
     }
-    if (lowerMessage.includes('validation') || lowerMessage.includes('invalid')) {
+    if (
+      lowerMessage.includes('validation') ||
+      lowerMessage.includes('invalid') ||
+      lowerMessage.includes('cannot')
+    ) {
       return HttpStatus.BAD_REQUEST;
     }
     if (lowerMessage.includes('already exists') || lowerMessage.includes('conflict')) {

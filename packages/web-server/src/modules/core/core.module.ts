@@ -68,16 +68,23 @@ export const REPOSITORY_FACTORY = 'REPOSITORY_FACTORY';
       },
       inject: [REPOSITORY_FACTORY],
     },
-    // RequirementService
+    // RequirementService - with VersionHistoryService and LinkingService for full functionality
     {
       provide: RequirementService,
       useFactory: (
         repositoryFactory: RepositoryFactory,
-        planService: PlanService
+        planService: PlanService,
+        versionHistoryService: VersionHistoryService,
+        linkingService: LinkingService
       ): RequirementService => {
-        return new RequirementService(repositoryFactory, planService);
+        return new RequirementService(
+          repositoryFactory,
+          planService,
+          versionHistoryService,
+          linkingService
+        );
       },
-      inject: [REPOSITORY_FACTORY, PlanService],
+      inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, LinkingService],
     },
     // SolutionService
     {

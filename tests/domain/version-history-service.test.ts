@@ -539,16 +539,13 @@ describe('Version History Service (Sprint 7)', () => {
       expect(history.currentVersion).toBe(3);
     });
 
-    // Test 22: get_history for non-existent requirement
-    it('should return empty history for non-existent requirement', async () => {
-      const history = await requirementService.getHistory({
+    // Test 22: get_history for non-existent requirement (should throw 404)
+    it('should throw NotFoundError for non-existent requirement', async () => {
+      // Should throw NotFoundError for non-existent requirement with no history
+      await expect(requirementService.getHistory({
         planId,
         requirementId: 'non-existent-id'
-      });
-
-      // Should return empty history
-      expect(history.versions).toHaveLength(0);
-      expect(history.total).toBe(0);
+      })).rejects.toThrow(/not found/i);
     });
   });
 
@@ -1472,25 +1469,22 @@ describe('Version History Service (Sprint 7)', () => {
       await expect(requirementService.getHistory({
         planId: 'invalid-plan-id',
         requirementId: 'some-id'
-      })).rejects.toThrow(/Plan not found/i);
+      })).rejects.toThrow(/not found/i);
     });
 
-    // Test 50: get_history with invalid requirementId
-    it('should return empty history for invalid requirementId', async () => {
+    // Test 50: get_history with invalid requirementId (should throw 404, not empty)
+    it('should throw NotFoundError for invalid requirementId', async () => {
       const plan = await planService.createPlan({
         name: 'Test',
         description: 'Test',
         maxHistoryDepth: 5
       });
 
-      // Should return empty history for non-existent requirement
-      const history = await requirementService.getHistory({
+      // Should throw NotFoundError for non-existent requirement with no history
+      await expect(requirementService.getHistory({
         planId: plan.planId,
         requirementId: 'invalid-req-id'
-      });
-
-      expect(history.versions).toHaveLength(0);
-      expect(history.total).toBe(0);
+      })).rejects.toThrow(/not found/i);
     });
 
     // Test 51: Backwards compatibility - old plans without enableHistory

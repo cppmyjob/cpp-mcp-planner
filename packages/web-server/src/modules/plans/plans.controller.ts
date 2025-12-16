@@ -11,15 +11,17 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-import { type PlanService } from '@mcp-planner/core';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports -- NestJS DI requires runtime class reference
+import { PlanService } from '@mcp-planner/core';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports -- NestJS validation requires runtime class reference
 import {
-  type CreatePlanDto,
-  type UpdatePlanDto,
-  type ListPlansQueryDto,
-  type GetPlanQueryDto,
-  type ActivatePlanDto,
-  type GetActivePlanQueryDto,
-  type DeletePlanQueryDto,
+  CreatePlanDto,
+  UpdatePlanDto,
+  ListPlansQueryDto,
+  GetPlanQueryDto,
+  ActivatePlanDto,
+  GetActivePlanQueryDto,
+  DeletePlanQueryDto,
 } from './dto/index.js';
 
 @ApiTags('plans')
