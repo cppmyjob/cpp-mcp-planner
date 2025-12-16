@@ -1,0 +1,21 @@
+/* PrimeIcons and PrimeFlex */
+@import "primeicons/primeicons.css";
+@import "primeflex/primeflex.css";
+
+/* Global Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-family);
+}
+
+body {
+  margin: 0;
+  background-color: var(--p-surface-ground);
+  color: var(--p-text-color);
+}

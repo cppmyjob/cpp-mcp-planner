@@ -1,0 +1,18 @@
+<div class="app-container">
+  <header class="app-header">
+    <div class="header-content">
+      <h1 class="app-title">{{ title() }}</h1>
+      <p-button
+        [icon]="isDarkTheme ? 'pi pi-sun' : 'pi pi-moon'"
+        [label]="isDarkTheme ? 'Light Mode' : 'Dark Mode'"
+        (onClick)="toggleTheme()"
+        [outlined]="true"
+        severity="secondary"
+      />
+    </div>
+  </header>
+
+  <main class="app-main">
+    <router-outlet />
+  </main>
+</div>
