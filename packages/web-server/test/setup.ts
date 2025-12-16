@@ -15,6 +15,7 @@ import { PlansModule } from '../src/modules/plans/plans.module.js';
 import { RequirementsModule } from '../src/modules/requirements/requirements.module.js';
 import { SolutionsModule } from '../src/modules/solutions/solutions.module.js';
 import { DecisionsModule } from '../src/modules/decisions/decisions.module.js';
+import { PhasesModule } from '../src/modules/phases/phases.module.js';
 import {
   GlobalExceptionFilter,
   TransformInterceptor,
@@ -51,6 +52,7 @@ export async function createTestApp(): Promise<TestContext> {
       RequirementsModule,
       SolutionsModule,
       DecisionsModule,
+      PhasesModule,
     ],
   }).compile();
 

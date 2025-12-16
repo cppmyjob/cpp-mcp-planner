@@ -68,6 +68,22 @@ export const REPOSITORY_FACTORY = 'REPOSITORY_FACTORY';
       },
       inject: [REPOSITORY_FACTORY],
     },
+    // VersionHistoryService (must be before services that depend on it)
+    {
+      provide: VersionHistoryService,
+      useFactory: (repositoryFactory: RepositoryFactory): VersionHistoryService => {
+        return new VersionHistoryService(repositoryFactory);
+      },
+      inject: [REPOSITORY_FACTORY],
+    },
+    // LinkingService (must be before services that depend on it)
+    {
+      provide: LinkingService,
+      useFactory: (repositoryFactory: RepositoryFactory): LinkingService => {
+        return new LinkingService(repositoryFactory);
+      },
+      inject: [REPOSITORY_FACTORY],
+    },
     // RequirementService - with VersionHistoryService and LinkingService for full functionality
     {
       provide: RequirementService,
@@ -129,11 +145,18 @@ export const REPOSITORY_FACTORY = 'REPOSITORY_FACTORY';
       provide: PhaseService,
       useFactory: (
         repositoryFactory: RepositoryFactory,
-        planService: PlanService
+        planService: PlanService,
+        versionHistoryService: VersionHistoryService,
+        linkingService: LinkingService
       ): PhaseService => {
-        return new PhaseService(repositoryFactory, planService);
+        return new PhaseService(
+          repositoryFactory,
+          planService,
+          versionHistoryService,
+          linkingService
+        );
       },
-      inject: [REPOSITORY_FACTORY, PlanService],
+      inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, LinkingService],
     },
     // ArtifactService
     {
@@ -145,22 +168,6 @@ export const REPOSITORY_FACTORY = 'REPOSITORY_FACTORY';
         return new ArtifactService(repositoryFactory, planService);
       },
       inject: [REPOSITORY_FACTORY, PlanService],
-    },
-    // LinkingService
-    {
-      provide: LinkingService,
-      useFactory: (repositoryFactory: RepositoryFactory): LinkingService => {
-        return new LinkingService(repositoryFactory);
-      },
-      inject: [REPOSITORY_FACTORY],
-    },
-    // VersionHistoryService
-    {
-      provide: VersionHistoryService,
-      useFactory: (repositoryFactory: RepositoryFactory): VersionHistoryService => {
-        return new VersionHistoryService(repositoryFactory);
-      },
-      inject: [REPOSITORY_FACTORY],
     },
     // QueryService
     {
