@@ -2,8 +2,11 @@
 
 ## WHAT
 
-TypeScript MCP server implementing structured planning workflow.
-Layered architecture (domain/infrastructure/server) with file-based persistence, atomic writes, and cross-process locking.
+TypeScript MCP server with REST API implementing structured planning workflow.
+Monorepo architecture with 3 packages:
+- **@mcp-planner/core** - Domain logic + infrastructure (file-based persistence, atomic writes, locking)
+- **@mcp-planner/mcp-server** - MCP protocol server for Claude Code CLI
+- **@mcp-planner/web-server** - NestJS REST API for Web Dashboard (8 resources, 50+ endpoints)
 
 ## WHY
 
@@ -15,9 +18,11 @@ Supports traceability, version history, and batch operations with temp ID resolu
 ### Commands
 
 ```bash
-npm run build      # Compile TypeScript
-npm test           # Run all tests
-npm run lint:fix   # Fix ESLint errors -- MANDATORY after code changes
+npm run build         # Compile all packages
+npm test              # Run all tests (core + mcp-server + web-server)
+npm run lint:fix      # Fix ESLint errors -- MANDATORY after code changes
+npm run test:web      # Run web-server E2E tests only
+npm run build:web     # Build web-server only
 ```
 
 ### Workflow
@@ -73,16 +78,32 @@ Reference: `eslint.config.js` for full rules
 
 ## Key Files
 
+### Core Package (@mcp-planner/core)
 | Area | File |
 |------|------|
-| Entity types | `src/domain/entities/types.ts` |
-| Error hierarchy | `src/domain/repositories/errors.ts` |
-| Validators | `src/domain/services/validators.ts` |
-| Services init | `src/server/services.ts` |
-| Tool handlers | `src/server/handlers/` |
-| File storage | `src/infrastructure/file-storage.ts` |
-| File repository | `src/infrastructure/repositories/file/file-repository.ts` |
-| Lock manager | `src/infrastructure/repositories/file/file-lock-manager.ts` |
+| Entity types | `packages/core/src/domain/entities/types.ts` |
+| Error hierarchy | `packages/core/src/domain/repositories/errors.ts` |
+| Validators | `packages/core/src/domain/services/validators.ts` |
+| Domain services | `packages/core/src/domain/services/` (10 services) |
+| File storage | `packages/core/src/infrastructure/file-storage.ts` |
+| File repository | `packages/core/src/infrastructure/repositories/file/file-repository.ts` |
+| Lock manager | `packages/core/src/infrastructure/repositories/file/file-lock-manager.ts` |
+
+### MCP Server (@mcp-planner/mcp-server)
+| Area | File |
+|------|------|
+| Services init | `packages/mcp-server/src/server/services.ts` |
+| Tool handlers | `packages/mcp-server/src/server/handlers/` |
+| MCP entry point | `packages/mcp-server/src/index.ts` |
+
+### Web Server (@mcp-planner/web-server)
+| Area | File |
+|------|------|
+| Main app | `packages/web-server/src/main.ts` |
+| App module | `packages/web-server/src/app.module.ts` |
+| Core DI module | `packages/web-server/src/modules/core/core.module.ts` |
+| Feature modules | `packages/web-server/src/modules/*/` (plans, requirements, solutions, decisions, phases, artifacts, links, query) |
+| E2E tests | `packages/web-server/test/*.e2e-spec.ts` |
 
 ---
 

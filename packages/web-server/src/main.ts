@@ -39,7 +39,6 @@ async function bootstrap(): Promise<void> {
     .addTag('artifacts', 'Artifact management')
     .addTag('links', 'Entity linking')
     .addTag('query', 'Search and analysis')
-    .addTag('batch', 'Batch operations')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

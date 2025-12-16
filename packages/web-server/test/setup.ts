@@ -18,6 +18,7 @@ import { DecisionsModule } from '../src/modules/decisions/decisions.module.js';
 import { PhasesModule } from '../src/modules/phases/phases.module.js';
 import { ArtifactsModule } from '../src/modules/artifacts/artifacts.module.js';
 import { LinksModule } from '../src/modules/links/links.module.js';
+import { QueryModule } from '../src/modules/query/query.module.js';
 import {
   GlobalExceptionFilter,
   TransformInterceptor,
@@ -57,6 +58,7 @@ export async function createTestApp(): Promise<TestContext> {
       PhasesModule,
       ArtifactsModule,
       LinksModule,
+      QueryModule,
     ],
   }).compile();
 

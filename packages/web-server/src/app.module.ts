@@ -8,6 +8,7 @@ import { DecisionsModule } from './modules/decisions/index.js';
 import { PhasesModule } from './modules/phases/index.js';
 import { ArtifactsModule } from './modules/artifacts/index.js';
 import { LinksModule } from './modules/links/index.js';
+import { QueryModule } from './modules/query/index.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { LinksModule } from './modules/links/index.js';
     PhasesModule,
     ArtifactsModule,
     LinksModule,
+    QueryModule,
   ],
   controllers: [],
   providers: [],
