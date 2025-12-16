@@ -16,10 +16,19 @@ import {
   type RepositoryFactory,
 } from '@mcp-planner/core';
 
-// Token constants for DI
+// Token constants for DI - string tokens for reliable injection across ESM boundaries
 export const LOCK_MANAGER = 'LOCK_MANAGER';
 export const REPOSITORY_FACTORY = 'REPOSITORY_FACTORY';
 export const PLAN_SERVICE = 'PLAN_SERVICE';
+export const REQUIREMENT_SERVICE = 'REQUIREMENT_SERVICE';
+export const SOLUTION_SERVICE = 'SOLUTION_SERVICE';
+export const DECISION_SERVICE = 'DECISION_SERVICE';
+export const PHASE_SERVICE = 'PHASE_SERVICE';
+export const ARTIFACT_SERVICE = 'ARTIFACT_SERVICE';
+export const LINKING_SERVICE = 'LINKING_SERVICE';
+export const QUERY_SERVICE = 'QUERY_SERVICE';
+export const BATCH_SERVICE = 'BATCH_SERVICE';
+export const VERSION_HISTORY_SERVICE = 'VERSION_HISTORY_SERVICE';
 
 @Module({
   providers: [
@@ -76,23 +85,44 @@ export const PLAN_SERVICE = 'PLAN_SERVICE';
     },
     // VersionHistoryService (must be before services that depend on it)
     {
-      provide: VersionHistoryService,
+      provide: VERSION_HISTORY_SERVICE,
       useFactory: (repositoryFactory: RepositoryFactory): VersionHistoryService => {
         return new VersionHistoryService(repositoryFactory);
       },
       inject: [REPOSITORY_FACTORY],
     },
+    { provide: VersionHistoryService, useExisting: VERSION_HISTORY_SERVICE },
     // LinkingService (must be before services that depend on it)
     {
-      provide: LinkingService,
+      provide: LINKING_SERVICE,
       useFactory: (repositoryFactory: RepositoryFactory): LinkingService => {
         return new LinkingService(repositoryFactory);
       },
       inject: [REPOSITORY_FACTORY],
     },
-    // RequirementService - with VersionHistoryService and LinkingService for full functionality
+    { provide: LinkingService, useExisting: LINKING_SERVICE },
+    // DecisionService - must be before SolutionService
     {
-      provide: RequirementService,
+      provide: DECISION_SERVICE,
+      useFactory: (
+        repositoryFactory: RepositoryFactory,
+        planService: PlanService,
+        versionHistoryService: VersionHistoryService,
+        linkingService: LinkingService
+      ): DecisionService => {
+        return new DecisionService(
+          repositoryFactory,
+          planService,
+          versionHistoryService,
+          linkingService
+        );
+      },
+      inject: [REPOSITORY_FACTORY, PLAN_SERVICE, VERSION_HISTORY_SERVICE, LINKING_SERVICE],
+    },
+    { provide: DecisionService, useExisting: DECISION_SERVICE },
+    // RequirementService
+    {
+      provide: REQUIREMENT_SERVICE,
       useFactory: (
         repositoryFactory: RepositoryFactory,
         planService: PlanService,
@@ -106,11 +136,12 @@ export const PLAN_SERVICE = 'PLAN_SERVICE';
           linkingService
         );
       },
-      inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, LinkingService],
+      inject: [REPOSITORY_FACTORY, PLAN_SERVICE, VERSION_HISTORY_SERVICE, LINKING_SERVICE],
     },
-    // SolutionService - with VersionHistoryService, DecisionService, LinkingService for full functionality
+    { provide: RequirementService, useExisting: REQUIREMENT_SERVICE },
+    // SolutionService
     {
-      provide: SolutionService,
+      provide: SOLUTION_SERVICE,
       useFactory: (
         repositoryFactory: RepositoryFactory,
         planService: PlanService,
@@ -126,29 +157,12 @@ export const PLAN_SERVICE = 'PLAN_SERVICE';
           linkingService
         );
       },
-      inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, DecisionService, LinkingService],
+      inject: [REPOSITORY_FACTORY, PLAN_SERVICE, VERSION_HISTORY_SERVICE, DECISION_SERVICE, LINKING_SERVICE],
     },
-    // DecisionService - with VersionHistoryService for history/diff support
-    {
-      provide: DecisionService,
-      useFactory: (
-        repositoryFactory: RepositoryFactory,
-        planService: PlanService,
-        versionHistoryService: VersionHistoryService,
-        linkingService: LinkingService
-      ): DecisionService => {
-        return new DecisionService(
-          repositoryFactory,
-          planService,
-          versionHistoryService,
-          linkingService
-        );
-      },
-      inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, LinkingService],
-    },
+    { provide: SolutionService, useExisting: SOLUTION_SERVICE },
     // PhaseService
     {
-      provide: PhaseService,
+      provide: PHASE_SERVICE,
       useFactory: (
         repositoryFactory: RepositoryFactory,
         planService: PlanService,
@@ -162,11 +176,12 @@ export const PLAN_SERVICE = 'PLAN_SERVICE';
           linkingService
         );
       },
-      inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, LinkingService],
+      inject: [REPOSITORY_FACTORY, PLAN_SERVICE, VERSION_HISTORY_SERVICE, LINKING_SERVICE],
     },
-    // ArtifactService - with VersionHistoryService and LinkingService for full functionality
+    { provide: PhaseService, useExisting: PHASE_SERVICE },
+    // ArtifactService
     {
-      provide: ArtifactService,
+      provide: ARTIFACT_SERVICE,
       useFactory: (
         repositoryFactory: RepositoryFactory,
         planService: PlanService,
@@ -180,11 +195,12 @@ export const PLAN_SERVICE = 'PLAN_SERVICE';
           linkingService
         );
       },
-      inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, LinkingService],
+      inject: [REPOSITORY_FACTORY, PLAN_SERVICE, VERSION_HISTORY_SERVICE, LINKING_SERVICE],
     },
+    { provide: ArtifactService, useExisting: ARTIFACT_SERVICE },
     // QueryService
     {
-      provide: QueryService,
+      provide: QUERY_SERVICE,
       useFactory: (
         repositoryFactory: RepositoryFactory,
         planService: PlanService,
@@ -192,11 +208,12 @@ export const PLAN_SERVICE = 'PLAN_SERVICE';
       ): QueryService => {
         return new QueryService(repositoryFactory, planService, linkingService);
       },
-      inject: [REPOSITORY_FACTORY, PlanService, LinkingService],
+      inject: [REPOSITORY_FACTORY, PLAN_SERVICE, LINKING_SERVICE],
     },
+    { provide: QueryService, useExisting: QUERY_SERVICE },
     // BatchService
     {
-      provide: BatchService,
+      provide: BATCH_SERVICE,
       useFactory: (
         repositoryFactory: RepositoryFactory,
         planService: PlanService,
@@ -220,20 +237,31 @@ export const PLAN_SERVICE = 'PLAN_SERVICE';
       },
       inject: [
         REPOSITORY_FACTORY,
-        PlanService,
-        RequirementService,
-        SolutionService,
-        PhaseService,
-        LinkingService,
-        DecisionService,
-        ArtifactService,
+        PLAN_SERVICE,
+        REQUIREMENT_SERVICE,
+        SOLUTION_SERVICE,
+        PHASE_SERVICE,
+        LINKING_SERVICE,
+        DECISION_SERVICE,
+        ARTIFACT_SERVICE,
       ],
     },
+    { provide: BatchService, useExisting: BATCH_SERVICE },
   ],
   exports: [
     LOCK_MANAGER,
     REPOSITORY_FACTORY,
     PLAN_SERVICE,
+    REQUIREMENT_SERVICE,
+    SOLUTION_SERVICE,
+    DECISION_SERVICE,
+    PHASE_SERVICE,
+    ARTIFACT_SERVICE,
+    LINKING_SERVICE,
+    QUERY_SERVICE,
+    BATCH_SERVICE,
+    VERSION_HISTORY_SERVICE,
+    // Also export class tokens for backwards compatibility
     PlanService,
     RequirementService,
     SolutionService,

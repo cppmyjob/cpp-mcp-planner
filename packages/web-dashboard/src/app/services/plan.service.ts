@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { type Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { ApiService } from './api.service';
 import type {
@@ -9,6 +10,16 @@ import type {
   ListPlansParams,
   PlanSummary
 } from '../models';
+
+interface PlansListResponse {
+  plans: PlanManifest[];
+  total: number;
+  hasMore: boolean;
+}
+
+interface ActivePlanResponse {
+  activePlan: PlanManifest | null;
+}
 
 /**
  * Service for Plan API operations
@@ -23,7 +34,9 @@ export class PlanService {
    * List all plans with optional filters
    */
   public list(params?: ListPlansParams): Observable<PlanManifest[]> {
-    return this.api.get<PlanManifest[]>('/plans', params as Record<string, unknown>);
+    return this.api.get<PlansListResponse>('/plans', params as Record<string, unknown>).pipe(
+      map(response => response.plans)
+    );
   }
 
   /**
@@ -71,8 +84,10 @@ export class PlanService {
   /**
    * Get active plan for workspace
    */
-  public getActive(workspacePath: string): Observable<PlanManifest> {
-    return this.api.get<PlanManifest>('/plans/active', { workspacePath });
+  public getActive(workspacePath: string): Observable<PlanManifest | null> {
+    return this.api.get<ActivePlanResponse>('/plans/active', { workspacePath }).pipe(
+      map(response => response.activePlan)
+    );
   }
 
   /**

@@ -111,10 +111,10 @@ test.describe('MCP Planning Dashboard', () => {
     console.log('Theme button exists:', buttonExists);
 
     if (buttonExists) {
-      // Get initial theme state - ThemeService applies class to body, not html
-      const body = page.locator('body');
-      const initialClass = await body.getAttribute('class');
-      console.log('Initial body class:', initialClass);
+      // Get initial theme state - PrimeNG requires class on <html> element
+      const html = page.locator('html');
+      const initialClass = await html.getAttribute('class');
+      console.log('Initial html class:', initialClass);
       const initialIsDark = initialClass?.includes('dark-theme') ?? false;
 
       // Click theme toggle
@@ -124,8 +124,8 @@ test.describe('MCP Planning Dashboard', () => {
       await page.waitForTimeout(500);
 
       // Check new theme state
-      const newClass = await body.getAttribute('class');
-      console.log('New body class:', newClass);
+      const newClass = await html.getAttribute('class');
+      console.log('New html class:', newClass);
       const newIsDark = newClass?.includes('dark-theme') ?? false;
 
       // Verify theme actually toggled

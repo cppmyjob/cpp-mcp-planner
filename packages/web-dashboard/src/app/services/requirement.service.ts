@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { type Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { ApiService } from './api.service';
 import type {
@@ -9,6 +10,12 @@ import type {
   ListRequirementsParams,
   VersionHistory
 } from '../models';
+
+interface RequirementsListResponse {
+  requirements: Requirement[];
+  total: number;
+  hasMore: boolean;
+}
 
 /**
  * Service for Requirement API operations
@@ -23,9 +30,11 @@ export class RequirementService {
    * List requirements for plan
    */
   public list(planId: string, params?: ListRequirementsParams): Observable<Requirement[]> {
-    return this.api.get<Requirement[]>(
+    return this.api.get<RequirementsListResponse>(
       `/plans/${planId}/requirements`,
       params as Record<string, unknown>
+    ).pipe(
+      map(response => response.requirements)
     );
   }
 

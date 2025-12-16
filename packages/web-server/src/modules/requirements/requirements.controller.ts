@@ -9,10 +9,11 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Inject,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports -- NestJS DI requires runtime class reference
-import { RequirementService } from '@mcp-planner/core';
+import type { RequirementService } from '@mcp-planner/core';
+import { REQUIREMENT_SERVICE } from '../core/core.module.js';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports -- NestJS validation requires runtime class reference
 import {
   CreateRequirementDto,
@@ -33,7 +34,7 @@ import {
 @ApiTags('requirements')
 @Controller('plans/:planId/requirements')
 export class RequirementsController {
-  constructor(private readonly requirementService: RequirementService) {}
+  constructor(@Inject(REQUIREMENT_SERVICE) private readonly requirementService: RequirementService) {}
 
   /**
    * POST /api/v1/plans/:planId/requirements - Add requirement

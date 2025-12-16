@@ -47,12 +47,13 @@ export class ThemeService {
   }
 
   private applyTheme(theme: Theme): void {
-    const body = document.body;
+    // PrimeNG darkModeSelector requires class on <html> element
+    const root = document.documentElement;
 
     if (theme === 'dark') {
-      body.classList.add(this.darkThemeClass);
+      root.classList.add(this.darkThemeClass);
     } else {
-      body.classList.remove(this.darkThemeClass);
+      root.classList.remove(this.darkThemeClass);
     }
   }
 }
