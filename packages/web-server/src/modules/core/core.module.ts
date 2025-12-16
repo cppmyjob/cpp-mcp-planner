@@ -19,6 +19,7 @@ import {
 // Token constants for DI
 export const LOCK_MANAGER = 'LOCK_MANAGER';
 export const REPOSITORY_FACTORY = 'REPOSITORY_FACTORY';
+export const PLAN_SERVICE = 'PLAN_SERVICE';
 
 @Module({
   providers: [
@@ -60,13 +61,18 @@ export const REPOSITORY_FACTORY = 'REPOSITORY_FACTORY';
       },
       inject: [ConfigService, LOCK_MANAGER],
     },
-    // PlanService
+    // PlanService - use string token for reliable DI across ESM boundaries
     {
-      provide: PlanService,
+      provide: PLAN_SERVICE,
       useFactory: (repositoryFactory: RepositoryFactory): PlanService => {
         return new PlanService(repositoryFactory);
       },
       inject: [REPOSITORY_FACTORY],
+    },
+    // Also provide as class for backwards compatibility
+    {
+      provide: PlanService,
+      useExisting: PLAN_SERVICE,
     },
     // VersionHistoryService (must be before services that depend on it)
     {
@@ -227,6 +233,7 @@ export const REPOSITORY_FACTORY = 'REPOSITORY_FACTORY';
   exports: [
     LOCK_MANAGER,
     REPOSITORY_FACTORY,
+    PLAN_SERVICE,
     PlanService,
     RequirementService,
     SolutionService,

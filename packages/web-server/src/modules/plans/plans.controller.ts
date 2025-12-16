@@ -9,10 +9,11 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Inject,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports -- NestJS DI requires runtime class reference
-import { PlanService } from '@mcp-planner/core';
+import type { PlanService } from '@mcp-planner/core';
+import { PLAN_SERVICE } from '../core/core.module.js';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports -- NestJS validation requires runtime class reference
 import {
   CreatePlanDto,
@@ -27,7 +28,7 @@ import {
 @ApiTags('plans')
 @Controller('plans')
 export class PlansController {
-  constructor(private readonly planService: PlanService) {}
+  constructor(@Inject(PLAN_SERVICE) private readonly planService: PlanService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)

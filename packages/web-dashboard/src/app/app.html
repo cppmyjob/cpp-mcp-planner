@@ -13,6 +13,63 @@
   </header>
 
   <main class="app-main">
+    <!-- Loading State -->
+    @if (loading()) {
+      <div class="loading" data-testid="loading">
+        <p-progressSpinner ariaLabel="Loading" />
+      </div>
+    }
+
+    <!-- Error State -->
+    @if (error()) {
+      <div class="error" data-testid="error">
+        <p-message severity="error" [text]="error()!" />
+      </div>
+    }
+
+    <!-- Requirements Table -->
+    @if (!loading() && !error()) {
+      @if (requirements().length === 0) {
+        <div class="empty-state">
+          <p>No requirements found for this plan.</p>
+        </div>
+      } @else {
+        <p-table [value]="requirements()" [tableStyle]="{ 'min-width': '50rem' }">
+          <ng-template #header>
+            <tr>
+              <th>Title</th>
+              <th>Description</th>
+              <th>Priority</th>
+              <th>Category</th>
+              <th>Status</th>
+              <th>Votes</th>
+            </tr>
+          </ng-template>
+          <ng-template #body let-req>
+            <tr>
+              <td>{{ req.title }}</td>
+              <td>{{ req.description }}</td>
+              <td>
+                <p-tag
+                  [value]="req.priority"
+                  [severity]="getPrioritySeverity(req.priority)"
+                  data-testid="priority"
+                />
+              </td>
+              <td>{{ req.category }}</td>
+              <td>
+                <p-tag
+                  [value]="req.status"
+                  [severity]="getStatusSeverity(req.status)"
+                />
+              </td>
+              <td>{{ req.votes }}</td>
+            </tr>
+          </ng-template>
+        </p-table>
+      }
+    }
+
     <router-outlet />
   </main>
 </div>
