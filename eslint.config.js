@@ -122,6 +122,7 @@ export default tseslint.config(
       'node_modules/',
       'packages/*/dist/',
       'packages/*/jest.config.js',
+      'packages/*/eslint.config.js',
       'packages/web-dashboard/**',
       '*.js',
       '!eslint.config.js',

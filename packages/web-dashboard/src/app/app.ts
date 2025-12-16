@@ -9,15 +9,15 @@ import { ThemeService } from './services/theme.service';
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
-export class App {
+export class AppComponent {
   protected readonly title = signal('MCP Planning Dashboard');
   protected readonly themeService = inject(ThemeService);
 
-  protected toggleTheme(): void {
-    this.themeService.toggleTheme();
-  }
-
   protected get isDarkTheme(): boolean {
     return this.themeService.currentTheme() === 'dark';
+  }
+
+  protected toggleTheme(): void {
+    this.themeService.toggleTheme();
   }
 }
