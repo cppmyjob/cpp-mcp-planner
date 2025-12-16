@@ -13,6 +13,8 @@ import * as os from 'node:os';
 import { CoreModule } from '../src/modules/core/core.module.js';
 import { PlansModule } from '../src/modules/plans/plans.module.js';
 import { RequirementsModule } from '../src/modules/requirements/requirements.module.js';
+import { SolutionsModule } from '../src/modules/solutions/solutions.module.js';
+import { DecisionsModule } from '../src/modules/decisions/decisions.module.js';
 import {
   GlobalExceptionFilter,
   TransformInterceptor,
@@ -47,6 +49,8 @@ export async function createTestApp(): Promise<TestContext> {
       CoreModule,
       PlansModule,
       RequirementsModule,
+      SolutionsModule,
+      DecisionsModule,
     ],
   }).compile();
 

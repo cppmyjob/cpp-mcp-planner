@@ -277,6 +277,13 @@ export class SolutionService {
   }
 
   public async proposeSolution(input: ProposeSolutionInput): Promise<ProposeSolutionResult> {
+    // Validate plan exists before creating solution
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const planExists = await planRepo.planExists(input.planId);
+    if (!planExists) {
+      throw new NotFoundError('plan', input.planId);
+    }
+
     // Validate REQUIRED fields
     validateRequiredString(input.solution.title, 'title');
 
@@ -574,6 +581,13 @@ export class SolutionService {
   }
 
   public async listSolutions(input: ListSolutionsInput): Promise<ListSolutionsResult> {
+    // Validate plan exists before listing
+    const planRepo = this.repositoryFactory.createPlanRepository();
+    const planExists = await planRepo.planExists(input.planId);
+    if (!planExists) {
+      throw new NotFoundError('plan', input.planId);
+    }
+
     const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
     let solutions = await repo.findAll();
 
@@ -697,9 +711,11 @@ export class SolutionService {
     // REQ-6: Load current entity to get accurate currentVersion
     const repo = this.repositoryFactory.createRepository<Solution>('solution', input.planId);
     let currentVersion = 1;
+    let solutionExists = false;
     try {
       const currentSolution = await repo.findById(input.solutionId);
       currentVersion = currentSolution.version;
+      solutionExists = true;
     } catch {
       // Entity might be deleted - use version from history file
     }
@@ -711,6 +727,11 @@ export class SolutionService {
       limit: input.limit,
       offset: input.offset,
     });
+
+    // If solution doesn't exist AND has no history -> 404
+    if (!solutionExists && history.total === 0) {
+      throw new NotFoundError('solution', input.solutionId);
+    }
 
     // REQ-6: Override currentVersion with actual entity version
     history.currentVersion = currentVersion;
@@ -887,7 +908,12 @@ export class SolutionService {
       .filter((s) => s.id !== input.solutionId)
       .map((altSolution) => ({
         option: altSolution.title,
-        reasoning: (altSolution.description !== '') ? altSolution.description : altSolution.approach,
+        // Fallback to title-based reasoning when both description and approach are empty
+        reasoning: (altSolution.description !== '')
+          ? altSolution.description
+          : (altSolution.approach !== '')
+            ? altSolution.approach
+            : `Alternative solution: ${altSolution.title}`,
         whyNotChosen:
           altSolution.status === 'rejected'
             ? `Rejected in favor of ${selectedSolution.title}`

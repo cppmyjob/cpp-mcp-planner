@@ -86,27 +86,43 @@ export const REPOSITORY_FACTORY = 'REPOSITORY_FACTORY';
       },
       inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, LinkingService],
     },
-    // SolutionService
+    // SolutionService - with VersionHistoryService, DecisionService, LinkingService for full functionality
     {
       provide: SolutionService,
       useFactory: (
         repositoryFactory: RepositoryFactory,
-        planService: PlanService
+        planService: PlanService,
+        versionHistoryService: VersionHistoryService,
+        decisionService: DecisionService,
+        linkingService: LinkingService
       ): SolutionService => {
-        return new SolutionService(repositoryFactory, planService);
+        return new SolutionService(
+          repositoryFactory,
+          planService,
+          versionHistoryService,
+          decisionService,
+          linkingService
+        );
       },
-      inject: [REPOSITORY_FACTORY, PlanService],
+      inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, DecisionService, LinkingService],
     },
-    // DecisionService
+    // DecisionService - with VersionHistoryService for history/diff support
     {
       provide: DecisionService,
       useFactory: (
         repositoryFactory: RepositoryFactory,
-        planService: PlanService
+        planService: PlanService,
+        versionHistoryService: VersionHistoryService,
+        linkingService: LinkingService
       ): DecisionService => {
-        return new DecisionService(repositoryFactory, planService);
+        return new DecisionService(
+          repositoryFactory,
+          planService,
+          versionHistoryService,
+          linkingService
+        );
       },
-      inject: [REPOSITORY_FACTORY, PlanService],
+      inject: [REPOSITORY_FACTORY, PlanService, VersionHistoryService, LinkingService],
     },
     // PhaseService
     {

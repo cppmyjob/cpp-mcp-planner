@@ -101,15 +101,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     // Handle standard errors with message-based mapping
-    if (exception instanceof Error) {
-      const status = this.mapErrorMessageToStatus(exception.message);
+    // Note: Some Node.js errors (like SystemError) may not pass instanceof Error due to context issues
+    const errorLike = exception as { message?: string; code?: string };
+    if (exception instanceof Error || (errorLike.message !== undefined)) {
+      const message = errorLike.message ?? String(exception);
+      const status = this.mapErrorMessageToStatus(message);
       return {
         status,
         errorResponse: {
           success: false,
           error: {
             code: status === HttpStatus.NOT_FOUND ? 'NOT_FOUND' : 'INTERNAL_ERROR',
-            message: exception.message,
+            message,
           },
           timestamp,
           path,
@@ -158,13 +161,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   private mapErrorMessageToStatus(message: string): HttpStatus {
     const lowerMessage = message.toLowerCase();
 
+    // File system errors (ENOENT = file/directory not found)
+    if (lowerMessage.includes('enoent') || lowerMessage.includes('no such file or directory')) {
+      return HttpStatus.NOT_FOUND;
+    }
     if (lowerMessage.includes('not found')) {
       return HttpStatus.NOT_FOUND;
     }
     if (
       lowerMessage.includes('validation') ||
       lowerMessage.includes('invalid') ||
-      lowerMessage.includes('cannot')
+      lowerMessage.includes('cannot') ||
+      lowerMessage.includes('requires') ||
+      lowerMessage.includes('must be') ||
+      lowerMessage.includes('non-empty')
     ) {
       return HttpStatus.BAD_REQUEST;
     }
