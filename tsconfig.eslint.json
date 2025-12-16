@@ -3,6 +3,20 @@
   "compilerOptions": {
     "rootDir": "."
   },
-  "include": ["packages/*/src/**/*", "packages/*/test/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "dist", "packages/*/dist", "packages/*/jest.config.js"]
+  "include": [
+    "packages/core/src/**/*",
+    "packages/core/test/**/*",
+    "packages/mcp-server/src/**/*",
+    "packages/mcp-server/test/**/*",
+    "packages/web-server/src/**/*",
+    "packages/web-server/test/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "packages/*/dist",
+    "packages/*/jest.config.js",
+    "packages/web-dashboard/**"
+  ]
 }

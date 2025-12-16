@@ -7,8 +7,8 @@ export type Theme = 'light' | 'dark';
 })
 export class ThemeService {
   public readonly currentTheme = signal<Theme>('light');
-  private readonly THEME_STORAGE_KEY = 'app-theme';
-  private readonly DARK_THEME_CLASS = 'dark-theme';
+  private readonly themeStorageKey = 'app-theme';
+  private readonly darkThemeClass = 'dark-theme';
 
   constructor() {
     // Load theme from localStorage on initialization
@@ -31,7 +31,7 @@ export class ThemeService {
   }
 
   private loadTheme(): void {
-    const savedTheme = localStorage.getItem(this.THEME_STORAGE_KEY) as Theme | null;
+    const savedTheme = localStorage.getItem(this.themeStorageKey) as Theme | null;
 
     if (savedTheme === 'light' || savedTheme === 'dark') {
       this.currentTheme.set(savedTheme);
@@ -43,16 +43,16 @@ export class ThemeService {
   }
 
   private saveTheme(theme: Theme): void {
-    localStorage.setItem(this.THEME_STORAGE_KEY, theme);
+    localStorage.setItem(this.themeStorageKey, theme);
   }
 
   private applyTheme(theme: Theme): void {
     const body = document.body;
 
     if (theme === 'dark') {
-      body.classList.add(this.DARK_THEME_CLASS);
+      body.classList.add(this.darkThemeClass);
     } else {
-      body.classList.remove(this.DARK_THEME_CLASS);
+      body.classList.remove(this.darkThemeClass);
     }
   }
 }
