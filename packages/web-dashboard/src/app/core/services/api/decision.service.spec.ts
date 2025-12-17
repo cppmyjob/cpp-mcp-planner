@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 
 import { DecisionService } from './decision.service';
 import { API_BASE_URL } from './api.service';
-import type { Decision, CreateDecisionDto } from '../models';
+import type { Decision, CreateDecisionDto } from '../../../models';
 
 describe('DecisionService', () => {
   let service: DecisionService;

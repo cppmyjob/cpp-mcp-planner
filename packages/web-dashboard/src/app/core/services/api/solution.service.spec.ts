@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 
 import { SolutionService } from './solution.service';
 import { API_BASE_URL } from './api.service';
-import type { Solution, CreateSolutionDto } from '../models';
+import type { Solution, CreateSolutionDto } from '../../../models';
 
 describe('SolutionService', () => {
   let service: SolutionService;

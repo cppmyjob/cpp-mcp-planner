@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 
 import { PlanService } from './plan.service';
 import { API_BASE_URL } from './api.service';
-import type { PlanManifest, CreatePlanDto } from '../models';
+import type { PlanManifest, CreatePlanDto } from '../../../models';
 
 describe('PlanService', () => {
   let service: PlanService;
@@ -59,7 +59,7 @@ describe('PlanService', () => {
 
       const req = httpMock.expectOne(`${baseUrl}/plans`);
       expect(req.request.method).toBe('GET');
-      req.flush(mockPlans);
+      req.flush({ plans: mockPlans, total: 1, hasMore: false });
     });
 
     it('should filter by status', () => {
@@ -67,7 +67,7 @@ describe('PlanService', () => {
 
       const req = httpMock.expectOne(`${baseUrl}/plans?status=active`);
       expect(req.request.method).toBe('GET');
-      req.flush([]);
+      req.flush({ plans: [], total: 0, hasMore: false });
     });
   });
 
@@ -161,7 +161,7 @@ describe('PlanService', () => {
                      request.params.get('workspacePath') === '/workspace/path'
       );
       expect(req.request.method).toBe('GET');
-      req.flush(mockPlan);
+      req.flush({ activePlan: mockPlan });
     });
   });
 });

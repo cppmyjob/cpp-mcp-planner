@@ -3,7 +3,7 @@ import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { AppComponent } from './app';
-import { API_BASE_URL } from './services/api.service';
+import { API_BASE_URL } from './core/services/api/api.service';
 import type { PlanManifest, Requirement } from './models';
 
 // Mock window.matchMedia for ThemeService
@@ -113,13 +113,13 @@ describe('AppComponent', () => {
 
     // Handle plans request
     const plansReq = httpMock.expectOne(`${baseUrl}/plans`);
-    plansReq.flush([mockPlan]);
+    plansReq.flush({ plans: [mockPlan], total: 1, hasMore: false });
 
     await fixture.whenStable();
 
     // Handle requirements request
     const reqsReq = httpMock.expectOne(`${baseUrl}/plans/plan-1/requirements`);
-    reqsReq.flush(mockRequirements);
+    reqsReq.flush({ requirements: mockRequirements, total: mockRequirements.length, hasMore: false });
 
     await fixture.whenStable();
     fixture.detectChanges();
@@ -135,13 +135,13 @@ describe('AppComponent', () => {
 
       const plansReq = httpMock.expectOne(`${baseUrl}/plans`);
       expect(plansReq.request.method).toBe('GET');
-      plansReq.flush([mockPlan]);
+      plansReq.flush({ plans: [mockPlan], total: 1, hasMore: false });
 
       await fixture.whenStable();
 
       // Handle requirements request
       const reqsReq = httpMock.expectOne(`${baseUrl}/plans/plan-1/requirements`);
-      reqsReq.flush(mockRequirements);
+      reqsReq.flush({ requirements: mockRequirements, total: mockRequirements.length, hasMore: false });
 
       await fixture.whenStable();
       fixture.detectChanges();
@@ -153,14 +153,14 @@ describe('AppComponent', () => {
 
       // First, plans are loaded
       const plansReq = httpMock.expectOne(`${baseUrl}/plans`);
-      plansReq.flush([mockPlan]);
+      plansReq.flush({ plans: [mockPlan], total: 1, hasMore: false });
 
       await fixture.whenStable();
 
       // Then requirements are loaded for first plan
       const reqsReq = httpMock.expectOne(`${baseUrl}/plans/plan-1/requirements`);
       expect(reqsReq.request.method).toBe('GET');
-      reqsReq.flush(mockRequirements);
+      reqsReq.flush({ requirements: mockRequirements, total: mockRequirements.length, hasMore: false });
 
       await fixture.whenStable();
       fixture.detectChanges();
@@ -171,12 +171,12 @@ describe('AppComponent', () => {
       fixture.detectChanges();
 
       const plansReq = httpMock.expectOne(`${baseUrl}/plans`);
-      plansReq.flush([mockPlan]);
+      plansReq.flush({ plans: [mockPlan], total: 1, hasMore: false });
 
       await fixture.whenStable();
 
       const reqsReq = httpMock.expectOne(`${baseUrl}/plans/plan-1/requirements`);
-      reqsReq.flush(mockRequirements);
+      reqsReq.flush({ requirements: mockRequirements, total: mockRequirements.length, hasMore: false });
 
       await fixture.whenStable();
       fixture.detectChanges();
@@ -202,8 +202,16 @@ describe('AppComponent', () => {
       const loadingIndicator = compiled.querySelector('.loading, p-progressSpinner, [data-testid="loading"]');
       expect(loadingIndicator).toBeTruthy();
 
-      // Complete the requests to cleanup
-      httpMock.match(() => true).forEach(req => req.flush([]));
+      // Complete the requests to cleanup with proper response format
+      httpMock.match(() => true).forEach(req => {
+        if (req.request.url.includes('/plans') && !req.request.url.includes('/requirements')) {
+          req.flush({ plans: [], total: 0, hasMore: false });
+        } else if (req.request.url.includes('/requirements')) {
+          req.flush({ requirements: [], total: 0, hasMore: false });
+        } else {
+          req.flush({});
+        }
+      });
     });
 
     it('should show error message when API fails', async () => {
@@ -228,12 +236,12 @@ describe('AppComponent', () => {
       fixture.detectChanges();
 
       const plansReq = httpMock.expectOne(`${baseUrl}/plans`);
-      plansReq.flush([mockPlan]);
+      plansReq.flush({ plans: [mockPlan], total: 1, hasMore: false });
 
       await fixture.whenStable();
 
       const reqsReq = httpMock.expectOne(`${baseUrl}/plans/plan-1/requirements`);
-      reqsReq.flush([]);
+      reqsReq.flush({ requirements: [], total: 0, hasMore: false });
 
       await fixture.whenStable();
       fixture.detectChanges();
@@ -249,12 +257,12 @@ describe('AppComponent', () => {
       fixture.detectChanges();
 
       const plansReq = httpMock.expectOne(`${baseUrl}/plans`);
-      plansReq.flush([mockPlan]);
+      plansReq.flush({ plans: [mockPlan], total: 1, hasMore: false });
 
       await fixture.whenStable();
 
       const reqsReq = httpMock.expectOne(`${baseUrl}/plans/plan-1/requirements`);
-      reqsReq.flush(mockRequirements);
+      reqsReq.flush({ requirements: mockRequirements, total: mockRequirements.length, hasMore: false });
 
       await fixture.whenStable();
       fixture.detectChanges();

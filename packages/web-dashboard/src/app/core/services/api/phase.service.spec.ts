@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 
 import { PhaseService } from './phase.service';
 import { API_BASE_URL } from './api.service';
-import type { Phase, AddPhaseDto, PhaseTreeNode } from '../models';
+import type { Phase, AddPhaseDto, PhaseTreeNode } from '../../../models';
 
 describe('PhaseService', () => {
   let service: PhaseService;

@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 
 import { RequirementService } from './requirement.service';
 import { API_BASE_URL } from './api.service';
-import type { Requirement, CreateRequirementDto } from '../models';
+import type { Requirement, CreateRequirementDto } from '../../../models';
 
 describe('RequirementService', () => {
   let service: RequirementService;
@@ -55,21 +55,21 @@ describe('RequirementService', () => {
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/requirements`);
       expect(req.request.method).toBe('GET');
-      req.flush([mockRequirement]);
+      req.flush({ requirements: [mockRequirement], total: 1, hasMore: false });
     });
 
     it('should filter by status', () => {
       service.list(planId, { status: 'approved' }).subscribe();
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/requirements?status=approved`);
-      req.flush([]);
+      req.flush({ requirements: [], total: 0, hasMore: false });
     });
 
     it('should filter by priority', () => {
       service.list(planId, { priority: 'critical' }).subscribe();
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/requirements?priority=critical`);
-      req.flush([]);
+      req.flush({ requirements: [], total: 0, hasMore: false });
     });
   });
 

@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 
 import { LinkService } from './link.service';
 import { API_BASE_URL } from './api.service';
-import type { Link, CreateLinkDto } from '../models';
+import type { Link, CreateLinkDto } from '../../../models';
 
 describe('LinkService', () => {
   let service: LinkService;

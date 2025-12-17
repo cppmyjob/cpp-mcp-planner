@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 
 import { ArtifactService } from './artifact.service';
 import { API_BASE_URL } from './api.service';
-import type { Artifact, AddArtifactDto } from '../models';
+import type { Artifact, AddArtifactDto } from '../../../models';
 
 describe('ArtifactService', () => {
   let service: ArtifactService;
