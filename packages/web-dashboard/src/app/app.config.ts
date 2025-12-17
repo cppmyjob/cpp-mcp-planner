@@ -6,7 +6,7 @@ import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
 
 import { routes } from './app.routes';
-import { apiResponseInterceptor } from './interceptors';
+import { apiResponseInterceptor } from './core';
 
 export const appConfig: ApplicationConfig = {
   providers: [

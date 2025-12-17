@@ -10,7 +10,7 @@ import type {
   SelectSolutionDto,
   SolutionComparison,
   VersionHistory
-} from '../models';
+} from '../../../models';
 
 /**
  * Service for Solution API operations

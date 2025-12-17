@@ -6,9 +6,7 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { MessageModule } from 'primeng/message';
-import { ThemeService } from './services/theme.service';
-import { PlanService } from './services/plan.service';
-import { RequirementService } from './services/requirement.service';
+import { ThemeService, PlanService, RequirementService } from './core';
 import type { PlanManifest, Requirement, RequirementPriority } from './models';
 
 @Component({

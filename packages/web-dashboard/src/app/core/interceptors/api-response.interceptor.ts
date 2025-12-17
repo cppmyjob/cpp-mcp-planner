@@ -1,4 +1,4 @@
-import { HttpInterceptorFn, HttpResponse } from '@angular/common/http';
+import { type HttpInterceptorFn, HttpResponse } from '@angular/common/http';
 import { map } from 'rxjs/operators';
 
 interface ApiResponse<T> {

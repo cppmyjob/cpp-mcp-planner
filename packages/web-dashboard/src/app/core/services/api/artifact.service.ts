@@ -8,7 +8,7 @@ import type {
   UpdateArtifactDto,
   ListArtifactsParams,
   VersionHistory
-} from '../models';
+} from '../../../models';
 
 /**
  * Service for Artifact API operations

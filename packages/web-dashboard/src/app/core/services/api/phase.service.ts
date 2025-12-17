@@ -13,7 +13,7 @@ import type {
   PhaseTreeNode,
   NextAction,
   VersionHistory
-} from '../models';
+} from '../../../models';
 
 /**
  * Service for Phase API operations

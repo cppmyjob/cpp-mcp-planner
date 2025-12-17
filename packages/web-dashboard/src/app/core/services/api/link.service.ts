@@ -6,7 +6,7 @@ import type {
   Link,
   CreateLinkDto,
   RelationType
-} from '../models';
+} from '../../../models';
 
 /**
  * Service for Link API operations

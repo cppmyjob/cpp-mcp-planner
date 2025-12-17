@@ -9,7 +9,7 @@ import type {
   UpdateRequirementDto,
   ListRequirementsParams,
   VersionHistory
-} from '../models';
+} from '../../../models';
 
 interface RequirementsListResponse {
   requirements: Requirement[];

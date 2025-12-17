@@ -9,7 +9,7 @@ import type {
   UpdatePlanDto,
   ListPlansParams,
   PlanSummary
-} from '../models';
+} from '../../../models';
 
 interface PlansListResponse {
   plans: PlanManifest[];

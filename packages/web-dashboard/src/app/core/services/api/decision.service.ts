@@ -9,7 +9,7 @@ import type {
   ListDecisionsParams,
   SupersedeDecisionDto,
   VersionHistory
-} from '../models';
+} from '../../../models';
 
 /**
  * Service for Decision API operations (ADR pattern)
