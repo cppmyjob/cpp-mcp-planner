@@ -1,0 +1,30 @@
+.requirements-chart {
+  margin-bottom: 2rem;
+
+  &__header {
+    padding: 1.5rem 1.5rem 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--p-text-color);
+  }
+
+  &__loading,
+  &__error {
+    padding: 2rem;
+    text-align: center;
+    color: var(--p-text-muted-color);
+  }
+
+  &__error {
+    color: var(--p-error-color);
+  }
+
+  &__canvas-container {
+    height: 300px;
+    padding: 1rem;
+  }
+}

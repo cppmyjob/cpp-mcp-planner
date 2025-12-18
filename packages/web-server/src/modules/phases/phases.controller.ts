@@ -10,10 +10,11 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports -- NestJS DI requires runtime class reference
-import { PhaseService } from '@mcp-planner/core';
+import type { PhaseService } from '@mcp-planner/core';
+import { PHASE_SERVICE } from '../core/core.module.js';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports -- NestJS validation requires runtime class reference
 import {
   AddPhaseDto,
@@ -41,7 +42,7 @@ import {
 @ApiTags('phases')
 @Controller('plans/:planId/phases')
 export class PhasesController {
-  constructor(private readonly phaseService: PhaseService) {}
+  constructor(@Inject(PHASE_SERVICE) private readonly phaseService: PhaseService) {}
 
   /**
    * POST /api/v1/plans/:planId/phases - Add phase
@@ -117,26 +118,93 @@ export class PhasesController {
   }
 
   /**
-   * GET /api/v1/plans/:planId/phases - List phases by IDs
-   * UI: Entity Graph nodes
+   * GET /api/v1/plans/:planId/phases - List phases by IDs or filters
+   * UI: Entity Graph nodes, Dashboard (filtered by status)
+   * Supports two modes:
+   * 1. By IDs: ?phaseIds=id1,id2,id3
+   * 2. By filters: ?status=in_progress or ?parentId=xxx
    */
   @Get()
-  @ApiOperation({ summary: 'List multiple phases by IDs' })
+  @ApiOperation({ summary: 'List phases by IDs or filters' })
   @ApiParam({ name: 'planId', description: 'Plan ID' })
   @ApiResponse({ status: 200, description: 'Phases retrieved successfully' })
-  @ApiResponse({ status: 400, description: 'Missing phaseIds parameter' })
+  @ApiResponse({ status: 400, description: 'Missing phaseIds or filter parameters' })
   @ApiResponse({ status: 404, description: 'Plan not found' })
   public async list(
     @Param('planId') planId: string,
     @Query() query: ListPhasesQueryDto
   ): Promise<unknown> {
-    return this.phaseService.getPhases({
-      planId,
-      phaseIds: query.phaseIds,
-      fields: query.fields,
-      excludeMetadata: query.excludeMetadata,
-      excludeComputed: query.excludeComputed,
-    });
+    // Mode 1: List by IDs
+    if (query.phaseIds && query.phaseIds.length > 0) {
+      return this.phaseService.getPhases({
+        planId,
+        phaseIds: query.phaseIds,
+        fields: query.fields,
+        excludeMetadata: query.excludeMetadata,
+        excludeComputed: query.excludeComputed,
+      });
+    }
+
+    // Mode 2: Filter by status or parentId
+    if (query.status !== undefined || query.parentId !== undefined) {
+      // Ensure fields is array or undefined (NestJS validation pipe may not always apply @Transform)
+      const fields = query.fields
+        ? Array.isArray(query.fields)
+          ? query.fields
+          : (query.fields as string).split(',').map((f) => f.trim())
+        : undefined;
+
+      // Use PhaseRepository to get all phases and filter
+      const treeResult = await this.phaseService.getPhaseTree({
+        planId,
+        includeCompleted: true,
+        fields,
+        excludeMetadata: query.excludeMetadata,
+        excludeComputed: query.excludeComputed,
+      });
+
+      // Flatten tree to array
+      interface TreeNode {
+        phase: {
+          status?: string;
+          parentId?: string | null;
+          [key: string]: unknown;
+        };
+        children?: TreeNode[];
+      }
+
+      const flattenTree = (nodes: TreeNode[]): TreeNode['phase'][] => {
+        return nodes.reduce<TreeNode['phase'][]>((acc, node) => {
+          acc.push(node.phase);
+          if (node.children !== undefined && node.children.length > 0) {
+            acc.push(...flattenTree(node.children));
+          }
+          return acc;
+        }, []);
+      };
+
+      const allPhases = flattenTree(treeResult.tree as TreeNode[]);
+
+      // Apply filters
+      const filtered = allPhases.filter((phase) => {
+        if (query.status !== undefined && phase.status !== query.status) {
+          return false;
+        }
+        if (query.parentId !== undefined) {
+          // parentId can be null for root phases or a string for child phases
+          if (query.parentId === 'null' || query.parentId === '') {
+            return phase.parentId === null || phase.parentId === undefined;
+          }
+          return phase.parentId === query.parentId;
+        }
+        return true;
+      });
+
+      return { phases: filtered };
+    }
+
+    // Neither phaseIds nor filters provided
+    throw new BadRequestException('Either phaseIds or filter parameters (status, parentId) must be provided');
   }
 
   /**

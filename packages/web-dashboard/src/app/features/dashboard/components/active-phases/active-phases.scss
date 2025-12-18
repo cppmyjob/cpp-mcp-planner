@@ -1,0 +1,47 @@
+.active-phases {
+  margin-bottom: 2rem;
+
+  &__header {
+    padding: 1.5rem 1.5rem 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--p-text-color);
+  }
+
+  &__loading,
+  &__error,
+  &__empty {
+    padding: 2rem;
+    text-align: center;
+    color: var(--p-text-muted-color);
+  }
+
+  &__error {
+    color: var(--p-error-color);
+  }
+
+  &__phase-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__phase-path {
+    font-size: 0.75rem;
+    color: var(--p-text-muted-color);
+    font-family: monospace;
+    padding: 0.125rem 0.375rem;
+    background: var(--p-surface-100);
+    border-radius: 4px;
+  }
+
+  &__progress-text {
+    font-size: 0.75rem;
+    color: var(--p-text-muted-color);
+    margin-left: 0.5rem;
+  }
+}

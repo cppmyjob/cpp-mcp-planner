@@ -473,13 +473,128 @@ describe('Phases API (e2e)', () => {
       expect(body.data?.notFound).toContain('non-existent-id');
     });
 
-    it('should return 400 for missing phaseIds', async () => {
+    it('should return 400 for missing phaseIds when no filters provided', async () => {
       const response = await request(getServer())
         .get(`/api/v1/plans/${testPlanId}/phases`)
         .expect(HttpStatus.BAD_REQUEST);
 
       const body = response.body as ApiResponse;
       expect(body.success).toBe(false);
+    });
+
+    // RED: These tests will fail until we implement status filtering
+    it('RED: should filter phases by status=in_progress', async () => {
+      // First create a phase with in_progress status
+      const createResp = await request(getServer())
+        .post(`/api/v1/plans/${testPlanId}/phases`)
+        .send({ title: 'Status Filter Test - In Progress' });
+      const createBody = createResp.body as ApiResponse<PhaseData>;
+      const phaseId = createBody.data?.phaseId ?? '';
+
+      // Update status to in_progress
+      await request(getServer())
+        .patch(`/api/v1/plans/${testPlanId}/phases/${phaseId}/status`)
+        .send({ status: 'in_progress', progress: 50 });
+
+      // Now try to filter by status
+      const response = await request(getServer())
+        .get(`/api/v1/plans/${testPlanId}/phases`)
+        .query({ status: 'in_progress' })
+        .expect(HttpStatus.OK);
+
+      const body = response.body as ApiResponse<ListPhasesData>;
+      expect(body.success).toBe(true);
+      expect(body.data?.phases).toBeInstanceOf(Array);
+      expect(body.data?.phases.length).toBeGreaterThan(0);
+
+      // All returned phases should have status='in_progress'
+      const allInProgress = body.data?.phases.every(p => p.status === 'in_progress');
+      expect(allInProgress).toBe(true);
+    });
+
+    it('RED: should filter phases by status=blocked', async () => {
+      // Create a phase with blocked status
+      const createResp = await request(getServer())
+        .post(`/api/v1/plans/${testPlanId}/phases`)
+        .send({ title: 'Status Filter Test - Blocked' });
+      const createBody = createResp.body as ApiResponse<PhaseData>;
+      const phaseId = createBody.data?.phaseId ?? '';
+
+      // Update status to blocked (with blocking reason)
+      await request(getServer())
+        .patch(`/api/v1/plans/${testPlanId}/phases/${phaseId}/status`)
+        .send({ status: 'blocked', notes: 'Blocked by dependencies' });
+
+      // Filter by status=blocked
+      const response = await request(getServer())
+        .get(`/api/v1/plans/${testPlanId}/phases`)
+        .query({ status: 'blocked' })
+        .expect(HttpStatus.OK);
+
+      const body = response.body as ApiResponse<ListPhasesData>;
+      expect(body.success).toBe(true);
+      expect(body.data?.phases).toBeInstanceOf(Array);
+      expect(body.data?.phases.length).toBeGreaterThan(0);
+
+      // All returned phases should have status='blocked'
+      const allBlocked = body.data?.phases.every(p => p.status === 'blocked');
+      expect(allBlocked).toBe(true);
+    });
+
+    it('RED: should filter phases by parentId', async () => {
+      // Create parent phase
+      const parentResp = await request(getServer())
+        .post(`/api/v1/plans/${testPlanId}/phases`)
+        .send({ title: 'Parent Filter Test' });
+      const parentBody = parentResp.body as ApiResponse<PhaseData>;
+      const parentId = parentBody.data?.phaseId ?? '';
+
+      // Create child phases
+      await request(getServer())
+        .post(`/api/v1/plans/${testPlanId}/phases`)
+        .send({ title: 'Child 1', parentId });
+
+      await request(getServer())
+        .post(`/api/v1/plans/${testPlanId}/phases`)
+        .send({ title: 'Child 2', parentId });
+
+      // Filter by parentId
+      const response = await request(getServer())
+        .get(`/api/v1/plans/${testPlanId}/phases`)
+        .query({ parentId })
+        .expect(HttpStatus.OK);
+
+      const body = response.body as ApiResponse<ListPhasesData>;
+      expect(body.success).toBe(true);
+      expect(body.data?.phases).toBeInstanceOf(Array);
+      expect(body.data?.phases.length).toBeGreaterThanOrEqual(2);
+
+      // All returned phases should have the correct parentId
+      const allChildren = body.data?.phases.every(p => p.parentId === parentId);
+      expect(allChildren).toBe(true);
+    });
+
+    it('RED: should combine status and fields filters', async () => {
+      // Get phases with status filter and field selection
+      const response = await request(getServer())
+        .get(`/api/v1/plans/${testPlanId}/phases`)
+        .query({ status: 'planned', fields: 'id,title,status' })
+        .expect(HttpStatus.OK);
+
+      const body = response.body as ApiResponse<ListPhasesData>;
+      expect(body.success).toBe(true);
+      expect(body.data?.phases).toBeInstanceOf(Array);
+
+      // Check field filtering worked
+      const phasesLength = body.data?.phases.length ?? 0;
+      if (phasesLength > 0) {
+        const phase = body.data?.phases[0];
+        expect(phase?.id).toBeDefined();
+        expect(phase?.title).toBeDefined();
+        expect(phase?.status).toBe('planned');
+        // Should not have other fields like description, objectives, etc.
+        expect(phase?.description).toBeUndefined();
+      }
     });
   });
 

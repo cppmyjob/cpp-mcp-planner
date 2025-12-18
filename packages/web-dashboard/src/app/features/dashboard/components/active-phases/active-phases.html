@@ -1,0 +1,60 @@
+<div class="active-phases" data-testid="active-phases-table">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="active-phases__header">
+        <h3 class="active-phases__title" data-testid="active-phases-title">
+          Active Phases
+        </h3>
+      </div>
+    </ng-template>
+
+    @if (loading()) {
+      <div class="active-phases__loading">Loading active phases...</div>
+    }
+
+    @if (error()) {
+      <div class="active-phases__error">{{ error() }}</div>
+    }
+
+    @if (!loading() && !error()) {
+      @if (phases().length === 0) {
+        <div class="active-phases__empty">
+          No phases currently in progress.
+        </div>
+      } @else {
+        <p-table [value]="phases()" styleClass="p-datatable-sm">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>Title</th>
+              <th>Progress</th>
+              <th>Priority</th>
+              <th>Status</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-phase>
+            <tr>
+              <td>
+                <div class="active-phases__phase-title">
+                  <span class="active-phases__phase-path">{{ phase.path }}</span>
+                  {{ phase.title }}
+                </div>
+              </td>
+              <td>
+                <p-progressBar [value]="phase.progress" [showValue]="false" />
+                <span class="active-phases__progress-text">{{ phase.progress }}%</span>
+              </td>
+              <td>
+                <p-tag
+                  [value]="phase.priority ?? 'medium'"
+                  [severity]="getPrioritySeverity(phase.priority)" />
+              </td>
+              <td>
+                <p-tag value="In Progress" severity="info" />
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      }
+    }
+  </p-card>
+</div>

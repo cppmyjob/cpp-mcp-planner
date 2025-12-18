@@ -1,0 +1,55 @@
+<div class="statistics-cards" data-testid="statistics-cards">
+  @if (loading()) {
+    <div class="statistics-cards__loading">Loading statistics...</div>
+  }
+
+  @if (error()) {
+    <div class="statistics-cards__error">{{ error() }}</div>
+  }
+
+  @if (statistics(); as stats) {
+    <div class="statistics-cards__grid">
+      <p-card class="statistics-cards__card" data-testid="stat-card-requirements">
+        <div class="stat-card">
+          <div class="stat-card__label">Requirements</div>
+          <div class="stat-card__value" data-testid="stat-value">{{ stats.totalRequirements }}</div>
+        </div>
+      </p-card>
+
+      <p-card class="statistics-cards__card" data-testid="stat-card-solutions">
+        <div class="stat-card">
+          <div class="stat-card__label">Solutions</div>
+          <div class="stat-card__value" data-testid="stat-value">{{ stats.totalSolutions }}</div>
+        </div>
+      </p-card>
+
+      <p-card class="statistics-cards__card" data-testid="stat-card-decisions">
+        <div class="stat-card">
+          <div class="stat-card__label">Decisions</div>
+          <div class="stat-card__value" data-testid="stat-value">{{ stats.totalDecisions }}</div>
+        </div>
+      </p-card>
+
+      <p-card class="statistics-cards__card" data-testid="stat-card-phases">
+        <div class="stat-card">
+          <div class="stat-card__label">Phases</div>
+          <div class="stat-card__value" data-testid="stat-value">{{ stats.totalPhases }}</div>
+        </div>
+      </p-card>
+
+      <p-card class="statistics-cards__card" data-testid="stat-card-artifacts">
+        <div class="stat-card">
+          <div class="stat-card__label">Artifacts</div>
+          <div class="stat-card__value" data-testid="stat-value">{{ stats.totalArtifacts }}</div>
+        </div>
+      </p-card>
+
+      <p-card class="statistics-cards__card" data-testid="stat-card-completion">
+        <div class="stat-card stat-card--highlight">
+          <div class="stat-card__label">Completion</div>
+          <div class="stat-card__value" data-testid="stat-value">{{ stats.completionPercentage }}%</div>
+        </div>
+      </p-card>
+    </div>
+  }
+</div>

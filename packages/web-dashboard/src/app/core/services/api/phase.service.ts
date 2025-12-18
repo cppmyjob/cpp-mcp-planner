@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { type Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { ApiService } from './api.service';
 import type {
@@ -15,6 +16,11 @@ import type {
   VersionHistory
 } from '../../../models';
 
+interface PhasesListResponse {
+  phases: Phase[];
+  notFound?: string[];
+}
+
 /**
  * Service for Phase API operations
  */
@@ -25,12 +31,14 @@ export class PhaseService {
   private readonly api = inject(ApiService);
 
   /**
-   * List phases for plan
+   * List phases for plan (by IDs or filters)
    */
   public list(planId: string, params?: ListPhasesParams): Observable<Phase[]> {
-    return this.api.get<Phase[]>(
+    return this.api.get<PhasesListResponse>(
       `/plans/${planId}/phases`,
       params as Record<string, unknown>
+    ).pipe(
+      map(response => response.phases)
     );
   }
 

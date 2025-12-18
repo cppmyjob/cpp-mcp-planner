@@ -3,23 +3,39 @@ import {
   IsString,
   IsBoolean,
   IsArray,
-  IsNotEmpty,
+  IsEnum,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
 /**
- * Query parameters for listing multiple phases by IDs
+ * Query parameters for listing phases
+ * Supports two modes:
+ * 1. By IDs: phaseIds (comma-separated)
+ * 2. By filters: status, parentId
  */
 export class ListPhasesQueryDto {
-  @ApiProperty({ description: 'Phase IDs to retrieve (comma-separated)', example: 'id1,id2,id3', required: true })
+  @ApiPropertyOptional({ description: 'Phase IDs to retrieve (comma-separated)', example: 'id1,id2,id3' })
   @Transform(({ value }: { value: string | string[] }) =>
     typeof value === 'string' ? value.split(',').map((f) => f.trim()) : value
   )
   @IsArray()
   @IsString({ each: true })
-  @IsNotEmpty()
-  public phaseIds!: string[];
+  @IsOptional()
+  public phaseIds?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Filter by phase status',
+    enum: ['planned', 'in_progress', 'completed', 'blocked', 'skipped']
+  })
+  @IsEnum(['planned', 'in_progress', 'completed', 'blocked', 'skipped'])
+  @IsOptional()
+  public status?: 'planned' | 'in_progress' | 'completed' | 'blocked' | 'skipped';
+
+  @ApiPropertyOptional({ description: 'Filter by parent phase ID' })
+  @IsString()
+  @IsOptional()
+  public parentId?: string;
 
   @ApiPropertyOptional({ description: 'Fields to include (comma-separated)', type: [String] })
   @Transform(({ value }: { value: string | string[] }) =>

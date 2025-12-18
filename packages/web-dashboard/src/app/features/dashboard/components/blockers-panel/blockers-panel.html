@@ -1,0 +1,54 @@
+<div class="blockers-panel" data-testid="blockers-panel">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="blockers-panel__header">
+        <h3 class="blockers-panel__title" data-testid="blockers-title">
+          Blockers
+        </h3>
+      </div>
+    </ng-template>
+
+    @if (loading()) {
+      <div class="blockers-panel__loading">Loading blockers...</div>
+    }
+
+    @if (error()) {
+      <div class="blockers-panel__error">{{ error() }}</div>
+    }
+
+    @if (!loading() && !error()) {
+      @if (blockedPhases().length === 0) {
+        <div class="blockers-panel__empty" data-testid="blockers-empty-state">
+          No blocked phases. All clear!
+        </div>
+      } @else {
+        <div class="blockers-panel__list">
+          @for (phase of blockedPhases(); track phase.id) {
+            <div class="blocker-item" data-testid="blocker-item">
+              <div class="blocker-item__header">
+                <div class="blocker-item__title-row">
+                  <span class="blocker-item__path">{{ phase.path }}</span>
+                  <span class="blocker-item__title" data-testid="blocker-phase-title">
+                    {{ phase.title }}
+                  </span>
+                </div>
+                @if (phase.priority) {
+                  <p-tag
+                    [value]="phase.priority"
+                    [severity]="getPrioritySeverity(phase.priority)"
+                    styleClass="blocker-item__priority-tag" />
+                }
+              </div>
+              @if (phase.blockingReason) {
+                <div class="blocker-item__reason" data-testid="blocker-reason">
+                  <i class="pi pi-exclamation-triangle blocker-item__reason-icon"></i>
+                  {{ phase.blockingReason }}
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+  </p-card>
+</div>

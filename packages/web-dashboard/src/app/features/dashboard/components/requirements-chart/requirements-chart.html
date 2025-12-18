@@ -1,0 +1,25 @@
+<div class="requirements-chart" data-testid="requirements-chart">
+  <p-card>
+    <ng-template pTemplate="header">
+      <div class="requirements-chart__header">
+        <h3 class="requirements-chart__title" data-testid="requirements-chart-title">
+          Requirements by Status
+        </h3>
+      </div>
+    </ng-template>
+
+    @if (loading()) {
+      <div class="requirements-chart__loading">Loading chart...</div>
+    }
+
+    @if (error()) {
+      <div class="requirements-chart__error">{{ error() }}</div>
+    }
+
+    @if (chartData()) {
+      <div class="requirements-chart__canvas-container">
+        <p-chart type="bar" [data]="chartData()" [options]="chartOptions" />
+      </div>
+    }
+  </p-card>
+</div>
