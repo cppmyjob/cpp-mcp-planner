@@ -15,28 +15,95 @@ test.describe('MCP Planning Dashboard', () => {
     });
   });
 
-  test('should load the dashboard', async ({ page }) => {
+  test('should load the dashboard with layout shell', async ({ page }) => {
     await page.goto('/');
 
-    // Check title is visible
-    await expect(page.locator('h1')).toContainText('MCP Planning Dashboard');
+    // Check header is visible
+    const header = page.locator('[data-testid="app-header"]');
+    await expect(header).toBeVisible();
 
-    // Take screenshot of initial state
+    // Check title in header
+    await expect(page.locator('.header__title')).toContainText('MCP Planning Dashboard');
+
+    // Check sidebar is visible
+    const sidebar = page.locator('[data-testid="app-sidebar"]');
+    await expect(sidebar).toBeVisible();
+
+    // Check main content area
+    const mainContent = page.locator('[data-testid="main-content"]');
+    await expect(mainContent).toBeVisible();
+
+    // Take screenshot of layout
     await page.screenshot({ path: 'e2e/screenshots/01-dashboard-loaded.png' });
   });
 
-  test('should show loading state initially', async ({ page }) => {
+  test('should toggle theme', async ({ page }) => {
     await page.goto('/');
+    await page.waitForLoadState('networkidle');
 
-    // Check for loading indicator
-    const loading = page.locator('[data-testid="loading"], .loading, p-progressSpinner');
+    // Take screenshot of initial theme
+    await page.screenshot({ path: 'e2e/screenshots/05-theme-initial.png' });
 
-    // Loading should appear initially (or already be done)
-    await page.screenshot({ path: 'e2e/screenshots/02-loading-state.png' });
+    // Get initial theme
+    const html = page.locator('html');
+    const initialClass = await html.getAttribute('class');
+    const initialIsDark = initialClass?.includes('dark-theme') ?? false;
+
+    // Find and click theme toggle button
+    const themeButton = page.locator('[data-testid="theme-toggle"]');
+    await expect(themeButton).toBeVisible();
+    await themeButton.click();
+
+    // Wait for theme change
+    await page.waitForTimeout(300);
+
+    // Check theme toggled
+    const newClass = await html.getAttribute('class');
+    const newIsDark = newClass?.includes('dark-theme') ?? false;
+    expect(newIsDark).not.toBe(initialIsDark);
+
+    // Take screenshot after toggle
+    await page.screenshot({ path: 'e2e/screenshots/06-theme-toggled.png' });
+  });
+
+  test('should toggle sidebar', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Get initial sidebar width
+    const sidebar = page.locator('[data-testid="app-sidebar"]');
+    await expect(sidebar).toBeVisible();
+    const initialBox = await sidebar.boundingBox();
+
+    // Click sidebar toggle
+    const sidebarToggle = page.locator('[data-testid="sidebar-toggle"]');
+    await sidebarToggle.click();
+
+    // Wait for animation
+    await page.waitForTimeout(300);
+
+    // Check sidebar collapsed
+    const newBox = await sidebar.boundingBox();
+    expect(newBox?.width).toBeLessThan(initialBox?.width ?? 999);
+
+    // Take screenshot of collapsed state
+    await page.screenshot({ path: 'e2e/screenshots/sidebar-collapsed.png' });
+  });
+
+  test('should display navigation items in sidebar', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Check navigation items
+    await expect(page.locator('[data-testid="nav-dashboard"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-requirements"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-solutions"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-decisions"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-phases"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-artifacts"]')).toBeVisible();
   });
 
   test('should fetch plans from API', async ({ page }) => {
-    // Intercept API calls to see what's happening
     const apiCalls: string[] = [];
 
     page.on('request', request => {
@@ -45,109 +112,24 @@ test.describe('MCP Planning Dashboard', () => {
       }
     });
 
-    page.on('response', response => {
-      if (response.url().includes('/api')) {
-        console.log(`API Response: ${response.status()} ${response.url()}`);
-      }
-    });
-
     await page.goto('/');
-
-    // Wait for network to settle
     await page.waitForLoadState('networkidle');
 
-    // Log all API calls
+    // Log API calls
     console.log('API calls made:', apiCalls);
 
-    // Take screenshot after data load
-    await page.screenshot({ path: 'e2e/screenshots/03-after-api-load.png' });
-
-    // Check if error is displayed
-    const error = page.locator('[data-testid="error"], .error, p-message');
-    const hasError = await error.count() > 0;
-
-    if (hasError) {
-      console.log('ERROR STATE DETECTED');
-      await page.screenshot({ path: 'e2e/screenshots/03-error-state.png' });
-    }
-  });
-
-  test('should display requirements table when data loads', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for network to settle
-    await page.waitForLoadState('networkidle');
-
-    // Wait a bit for Angular to render
-    await page.waitForTimeout(2000);
-
-    // Check for table
-    const table = page.locator('p-table, table');
-    const tableVisible = await table.isVisible().catch(() => false);
-
-    console.log('Table visible:', tableVisible);
+    // Should have made plans request
+    const plansCall = apiCalls.find(call => call.includes('/plans'));
+    expect(plansCall).toBeTruthy();
 
     // Take screenshot
-    await page.screenshot({ path: 'e2e/screenshots/04-requirements-table.png' });
-
-    // Check for requirement titles
-    const pageContent = await page.textContent('body');
-    console.log('Page contains requirements:', pageContent?.includes('requirement') || pageContent?.includes('Requirement'));
-  });
-
-  test('should toggle theme', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for page to load
-    await page.waitForLoadState('networkidle');
-
-    // Take screenshot of initial theme
-    await page.screenshot({ path: 'e2e/screenshots/05-theme-initial.png' });
-
-    // Find theme toggle button
-    const themeButton = page.locator('p-button').filter({ hasText: /Dark Mode|Light Mode/ });
-    const buttonExists = await themeButton.count() > 0;
-
-    console.log('Theme button exists:', buttonExists);
-
-    if (buttonExists) {
-      // Get initial theme state - PrimeNG requires class on <html> element
-      const html = page.locator('html');
-      const initialClass = await html.getAttribute('class');
-      console.log('Initial html class:', initialClass);
-      const initialIsDark = initialClass?.includes('dark-theme') ?? false;
-
-      // Click theme toggle
-      await themeButton.click();
-
-      // Wait for theme change
-      await page.waitForTimeout(500);
-
-      // Check new theme state
-      const newClass = await html.getAttribute('class');
-      console.log('New html class:', newClass);
-      const newIsDark = newClass?.includes('dark-theme') ?? false;
-
-      // Verify theme actually toggled
-      expect(newIsDark).not.toBe(initialIsDark);
-
-      // Take screenshot after theme toggle
-      await page.screenshot({ path: 'e2e/screenshots/06-theme-toggled.png' });
-    }
+    await page.screenshot({ path: 'e2e/screenshots/03-after-api-load.png' });
   });
 
   test('debug: inspect page state', async ({ page }) => {
     await page.goto('/');
-
-    // Wait for everything to load
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(3000);
-
-    // Get page HTML for debugging
-    const bodyHTML = await page.locator('body').innerHTML();
-    console.log('=== PAGE BODY HTML ===');
-    console.log(bodyHTML.substring(0, 2000));
-    console.log('=== END HTML ===');
+    await page.waitForTimeout(2000);
 
     // Take full page screenshot
     await page.screenshot({ path: 'e2e/screenshots/07-debug-fullpage.png', fullPage: true });

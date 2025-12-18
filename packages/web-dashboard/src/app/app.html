@@ -1,75 +1,15 @@
-<div class="app-container">
-  <header class="app-header">
-    <div class="header-content">
-      <h1 class="app-title">{{ title() }}</h1>
-      <p-button
-        [icon]="isDarkTheme ? 'pi pi-sun' : 'pi pi-moon'"
-        [label]="isDarkTheme ? 'Light Mode' : 'Dark Mode'"
-        (onClick)="toggleTheme()"
-        [outlined]="true"
-        severity="secondary"
-      />
-    </div>
-  </header>
+<div class="app-shell">
+  <app-header (sidebarToggle)="toggleSidebar()" />
 
-  <main class="app-main">
-    <!-- Loading State -->
-    @if (loading()) {
-      <div class="loading" data-testid="loading">
-        <p-progressSpinner ariaLabel="Loading" />
-      </div>
-    }
+  <div class="app-shell__body">
+    <app-sidebar
+      [collapsed]="sidebarCollapsed()"
+      [selectedPlanId]="selectedPlan()?.id ?? ''"
+      (planSelected)="onPlanSelected($event)"
+    />
 
-    <!-- Error State -->
-    @if (error()) {
-      <div class="error" data-testid="error">
-        <p-message severity="error" [text]="error()!" />
-      </div>
-    }
-
-    <!-- Requirements Table -->
-    @if (!loading() && !error()) {
-      @if (requirements().length === 0) {
-        <div class="empty-state">
-          <p>No requirements found for this plan.</p>
-        </div>
-      } @else {
-        <p-table [value]="requirements()" [tableStyle]="{ 'min-width': '50rem' }">
-          <ng-template #header>
-            <tr>
-              <th>Title</th>
-              <th>Description</th>
-              <th>Priority</th>
-              <th>Category</th>
-              <th>Status</th>
-              <th>Votes</th>
-            </tr>
-          </ng-template>
-          <ng-template #body let-req>
-            <tr>
-              <td>{{ req.title }}</td>
-              <td>{{ req.description }}</td>
-              <td>
-                <p-tag
-                  [value]="req.priority"
-                  [severity]="getPrioritySeverity(req.priority)"
-                  data-testid="priority"
-                />
-              </td>
-              <td>{{ req.category }}</td>
-              <td>
-                <p-tag
-                  [value]="req.status"
-                  [severity]="getStatusSeverity(req.status)"
-                />
-              </td>
-              <td>{{ req.votes }}</td>
-            </tr>
-          </ng-template>
-        </p-table>
-      }
-    }
-
-    <router-outlet />
-  </main>
+    <main class="app-shell__main" data-testid="main-content">
+      <router-outlet />
+    </main>
+  </div>
 </div>

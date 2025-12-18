@@ -1,0 +1,24 @@
+<header class="header" data-testid="app-header">
+  <div class="header__left">
+    <p-button
+      [icon]="'pi pi-bars'"
+      [text]="true"
+      [rounded]="true"
+      severity="secondary"
+      data-testid="sidebar-toggle"
+      (onClick)="onSidebarToggle()"
+    />
+    <h1 class="header__title">MCP Planning Dashboard</h1>
+  </div>
+
+  <div class="header__right">
+    <p-button
+      [icon]="isDarkTheme ? 'pi pi-sun' : 'pi pi-moon'"
+      [text]="true"
+      [rounded]="true"
+      severity="secondary"
+      data-testid="theme-toggle"
+      (onClick)="toggleTheme()"
+    />
+  </div>
+</header>

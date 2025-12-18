@@ -1,0 +1,56 @@
+<aside class="sidebar" [class.sidebar--collapsed]="collapsed()" data-testid="app-sidebar">
+  <!-- Plans Section -->
+  <div class="sidebar__section" data-testid="plans-section">
+    <h3 class="sidebar__section-title">
+      @if (!collapsed()) {
+        Plans
+      }
+    </h3>
+    <ul class="plan-list">
+      @for (plan of plans(); track plan.id) {
+        <li
+          class="plan-item"
+          [class.plan-item--selected]="selectedPlanId() === plan.id"
+          [attr.data-selected]="selectedPlanId() === plan.id"
+          data-testid="plan-item"
+          tabindex="0"
+          role="button"
+          (click)="selectPlan(plan)"
+          (keydown.enter)="selectPlan(plan)"
+          (keydown.space)="selectPlan(plan)"
+          pRipple
+        >
+          <i class="pi pi-folder plan-item__icon"></i>
+          @if (!collapsed()) {
+            <span class="plan-item__name">{{ plan.name }}</span>
+          }
+        </li>
+      }
+    </ul>
+  </div>
+
+  <!-- Navigation Section -->
+  <div class="sidebar__section">
+    <h3 class="sidebar__section-title">
+      @if (!collapsed()) {
+        Navigation
+      }
+    </h3>
+    <nav class="nav-menu">
+      @for (item of navItems; track item.label) {
+        <a
+          class="nav-item"
+          [routerLink]="item.routerLink"
+          routerLinkActive="nav-item--active"
+          [attr.data-testid]="item.testId"
+          pRipple
+        >
+          <i [class]="item.icon + ' nav-item__icon'"></i>
+          @if (!collapsed()) {
+            <span class="nav-item__label">{{ item.label }}</span>
+          }
+        </a>
+      }
+    </nav>
+  </div>
+</aside>

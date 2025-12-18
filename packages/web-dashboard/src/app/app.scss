@@ -1,36 +1,19 @@
-.app-container {
+.app-shell {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   background-color: var(--p-surface-ground);
-}
 
-.app-header {
-  background-color: var(--p-surface-card);
-  border-bottom: 1px solid var(--p-surface-border);
-  padding: 1rem 2rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
+  &__body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
 
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.app-title {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--p-text-color);
-}
-
-.app-main {
-  flex: 1;
-  padding: 2rem;
-  max-width: 1400px;
-  width: 100%;
-  margin: 0 auto;
+  &__main {
+    flex: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+    background-color: var(--p-surface-ground);
+  }
 }
