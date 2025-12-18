@@ -1,0 +1,1 @@
+export { SolutionsComponent } from './solutions';

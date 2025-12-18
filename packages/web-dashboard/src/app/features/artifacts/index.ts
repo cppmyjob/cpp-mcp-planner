@@ -1,0 +1,1 @@
+export { ArtifactsComponent } from './artifacts';

@@ -40,7 +40,7 @@ export class SidebarComponent implements OnInit {
     { label: 'Solutions', icon: 'pi pi-lightbulb', routerLink: ['solutions'], testId: 'nav-solutions' },
     { label: 'Decisions', icon: 'pi pi-check-square', routerLink: ['decisions'], testId: 'nav-decisions' },
     { label: 'Phases', icon: 'pi pi-sitemap', routerLink: ['phases'], testId: 'nav-phases' },
-    { label: 'Artifacts', icon: 'pi pi-file-code', routerLink: ['artifacts'], testId: 'nav-artifacts' }
+    { label: 'Artifacts', icon: 'pi pi-code', routerLink: ['artifacts'], testId: 'nav-artifacts' }
   ];
 
   // Private services

@@ -1,0 +1,1 @@
+export { RequirementsComponent } from './requirements';
