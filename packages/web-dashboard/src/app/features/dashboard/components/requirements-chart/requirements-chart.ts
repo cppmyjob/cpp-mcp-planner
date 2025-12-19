@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { CardModule } from 'primeng/card';
 import { ChartModule } from 'primeng/chart';
 
-import { RequirementService } from '../../../../core/services/api/requirement.service';
+import { RequirementService, PlanStateService } from '../../../../core/services';
 import type { Requirement, RequirementStatus } from '../../../../models';
 
 interface ChartData {
@@ -25,6 +25,7 @@ interface ChartData {
 })
 export class RequirementsChartComponent implements OnInit {
   private readonly requirementService = inject(RequirementService);
+  private readonly planState = inject(PlanStateService);
 
   public readonly chartData = signal<ChartData | null>(null);
   public readonly chartOptions = {
@@ -38,9 +39,6 @@ export class RequirementsChartComponent implements OnInit {
   };
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
-
-  // TODO: Get active plan ID from state management
-  private readonly activePlanId = '261825f1-cef0-4227-873c-a20c7e81a9de'; // E-Commerce Platform test plan
 
   private readonly statusColors: Record<RequirementStatus, string> = {
     draft: '#94a3b8',
@@ -58,7 +56,7 @@ export class RequirementsChartComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.requirementService.list(this.activePlanId).subscribe({
+    this.requirementService.list(this.planState.activePlanId()).subscribe({
       next: (requirements) => {
         this.buildChartData(requirements);
         this.loading.set(false);

@@ -5,7 +5,7 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ProgressBarModule } from 'primeng/progressbar';
 
-import { PhaseService } from '../../../../core/services/api/phase.service';
+import { PhaseService, PlanStateService } from '../../../../core/services';
 import type { Phase } from '../../../../models';
 
 @Component({
@@ -17,13 +17,11 @@ import type { Phase } from '../../../../models';
 })
 export class ActivePhasesComponent implements OnInit {
   private readonly phaseService = inject(PhaseService);
+  private readonly planState = inject(PlanStateService);
 
   public readonly phases = signal<Phase[]>([]);
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
-
-  // TODO: Get active plan ID from state management
-  private readonly activePlanId = '261825f1-cef0-4227-873c-a20c7e81a9de'; // E-Commerce Platform test plan
 
   public ngOnInit(): void {
     this.loadActivePhases();
@@ -33,7 +31,7 @@ export class ActivePhasesComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.phaseService.list(this.activePlanId, {
+    this.phaseService.list(this.planState.activePlanId(), {
       status: 'in_progress',
       fields: ['title', 'progress', 'priority', 'status', 'path']
     }).subscribe({
