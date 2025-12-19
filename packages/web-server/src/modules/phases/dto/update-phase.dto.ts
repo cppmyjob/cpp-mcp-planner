@@ -1,12 +1,12 @@
 import { PartialType } from '@nestjs/swagger';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, Min, Max, IsOptional } from 'class-validator';
+import { IsInt, Min, Max, IsOptional, IsString, ValidateIf } from 'class-validator';
 import { AddPhaseDto } from './add-phase.dto.js';
 
 /**
  * DTO for updating an existing phase
  * Uses PartialType to make all fields optional
- * Adds progress field for phase updates
+ * Adds progress and blockingReason fields for phase updates
  */
 export class UpdatePhaseDto extends PartialType(AddPhaseDto) {
   @ApiPropertyOptional({ description: 'Phase progress percentage (0-100)', minimum: 0, maximum: 100 })
@@ -15,4 +15,10 @@ export class UpdatePhaseDto extends PartialType(AddPhaseDto) {
   @Max(100)
   @IsOptional()
   public progress?: number;
+
+  @ApiPropertyOptional({ description: 'Reason for blocked status (empty string to clear)' })
+  @ValidateIf((o: UpdatePhaseDto) => o.blockingReason !== '')
+  @IsString()
+  @IsOptional()
+  public blockingReason?: string;
 }

@@ -557,8 +557,13 @@ export class PhaseService {
       phase.priority = input.updates.priority;
     }
     if (input.updates.blockingReason !== undefined) {
-      validateOptionalString(input.updates.blockingReason, 'blockingReason');
-      phase.blockingReason = input.updates.blockingReason;
+      // Empty string clears the blocking reason
+      if (input.updates.blockingReason === '') {
+        phase.blockingReason = undefined;
+      } else {
+        validateOptionalString(input.updates.blockingReason, 'blockingReason');
+        phase.blockingReason = input.updates.blockingReason;
+      }
     }
 
     // FIX #12: Don't manually increment version - FileRepository.update() does it automatically

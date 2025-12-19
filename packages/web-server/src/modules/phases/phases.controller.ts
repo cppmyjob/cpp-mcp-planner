@@ -269,6 +269,7 @@ export class PhasesController {
         priority: dto.priority,
         implementationNotes: dto.implementationNotes,
         progress: dto.progress,
+        blockingReason: dto.blockingReason,
       },
     });
   }

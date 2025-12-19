@@ -707,6 +707,58 @@ describe('Phases API (e2e)', () => {
       expect(body.success).toBe(true);
     });
 
+    it('should update blockingReason field', async () => {
+      const blockingReason = 'Waiting for external API availability';
+
+      const response = await request(getServer())
+        .patch(`/api/v1/plans/${testPlanId}/phases/${testPhaseId}`)
+        .send({
+          blockingReason,
+        })
+        .expect(HttpStatus.OK);
+
+      const body = response.body as ApiResponse<{ success: boolean; phaseId: string }>;
+      expect(body.success).toBe(true);
+      expect(body.data?.phaseId).toBe(testPhaseId);
+
+      // Verify the blockingReason was saved
+      const getResponse = await request(getServer())
+        .get(`/api/v1/plans/${testPlanId}/phases/${testPhaseId}`)
+        .query({ fields: 'id,blockingReason' })
+        .expect(HttpStatus.OK);
+
+      const getBody = getResponse.body as ApiResponse<{ phase: PhaseDetailData }>;
+      expect(getBody.data?.phase.blockingReason).toBe(blockingReason);
+    });
+
+    it('should clear blockingReason with empty string', async () => {
+      // First set a blocking reason
+      await request(getServer())
+        .patch(`/api/v1/plans/${testPlanId}/phases/${testPhaseId}`)
+        .send({ blockingReason: 'Some reason' });
+
+      // Then clear it
+      const response = await request(getServer())
+        .patch(`/api/v1/plans/${testPlanId}/phases/${testPhaseId}`)
+        .send({
+          blockingReason: '',
+        })
+        .expect(HttpStatus.OK);
+
+      const body = response.body as ApiResponse<{ success: boolean; phaseId: string }>;
+      expect(body.success).toBe(true);
+
+      // Verify it was cleared
+      const getResponse = await request(getServer())
+        .get(`/api/v1/plans/${testPlanId}/phases/${testPhaseId}`)
+        .query({ fields: 'id,blockingReason' })
+        .expect(HttpStatus.OK);
+
+      const getBody = getResponse.body as ApiResponse<{ phase: PhaseDetailData }>;
+      // Empty string clears blockingReason (sets to undefined)
+      expect(getBody.data?.phase.blockingReason).toBeUndefined();
+    });
+
     it('should return 400 for empty title', async () => {
       const response = await request(getServer())
         .patch(`/api/v1/plans/${testPlanId}/phases/${testPhaseId}`)
