@@ -61,7 +61,7 @@ describe('PhaseService', () => {
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/phases`);
       expect(req.request.method).toBe('GET');
-      req.flush([mockPhase]);
+      req.flush({ phases: [mockPhase] });
     });
   });
 
@@ -80,14 +80,14 @@ describe('PhaseService', () => {
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/phases/tree`);
       expect(req.request.method).toBe('GET');
-      req.flush(mockTree);
+      req.flush({ tree: mockTree });
     });
 
     it('should respect maxDepth parameter', () => {
       service.getTree(planId, { maxDepth: 2 }).subscribe();
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/phases/tree?maxDepth=2`);
-      req.flush([]);
+      req.flush({ tree: [] });
     });
   });
 

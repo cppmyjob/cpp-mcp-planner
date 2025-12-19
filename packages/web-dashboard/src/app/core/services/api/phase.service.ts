@@ -46,9 +46,11 @@ export class PhaseService {
    * Get phase tree
    */
   public getTree(planId: string, params?: GetPhaseTreeParams): Observable<PhaseTreeNode[]> {
-    return this.api.get<PhaseTreeNode[]>(
+    return this.api.get<{ tree: PhaseTreeNode[] }>(
       `/plans/${planId}/phases/tree`,
       params as Record<string, unknown>
+    ).pipe(
+      map(response => response.tree)
     );
   }
 
