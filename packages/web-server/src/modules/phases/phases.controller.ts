@@ -148,11 +148,21 @@ export class PhasesController {
     // Mode 2: Filter by status or parentId
     if (query.status !== undefined || query.parentId !== undefined) {
       // Ensure fields is array or undefined (NestJS validation pipe may not always apply @Transform)
-      const fields = query.fields
+      let fields = query.fields
         ? Array.isArray(query.fields)
           ? query.fields
           : (query.fields as string).split(',').map((f) => f.trim())
         : undefined;
+
+      // BUG FIX: When filtering by status/parentId, ensure those fields are included
+      if (fields !== undefined && fields.length > 0) {
+        if (query.status !== undefined && !fields.includes('status')) {
+          fields = [...fields, 'status'];
+        }
+        if (query.parentId !== undefined && !fields.includes('parentId')) {
+          fields = [...fields, 'parentId'];
+        }
+      }
 
       // Use PhaseRepository to get all phases and filter
       const treeResult = await this.phaseService.getPhaseTree({

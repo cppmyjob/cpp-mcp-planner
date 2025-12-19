@@ -20,7 +20,7 @@ export class StatisticsCardsComponent implements OnInit {
   public readonly error = signal<string | null>(null);
 
   // TODO: Get active plan ID from state management
-  private readonly activePlanId = '9323523a-60c1-4a35-b3b3-20b4205a3415';
+  private readonly activePlanId = '261825f1-cef0-4227-873c-a20c7e81a9de'; // E-Commerce Platform test plan
 
   public ngOnInit(): void {
     this.loadStatistics();

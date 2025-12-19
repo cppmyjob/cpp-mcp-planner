@@ -556,6 +556,10 @@ export class PhaseService {
       validatePriority(input.updates.priority);
       phase.priority = input.updates.priority;
     }
+    if (input.updates.blockingReason !== undefined) {
+      validateOptionalString(input.updates.blockingReason, 'blockingReason');
+      phase.blockingReason = input.updates.blockingReason;
+    }
 
     // FIX #12: Don't manually increment version - FileRepository.update() does it automatically
     await repo.update(phase.id, phase);
