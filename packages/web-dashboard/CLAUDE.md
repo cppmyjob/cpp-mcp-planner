@@ -5,6 +5,7 @@
 1. **Standalone** - All components must be standalone (no NgModules)
 2. **ViewEncapsulation.None** - Every component must set `encapsulation: ViewEncapsulation.None`
 3. **BEM in SCSS** - All styles must follow BEM: `.block__element--modifier`
+4. **Signals** - Use `signal()` for all reactive state (no `BehaviorSubject` or manual change detection)
 
 ## BEM Pattern
 
