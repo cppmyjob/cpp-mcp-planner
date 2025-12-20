@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { screenshotPath } from './test-paths';
 
 test.describe('Navigation', () => {
   test.beforeEach(async ({ page }) => {
@@ -27,7 +28,7 @@ test.describe('Navigation', () => {
     await expect(requirementsPage).toBeVisible();
 
     // Take screenshot
-    await page.screenshot({ path: 'e2e/screenshots/nav-requirements.png' });
+    await page.screenshot({ path: screenshotPath('nav-requirements.png') });
   });
 
   test('should navigate to solutions page', async ({ page }) => {
@@ -108,6 +109,6 @@ test.describe('Navigation', () => {
     }
 
     // Final screenshot showing all navigation works
-    await page.screenshot({ path: 'e2e/screenshots/nav-complete.png' });
+    await page.screenshot({ path: screenshotPath('nav-complete.png') });
   });
 });

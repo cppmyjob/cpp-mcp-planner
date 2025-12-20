@@ -1,4 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
+import { resolve } from 'path';
+import { testOutputDir } from './e2e/test-paths';
 
 /**
  * Playwright configuration for MCP Planning Dashboard E2E tests
@@ -10,7 +12,9 @@ export default defineConfig({
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 2 : 0,
   workers: process.env['CI'] ? 1 : undefined,
-  reporter: 'html',
+  reporter: [['html', { outputFolder: resolve(testOutputDir, 'playwright-report') }]],
+  outputDir: resolve(testOutputDir, 'test-results'),
+  snapshotPathTemplate: resolve(testOutputDir, 'screenshots/{testFilePath}/{arg}{ext}'),
 
   use: {
     baseURL: 'http://localhost:4200',

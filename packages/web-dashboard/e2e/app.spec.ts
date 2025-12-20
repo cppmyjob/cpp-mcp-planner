@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { screenshotPath } from './test-paths';
 
 test.describe('MCP Planning Dashboard', () => {
   test.beforeEach(async ({ page }) => {
@@ -34,7 +35,7 @@ test.describe('MCP Planning Dashboard', () => {
     await expect(mainContent).toBeVisible();
 
     // Take screenshot of layout
-    await page.screenshot({ path: 'e2e/screenshots/01-dashboard-loaded.png' });
+    await page.screenshot({ path: screenshotPath('01-dashboard-loaded.png') });
   });
 
   test('should toggle theme', async ({ page }) => {
@@ -42,7 +43,7 @@ test.describe('MCP Planning Dashboard', () => {
     await page.waitForLoadState('networkidle');
 
     // Take screenshot of initial theme
-    await page.screenshot({ path: 'e2e/screenshots/05-theme-initial.png' });
+    await page.screenshot({ path: screenshotPath('05-theme-initial.png') });
 
     // Get initial theme
     const html = page.locator('html');
@@ -63,7 +64,7 @@ test.describe('MCP Planning Dashboard', () => {
     expect(newIsDark).not.toBe(initialIsDark);
 
     // Take screenshot after toggle
-    await page.screenshot({ path: 'e2e/screenshots/06-theme-toggled.png' });
+    await page.screenshot({ path: screenshotPath('06-theme-toggled.png') });
   });
 
   test('should toggle sidebar', async ({ page }) => {
@@ -87,7 +88,7 @@ test.describe('MCP Planning Dashboard', () => {
     expect(newBox?.width).toBeLessThan(initialBox?.width ?? 999);
 
     // Take screenshot of collapsed state
-    await page.screenshot({ path: 'e2e/screenshots/sidebar-collapsed.png' });
+    await page.screenshot({ path: screenshotPath('sidebar-collapsed.png') });
   });
 
   test('should display navigation items in sidebar', async ({ page }) => {
@@ -123,7 +124,7 @@ test.describe('MCP Planning Dashboard', () => {
     expect(plansCall).toBeTruthy();
 
     // Take screenshot
-    await page.screenshot({ path: 'e2e/screenshots/03-after-api-load.png' });
+    await page.screenshot({ path: screenshotPath('03-after-api-load.png') });
   });
 
   test('debug: inspect page state', async ({ page }) => {
@@ -132,6 +133,6 @@ test.describe('MCP Planning Dashboard', () => {
     await page.waitForTimeout(2000);
 
     // Take full page screenshot
-    await page.screenshot({ path: 'e2e/screenshots/07-debug-fullpage.png', fullPage: true });
+    await page.screenshot({ path: screenshotPath('07-debug-fullpage.png'), fullPage: true });
   });
 });

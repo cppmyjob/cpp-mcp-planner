@@ -1,13 +1,12 @@
 import { rm, mkdir } from 'fs/promises';
 import { resolve } from 'path';
+import { testOutputDir } from './test-paths';
 
 export default async function globalSetup(): Promise<void> {
-  const baseDir = resolve(__dirname, '..');
-
   const dirsToClean = [
-    resolve(__dirname, 'screenshots'),
-    resolve(baseDir, 'playwright-report'),
-    resolve(baseDir, 'test-results'),
+    resolve(testOutputDir, 'screenshots'),
+    resolve(testOutputDir, 'playwright-report'),
+    resolve(testOutputDir, 'test-results'),
   ];
 
   for (const dir of dirsToClean) {
@@ -15,5 +14,5 @@ export default async function globalSetup(): Promise<void> {
     await mkdir(dir, { recursive: true });
   }
 
-  console.log('Cleaned: screenshots, playwright-report, test-results');
+  console.log(`Cleaned test output: ${testOutputDir}`);
 }

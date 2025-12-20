@@ -24,8 +24,8 @@ npm-debug.log*
 .env.local
 .env.*.local
 
-# Coverage
-coverage/
+# Test output (coverage, screenshots, playwright reports)
+.test-output/
 
 # Temporary files
 *.tmp

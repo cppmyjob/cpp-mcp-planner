@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { screenshotPath } from './test-paths';
 
 test.describe('Dashboard Page', () => {
   test.beforeEach(async ({ page }) => {
@@ -90,7 +91,7 @@ test.describe('Dashboard Page', () => {
     });
 
     test('RED: should take screenshot of chart', async ({ page }) => {
-      await page.screenshot({ path: 'e2e/screenshots/dashboard-requirements-chart.png' });
+      await page.screenshot({ path: screenshotPath('dashboard-requirements-chart.png') });
     });
   });
 
@@ -193,7 +194,7 @@ test.describe('Dashboard Page', () => {
 
       // Take full dashboard screenshot
       await page.screenshot({
-        path: 'e2e/screenshots/dashboard-full-page.png',
+        path: screenshotPath('dashboard-full-page.png'),
         fullPage: true
       });
     });

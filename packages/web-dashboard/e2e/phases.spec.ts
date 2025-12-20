@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { screenshotPath } from './test-paths';
 
 test.describe('Phases Page', () => {
   test.beforeEach(async ({ page }) => {
@@ -290,7 +291,7 @@ test.describe('Phases Page', () => {
       await page.waitForTimeout(500);
 
       await page.screenshot({
-        path: 'e2e/screenshots/phases-full-page.png',
+        path: screenshotPath('phases-full-page.png'),
         fullPage: true
       });
     });
@@ -328,7 +329,7 @@ test.describe('Phases Page', () => {
 
       // Take screenshot of initial state
       await page.screenshot({
-        path: 'e2e/screenshots/phases-header-initial.png'
+        path: screenshotPath('phases-header-initial.png')
       });
 
       // Step 2: Navigate to Dashboard
@@ -351,7 +352,7 @@ test.describe('Phases Page', () => {
 
       // Take screenshot of state after navigation
       await page.screenshot({
-        path: 'e2e/screenshots/phases-header-after-nav.png'
+        path: screenshotPath('phases-header-after-nav.png')
       });
 
       // Header row should NOT have p-highlight class
@@ -438,7 +439,7 @@ test.describe('Phases Page', () => {
 
       // Take screenshot for debugging
       await page.screenshot({
-        path: 'e2e/screenshots/phases-row-borders-after-nav.png'
+        path: screenshotPath('phases-row-borders-after-nav.png')
       });
 
       // Parse RGB values to check brightness
@@ -489,7 +490,7 @@ test.describe('Phases Page', () => {
 
       // Take screenshot for debugging
       await page.screenshot({
-        path: 'e2e/screenshots/phases-row-hover-dark.png'
+        path: screenshotPath('phases-row-hover-dark.png')
       });
 
       // Parse RGB values to check brightness
@@ -542,7 +543,7 @@ test.describe('Phases Page', () => {
 
       // Take screenshot for debugging
       await page.screenshot({
-        path: 'e2e/screenshots/phases-row-alignment.png'
+        path: screenshotPath('phases-row-alignment.png')
       });
 
       // Row should not shift position (allow 0.5px tolerance for subpixel rendering)

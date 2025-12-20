@@ -28,5 +28,6 @@ export default {
   setupFiles: ['./test/jest-setup.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   collectCoverageFrom: ['src/**/*.ts', '!src/main.ts', '!src/index.ts'],
+  coverageDirectory: '../../.test-output/coverage-web-server',
   verbose: true,
 };

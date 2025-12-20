@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { screenshotPath } from './test-paths';
 
 test.describe('Dark Theme Support', () => {
   test.beforeEach(async ({ page }) => {
@@ -87,7 +88,7 @@ test.describe('Dark Theme Support', () => {
 
     test('should take screenshot of header in dark theme', async ({ page }) => {
       await page.screenshot({
-        path: 'e2e/screenshots/header-dark-theme.png',
+        path: screenshotPath('header-dark-theme.png'),
         clip: { x: 0, y: 0, width: 1280, height: 80 }
       });
     });
@@ -126,7 +127,7 @@ test.describe('Dark Theme Support', () => {
     test('should re-render chart when theme changes', async ({ page }) => {
       // Take screenshot in dark theme
       await page.screenshot({
-        path: 'e2e/screenshots/chart-dark-theme.png'
+        path: screenshotPath('chart-dark-theme.png')
       });
 
       // Toggle back to light theme
@@ -139,7 +140,7 @@ test.describe('Dark Theme Support', () => {
 
       // Take screenshot in light theme
       await page.screenshot({
-        path: 'e2e/screenshots/chart-light-theme.png'
+        path: screenshotPath('chart-light-theme.png')
       });
 
       // Both screenshots should exist (visual diff comparison can be done manually)
@@ -148,7 +149,7 @@ test.describe('Dark Theme Support', () => {
     test('should take screenshot of requirements chart in dark theme', async ({ page }) => {
       const chartContainer = page.locator('[data-testid="requirements-chart"]');
       await chartContainer.screenshot({
-        path: 'e2e/screenshots/requirements-chart-dark-theme.png'
+        path: screenshotPath('requirements-chart-dark-theme.png')
       });
     });
   });
@@ -182,7 +183,7 @@ test.describe('Dark Theme Support', () => {
 
     test('should take full dashboard screenshot in dark theme', async ({ page }) => {
       await page.screenshot({
-        path: 'e2e/screenshots/dashboard-dark-theme.png',
+        path: screenshotPath('dashboard-dark-theme.png'),
         fullPage: true
       });
     });
@@ -233,7 +234,7 @@ test.describe('Dark Theme Support', () => {
 
       // Take screenshot
       await page.screenshot({
-        path: 'e2e/screenshots/phases-dark-theme.png',
+        path: screenshotPath('phases-dark-theme.png'),
         fullPage: true
       });
     });

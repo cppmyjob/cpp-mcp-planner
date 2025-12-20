@@ -32,16 +32,11 @@ yarn-error.log
 /.angular/cache
 .sass-cache/
 /connect.lock
-/coverage
 /libpeerconnection.log
 testem.log
 /typings
-__screenshots__/
 
-# Playwright
-/e2e/screenshots/
-/playwright-report/
-/test-results/
+# Test output is now in root .test-output/ directory
 
 # System files
 .DS_Store
