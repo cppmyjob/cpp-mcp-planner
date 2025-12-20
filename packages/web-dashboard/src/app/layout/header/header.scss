@@ -17,12 +17,22 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex: 1;
+  }
+
+  &__center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
   }
 
   &__right {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 0.5rem;
+    flex: 1;
   }
 
   &__title {
@@ -31,4 +41,9 @@
     font-weight: 600;
     color: var(--p-text-color);
   }
+}
+
+.plan-selector {
+  min-width: 250px;
+  max-width: 400px;
 }

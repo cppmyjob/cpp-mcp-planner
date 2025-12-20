@@ -11,6 +11,24 @@
     <h1 class="header__title">MCP Planning Dashboard</h1>
   </div>
 
+  <div class="header__center">
+    <p-select
+      [options]="plans()"
+      [(ngModel)]="selectedPlanId"
+      optionLabel="name"
+      optionValue="id"
+      [placeholder]="'Select Plan'"
+      [loading]="loading()"
+      [filter]="true"
+      filterBy="name"
+      filterPlaceholder="Search plans..."
+      [showClear]="true"
+      (onChange)="onPlanChange($event.value)"
+      [styleClass]="'plan-selector'"
+      data-testid="plan-selector"
+    />
+  </div>
+
   <div class="header__right">
     <p-button
       [icon]="isDarkTheme ? 'pi pi-sun' : 'pi pi-moon'"

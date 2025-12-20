@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, inject, signal, computed, type OnInit } from '@angular/core';
+import { Component, ViewEncapsulation, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CardModule } from 'primeng/card';
 import { ChartModule } from 'primeng/chart';
@@ -38,7 +38,7 @@ interface ChartOptions {
   styleUrl: './requirements-chart.scss',
   encapsulation: ViewEncapsulation.None
 })
-export class RequirementsChartComponent implements OnInit {
+export class RequirementsChartComponent {
   public readonly chartData = signal<ChartData | null>(null);
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
@@ -63,8 +63,11 @@ export class RequirementsChartComponent implements OnInit {
     rejected: '#ef4444'
   };
 
-  public ngOnInit(): void {
-    this.loadRequirements();
+  constructor() {
+    effect(() => {
+      const planId = this.planState.activePlanId();
+      this.loadRequirements(planId);
+    });
   }
 
   /**
@@ -105,11 +108,11 @@ export class RequirementsChartComponent implements OnInit {
     };
   }
 
-  private loadRequirements(): void {
+  private loadRequirements(planId: string): void {
     this.loading.set(true);
     this.error.set(null);
 
-    this.requirementService.list(this.planState.activePlanId()).subscribe({
+    this.requirementService.list(planId).subscribe({
       next: (requirements) => {
         this.buildChartData(requirements);
         this.loading.set(false);

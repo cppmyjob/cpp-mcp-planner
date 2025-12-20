@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, inject, signal, computed, type OnInit } from '@angular/core';
+import { Component, ViewEncapsulation, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TreeTableModule, type TreeTableNodeExpandEvent } from 'primeng/treetable';
 import { type TreeNode } from 'primeng/api';
@@ -26,7 +26,7 @@ import type { Phase, PhaseTreeNode, PhaseStatus } from '../../models';
   styleUrl: './phases.scss',
   encapsulation: ViewEncapsulation.None
 })
-export class PhasesComponent implements OnInit {
+export class PhasesComponent {
   // Public signals (before private fields per eslint member-ordering)
   public readonly treeNodes = signal<TreeNode<Phase>[]>([]);
   public readonly loading = signal(true);
@@ -45,15 +45,24 @@ export class PhasesComponent implements OnInit {
   private readonly phaseService = inject(PhaseService);
   private readonly planState = inject(PlanStateService);
 
-  public ngOnInit(): void {
-    this.loadPhaseTree();
+  constructor() {
+    effect(() => {
+      const planId = this.planState.activePlanId();
+      this.loadPhaseTreeInternal(planId);
+    });
   }
 
+  // Public API for manual reload
   public loadPhaseTree(): void {
+    const planId = this.planState.activePlanId();
+    this.loadPhaseTreeInternal(planId);
+  }
+
+  private loadPhaseTreeInternal(planId: string): void {
     this.loading.set(true);
     this.error.set(null);
 
-    this.phaseService.getTree(this.planState.activePlanId(), {
+    this.phaseService.getTree(planId, {
       fields: ['title', 'status', 'progress', 'priority', 'path', 'description', 'blockingReason']
     }).subscribe({
       next: (tree) => {

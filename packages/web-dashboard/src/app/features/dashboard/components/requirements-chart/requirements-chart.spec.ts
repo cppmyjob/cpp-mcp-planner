@@ -17,8 +17,9 @@ describe('RequirementsChartComponent', () => {
     list: vi.fn(() => of(mockRequirements))
   };
 
+  const activePlanIdSignal = signal('test-plan-id');
   const mockPlanStateService = {
-    activePlanId: vi.fn(() => 'test-plan-id')
+    activePlanId: activePlanIdSignal.asReadonly()
   };
 
   // Mock ThemeService with signal
@@ -29,6 +30,7 @@ describe('RequirementsChartComponent', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    activePlanIdSignal.set('test-plan-id');
     themeSignal.set('light');
 
     await TestBed.configureTestingModule({
@@ -65,6 +67,22 @@ describe('RequirementsChartComponent', () => {
     expect(chartData?.labels).toContain('Approved');
     expect(chartData?.labels).toContain('Draft');
     expect(chartData?.labels).toContain('Implemented');
+  });
+
+  it('should reload requirements when activePlanId changes', () => {
+    const fixture = TestBed.createComponent(RequirementsChartComponent);
+    fixture.detectChanges();
+
+    expect(mockRequirementService.list).toHaveBeenCalledTimes(1);
+
+    // Change active plan
+    activePlanIdSignal.set('plan-2');
+    TestBed.flushEffects();
+    fixture.detectChanges();
+
+    // Should reload with new planId
+    expect(mockRequirementService.list).toHaveBeenCalledTimes(2);
+    expect(mockRequirementService.list).toHaveBeenCalledWith('plan-2');
   });
 
   // Dark Theme Tests - These should FAIL initially (RED)

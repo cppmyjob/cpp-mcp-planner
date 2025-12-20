@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, inject, signal, type OnInit } from '@angular/core';
+import { Component, ViewEncapsulation, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CardModule } from 'primeng/card';
 import { TagModule } from 'primeng/tag';
@@ -13,7 +13,7 @@ import type { Phase } from '../../../../models';
   styleUrl: './blockers-panel.scss',
   encapsulation: ViewEncapsulation.None
 })
-export class BlockersPanelComponent implements OnInit {
+export class BlockersPanelComponent {
   public readonly blockedPhases = signal<Phase[]>([]);
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
@@ -21,8 +21,11 @@ export class BlockersPanelComponent implements OnInit {
   private readonly phaseService = inject(PhaseService);
   private readonly planState = inject(PlanStateService);
 
-  public ngOnInit(): void {
-    this.loadBlockedPhases();
+  constructor() {
+    effect(() => {
+      const planId = this.planState.activePlanId();
+      this.loadBlockedPhases(planId);
+    });
   }
 
   public getPrioritySeverity(priority?: string): 'danger' | 'warn' | 'info' | 'success' {
@@ -41,11 +44,11 @@ export class BlockersPanelComponent implements OnInit {
     }
   }
 
-  private loadBlockedPhases(): void {
+  private loadBlockedPhases(planId: string): void {
     this.loading.set(true);
     this.error.set(null);
 
-    this.phaseService.list(this.planState.activePlanId(), {
+    this.phaseService.list(planId, {
       status: 'blocked',
       fields: ['title', 'blockingReason', 'path', 'priority']
     }).subscribe({

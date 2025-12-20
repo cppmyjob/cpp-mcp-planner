@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
@@ -94,15 +95,17 @@ const mockPhaseTree: PhaseTreeNode[] = [
 
 describe('PhasesComponent', () => {
   let phaseServiceMock: { getTree: ReturnType<typeof vi.fn> };
-  let planStateServiceMock: { activePlanId: ReturnType<typeof vi.fn> };
+  const activePlanIdSignal = signal('test-plan-id');
+  let planStateServiceMock: { activePlanId: ReturnType<typeof activePlanIdSignal.asReadonly> };
 
   beforeEach(async () => {
     phaseServiceMock = {
       getTree: vi.fn().mockReturnValue(of(mockPhaseTree))
     };
 
+    activePlanIdSignal.set('test-plan-id');
     planStateServiceMock = {
-      activePlanId: vi.fn().mockReturnValue('test-plan-id')
+      activePlanId: activePlanIdSignal.asReadonly()
     };
 
     await TestBed.configureTestingModule({
@@ -347,6 +350,24 @@ describe('PhasesComponent', () => {
       component.loadPhaseTree();
 
       expect(phaseServiceMock.getTree).toHaveBeenCalledTimes(1);
+    });
+
+    it('should reload phase tree when activePlanId changes', () => {
+      const fixture = TestBed.createComponent(PhasesComponent);
+      fixture.detectChanges();
+
+      expect(phaseServiceMock.getTree).toHaveBeenCalledTimes(1);
+
+      // Change active plan
+      activePlanIdSignal.set('plan-2');
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      // Should reload with new planId
+      expect(phaseServiceMock.getTree).toHaveBeenCalledTimes(2);
+      expect(phaseServiceMock.getTree).toHaveBeenCalledWith('plan-2', {
+        fields: ['title', 'status', 'progress', 'priority', 'path', 'description', 'blockingReason']
+      });
     });
   });
 });

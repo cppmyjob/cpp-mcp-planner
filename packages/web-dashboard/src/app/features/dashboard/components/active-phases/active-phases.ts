@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, inject, signal, type OnInit } from '@angular/core';
+import { Component, ViewEncapsulation, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
@@ -15,7 +15,7 @@ import type { Phase } from '../../../../models';
   styleUrl: './active-phases.scss',
   encapsulation: ViewEncapsulation.None
 })
-export class ActivePhasesComponent implements OnInit {
+export class ActivePhasesComponent {
   public readonly phases = signal<Phase[]>([]);
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
@@ -23,8 +23,11 @@ export class ActivePhasesComponent implements OnInit {
   private readonly phaseService = inject(PhaseService);
   private readonly planState = inject(PlanStateService);
 
-  public ngOnInit(): void {
-    this.loadActivePhases();
+  constructor() {
+    effect(() => {
+      const planId = this.planState.activePlanId();
+      this.loadActivePhases(planId);
+    });
   }
 
   public getPrioritySeverity(priority?: string): 'danger' | 'warn' | 'info' | 'success' {
@@ -43,11 +46,11 @@ export class ActivePhasesComponent implements OnInit {
     }
   }
 
-  private loadActivePhases(): void {
+  private loadActivePhases(planId: string): void {
     this.loading.set(true);
     this.error.set(null);
 
-    this.phaseService.list(this.planState.activePlanId(), {
+    this.phaseService.list(planId, {
       status: 'in_progress',
       fields: ['title', 'progress', 'priority', 'status', 'path']
     }).subscribe({

@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, inject, signal, type OnInit } from '@angular/core';
+import { Component, ViewEncapsulation, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CardModule } from 'primeng/card';
 
@@ -12,7 +12,7 @@ import type { PlanStatistics } from '../../../../models';
   styleUrl: './statistics-cards.scss',
   encapsulation: ViewEncapsulation.None
 })
-export class StatisticsCardsComponent implements OnInit {
+export class StatisticsCardsComponent {
   public readonly statistics = signal<PlanStatistics | null>(null);
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
@@ -20,15 +20,18 @@ export class StatisticsCardsComponent implements OnInit {
   private readonly planService = inject(PlanService);
   private readonly planState = inject(PlanStateService);
 
-  public ngOnInit(): void {
-    this.loadStatistics();
+  constructor() {
+    effect(() => {
+      const planId = this.planState.activePlanId();
+      this.loadStatistics(planId);
+    });
   }
 
-  private loadStatistics(): void {
+  private loadStatistics(planId: string): void {
     this.loading.set(true);
     this.error.set(null);
 
-    this.planService.getSummary(this.planState.activePlanId()).subscribe({
+    this.planService.getSummary(planId).subscribe({
       next: (summary) => {
         this.statistics.set(summary.statistics);
         this.loading.set(false);
