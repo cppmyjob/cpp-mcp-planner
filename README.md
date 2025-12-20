@@ -1,10 +1,47 @@
 # MCP Planning Server
 
-MCP server for Claude Code that helps organize and track software development tasks.
+A comprehensive planning system with:
+- **MCP Server** - Plugin for Claude Code CLI
+- **REST API** - NestJS backend server
+- **Web Dashboard** - Angular UI for visual planning
+
+## 🚀 Quick Start (Web Dashboard)
+
+**For developers who want to run the Web UI:**
+
+### Windows
+```cmd
+start-dev.bat
+```
+
+### Linux/macOS
+```bash
+./start-dev.sh
+```
+
+Then open http://localhost:8791 in your browser.
+
+📖 **Full setup guide:** [SETUP.md](SETUP.md)
+
+---
 
 ## What is this?
 
-This is a plugin for Claude Code (Anthropic's AI coding assistant). It adds planning tools that help:
+This project provides two ways to interact with the planning system:
+
+### 1. Web Dashboard (NEW)
+A modern web interface built with Angular and PrimeNG:
+- Visual task management with drag-and-drop
+- Real-time progress tracking
+- Interactive phase hierarchy
+- RESTful API integration
+
+**Ports:**
+- Web Server (API): `8790`
+- Web Dashboard (UI): `8791`
+
+### 2. MCP Server (Claude Code Integration)
+A plugin for Claude Code (Anthropic's AI coding assistant) that helps:
 - Break down complex tasks into steps
 - Track what's done and what's next
 - Record technical decisions
