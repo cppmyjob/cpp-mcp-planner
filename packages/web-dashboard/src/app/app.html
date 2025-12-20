@@ -4,8 +4,6 @@
   <div class="app-shell__body">
     <app-sidebar
       [collapsed]="sidebarCollapsed()"
-      [selectedPlanId]="selectedPlan()?.id ?? ''"
-      (planSelected)="onPlanSelected($event)"
     />
 
     <main class="app-shell__main" data-testid="main-content">
