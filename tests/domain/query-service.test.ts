@@ -1223,7 +1223,7 @@ describe('QueryService', () => {
       const requirement = requirements[0] as Partial<Requirement>;
       delete requirement.acceptanceCriteria; // Set to undefined
        
-      await repo.update(requirement.id as string, requirement as Requirement);
+      await repo.update(requirement.id as string, requirement);
 
       const result = await queryService.searchEntities({
         planId,

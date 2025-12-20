@@ -14,11 +14,17 @@ This is a plugin for Claude Code (Anthropic's AI coding assistant). It adds plan
 
 Before installing, make sure you have:
 - **Node.js** (version 18 or higher) - download from https://nodejs.org
+- **pnpm** (recommended package manager for this monorepo)
 - **Claude Code** - the CLI tool from Anthropic
 
 To check if Node.js is installed, run in terminal:
 ```bash
 node --version
+```
+
+To install pnpm globally:
+```bash
+npm install -g pnpm
 ```
 
 ## Installation
@@ -29,7 +35,7 @@ node --version
 
 3. Install dependencies:
 ```bash
-npm install
+pnpm install
 ```
 
 4. Build the project:
@@ -38,6 +44,8 @@ npm run build
 ```
 
 After build, you should see a `dist` folder with compiled files.
+
+**Note:** This is a monorepo managed by pnpm workspaces. All dependencies are installed with a single `pnpm install` command from the root directory.
 
 ## Configuration
 

@@ -33,7 +33,7 @@ async function loadEntities<T extends Entity>(
   const typeMap: Record<string, string> = {
     phases: 'phase'
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
   return repo.findAll();
 }
@@ -47,7 +47,7 @@ async function saveEntities(
   const typeMap: Record<string, string> = {
     phases: 'phase'
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const repo = repositoryFactory.createRepository<Entity>(typeMap[entityType] as any, planId);
   for (const entity of entities) {
     await repo.update(entity.id, entity);
@@ -356,7 +356,7 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       // Simulate legacy data: manually inject codeExamples into storage
       const phases = await loadEntities<Entity>(repositoryFactory, testPlanId, 'phases');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const legacyPhase = phases.find((p: any) => p.id === phaseResult.phaseId) as any;
+      const legacyPhase = phases.find((p: any) => p.id === phaseResult.phaseId);
       if (legacyPhase !== undefined) {
         legacyPhase.codeExamples = [
           { language: 'typescript', code: 'legacy code', description: 'old example' },
@@ -393,7 +393,7 @@ describe('Sprint 10: Remove codeExamples from Phase', () => {
       // Simulate legacy data: manually inject codeRefs into storage
       const phases = await loadEntities<Entity>(repositoryFactory, testPlanId, 'phases');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const legacyPhase = phases.find((p: any) => p.id === phaseResult.phaseId) as any;
+      const legacyPhase = phases.find((p: any) => p.id === phaseResult.phaseId);
       if (legacyPhase !== undefined) {
         legacyPhase.codeRefs = ['src/legacy.ts:42', 'tests/old.test.ts:100'];
         await saveEntities(repositoryFactory, testPlanId, 'phases', phases);

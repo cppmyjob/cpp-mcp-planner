@@ -45,7 +45,7 @@ async function loadEntities<T extends Entity>(
     decisions: 'decision',
     artifacts: 'artifact'
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const repo = repositoryFactory.createRepository<T>(typeMap[entityType] as any, planId);
   return repo.findAll();
 }

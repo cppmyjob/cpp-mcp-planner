@@ -51,7 +51,7 @@ describe('RED: RepositoryFactory', () => {
     });
 
     it('should require storage config', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect(() => new FileRepositoryFactory(null as any)).toThrow();
     });
 
@@ -75,15 +75,15 @@ describe('RED: RepositoryFactory', () => {
 
   describe('Input Validation', () => {
     it('should validate entityType in createRepository', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect(() => factory.createRepository<Requirement>('' as any, 'plan-123')).toThrow(
         /entityType is required/
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect(() => factory.createRepository<Requirement>(null as unknown as any, 'plan-123')).toThrow(
         /entityType is required/
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect(() => factory.createRepository<Requirement>('  ' as any, 'plan-123')).toThrow(
         /entityType is required/
       );
