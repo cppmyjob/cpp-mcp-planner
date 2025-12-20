@@ -1,9 +1,9 @@
-import { Component, ViewEncapsulation, inject, signal, type OnInit } from '@angular/core';
+import { Component, ViewEncapsulation, inject, signal, computed, type OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CardModule } from 'primeng/card';
 import { ChartModule } from 'primeng/chart';
 
-import { RequirementService, PlanStateService } from '../../../../core/services';
+import { RequirementService, PlanStateService, ThemeService } from '../../../../core/services';
 import type { Requirement, RequirementStatus } from '../../../../models';
 
 interface ChartData {
@@ -16,6 +16,21 @@ interface ChartData {
   }>;
 }
 
+interface ChartOptions {
+  plugins: {
+    legend: { display: boolean };
+    tooltip: {
+      backgroundColor: string;
+      titleColor: string;
+      bodyColor: string;
+      borderColor: string;
+      borderWidth: number;
+    };
+  };
+  responsive: boolean;
+  maintainAspectRatio: boolean;
+}
+
 @Component({
   selector: 'app-requirements-chart',
   imports: [CommonModule, CardModule, ChartModule],
@@ -24,21 +39,21 @@ interface ChartData {
   encapsulation: ViewEncapsulation.None
 })
 export class RequirementsChartComponent implements OnInit {
-  private readonly requirementService = inject(RequirementService);
-  private readonly planState = inject(PlanStateService);
-
   public readonly chartData = signal<ChartData | null>(null);
-  public readonly chartOptions = {
-    plugins: {
-      legend: {
-        display: false  // Disable legend to prevent undefined from showing
-      }
-    },
-    responsive: true,
-    maintainAspectRatio: false
-  };
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
+
+  /**
+   * Computed chart options that react to theme changes
+   */
+  public readonly chartOptions = computed<ChartOptions>(() => {
+    const isDark = this.themeService.currentTheme() === 'dark';
+    return this.buildChartOptions(isDark);
+  });
+
+  private readonly requirementService = inject(RequirementService);
+  private readonly planState = inject(PlanStateService);
+  private readonly themeService = inject(ThemeService);
 
   private readonly statusColors: Record<RequirementStatus, string> = {
     draft: '#94a3b8',
@@ -50,6 +65,44 @@ export class RequirementsChartComponent implements OnInit {
 
   public ngOnInit(): void {
     this.loadRequirements();
+  }
+
+  /**
+   * Build theme-aware chart options
+   */
+  private buildChartOptions(isDark: boolean): ChartOptions {
+    // Light theme colors
+    const lightColors = {
+      tooltipBg: '#ffffff',
+      tooltipText: '#334155',
+      tooltipBorder: '#e2e8f0'
+    };
+
+    // Dark theme colors
+    const darkColors = {
+      tooltipBg: '#1e293b',
+      tooltipText: '#e2e8f0',
+      tooltipBorder: '#475569'
+    };
+
+    const colors = isDark ? darkColors : lightColors;
+
+    return {
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
+          borderColor: colors.tooltipBorder,
+          borderWidth: 1
+        }
+      },
+      responsive: true,
+      maintainAspectRatio: false
+    };
   }
 
   private loadRequirements(): void {
@@ -77,12 +130,11 @@ export class RequirementsChartComponent implements OnInit {
       rejected: 0
     };
 
-    // GREEN: Filter out requirements with invalid/undefined status
+    // Filter out requirements with invalid/undefined status
     requirements.forEach(req => {
       if (req.status !== undefined && req.status in statusCounts) {
         statusCounts[req.status]++;
       } else {
-        // REFACTOR: Log invalid status for debugging
         console.warn(`Requirement ${req.id} has invalid status:`, req.status);
       }
     });

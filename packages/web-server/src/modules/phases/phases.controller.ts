@@ -87,11 +87,18 @@ export class PhasesController {
     @Param('planId') planId: string,
     @Query() query: TreeQueryDto
   ): Promise<unknown> {
+    // Ensure fields is array (NestJS @Transform may not always apply for query params)
+    const fields = query.fields
+      ? Array.isArray(query.fields)
+        ? query.fields
+        : (query.fields as unknown as string).split(',').map((f) => f.trim())
+      : undefined;
+
     return this.phaseService.getPhaseTree({
       planId,
       maxDepth: query.maxDepth,
       includeCompleted: query.includeCompleted,
-      fields: query.fields,
+      fields,
       excludeMetadata: query.excludeMetadata,
       excludeComputed: query.excludeComputed,
     });

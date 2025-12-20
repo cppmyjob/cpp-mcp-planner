@@ -6,7 +6,12 @@
   padding: 0 1rem;
   background-color: var(--p-surface-card);
   border-bottom: 1px solid var(--p-surface-border);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+
+  // Dark theme: stronger shadow for visibility on dark background
+  :root.dark-theme & {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
 
   &__left {
     display: flex;

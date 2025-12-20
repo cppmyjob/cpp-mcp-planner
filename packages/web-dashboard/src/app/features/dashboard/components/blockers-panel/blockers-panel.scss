@@ -35,7 +35,7 @@
   padding: 1rem;
   border: 1px solid var(--p-surface-border);
   border-radius: 6px;
-  background: var(--p-surface-50);
+  background: var(--app-card-bg);
 
   &__header {
     display: flex;
@@ -56,7 +56,7 @@
     color: var(--p-text-muted-color);
     font-family: monospace;
     padding: 0.125rem 0.375rem;
-    background: var(--p-surface-100);
+    background: var(--app-badge-bg);
     border-radius: 4px;
   }
 
@@ -74,7 +74,7 @@
     align-items: flex-start;
     gap: 0.5rem;
     padding: 0.75rem;
-    background: var(--p-surface-0);
+    background: var(--app-highlight-bg);
     border-left: 3px solid var(--p-warn-color);
     border-radius: 4px;
     font-size: 0.875rem;

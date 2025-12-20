@@ -1,9 +1,10 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { of } from 'rxjs';
 
 import { DashboardComponent } from './dashboard';
-import { PlanService, RequirementService, PhaseService, PlanStateService } from '../../core/services';
+import { PlanService, RequirementService, PhaseService, PlanStateService, ThemeService } from '../../core/services';
 
 describe('DashboardComponent', () => {
   const mockPlanService = {
@@ -36,6 +37,10 @@ describe('DashboardComponent', () => {
     activePlanId: vi.fn(() => 'test-plan-id')
   };
 
+  const mockThemeService = {
+    currentTheme: signal<'light' | 'dark'>('light')
+  };
+
   beforeEach(async () => {
     vi.clearAllMocks();
 
@@ -45,7 +50,8 @@ describe('DashboardComponent', () => {
         { provide: PlanService, useValue: mockPlanService },
         { provide: RequirementService, useValue: mockRequirementService },
         { provide: PhaseService, useValue: mockPhaseService },
-        { provide: PlanStateService, useValue: mockPlanStateService }
+        { provide: PlanStateService, useValue: mockPlanStateService },
+        { provide: ThemeService, useValue: mockThemeService }
       ]
     }).compileComponents();
   });

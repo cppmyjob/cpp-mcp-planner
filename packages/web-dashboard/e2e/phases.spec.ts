@@ -295,4 +295,259 @@ test.describe('Phases Page', () => {
       });
     });
   });
+
+  test.describe('Navigation Bug Regression', () => {
+    /**
+     * RED test for navigation bug:
+     * When navigating Phases → Dashboard → Phases, the table header
+     * gets incorrect styling (appears highlighted/selected).
+     * Most visible in dark theme.
+     */
+    test('should maintain consistent header styling after navigation in dark theme', async ({ page }) => {
+      // Step 1: Go to Phases page (initial visit)
+      await page.goto('/phases');
+      await page.waitForLoadState('networkidle');
+
+      // Enable dark theme
+      const themeToggle = page.locator('[data-testid="theme-toggle"]');
+      await themeToggle.click();
+      await expect(page.locator('html')).toHaveClass(/dark-theme/);
+      await page.waitForTimeout(300); // Wait for theme transition
+
+      // Wait for tree table to load
+      const treeTable = page.locator('[data-testid="phase-tree"]');
+      await expect(treeTable).toBeVisible();
+
+      // Capture header background color on first visit
+      const headerRow = page.locator('.p-treetable-thead > tr').first();
+      const headerCell = page.locator('.p-treetable-thead > tr > th').first();
+
+      const initialHeaderBg = await headerCell.evaluate(el => {
+        return window.getComputedStyle(el).backgroundColor;
+      });
+
+      // Take screenshot of initial state
+      await page.screenshot({
+        path: 'e2e/screenshots/phases-header-initial.png'
+      });
+
+      // Step 2: Navigate to Dashboard
+      await page.locator('[data-testid="nav-dashboard"]').click();
+      await page.waitForURL(/.*\/dashboard/);
+      await page.waitForLoadState('networkidle');
+
+      // Step 3: Navigate back to Phases
+      await page.locator('[data-testid="nav-phases"]').click();
+      await page.waitForURL(/.*\/phases/);
+      await page.waitForLoadState('networkidle');
+
+      // Wait for tree table to reload
+      await expect(treeTable).toBeVisible();
+
+      // Capture header background color after navigation
+      const afterNavHeaderBg = await headerCell.evaluate(el => {
+        return window.getComputedStyle(el).backgroundColor;
+      });
+
+      // Take screenshot of state after navigation
+      await page.screenshot({
+        path: 'e2e/screenshots/phases-header-after-nav.png'
+      });
+
+      // Header row should NOT have p-highlight class
+      await expect(headerRow).not.toHaveClass(/p-highlight/);
+
+      // Header cells should NOT have p-highlight class
+      const headerCells = page.locator('.p-treetable-thead > tr > th');
+      const cellCount = await headerCells.count();
+      for (let i = 0; i < cellCount; i++) {
+        await expect(headerCells.nth(i)).not.toHaveClass(/p-highlight/);
+      }
+
+      // Parse RGB values to check brightness
+      const parseRgb = (rgb: string): number[] => {
+        const match = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : [0, 0, 0];
+      };
+
+      const [r, g, b] = parseRgb(afterNavHeaderBg);
+      const brightness = (r + g + b) / 3;
+
+      // In dark theme, header should stay dark (not become light/white)
+      // Original bug: header became rgb(244, 244, 245) = brightness ~244 after navigation
+      // Fixed: header should have brightness < 100 (dark color)
+      expect(brightness).toBeLessThan(100);
+    });
+
+    test('should not apply highlight classes to header on multiple navigations', async ({ page }) => {
+      // Perform multiple navigation cycles
+      for (let cycle = 0; cycle < 3; cycle++) {
+        // Go to Phases
+        await page.goto('/phases');
+        await page.waitForLoadState('networkidle');
+
+        const treeTable = page.locator('[data-testid="phase-tree"]');
+        await expect(treeTable).toBeVisible();
+
+        // Check no highlight on header
+        const headerRow = page.locator('.p-treetable-thead > tr').first();
+        await expect(headerRow).not.toHaveClass(/p-highlight/);
+
+        // Navigate to Dashboard
+        await page.locator('[data-testid="nav-dashboard"]').click();
+        await page.waitForURL(/.*\/dashboard/);
+        await page.waitForLoadState('networkidle');
+      }
+    });
+
+    /**
+     * RED test for row border bug:
+     * After navigation in dark theme, row borders become white instead of dark.
+     */
+    test('should maintain dark row borders after navigation in dark theme', async ({ page }) => {
+      // Step 1: Go to Phases page
+      await page.goto('/phases');
+      await page.waitForLoadState('networkidle');
+
+      // Enable dark theme
+      const themeToggle = page.locator('[data-testid="theme-toggle"]');
+      await themeToggle.click();
+      await expect(page.locator('html')).toHaveClass(/dark-theme/);
+      await page.waitForTimeout(300);
+
+      // Wait for tree table to load
+      const treeTable = page.locator('[data-testid="phase-tree"]');
+      await expect(treeTable).toBeVisible();
+
+      // Step 2: Navigate to Dashboard
+      await page.locator('[data-testid="nav-dashboard"]').click();
+      await page.waitForURL(/.*\/dashboard/);
+      await page.waitForLoadState('networkidle');
+
+      // Step 3: Navigate back to Phases
+      await page.locator('[data-testid="nav-phases"]').click();
+      await page.waitForURL(/.*\/phases/);
+      await page.waitForLoadState('networkidle');
+      await expect(treeTable).toBeVisible();
+
+      // Capture row border color after navigation
+      const tableCell = page.locator('.p-treetable-tbody > tr > td').first();
+      const borderColor = await tableCell.evaluate(el => {
+        return window.getComputedStyle(el).borderBottomColor;
+      });
+
+      // Take screenshot for debugging
+      await page.screenshot({
+        path: 'e2e/screenshots/phases-row-borders-after-nav.png'
+      });
+
+      // Parse RGB values to check brightness
+      const parseRgb = (rgb: string): number[] => {
+        const match = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : [0, 0, 0];
+      };
+
+      const [r, g, b] = parseRgb(borderColor);
+      const brightness = (r + g + b) / 3;
+
+      // In dark theme, borders should stay dark (not become white/light)
+      // Bug: borders become rgb(226, 232, 240) = brightness ~233 after navigation
+      // Fixed: borders should have brightness < 100 (dark color)
+      expect(brightness).toBeLessThan(100);
+    });
+
+    /**
+     * RED test for row hover bug:
+     * In dark theme, hovering over a row shows white background instead of dark.
+     */
+    test('should maintain dark hover background in dark theme', async ({ page }) => {
+      await page.goto('/phases');
+      await page.waitForLoadState('networkidle');
+
+      // Enable dark theme
+      const themeToggle = page.locator('[data-testid="theme-toggle"]');
+      await themeToggle.click();
+      await expect(page.locator('html')).toHaveClass(/dark-theme/);
+      await page.waitForTimeout(300);
+
+      // Wait for tree table to load
+      const treeTable = page.locator('[data-testid="phase-tree"]');
+      await expect(treeTable).toBeVisible();
+
+      // Find a row to hover
+      const tableRow = page.locator('.p-treetable-tbody > tr').first();
+      await expect(tableRow).toBeVisible();
+
+      // Hover over the row
+      await tableRow.hover();
+      await page.waitForTimeout(100);
+
+      // Capture hover background color
+      const hoverBg = await tableRow.evaluate(el => {
+        return window.getComputedStyle(el).backgroundColor;
+      });
+
+      // Take screenshot for debugging
+      await page.screenshot({
+        path: 'e2e/screenshots/phases-row-hover-dark.png'
+      });
+
+      // Parse RGB values to check brightness
+      const parseRgb = (rgb: string): number[] => {
+        const match = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : [0, 0, 0];
+      };
+
+      const [r, g, b] = parseRgb(hoverBg);
+      const brightness = (r + g + b) / 3;
+
+      // In dark theme, hover should be dark (not white/light)
+      // Bug: hover becomes rgb(248, 250, 252) = brightness ~250
+      // Fixed: hover should have brightness < 100 (dark color)
+      expect(brightness).toBeLessThan(100);
+    });
+
+    /**
+     * RED test for row alignment bug:
+     * Selected/highlighted rows shift by 1px due to PrimeNG outline/border.
+     */
+    test('should not shift row position on selection in dark theme', async ({ page }) => {
+      await page.goto('/phases');
+      await page.waitForLoadState('networkidle');
+
+      // Enable dark theme
+      const themeToggle = page.locator('[data-testid="theme-toggle"]');
+      await themeToggle.click();
+      await expect(page.locator('html')).toHaveClass(/dark-theme/);
+      await page.waitForTimeout(300);
+
+      // Wait for tree table to load
+      const treeTable = page.locator('[data-testid="phase-tree"]');
+      await expect(treeTable).toBeVisible();
+
+      // Find first row and get its initial position
+      const tableRow = page.locator('.p-treetable-tbody > tr').first();
+      await expect(tableRow).toBeVisible();
+
+      const initialBox = await tableRow.boundingBox();
+      expect(initialBox).not.toBeNull();
+
+      // Click to select the row
+      await tableRow.click();
+      await page.waitForTimeout(100);
+
+      // Get position after selection
+      const afterSelectBox = await tableRow.boundingBox();
+      expect(afterSelectBox).not.toBeNull();
+
+      // Take screenshot for debugging
+      await page.screenshot({
+        path: 'e2e/screenshots/phases-row-alignment.png'
+      });
+
+      // Row should not shift position (allow 0.5px tolerance for subpixel rendering)
+      expect(Math.abs(afterSelectBox!.y - initialBox!.y)).toBeLessThan(1);
+      expect(Math.abs(afterSelectBox!.height - initialBox!.height)).toBeLessThan(1);
+    });
+  });
 });

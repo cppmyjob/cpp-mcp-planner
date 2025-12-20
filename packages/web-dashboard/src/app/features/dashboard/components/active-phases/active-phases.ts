@@ -16,15 +16,31 @@ import type { Phase } from '../../../../models';
   encapsulation: ViewEncapsulation.None
 })
 export class ActivePhasesComponent implements OnInit {
-  private readonly phaseService = inject(PhaseService);
-  private readonly planState = inject(PlanStateService);
-
   public readonly phases = signal<Phase[]>([]);
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
 
+  private readonly phaseService = inject(PhaseService);
+  private readonly planState = inject(PlanStateService);
+
   public ngOnInit(): void {
     this.loadActivePhases();
+  }
+
+  public getPrioritySeverity(priority?: string): 'danger' | 'warn' | 'info' | 'success' {
+    switch (priority) {
+      case 'critical':
+        return 'danger';
+      case 'high':
+        return 'warn';
+      case 'medium':
+        return 'info';
+      case 'low':
+        return 'success';
+      case undefined:
+      default:
+        return 'info';
+    }
   }
 
   private loadActivePhases(): void {
@@ -44,20 +60,5 @@ export class ActivePhasesComponent implements OnInit {
         this.loading.set(false);
       }
     });
-  }
-
-  public getPrioritySeverity(priority?: string): 'danger' | 'warn' | 'info' | 'success' {
-    switch (priority) {
-      case 'critical':
-        return 'danger';
-      case 'high':
-        return 'warn';
-      case 'medium':
-        return 'info';
-      case 'low':
-        return 'success';
-      default:
-        return 'info';
-    }
   }
 }

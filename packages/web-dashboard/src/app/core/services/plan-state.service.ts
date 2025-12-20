@@ -8,14 +8,14 @@ import { Injectable, signal, computed } from '@angular/core';
   providedIn: 'root'
 })
 export class PlanStateService {
+  public readonly activePlanId = computed(() => this.activePlanIdSignal() ?? this.defaultPlanId);
+  public readonly hasActivePlan = computed(() => this.activePlanIdSignal() !== null);
+
   private readonly activePlanIdSignal = signal<string | null>(null);
   private readonly planStorageKey = 'active-plan-id';
 
   // Default plan for development/testing
   private readonly defaultPlanId = '261825f1-cef0-4227-873c-a20c7e81a9de';
-
-  public readonly activePlanId = computed(() => this.activePlanIdSignal() ?? this.defaultPlanId);
-  public readonly hasActivePlan = computed(() => this.activePlanIdSignal() !== null);
 
   constructor() {
     this.loadActivePlan();

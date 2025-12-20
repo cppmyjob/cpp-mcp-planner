@@ -42,3 +42,31 @@ body {
   background-color: var(--p-surface-ground);
   color: var(--p-text-color);
 }
+
+/* App-level theme variables
+ * PrimeNG only redefines CSS variables within its own component scopes.
+ * Custom CSS classes need their own dark-theme-aware variables.
+ * See: https://github.com/orgs/primefaces/discussions/2899
+ */
+:root {
+  --app-badge-bg: #e2e8f0;           /* slate-200 - for path badges, tags */
+  --app-card-bg: #f1f5f9;            /* slate-100 - for card backgrounds */
+  --app-card-bg-subtle: #f8fafc;     /* slate-50 - for subtle backgrounds */
+  --app-highlight-bg: #e2e8f0;       /* slate-200 - for highlighted content */
+  --app-border-color: #e2e8f0;       /* slate-200 - for table borders */
+  --app-hover-bg: #f8fafc;           /* slate-50 - for row hover */
+}
+
+:root.dark-theme {
+  --app-badge-bg: #475569;           /* slate-600 */
+  --app-card-bg: #1e293b;            /* slate-800 */
+  --app-card-bg-subtle: #334155;     /* slate-700 */
+  --app-highlight-bg: #334155;       /* slate-700 */
+  --app-border-color: #334155;       /* slate-700 - for table borders */
+  --app-hover-bg: #334155;           /* slate-700 - for row hover */
+}
+
+/* PrimeNG TreeTable: Prevent unwanted highlight on header after navigation */
+.p-treetable-thead > tr > th.p-highlight {
+  background: var(--app-card-bg);
+}

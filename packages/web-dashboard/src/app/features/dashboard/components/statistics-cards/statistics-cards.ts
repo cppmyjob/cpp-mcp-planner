@@ -13,12 +13,12 @@ import type { PlanStatistics } from '../../../../models';
   encapsulation: ViewEncapsulation.None
 })
 export class StatisticsCardsComponent implements OnInit {
-  private readonly planService = inject(PlanService);
-  private readonly planState = inject(PlanStateService);
-
   public readonly statistics = signal<PlanStatistics | null>(null);
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
+
+  private readonly planService = inject(PlanService);
+  private readonly planState = inject(PlanStateService);
 
   public ngOnInit(): void {
     this.loadStatistics();
