@@ -17,3 +17,6 @@
 ```
 
 **Rules:** No bare tag selectors (`i`, `span`). Use `&__icon`, `&__label` instead.
+
+## Testing
+See @.claude/rules/testing.md
