@@ -130,12 +130,10 @@ export class RequirementsChartComponent implements OnInit {
       rejected: 0
     };
 
-    // Filter out requirements with invalid/undefined status
+    // Count requirements by status (skip invalid/undefined status)
     requirements.forEach(req => {
       if (req.status !== undefined && req.status in statusCounts) {
         statusCounts[req.status]++;
-      } else {
-        console.warn(`Requirement ${req.id} has invalid status:`, req.status);
       }
     });
 

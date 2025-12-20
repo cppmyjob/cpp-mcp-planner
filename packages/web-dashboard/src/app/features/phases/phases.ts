@@ -73,9 +73,8 @@ export class PhasesComponent implements OnInit {
     this.treeNodes.update(nodes => this.setExpandedRecursive(nodes, expanded));
   }
 
-  public onNodeExpand(event: TreeTableNodeExpandEvent): void {
-    // Track expansion state if needed
-    console.log('Node expanded:', event.node.data?.title);
+  public onNodeExpand(_event: TreeTableNodeExpandEvent): void {
+    // Expansion state tracking can be added here if needed
   }
 
   public getStatusSeverity(status: PhaseStatus | undefined): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
