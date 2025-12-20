@@ -1,4 +1,241 @@
 <div class="requirements" data-testid="requirements-page">
-  <h2 class="requirements__title">Requirements</h2>
-  <p class="requirements__description">Kanban board for requirements will appear here.</p>
+  <!-- Toolbar -->
+  <div class="requirements__toolbar">
+    <h2 class="requirements__title">Requirements</h2>
+
+    <div class="requirements__toolbar-actions">
+      <span class="p-input-icon-left">
+        <i class="pi pi-search"></i>
+        <input
+          pInputText
+          type="text"
+          placeholder="Search requirements..."
+          [ngModel]="searchTerm()"
+          (ngModelChange)="searchTerm.set($event)"
+          data-testid="requirements-search"
+          class="requirements__search"
+        />
+      </span>
+
+      <p-button
+        label="Filter"
+        icon="pi pi-filter"
+        [outlined]="true"
+        severity="secondary"
+        data-testid="requirements-filter-button"
+      />
+
+      <p-button
+        label="Sort"
+        icon="pi pi-sort-alt"
+        [outlined]="true"
+        severity="secondary"
+        data-testid="requirements-sort-button"
+      />
+
+      <p-button
+        label="Add Requirement"
+        icon="pi pi-plus"
+        (onClick)="openAddDialog()"
+        data-testid="add-requirement-button"
+      />
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  @if (loading()) {
+    <div class="requirements__loading" data-testid="requirements-loading">
+      <i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i>
+      <p>Loading requirements...</p>
+    </div>
+  }
+
+  <!-- Error state -->
+  @if (error()) {
+    <div class="requirements__error" data-testid="requirements-error">
+      <i class="pi pi-exclamation-triangle"></i>
+      <p>{{ error() }}</p>
+    </div>
+  }
+
+  <!-- Kanban Board -->
+  @if (!loading() && !error()) {
+    <div class="requirements__kanban">
+      @for (column of kanbanColumns(); track column.status) {
+        <div
+          class="kanban-column"
+          [attr.data-testid]="'kanban-column-' + column.status"
+          (drop)="onDrop(column.status)"
+          (dragover)="onDragOver($event)"
+        >
+          <!-- Column Header -->
+          <div class="kanban-column__header" [attr.data-testid]="'column-header-' + column.status">
+            <span class="kanban-column__title">{{ column.title }}</span>
+            <span class="kanban-column__count">({{ column.requirements.length }})</span>
+          </div>
+
+          <!-- Column Cards -->
+          <div class="kanban-column__cards">
+            @for (requirement of column.requirements; track requirement.id) {
+              <p-card
+                class="requirement-card"
+                [draggable]="true"
+                (dragstart)="onDragStart(requirement)"
+                (dragend)="onDragEnd()"
+                [attr.data-testid]="'requirement-card-' + requirement.id"
+              >
+                <!-- Card Header -->
+                <ng-template pTemplate="header">
+                  <div class="requirement-card__header">
+                    <p-tag
+                      [value]="requirement.priority"
+                      [severity]="getPrioritySeverity(requirement.priority)"
+                      data-testid="requirement-priority"
+                    />
+                  </div>
+                </ng-template>
+
+                <!-- Card Content -->
+                <div class="requirement-card__content">
+                  <h4 class="requirement-card__title" data-testid="requirement-title">
+                    {{ requirement.title }}
+                  </h4>
+
+                  @if (requirement.description) {
+                    <p class="requirement-card__description">
+                      {{ requirement.description }}
+                    </p>
+                  }
+
+                  <!-- Tags -->
+                  @if (getTags(requirement).length > 0) {
+                    <div class="requirement-card__tags" data-testid="requirement-tags">
+                      @for (tag of getTags(requirement); track tag) {
+                        <p-chip [label]="tag" />
+                      }
+                    </div>
+                  }
+                </div>
+
+                <!-- Card Footer -->
+                <ng-template pTemplate="footer">
+                  <div class="requirement-card__footer">
+                    <div class="requirement-card__votes" data-testid="requirement-votes">
+                      <i class="pi pi-thumbs-up"></i>
+                      <span>{{ requirement.votes }} votes</span>
+                    </div>
+
+                    @if (requirement.source.type) {
+                      <p-tag
+                        [value]="requirement.source.type"
+                        [rounded]="true"
+                        severity="info"
+                      />
+                    }
+                  </div>
+                </ng-template>
+              </p-card>
+            }
+
+            <!-- Empty state -->
+            @if (column.requirements.length === 0) {
+              <div class="kanban-column__empty">
+                <p>No {{ column.title.toLowerCase() }} requirements</p>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Add Requirement Dialog -->
+  <p-dialog
+    header="Add Requirement"
+    [(visible)]="showAddDialog"
+    [modal]="true"
+    [style]="{ width: '50vw' }"
+    [draggable]="false"
+    [resizable]="false"
+    data-testid="add-requirement-dialog"
+  >
+    <div class="add-requirement-form">
+      <!-- Title -->
+      <div class="form-field">
+        <label for="req-title">Title <span class="required">*</span></label>
+        <input
+          id="req-title"
+          pInputText
+          type="text"
+          [(ngModel)]="newRequirement().title"
+          placeholder="Enter requirement title"
+          data-testid="requirement-title-input"
+          class="w-full"
+        />
+      </div>
+
+      <!-- Description -->
+      <div class="form-field">
+        <label for="req-description">Description</label>
+        <textarea
+          id="req-description"
+          pTextarea
+          [(ngModel)]="newRequirement().description"
+          placeholder="Enter requirement description"
+          data-testid="requirement-description-input"
+          rows="4"
+          class="w-full"
+        ></textarea>
+      </div>
+
+      <!-- Priority -->
+      <div class="form-field">
+        <label for="req-priority">Priority</label>
+        <p-select
+          id="req-priority"
+          [(ngModel)]="newRequirement().priority"
+          [options]="priorityOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Select priority"
+          data-testid="requirement-priority-select"
+          class="w-full"
+        />
+      </div>
+
+      <!-- Category -->
+      <div class="form-field">
+        <label for="req-category">Category</label>
+        <p-select
+          id="req-category"
+          [(ngModel)]="newRequirement().category"
+          [options]="categoryOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Select category"
+          data-testid="requirement-category-select"
+          class="w-full"
+        />
+      </div>
+    </div>
+
+    <ng-template pTemplate="footer">
+      <p-button
+        label="Cancel"
+        icon="pi pi-times"
+        [outlined]="true"
+        (onClick)="showAddDialog.set(false)"
+        severity="secondary"
+      />
+      <p-button
+        label="Save"
+        icon="pi pi-check"
+        (onClick)="saveRequirement()"
+        data-testid="requirement-save-button"
+      />
+    </ng-template>
+  </p-dialog>
+
+  <!-- Toast notifications -->
+  <p-toast />
 </div>
