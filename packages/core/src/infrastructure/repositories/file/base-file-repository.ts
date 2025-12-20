@@ -134,7 +134,7 @@ export abstract class BaseFileRepository {
   protected cacheSet<T>(cache: Map<string, T>, key: string, value: T): void {
     // LRU eviction - remove oldest entry if cache is full
     if (cache.size >= this.cacheOptions.maxSize) {
-      const firstKey = cache.keys().next().value;
+      const firstKey = cache.keys().next().value as string | undefined;
       if (firstKey !== undefined && firstKey !== '') {
         cache.delete(firstKey);
       }

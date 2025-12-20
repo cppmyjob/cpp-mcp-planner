@@ -552,7 +552,7 @@ describe('DecisionService', () => {
           expect(decision2After.consequences).toBe('Better outcome');
 
           // Verify Decision 2 version incremented (it was updated, not created)
-          expect(decision2After.version).toBe(decision2Before.version + 1);
+          expect(decision2After.version).toBe((decision2Before.version as number) + 1);
 
           // Verify NO third decision was created
           const allDecisions = await service.listDecisions({ planId, fields: ['*'] });
@@ -716,7 +716,7 @@ describe('DecisionService', () => {
                 // Simulate disk failure / network error on second update
                 throw new Error('M-1 TEST: Simulated failure on second update');
               }
-              return originalUpdate(id, data);
+              return await originalUpdate(id, data);
             });
 
             // Attempt supersede - should fail on second update

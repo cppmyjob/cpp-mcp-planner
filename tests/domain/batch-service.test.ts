@@ -33,7 +33,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 // Helper functions to replace storage.loadEntities/loadLinks
-async function loadEntities<T extends Entity>(
+function loadEntities<T extends Entity>(
   repositoryFactory: RepositoryFactory,
   planId: string,
   entityType: 'requirements' | 'solutions' | 'phases' | 'decisions' | 'artifacts'
@@ -49,7 +49,7 @@ async function loadEntities<T extends Entity>(
   return repo.findAll();
 }
 
-async function loadLinks(
+function loadLinks(
   repositoryFactory: RepositoryFactory,
   planId: string
 ): Promise<Link[]> {
@@ -1123,7 +1123,7 @@ describe('BatchService - Unit Tests', () => {
         requirementId: req.requirementId,
       });
 
-      expect(after.requirement.version).toBe(before.requirement.version + 1);
+      expect(after.requirement.version).toBe((before.requirement.version as number) + 1);
     });
 
     it('Test 25: executeBatch should handle solution updates', async () => {

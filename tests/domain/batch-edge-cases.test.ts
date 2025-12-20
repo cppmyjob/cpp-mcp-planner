@@ -30,7 +30,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 // Helper functions to replace storage.loadEntities/loadLinks
-async function loadEntities<T extends Entity>(
+function loadEntities<T extends Entity>(
   repositoryFactory: RepositoryFactory,
   planId: string,
   entityType: 'requirements' | 'solutions' | 'phases' | 'decisions' | 'artifacts'

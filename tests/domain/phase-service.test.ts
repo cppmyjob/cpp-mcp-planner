@@ -2382,7 +2382,7 @@ describe('PhaseService', () => {
           phaseId: p1.phaseId,
           fields: ['*'],
         });
-        expect(completed.phase.version).toBe(beforeVersion + 1);
+        expect(completed.phase.version).toBe((beforeVersion as number) + 1);
       });
     });
 

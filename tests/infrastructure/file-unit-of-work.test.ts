@@ -297,7 +297,7 @@ describe('FileUnitOfWork', () => {
       const exists2 = await repo.exists('req-2').catch(() => false);
 
       // At least one should be rolled back (best effort)
-      expect(exists1 || exists2).toBeDefined();
+      expect(Boolean(exists1) || Boolean(exists2)).toBeDefined();
     });
   });
 

@@ -34,7 +34,7 @@ describe('FileLockManager', () => {
 
   afterEach(async () => {
     // Dispose lock manager
-    if (!lockManager.isDisposed()) {
+    if (lockManager.isDisposed() === false) {
       await lockManager.dispose();
     }
 

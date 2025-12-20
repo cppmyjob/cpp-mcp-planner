@@ -29,7 +29,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 // Helper function to load manifest via repository
-async function loadManifest(repositoryFactory: RepositoryFactory, planId: string): Promise<PlanManifest> {
+function loadManifest(repositoryFactory: RepositoryFactory, planId: string): Promise<PlanManifest> {
   const planRepo = repositoryFactory.createPlanRepository();
   return planRepo.loadManifest(planId);
 }
@@ -1614,7 +1614,7 @@ describe('Version History Service (Sprint 7)', () => {
 
       // lockVersion should increment
       manifest = await loadManifest(repositoryFactory, plan.planId);
-      expect(manifest.lockVersion).toBe(initialLockVersion + 1);
+      expect(manifest.lockVersion).toBe((initialLockVersion as number) + 1);
       expect(manifest.lockVersion).toBe(2);
 
       // Another update

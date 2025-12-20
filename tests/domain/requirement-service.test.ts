@@ -965,7 +965,7 @@ describe('RequirementService', () => {
       await service.resetAllVotes({ planId });
 
       const after = await service.getRequirement({ planId, requirementId: req.requirementId });
-      expect(after.requirement.version).toBe(versionBefore + 1);
+      expect(after.requirement.version).toBe((versionBefore as number) + 1);
     });
 
     it('should handle requirements with undefined votes (backward compatibility)', async () => {

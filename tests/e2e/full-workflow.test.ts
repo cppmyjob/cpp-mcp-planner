@@ -128,7 +128,6 @@ describe('E2E: Complete Planning Workflow', () => {
 
         const parsed = JSON.parse(result.content[0].text);
         expect(parsed.requirementId).toBeDefined();
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         requirementIds.push(parsed.requirementId);
       }
 
@@ -215,7 +214,6 @@ describe('E2E: Complete Planning Workflow', () => {
 
         const parsed = JSON.parse(result.content[0].text);
         expect(parsed.solutionId).toBeDefined();
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         solutionIds.push(parsed.solutionId);
       }
 
@@ -308,7 +306,6 @@ describe('E2E: Complete Planning Workflow', () => {
 
         const parsed = JSON.parse(result.content[0].text);
         expect(parsed.decisionId).toBeDefined();
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         decisionIds.push(parsed.decisionId);
       }
 
@@ -336,7 +333,6 @@ describe('E2E: Complete Planning Workflow', () => {
       );
 
       const mainPhase = JSON.parse(mainPhaseResult.content[0].text);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       phaseIds.push(mainPhase.phaseId);
 
       // Create child phases
@@ -376,7 +372,6 @@ describe('E2E: Complete Planning Workflow', () => {
 
         const parsed = JSON.parse(result.content[0].text);
         expect(parsed.phaseId).toBeDefined();
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         phaseIds.push(parsed.phaseId);
       }
 

@@ -259,7 +259,7 @@ export class IndexManager<TMetadata extends IndexMetadata = IndexMetadata> {
     // Enforce max cache size (LRU eviction)
     if (this.cache.size >= this.cacheOptions.maxSize) {
       // Remove oldest entry
-      const firstKey = this.cache.keys().next().value;
+      const firstKey = this.cache.keys().next().value as string | undefined;
       if (firstKey !== undefined && firstKey !== '') {
         this.cache.delete(firstKey);
       }

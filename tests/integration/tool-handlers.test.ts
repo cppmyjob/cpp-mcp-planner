@@ -1077,7 +1077,6 @@ describe('Tool Handlers Integration', () => {
             }
           }
         };
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         collectPaths(treeData.tree);
 
         expect(allPaths.size).toBe(4); // 2 parents + 2 children

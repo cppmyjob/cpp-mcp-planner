@@ -25,7 +25,7 @@ import os from 'os';
 import * as fs from 'fs/promises';
 
 // Helper functions for loading/saving entities via repository
-async function loadEntities<T extends Entity>(
+function loadEntities<T extends Entity>(
   repositoryFactory: RepositoryFactory,
   planId: string,
   entityType: 'phases'

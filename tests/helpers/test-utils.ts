@@ -36,7 +36,7 @@ export async function cleanupTestContext(ctx: TestContext): Promise<void> {
   await fs.rm(ctx.testDir, { recursive: true, force: true });
 }
 
-export async function createTestRequirement(
+export function createTestRequirement(
   ctx: TestContext,
   overrides: Partial<{
     title: string;
@@ -57,7 +57,7 @@ export async function createTestRequirement(
   });
 }
 
-export async function createTestSolution(
+export function createTestSolution(
   ctx: TestContext,
   addressing: string[] = [],
   overrides: Partial<{ title: string; description: string }> = {}
@@ -79,7 +79,7 @@ export async function createTestSolution(
   });
 }
 
-export async function createTestPhase(
+export function createTestPhase(
   ctx: TestContext,
   overrides: Partial<{ title: string; parentId: string }> = {}
 ): Promise<AddPhaseResult> {
@@ -96,7 +96,7 @@ export async function createTestPhase(
   });
 }
 
-export async function createTestDecision(
+export function createTestDecision(
   ctx: TestContext,
   overrides: Partial<{ title: string; question: string }> = {}
 ): Promise<RecordDecisionResult> {
@@ -112,7 +112,7 @@ export async function createTestDecision(
   });
 }
 
-export async function createTestArtifact(
+export function createTestArtifact(
   ctx: TestContext,
   overrides: Partial<{
     title: string;

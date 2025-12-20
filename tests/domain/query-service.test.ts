@@ -17,7 +17,7 @@ import {
 import { FileRepositoryFactory, FileLockManager, type RepositoryFactory } from '@mcp-planner/core';
 
 // Helper functions for loading/saving entities via repository
-async function loadEntities<T extends Entity>(
+function loadEntities<T extends Entity>(
   repositoryFactory: RepositoryFactory,
   planId: string,
   entityType: 'requirements' | 'solutions' | 'phases' | 'artifacts'
@@ -28,7 +28,7 @@ async function loadEntities<T extends Entity>(
     phases: 'phase',
     artifacts: 'artifact'
   };
-   
+
   const repo = repositoryFactory.createRepository<T>(typeMap[entityType], planId);
   return repo.findAll();
 }
@@ -2112,7 +2112,7 @@ describe('QueryService', () => {
         expect(result.trace.implementingPhases).toBeDefined();
         if (result.trace.implementingPhases === undefined) throw new Error('implementingPhases is required');
         expect(result.trace.implementingPhases.length).toBeLessThanOrEqual(2);
-        if (result.trace.artifacts) {
+        if (result.trace.artifacts !== undefined) {
           expect(result.trace.artifacts.length).toBeLessThanOrEqual(2);
         }
       });

@@ -1190,7 +1190,7 @@ describe('ArtifactService', () => {
         });
 
         const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
-        expect(retrieved.artifact.slug).toBe(`artifact-${result.artifactId}`);
+        expect(retrieved.artifact.slug).toBe(`artifact-${String(result.artifactId)}`);
       });
 
       it('should enforce max length of 100 characters', async () => {
@@ -1281,7 +1281,7 @@ describe('ArtifactService', () => {
         const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
         expect(retrieved.artifact.targets).toBeDefined();
         expect(retrieved.artifact.targets).toHaveLength(1);
-        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+        if (retrieved.artifact.targets === undefined || retrieved.artifact.targets.length === 0) {
           throw new Error('Targets should be defined and not empty');
         }
         expect(retrieved.artifact.targets[0].path).toBe('src/file.ts');
@@ -1301,7 +1301,7 @@ describe('ArtifactService', () => {
         });
 
         const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
-        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+        if (retrieved.artifact.targets === undefined || retrieved.artifact.targets.length === 0) {
           throw new Error('Targets should be defined and not empty');
         }
         expect(retrieved.artifact.targets[0].lineNumber).toBe(42);
@@ -1320,7 +1320,7 @@ describe('ArtifactService', () => {
         });
 
         const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
-        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+        if (retrieved.artifact.targets === undefined || retrieved.artifact.targets.length === 0) {
           throw new Error('Targets should be defined and not empty');
         }
         expect(retrieved.artifact.targets[0].lineNumber).toBe(10);
@@ -1340,7 +1340,7 @@ describe('ArtifactService', () => {
         });
 
         const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
-        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+        if (retrieved.artifact.targets === undefined || retrieved.artifact.targets.length === 0) {
           throw new Error('Targets should be defined and not empty');
         }
         expect(retrieved.artifact.targets[0].searchPattern).toBe('function.*test');
@@ -1359,7 +1359,7 @@ describe('ArtifactService', () => {
         });
 
         const retrieved = await service.getArtifact({ planId, artifactId: result.artifactId });
-        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+        if (retrieved.artifact.targets === undefined || retrieved.artifact.targets.length === 0) {
           throw new Error('Targets should be defined and not empty');
         }
         expect(retrieved.artifact.targets[0].description).toBe('Main source file');
@@ -1387,7 +1387,7 @@ describe('ArtifactService', () => {
 
         const retrieved = await service.getArtifact({ planId, artifactId: added.artifactId });
         expect(retrieved.artifact.targets).toHaveLength(1);
-        if (!retrieved.artifact.targets || retrieved.artifact.targets.length === 0) {
+        if (retrieved.artifact.targets === undefined || retrieved.artifact.targets.length === 0) {
           throw new Error('Targets should be defined and not empty');
         }
         expect(retrieved.artifact.targets[0].path).toBe('new.ts');

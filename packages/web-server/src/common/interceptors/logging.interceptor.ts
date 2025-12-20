@@ -12,7 +12,7 @@ import { tap } from 'rxjs/operators';
  * Logging interceptor that logs request details and response times.
  */
 @Injectable()
- 
+
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
 
@@ -26,7 +26,8 @@ export class LoggingInterceptor implements NestInterceptor {
     const startTime = Date.now();
 
     return next.handle().pipe(
-      tap({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call
+      tap<unknown>({
         next: () => {
           const response = context.switchToHttp().getResponse<{ statusCode: number }>();
           const duration = Date.now() - startTime;

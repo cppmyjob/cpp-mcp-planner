@@ -33,7 +33,7 @@ import * as path from 'path';
 import * as os from 'os';
 
 // Helper functions to replace storage.loadEntities/loadLinks
-async function loadEntities<T extends Entity>(
+function loadEntities<T extends Entity>(
   repositoryFactory: RepositoryFactory,
   planId: string,
   entityType: 'requirements' | 'solutions' | 'phases' | 'decisions' | 'artifacts'
@@ -50,7 +50,7 @@ async function loadEntities<T extends Entity>(
   return repo.findAll();
 }
 
-async function loadLinks(
+function loadLinks(
   repositoryFactory: RepositoryFactory,
   planId: string
 ): Promise<Link[]> {
@@ -471,7 +471,7 @@ describe('BatchService - Integration Tests', () => {
     const phase11 = phases.find((p) => p.title === 'Phase 1.1');
     expect(phase11).toBeDefined();
     expect(phase1).toBeDefined();
-    if (!phase11 || !phase1) throw new Error('Phases should be defined');
+    if (phase11 === undefined || phase1 === undefined) throw new Error('Phases should be defined');
     expect(phase11.parentId).toBe(phase1.id);
   });
 

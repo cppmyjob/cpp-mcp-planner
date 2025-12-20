@@ -282,7 +282,7 @@ describe('RED: RepositoryFactory', () => {
       const repo = factory.createRepository<Requirement>('requirement', planId);
 
       // Should be able to initialize
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (repo as any).initialize();
 
       // Repository should have basic CRUD methods
@@ -299,7 +299,7 @@ describe('RED: RepositoryFactory', () => {
       await fs.mkdir(path.join(testDir, 'plans', planId), { recursive: true });
 
       const linkRepo = factory.createLinkRepository(planId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (linkRepo as any).initialize();
 
       // Create a link
