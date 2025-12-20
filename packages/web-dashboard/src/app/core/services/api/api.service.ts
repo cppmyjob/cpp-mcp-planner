@@ -1,13 +1,14 @@
 import { Injectable, InjectionToken, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { type Observable } from 'rxjs';
+import { CLIENT_API_BASE_URL } from '@mcp-planner/config/client';
 
 /**
  * Injection token for API base URL configuration
  */
 export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL', {
   providedIn: 'root',
-  factory: () => 'http://localhost:3000/api/v1'
+  factory: () => CLIENT_API_BASE_URL
 });
 
 /**

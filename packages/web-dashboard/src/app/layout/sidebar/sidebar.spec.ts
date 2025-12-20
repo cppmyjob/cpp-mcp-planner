@@ -4,6 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Component } from '@angular/core';
+import { WEB_SERVER_PORT } from '@mcp-planner/config/client';
 import { SidebarComponent } from './sidebar';
 import { API_BASE_URL } from '../../core/services/api/api.service';
 import type { PlanManifest } from '../../models';
@@ -21,7 +22,7 @@ class TestHostComponent {
 
 describe('SidebarComponent', () => {
   let httpMock: HttpTestingController;
-  const baseUrl = 'http://localhost:3000/api';
+  const baseUrl = `http://localhost:${WEB_SERVER_PORT}/api`;
 
   const mockPlans: PlanManifest[] = [
     {

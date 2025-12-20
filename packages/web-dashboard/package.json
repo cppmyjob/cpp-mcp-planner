@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "node scripts/start.mjs",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
@@ -28,6 +28,7 @@
   },
   "private": true,
   "dependencies": {
+    "@mcp-planner/config": "workspace:*",
     "@angular/animations": "^21.0.5",
     "@angular/common": "^21.0.0",
     "@angular/compiler": "^21.0.0",

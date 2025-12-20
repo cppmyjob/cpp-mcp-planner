@@ -6,6 +6,9 @@ export default {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@mcp-planner/core$': '<rootDir>/../core/src/index.ts',
+    '^@mcp-planner/config/server$': '<rootDir>/../config/src/server.ts',
+    '^@mcp-planner/config/client$': '<rootDir>/../config/src/client.ts',
+    '^@mcp-planner/config$': '<rootDir>/../config/src/index.ts',
   },
   transform: {
     '^.+\\.ts$': [
@@ -20,6 +23,12 @@ export default {
           target: 'ES2022',
           strict: true,
           skipLibCheck: true,
+          paths: {
+            '@mcp-planner/config/server': ['../config/src/server.ts'],
+            '@mcp-planner/config/client': ['../config/src/client.ts'],
+            '@mcp-planner/config': ['../config/src/index.ts'],
+            '@mcp-planner/core': ['../core/src/index.ts'],
+          },
         },
       },
     ],

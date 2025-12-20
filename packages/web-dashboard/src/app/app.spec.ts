@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { WEB_SERVER_PORT } from '@mcp-planner/config/client';
 import { AppComponent } from './app';
 import { API_BASE_URL } from './core/services/api/api.service';
 
@@ -24,7 +25,7 @@ Object.defineProperty(window, 'matchMedia', {
 describe('AppComponent', () => {
   let fixture: ComponentFixture<AppComponent>;
   let httpMock: HttpTestingController;
-  const baseUrl = 'http://localhost:3000/api';
+  const baseUrl = `http://localhost:${WEB_SERVER_PORT}/api`;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({

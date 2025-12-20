@@ -26,7 +26,7 @@ export class LoggingInterceptor implements NestInterceptor {
     const startTime = Date.now();
 
     return next.handle().pipe(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call
+       
       tap<unknown>({
         next: () => {
           const response = context.switchToHttp().getResponse<{ statusCode: number }>();

@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "tsc --build",
+    "build:config": "npm run build -w @mcp-planner/config",
     "build:core": "npm run build -w @mcp-planner/core",
     "build:web-server": "npm run build -w @mcp-planner/web-server",
     "build:dashboard": "npm run build -w web-dashboard",

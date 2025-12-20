@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { WEB_SERVER_PORT } from '@mcp-planner/config/client';
 
 import { LinkService } from './link.service';
 import { API_BASE_URL } from './api.service';
@@ -9,7 +10,7 @@ import type { Link, CreateLinkDto } from '../../../models';
 describe('LinkService', () => {
   let service: LinkService;
   let httpMock: HttpTestingController;
-  const baseUrl = 'http://localhost:3000/api';
+  const baseUrl = `http://localhost:${WEB_SERVER_PORT}/api`;
   const planId = 'plan-1';
 
   const mockLink: Link = {

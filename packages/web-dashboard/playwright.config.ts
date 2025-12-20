@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { resolve } from 'path';
 import { testOutputDir } from './e2e/test-paths';
+import { WEB_SERVER_PORT, WEB_DASHBOARD_PORT, API_BASE_URL } from '@mcp-planner/config/client';
 
 /**
  * Playwright configuration for MCP Planning Dashboard E2E tests
@@ -17,7 +18,7 @@ export default defineConfig({
   snapshotPathTemplate: resolve(testOutputDir, 'screenshots/{testFilePath}/{arg}{ext}'),
 
   use: {
-    baseURL: 'http://localhost:4200',
+    baseURL: `http://localhost:${WEB_DASHBOARD_PORT}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -34,13 +35,13 @@ export default defineConfig({
     {
       command: 'npm run start:dev',
       cwd: '../web-server',
-      url: 'http://localhost:3000/api/v1/plans',
+      url: `${API_BASE_URL}/plans`,
       reuseExistingServer: !process.env['CI'],
       timeout: 60000,
     },
     {
       command: 'npm start',
-      url: 'http://localhost:4200',
+      url: `http://localhost:${WEB_DASHBOARD_PORT}`,
       reuseExistingServer: !process.env['CI'],
       timeout: 60000,
     },

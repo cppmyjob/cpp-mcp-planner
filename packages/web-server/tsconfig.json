@@ -19,6 +19,7 @@
     "emitDecoratorMetadata": true
   },
   "references": [
+    { "path": "../config" },
     { "path": "../core" }
   ],
   "include": ["src/**/*"],

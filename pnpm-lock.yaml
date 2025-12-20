@@ -67,6 +67,12 @@ importers:
         specifier: ^8.49.0
         version: 8.50.0(eslint@9.39.2)(typescript@5.3.3)
 
+  packages/config:
+    devDependencies:
+      typescript:
+        specifier: ~5.3.3
+        version: 5.3.3
+
   packages/core:
     dependencies:
       uuid:
@@ -131,6 +137,9 @@ importers:
       '@angular/router':
         specifier: ^21.0.0
         version: 21.0.6(@angular/common@21.0.6(@angular/core@21.0.6(@angular/compiler@21.0.6)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.0.6(@angular/compiler@21.0.6)(rxjs@7.8.2))(@angular/platform-browser@21.0.6(@angular/animations@21.0.6(@angular/core@21.0.6(@angular/compiler@21.0.6)(rxjs@7.8.2)))(@angular/common@21.0.6(@angular/core@21.0.6(@angular/compiler@21.0.6)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.0.6(@angular/compiler@21.0.6)(rxjs@7.8.2)))(rxjs@7.8.2)
+      '@mcp-planner/config':
+        specifier: workspace:*
+        version: link:../config
       '@primeuix/themes':
         specifier: ^2.0.2
         version: 2.0.2
@@ -213,6 +222,9 @@ importers:
 
   packages/web-server:
     dependencies:
+      '@mcp-planner/config':
+        specifier: workspace:*
+        version: link:../config
       '@mcp-planner/core':
         specifier: workspace:*
         version: link:../core

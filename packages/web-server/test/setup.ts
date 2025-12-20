@@ -10,6 +10,7 @@ import { ConfigModule } from '@nestjs/config';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { WEB_SERVER_PORT } from '@mcp-planner/config/server';
 import { CoreModule } from '../src/modules/core/core.module.js';
 import { PlansModule } from '../src/modules/plans/plans.module.js';
 import { RequirementsModule } from '../src/modules/requirements/requirements.module.js';
@@ -44,7 +45,7 @@ export async function createTestApp(): Promise<TestContext> {
         isGlobal: true,
         load: [
           () => ({
-            port: 3000,
+            port: WEB_SERVER_PORT,
             nodeEnv: 'test',
             storagePath,
           }),

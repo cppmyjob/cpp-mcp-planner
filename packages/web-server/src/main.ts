@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { getServerConfig } from '@mcp-planner/config/server';
 import { AppModule } from './app.module.js';
 import {
   GlobalExceptionFilter,
@@ -10,14 +11,13 @@ import {
   createValidationPipe,
 } from './common/index.js';
 
-const DEFAULT_PORT = 3000;
-
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  const serverConfig = getServerConfig();
 
-  // Enable CORS for development (Angular on port 4200)
+  // Enable CORS for development (Angular)
   app.enableCors({
-    origin: ['http://localhost:4200'],
+    origin: serverConfig.corsOrigins,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -54,11 +54,11 @@ async function bootstrap(): Promise<void> {
 
   // Get port from config
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('port') ?? DEFAULT_PORT;
+  const port = configService.get<number>('port') ?? serverConfig.port;
   await app.listen(port);
 
   console.log(`MCP Planning Server running on http://localhost:${String(port)}`);
-  console.log(`Swagger UI available at http://localhost:${String(port)}/api`);
+  console.log(`Swagger UI available at http://localhost:${String(port)}/${serverConfig.apiPrefix}`);
 }
 
 bootstrap().catch((error: unknown) => {

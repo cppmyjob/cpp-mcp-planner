@@ -24,7 +24,7 @@ export class TransformInterceptor<T> implements NestInterceptor<T, SuccessRespon
     next: CallHandler<T>
   ): Observable<SuccessResponse<T>> {
     return next.handle().pipe<SuccessResponse<T>>(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call
+       
       map((data: T): SuccessResponse<T> => ({
         success: true as const,
         data,
