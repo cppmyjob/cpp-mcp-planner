@@ -274,7 +274,8 @@ export class SolutionsComponent implements OnInit {
    * Load solutions
    */
   private loadSolutions(planId: string): void {
-    this.solutionService.list(planId).subscribe({
+    // Request all fields to include tradeoffs, evaluation, etc.
+    this.solutionService.list(planId, { fields: ['*'] }).subscribe({
       next: (solutions) => {
         this.allSolutions.set(solutions);
         this.loading.set(false);
