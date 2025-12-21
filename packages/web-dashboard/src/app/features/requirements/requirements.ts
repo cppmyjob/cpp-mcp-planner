@@ -61,12 +61,11 @@ interface CategoryOption {
   encapsulation: ViewEncapsulation.None
 })
 export class RequirementsComponent {
+  // Public fields
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
   public readonly searchTerm = signal('');
   public readonly showAddDialog = signal(false);
-
-  private readonly allRequirements = signal<Requirement[]>([]);
 
   /**
    * Kanban columns configuration
@@ -128,6 +127,8 @@ export class RequirementsComponent {
 
   public draggedRequirement: Requirement | null = null;
 
+  // Private fields
+  private readonly allRequirements = signal<Requirement[]>([]);
   private readonly requirementService = inject(RequirementService);
   private readonly planState = inject(PlanStateService);
   private readonly messageService = inject(MessageService);
@@ -139,34 +140,7 @@ export class RequirementsComponent {
     });
   }
 
-  /**
-   * Load requirements for active plan
-   */
-  private loadRequirements(planId: string): void {
-    if (!planId) {
-      return;
-    }
-
-    this.loading.set(true);
-    this.error.set(null);
-
-    this.requirementService.list(planId).subscribe({
-      next: (requirements) => {
-        this.allRequirements.set(requirements);
-        this.loading.set(false);
-      },
-      error: (err) => {
-        this.error.set(err.message ?? 'Failed to load requirements');
-        this.loading.set(false);
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: 'Failed to load requirements'
-        });
-      }
-    });
-  }
-
+  // Public methods
   /**
    * Open add requirement dialog
    */
@@ -314,5 +288,34 @@ export class RequirementsComponent {
     return requirement.metadata.tags
       .filter(tag => tag.key === 'tag')
       .map(tag => tag.value);
+  }
+
+  // Private methods
+  /**
+   * Load requirements for active plan
+   */
+  private loadRequirements(planId: string): void {
+    if (!planId) {
+      return;
+    }
+
+    this.loading.set(true);
+    this.error.set(null);
+
+    this.requirementService.list(planId).subscribe({
+      next: (requirements) => {
+        this.allRequirements.set(requirements);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.error.set(err.message ?? 'Failed to load requirements');
+        this.loading.set(false);
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to load requirements'
+        });
+      }
+    });
   }
 }

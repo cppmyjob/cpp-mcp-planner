@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { RequirementsChartComponent } from './requirements-chart';
 import { RequirementService, PlanStateService, ThemeService } from '../../../../core/services';
@@ -32,6 +32,7 @@ describe('RequirementsChartComponent', () => {
     vi.clearAllMocks();
     activePlanIdSignal.set('test-plan-id');
     themeSignal.set('light');
+    mockRequirementService.list.mockReturnValue(of(mockRequirements));
 
     await TestBed.configureTestingModule({
       imports: [RequirementsChartComponent],
@@ -43,46 +44,141 @@ describe('RequirementsChartComponent', () => {
     }).compileComponents();
   });
 
-  it('should create', () => {
-    const fixture = TestBed.createComponent(RequirementsChartComponent);
-    const component = fixture.componentInstance;
-    expect(component).toBeTruthy();
+  describe('initialization', () => {
+    it('should create', () => {
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      const component = fixture.componentInstance;
+      expect(component).toBeTruthy();
+    });
+
+    it('should initialize with null chartData', () => {
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      const component = fixture.componentInstance;
+
+      expect(component.chartData()).toBeNull();
+    });
+
+    it('should initialize with loading true', () => {
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      const component = fixture.componentInstance;
+
+      expect(component.loading()).toBe(true);
+    });
+
+    it('should initialize with null error', () => {
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      const component = fixture.componentInstance;
+
+      expect(component.error()).toBeNull();
+    });
   });
 
-  it('should load requirements on init', () => {
-    const fixture = TestBed.createComponent(RequirementsChartComponent);
-    fixture.detectChanges();
+  describe('successful data loading', () => {
+    it('should load requirements on init', () => {
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      fixture.detectChanges();
 
-    expect(mockRequirementService.list).toHaveBeenCalledWith('test-plan-id');
+      expect(mockRequirementService.list).toHaveBeenCalledWith('test-plan-id');
+    });
+
+    it('should build chart data from requirements', () => {
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      fixture.detectChanges();
+
+      const component = fixture.componentInstance;
+      const chartData = component.chartData();
+
+      expect(chartData).not.toBeNull();
+      expect(chartData?.labels).toContain('Approved');
+      expect(chartData?.labels).toContain('Draft');
+      expect(chartData?.labels).toContain('Implemented');
+    });
+
+    it('should set loading to false after successful load', () => {
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      const component = fixture.componentInstance;
+
+      expect(component.loading()).toBe(true);
+
+      fixture.detectChanges();
+
+      expect(component.loading()).toBe(false);
+    });
+
+    it('should clear error after successful load', () => {
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      const component = fixture.componentInstance;
+
+      // Simulate previous error
+      component.error.set('Previous error');
+      expect(component.error()).toBe('Previous error');
+
+      fixture.detectChanges();
+
+      expect(component.error()).toBeNull();
+    });
+
+    it('should reload requirements when activePlanId changes', () => {
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      fixture.detectChanges();
+
+      expect(mockRequirementService.list).toHaveBeenCalledTimes(1);
+
+      // Change active plan
+      activePlanIdSignal.set('plan-2');
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      // Should reload with new planId
+      expect(mockRequirementService.list).toHaveBeenCalledTimes(2);
+      expect(mockRequirementService.list).toHaveBeenCalledWith('plan-2');
+    });
   });
 
-  it('should build chart data from requirements', () => {
-    const fixture = TestBed.createComponent(RequirementsChartComponent);
-    fixture.detectChanges();
+  describe('error handling', () => {
+    it('should set error when list fails', () => {
+      const errorMessage = 'Failed to fetch requirements';
+      mockRequirementService.list.mockReturnValue(throwError(() => ({ message: errorMessage })));
 
-    const component = fixture.componentInstance;
-    const chartData = component.chartData();
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
 
-    expect(chartData).not.toBeNull();
-    expect(chartData?.labels).toContain('Approved');
-    expect(chartData?.labels).toContain('Draft');
-    expect(chartData?.labels).toContain('Implemented');
-  });
+      expect(component.error()).toBe(errorMessage);
+    });
 
-  it('should reload requirements when activePlanId changes', () => {
-    const fixture = TestBed.createComponent(RequirementsChartComponent);
-    fixture.detectChanges();
+    it('should set default error message when error has no message', () => {
+      mockRequirementService.list.mockReturnValue(throwError(() => ({})));
 
-    expect(mockRequirementService.list).toHaveBeenCalledTimes(1);
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
 
-    // Change active plan
-    activePlanIdSignal.set('plan-2');
-    TestBed.flushEffects();
-    fixture.detectChanges();
+      expect(component.error()).toBe('Failed to load requirements');
+    });
 
-    // Should reload with new planId
-    expect(mockRequirementService.list).toHaveBeenCalledTimes(2);
-    expect(mockRequirementService.list).toHaveBeenCalledWith('plan-2');
+    it('should set loading to false after error', () => {
+      mockRequirementService.list.mockReturnValue(throwError(() => ({ message: 'Error' })));
+
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      const component = fixture.componentInstance;
+
+      expect(component.loading()).toBe(true);
+
+      fixture.detectChanges();
+
+      expect(component.loading()).toBe(false);
+    });
+
+    it('should keep chartData null when load fails', () => {
+      mockRequirementService.list.mockReturnValue(throwError(() => ({ message: 'Error' })));
+
+      const fixture = TestBed.createComponent(RequirementsChartComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      expect(component.chartData()).toBeNull();
+    });
   });
 
   // Dark Theme Tests - These should FAIL initially (RED)
@@ -199,24 +295,6 @@ describe('RequirementsChartComponent', () => {
       // RED: tooltip should have border styling
       expect(tooltip?.['borderColor']).toBeDefined();
       expect(tooltip?.['borderWidth']).toBeDefined();
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should have error signal', () => {
-      const fixture = TestBed.createComponent(RequirementsChartComponent);
-      const component = fixture.componentInstance;
-
-      expect(component.error).toBeDefined();
-      expect(typeof component.error).toBe('function'); // signal
-    });
-
-    it('should have loading signal', () => {
-      const fixture = TestBed.createComponent(RequirementsChartComponent);
-      const component = fixture.componentInstance;
-
-      expect(component.loading).toBeDefined();
-      expect(typeof component.loading).toBe('function'); // signal
     });
   });
 });

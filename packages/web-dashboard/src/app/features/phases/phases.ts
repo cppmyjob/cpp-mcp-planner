@@ -52,28 +52,10 @@ export class PhasesComponent {
     });
   }
 
-  // Public API for manual reload
+  // Public methods
   public loadPhaseTree(): void {
     const planId = this.planState.activePlanId();
     this.loadPhaseTreeInternal(planId);
-  }
-
-  private loadPhaseTreeInternal(planId: string): void {
-    this.loading.set(true);
-    this.error.set(null);
-
-    this.phaseService.getTree(planId, {
-      fields: ['title', 'status', 'progress', 'priority', 'path', 'description', 'blockingReason']
-    }).subscribe({
-      next: (tree) => {
-        this.treeNodes.set(this.transformToTreeNodes(tree));
-        this.loading.set(false);
-      },
-      error: (err) => {
-        this.error.set(err.message ?? 'Failed to load phase tree');
-        this.loading.set(false);
-      }
-    });
   }
 
   public toggleExpandAll(): void {
@@ -142,6 +124,25 @@ export class PhasesComponent {
     if (progress >= 50) return 'phases__progress--half';
     if (progress > 0) return 'phases__progress--started';
     return 'phases__progress--empty';
+  }
+
+  // Private methods
+  private loadPhaseTreeInternal(planId: string): void {
+    this.loading.set(true);
+    this.error.set(null);
+
+    this.phaseService.getTree(planId, {
+      fields: ['title', 'status', 'progress', 'priority', 'path', 'description', 'blockingReason']
+    }).subscribe({
+      next: (tree) => {
+        this.treeNodes.set(this.transformToTreeNodes(tree));
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.error.set(err.message ?? 'Failed to load phase tree');
+        this.loading.set(false);
+      }
+    });
   }
 
   private transformToTreeNodes(apiNodes: PhaseTreeNode[]): TreeNode<Phase>[] {

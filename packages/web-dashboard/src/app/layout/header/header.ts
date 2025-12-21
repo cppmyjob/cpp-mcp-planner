@@ -25,6 +25,11 @@ export class HeaderComponent {
   private readonly planService = inject(PlanService);
   private readonly planState = inject(PlanStateService);
 
+  // Getters
+  public get isDarkTheme(): boolean {
+    return this.themeService.currentTheme() === 'dark';
+  }
+
   constructor() {
     // Load plans once on initialization
     this.loadPlans();
@@ -36,10 +41,7 @@ export class HeaderComponent {
     });
   }
 
-  public get isDarkTheme(): boolean {
-    return this.themeService.currentTheme() === 'dark';
-  }
-
+  // Public methods
   public toggleTheme(): void {
     this.themeService.toggleTheme();
   }
@@ -53,6 +55,7 @@ export class HeaderComponent {
     // selectedPlanId will be updated automatically by effect
   }
 
+  // Private methods
   private loadPlans(): void {
     this.loading.set(true);
     this.planService.list().subscribe({

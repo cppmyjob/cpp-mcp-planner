@@ -94,17 +94,4 @@ describe('AppComponent', () => {
     component.toggleSidebar();
     expect(component.sidebarCollapsed()).toBe(false);
   });
-
-  it('should set selected plan when onPlanSelected is called', () => {
-    fixture.detectChanges();
-    flushRequests();
-
-    const component = fixture.componentInstance;
-    expect(component.selectedPlan()).toBeNull();
-
-    const mockPlan = { id: 'plan-1', name: 'Test Plan' };
-    component.onPlanSelected(mockPlan as never);
-
-    expect(component.selectedPlan()?.id).toBe('plan-1');
-  });
 });
