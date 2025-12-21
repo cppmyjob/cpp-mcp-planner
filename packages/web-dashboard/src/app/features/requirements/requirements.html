@@ -79,7 +79,7 @@
           <!-- Column Cards -->
           <div
             class="kanban-column__cards"
-            #cardsContainer
+            scrollContainer
             [attr.data-testid]="'column-cards-' + column.status"
           >
             @for (requirement of column.requirements; track requirement.id) {

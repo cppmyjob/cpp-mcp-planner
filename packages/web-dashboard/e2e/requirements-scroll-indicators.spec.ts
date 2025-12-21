@@ -16,12 +16,12 @@ test.describe('Requirements Kanban - Scroll Indicators', () => {
 
     // Check if column has overflow by checking class
     const hasOverflowBottom = await draftCards.evaluate((el) => {
-      return el.classList.contains('has-overflow-bottom');
+      return el.classList.contains('scroll-container--overflow-bottom');
     });
 
     // Only test if there's actual overflow (skip if empty or few cards)
     if (hasOverflowBottom) {
-      await expect(draftCards).toHaveClass(/has-overflow-bottom/);
+      await expect(draftCards).toHaveClass(/scroll-container--overflow-bottom/);
 
       await page.screenshot({
         path: screenshotPath('scroll-indicator-bottom.png'),
@@ -52,7 +52,7 @@ test.describe('Requirements Kanban - Scroll Indicators', () => {
       await page.waitForTimeout(100);
 
       // Top gradient should appear
-      await expect(draftCards).toHaveClass(/has-overflow-top/);
+      await expect(draftCards).toHaveClass(/scroll-container--overflow-top/);
 
       await page.screenshot({
         path: screenshotPath('scroll-indicator-top.png'),
@@ -86,8 +86,8 @@ test.describe('Requirements Kanban - Scroll Indicators', () => {
       await page.waitForTimeout(100);
 
       // Both gradients should appear
-      await expect(draftCards).toHaveClass(/has-overflow-top/);
-      await expect(draftCards).toHaveClass(/has-overflow-bottom/);
+      await expect(draftCards).toHaveClass(/scroll-container--overflow-top/);
+      await expect(draftCards).toHaveClass(/scroll-container--overflow-bottom/);
 
       await page.screenshot({
         path: screenshotPath('scroll-indicator-both.png'),
@@ -108,8 +108,8 @@ test.describe('Requirements Kanban - Scroll Indicators', () => {
     // Only test if no overflow
     if (hasNoOverflow) {
       // No gradients should appear
-      await expect(deferredCards).not.toHaveClass(/has-overflow-top/);
-      await expect(deferredCards).not.toHaveClass(/has-overflow-bottom/);
+      await expect(deferredCards).not.toHaveClass(/scroll-container--overflow-top/);
+      await expect(deferredCards).not.toHaveClass(/scroll-container--overflow-bottom/);
 
       await page.screenshot({
         path: screenshotPath('scroll-indicator-none.png'),
@@ -140,8 +140,8 @@ test.describe('Requirements Kanban - Scroll Indicators', () => {
       await page.waitForTimeout(100);
 
       // Only top gradient should appear
-      await expect(draftCards).toHaveClass(/has-overflow-top/);
-      await expect(draftCards).not.toHaveClass(/has-overflow-bottom/);
+      await expect(draftCards).toHaveClass(/scroll-container--overflow-top/);
+      await expect(draftCards).not.toHaveClass(/scroll-container--overflow-bottom/);
 
       await page.screenshot({
         path: screenshotPath('scroll-indicator-bottom-reached.png'),
@@ -172,10 +172,10 @@ test.describe('Requirements Kanban - Scroll Indicators', () => {
       await page.waitForTimeout(100);
 
       // Draft should have top gradient
-      await expect(draftCards).toHaveClass(/has-overflow-top/);
+      await expect(draftCards).toHaveClass(/scroll-container--overflow-top/);
 
       // Approved should still be at top (no top gradient)
-      await expect(approvedCards).not.toHaveClass(/has-overflow-top/);
+      await expect(approvedCards).not.toHaveClass(/scroll-container--overflow-top/);
 
       await page.screenshot({
         path: screenshotPath('scroll-indicator-independent.png'),
@@ -210,7 +210,7 @@ test.describe('Requirements Kanban - Scroll Indicators', () => {
 
     if (hasOverflow) {
       // Bottom gradient should appear due to reduced viewport
-      await expect(draftCards).toHaveClass(/has-overflow-bottom/);
+      await expect(draftCards).toHaveClass(/scroll-container--overflow-bottom/);
 
       await page.screenshot({
         path: screenshotPath('scroll-indicator-resize.png'),
@@ -239,8 +239,8 @@ test.describe('Requirements Kanban - Scroll Indicators', () => {
       return style.width;
     });
 
-    // Scrollbar should be 10px wide (as defined in SCSS)
-    expect(scrollbarWidth).toBe('10px');
+    // Scrollbar should be 8px wide (as defined in global styles.scss)
+    expect(scrollbarWidth).toBe('8px');
   });
 
   test('should use correct gradient colors in light theme', async ({ page }) => {
