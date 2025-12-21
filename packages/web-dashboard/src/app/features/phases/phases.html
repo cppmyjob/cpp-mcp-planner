@@ -78,75 +78,81 @@
 
   <!-- Tree Table -->
   @if (!loading() && !error() && treeNodes().length > 0) {
-    <p-treetable
-      [value]="treeNodes()"
-      [scrollable]="true"
-      scrollHeight="flex"
-      styleClass="phases__tree p-treetable-sm"
-      (onNodeExpand)="onNodeExpand($event)"
-      data-testid="phase-tree">
-      <ng-template pTemplate="header">
-        <tr>
-          <th class="phases__col-title">Title</th>
-          <th class="phases__col-status">Status</th>
-          <th class="phases__col-progress">Progress</th>
-          <th class="phases__col-priority">Priority</th>
-        </tr>
-      </ng-template>
-      <ng-template pTemplate="body" let-rowNode let-rowData="rowData">
-        <tr [ttRow]="rowNode" class="phases__row phases__row--{{ rowData.status }}">
-          <!-- Title Column with Tree Toggle -->
-          <td class="phases__cell-title">
-            <p-treeTableToggler [rowNode]="rowNode" />
-            <div class="phases__title-content">
-              <span class="phases__path" data-testid="phase-path">{{ rowData.path }}</span>
-              <span class="phases__name" [pTooltip]="rowData.description" tooltipPosition="top">
-                {{ rowData.title }}
-              </span>
-              @if (rowData.status === 'blocked' && rowData.blockingReason) {
-                <span class="phases__blocker-hint" pTooltip="{{ rowData.blockingReason }}">
-                  <i class="pi pi-exclamation-circle"></i>
+    <div
+      class="phases__tree-container"
+      data-testid="phases-tree-container"
+      scrollContainer
+      [enableVertical]="true"
+      [enableHorizontal]="false"
+    >
+      <p-treetable
+        [value]="treeNodes()"
+        styleClass="phases__tree p-treetable-sm"
+        (onNodeExpand)="onNodeExpand($event)"
+        data-testid="phase-tree">
+        <ng-template pTemplate="header">
+          <tr>
+            <th class="phases__col-title">Title</th>
+            <th class="phases__col-status">Status</th>
+            <th class="phases__col-progress">Progress</th>
+            <th class="phases__col-priority">Priority</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-rowNode let-rowData="rowData">
+          <tr [ttRow]="rowNode" class="phases__row phases__row--{{ rowData.status }}">
+            <!-- Title Column with Tree Toggle -->
+            <td class="phases__cell-title">
+              <p-treeTableToggler [rowNode]="rowNode" />
+              <div class="phases__title-content">
+                <span class="phases__path" data-testid="phase-path">{{ rowData.path }}</span>
+                <span class="phases__name" [pTooltip]="rowData.description" tooltipPosition="top">
+                  {{ rowData.title }}
                 </span>
-              }
-            </div>
-          </td>
+                @if (rowData.status === 'blocked' && rowData.blockingReason) {
+                  <span class="phases__blocker-hint" pTooltip="{{ rowData.blockingReason }}">
+                    <i class="pi pi-exclamation-circle"></i>
+                  </span>
+                }
+              </div>
+            </td>
 
-          <!-- Status Column -->
-          <td class="phases__cell-status">
-            <p-tag
-              [value]="getStatusLabel(rowData.status)"
-              [severity]="getStatusSeverity(rowData.status)"
-              [rounded]="true"
-              data-testid="phase-status" />
-          </td>
-
-          <!-- Progress Column -->
-          <td class="phases__cell-progress">
-            <div class="phases__progress-wrapper" [class]="getProgressBarClass(rowData.progress ?? 0)">
-              <p-progressBar
-                [value]="rowData.progress ?? 0"
-                [showValue]="false"
-                styleClass="phases__progress-bar" />
-              <span class="phases__progress-value" data-testid="phase-progress">
-                {{ rowData.progress ?? 0 }}%
-              </span>
-            </div>
-          </td>
-
-          <!-- Priority Column -->
-          <td class="phases__cell-priority">
-            @if (rowData.priority) {
+            <!-- Status Column -->
+            <td class="phases__cell-status">
               <p-tag
-                [value]="rowData.priority"
-                [severity]="getPrioritySeverity(rowData.priority)"
+                [value]="getStatusLabel(rowData.status)"
+                [severity]="getStatusSeverity(rowData.status)"
                 [rounded]="true"
-                data-testid="phase-priority" />
-            } @else {
-              <span class="phases__no-priority">-</span>
-            }
-          </td>
-        </tr>
-      </ng-template>
-    </p-treetable>
+                data-testid="phase-status" />
+            </td>
+
+            <!-- Progress Column -->
+            <td class="phases__cell-progress">
+              <div class="phases__progress-wrapper" [class]="getProgressBarClass(rowData.progress ?? 0)">
+                <p-progressBar
+                  [value]="rowData.progress ?? 0"
+                  [showValue]="false"
+                  styleClass="phases__progress-bar" />
+                <span class="phases__progress-value" data-testid="phase-progress">
+                  {{ rowData.progress ?? 0 }}%
+                </span>
+              </div>
+            </td>
+
+            <!-- Priority Column -->
+            <td class="phases__cell-priority">
+              @if (rowData.priority) {
+                <p-tag
+                  [value]="rowData.priority"
+                  [severity]="getPrioritySeverity(rowData.priority)"
+                  [rounded]="true"
+                  data-testid="phase-priority" />
+              } @else {
+                <span class="phases__no-priority">-</span>
+              }
+            </td>
+          </tr>
+        </ng-template>
+      </p-treetable>
+    </div>
   }
 </div>

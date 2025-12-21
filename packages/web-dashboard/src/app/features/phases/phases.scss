@@ -148,9 +148,18 @@
     color: var(--p-text-muted-color);
   }
 
+  // Tree Container (wrapper for scroll indicators)
+  &__tree-container {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
   // Tree Table
   &__tree {
-    flex: 1;
+    height: 100%;
 
     .p-treetable-header {
       background: var(--app-card-bg-subtle);

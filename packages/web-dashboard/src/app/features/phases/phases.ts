@@ -8,6 +8,7 @@ import { ButtonModule } from 'primeng/button';
 import { TooltipModule } from 'primeng/tooltip';
 import { CardModule } from 'primeng/card';
 
+import { ScrollContainerDirective } from '../../shared/directives/scroll-container';
 import { PhaseService, PlanStateService } from '../../core/services';
 import type { Phase, PhaseTreeNode, PhaseStatus } from '../../models';
 
@@ -20,7 +21,8 @@ import type { Phase, PhaseTreeNode, PhaseStatus } from '../../models';
     ProgressBarModule,
     ButtonModule,
     TooltipModule,
-    CardModule
+    CardModule,
+    ScrollContainerDirective
   ],
   templateUrl: './phases.html',
   styleUrl: './phases.scss',
