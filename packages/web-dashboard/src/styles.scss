@@ -1,3 +1,6 @@
+/* Scroll Container Directive */
+@use 'app/shared/directives/scroll-container/scroll-container';
+
 /* PrimeIcons and PrimeFlex */
 @import "primeicons/primeicons.css";
 @import "primeflex/primeflex.css";
@@ -75,110 +78,4 @@ body {
 /* PrimeNG TreeTable: Prevent unwanted highlight on header after navigation */
 .p-treetable-thead > tr > th.p-highlight {
   background: var(--app-card-bg);
-}
-
-/* Scroll Container Directive - Reusable Scroll Indicators */
-
-/* CSS variables for scroll gradient overlays */
-:root {
-  --scroll-gradient-start: rgba(255, 255, 255, 0.95);
-  --scroll-gradient-end: rgba(255, 255, 255, 0);
-}
-
-:root.dark-theme {
-  --scroll-gradient-start: rgba(15, 23, 42, 0.95); /* slate-900 */
-  --scroll-gradient-end: rgba(15, 23, 42, 0);
-}
-
-/* BEM Block: scroll-container */
-/* Apply to any scrollable container element with [scrollContainer] directive */
-[scrollContainer] {
-  position: relative; // For ::before/::after gradient positioning
-
-  // Custom scrollbar for better visibility
-  &::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: var(--app-scrollbar-track);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--app-scrollbar-thumb);
-    border-radius: 4px;
-
-    &:hover {
-      background: var(--app-scrollbar-thumb-hover);
-    }
-  }
-
-  // BEM Modifier: overflow-top (when scrolled down from top)
-  &.scroll-container--overflow-top::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 24px;
-    pointer-events: none;
-    z-index: 1;
-    background: linear-gradient(
-      to bottom,
-      var(--scroll-gradient-start) 0%,
-      var(--scroll-gradient-end) 100%
-    );
-  }
-
-  // BEM Modifier: overflow-bottom (when content overflows bottom)
-  &.scroll-container--overflow-bottom::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 24px;
-    pointer-events: none;
-    z-index: 1;
-    background: linear-gradient(
-      to top,
-      var(--scroll-gradient-start) 0%,
-      var(--scroll-gradient-end) 100%
-    );
-  }
-
-  // BEM Modifier: overflow-left (when scrolled right from left)
-  &.scroll-container--overflow-left::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 24px;
-    pointer-events: none;
-    z-index: 1;
-    background: linear-gradient(
-      to right,
-      var(--scroll-gradient-start) 0%,
-      var(--scroll-gradient-end) 100%
-    );
-  }
-
-  // BEM Modifier: overflow-right (when content overflows right)
-  &.scroll-container--overflow-right::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 24px;
-    pointer-events: none;
-    z-index: 1;
-    background: linear-gradient(
-      to left,
-      var(--scroll-gradient-start) 0%,
-      var(--scroll-gradient-end) 100%
-    );
-  }
 }
