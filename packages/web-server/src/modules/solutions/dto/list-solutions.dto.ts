@@ -5,7 +5,7 @@ import type { SolutionStatus } from '@mcp-planner/core';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
-const VALID_STATUSES: SolutionStatus[] = ['proposed', 'selected', 'rejected'];
+const VALID_STATUSES: SolutionStatus[] = ['proposed', 'evaluated', 'selected', 'rejected', 'implemented'];
 
 /**
  * Query parameters for listing solutions

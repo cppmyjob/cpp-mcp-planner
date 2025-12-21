@@ -1,4 +1,251 @@
 <div class="solutions" data-testid="solutions-page">
-  <h2 class="solutions__title">Solutions</h2>
-  <p class="solutions__description">Solutions comparison view will appear here.</p>
+  <!-- Header -->
+  <div class="solutions__header">
+    <h2 class="solutions__title">Solutions Comparison</h2>
+
+    <!-- Requirement Filter -->
+    <div class="solutions__filter" *ngIf="!loading() && requirementOptions().length > 0">
+      <label class="solutions__filter-label" for="requirement-filter">Filter by requirement:</label>
+      <p-select
+        inputId="requirement-filter"
+        [options]="requirementOptions()"
+        [(ngModel)]="selectedRequirementId"
+        placeholder="All Solutions"
+        [showClear]="true"
+        styleClass="solutions__filter-dropdown"
+        data-testid="requirement-filter"
+      />
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="solutions__loading" *ngIf="loading()" data-testid="solutions-loading">
+    <p-progressBar mode="indeterminate" />
+    <p class="solutions__loading-text">Loading solutions...</p>
+  </div>
+
+  <!-- Error State -->
+  <div class="solutions__error" *ngIf="error() && !loading()" data-testid="solutions-error">
+    <i class="pi pi-exclamation-triangle solutions__error-icon"></i>
+    <p class="solutions__error-message">{{ error() }}</p>
+  </div>
+
+  <!-- Empty State -->
+  <div class="solutions__empty" *ngIf="!loading() && !error() && filteredSolutions().length === 0" data-testid="solutions-empty">
+    <i class="pi pi-inbox solutions__empty-icon"></i>
+    <p class="solutions__empty-text">No solutions found</p>
+    <p class="solutions__empty-hint" *ngIf="selectedRequirementId()">Try clearing the filter or selecting a different requirement</p>
+  </div>
+
+  <!-- Solutions Grid -->
+  <div class="solutions__grid" *ngIf="!loading() && !error() && filteredSolutions().length > 0" data-testid="solutions-grid">
+    <p-card
+      *ngFor="let solution of filteredSolutions()"
+      class="solutions__card"
+      [ngClass]="{
+        'solutions__card--selected': solution.status === 'selected',
+        'solutions__card--rejected': solution.status === 'rejected'
+      }"
+      [attr.data-testid]="'solution-card-' + getSolId(solution)"
+    >
+      <ng-template pTemplate="header">
+        <div class="solutions__card-header">
+          <span class="solutions__card-id">{{ getSolId(solution) }}</span>
+          <p-tag
+            [value]="solution.status.toUpperCase()"
+            [severity]="getStatusSeverity(solution.status)"
+            styleClass="solutions__card-status"
+          />
+        </div>
+      </ng-template>
+
+      <ng-template pTemplate="content">
+        <h3 class="solutions__card-title">{{ solution.title }}</h3>
+        <p class="solutions__card-description" *ngIf="solution.description">{{ solution.description }}</p>
+
+        <!-- Approach Section -->
+        <div class="solutions__card-section" *ngIf="solution.approach">
+          <h4 class="solutions__card-section-title">Approach</h4>
+          <p class="solutions__card-section-text">{{ solution.approach }}</p>
+        </div>
+
+        <!-- Implementation Notes -->
+        <div class="solutions__card-section" *ngIf="solution.implementationNotes">
+          <h4 class="solutions__card-section-title">Implementation Notes</h4>
+          <p class="solutions__card-section-text">{{ solution.implementationNotes }}</p>
+        </div>
+
+        <!-- Tradeoffs -->
+        <div class="solutions__card-section solutions__tradeoffs" *ngIf="solution.tradeoffs && solution.tradeoffs.length > 0">
+          <h4 class="solutions__card-section-title">Tradeoff Analysis</h4>
+          <div class="solutions__tradeoff" *ngFor="let tradeoff of solution.tradeoffs">
+            <!-- Aspect Header with Score -->
+            <div class="solutions__tradeoff-header">
+              <span class="solutions__tradeoff-aspect">{{ tradeoff.aspect }}</span>
+              <span class="solutions__tradeoff-score" *ngIf="tradeoff.score !== undefined">
+                {{ tradeoff.score }}/10
+              </span>
+            </div>
+
+            <!-- Score Progress Bar -->
+            <p-progressBar
+              *ngIf="tradeoff.score !== undefined"
+              [value]="tradeoff.score * 10"
+              [showValue]="false"
+              styleClass="solutions__tradeoff-progress"
+            />
+
+            <!-- Pros -->
+            <div class="solutions__tradeoff-pros" *ngIf="tradeoff.pros && tradeoff.pros.length > 0">
+              <div class="solutions__tradeoff-label">
+                <i class="pi pi-check solutions__tradeoff-icon solutions__tradeoff-icon--pros"></i>
+                <span class="solutions__tradeoff-label-text">Pros</span>
+              </div>
+              <ul class="solutions__tradeoff-list">
+                <li class="solutions__tradeoff-item" *ngFor="let pro of tradeoff.pros">{{ pro }}</li>
+              </ul>
+            </div>
+
+            <!-- Cons -->
+            <div class="solutions__tradeoff-cons" *ngIf="tradeoff.cons && tradeoff.cons.length > 0">
+              <div class="solutions__tradeoff-label">
+                <i class="pi pi-times solutions__tradeoff-icon solutions__tradeoff-icon--cons"></i>
+                <span class="solutions__tradeoff-label-text">Cons</span>
+              </div>
+              <ul class="solutions__tradeoff-list">
+                <li class="solutions__tradeoff-item" *ngFor="let con of tradeoff.cons">{{ con }}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selection Reason (if selected) -->
+        <div class="solutions__card-selection" *ngIf="solution.status === 'selected' && solution.selectionReason">
+          <div class="solutions__card-selection-header">
+            <i class="pi pi-check-circle solutions__card-selection-icon"></i>
+            <span class="solutions__card-selection-label">Selection Reason</span>
+          </div>
+          <p class="solutions__card-selection-text">{{ solution.selectionReason }}</p>
+        </div>
+
+        <!-- Addressing Requirements -->
+        <div class="solutions__card-requirements" *ngIf="solution.addressing && solution.addressing.length > 0">
+          <h4 class="solutions__card-section-title">Addresses Requirements</h4>
+          <div class="solutions__card-requirements-list">
+            <p-tag
+              *ngFor="let reqId of solution.addressing"
+              [value]="getShortId(reqId)"
+              severity="info"
+              styleClass="solutions__card-requirement-tag"
+            />
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="solutions__card-actions">
+          <p-button
+            label="View Details"
+            icon="pi pi-eye"
+            severity="secondary"
+            [outlined]="true"
+            size="small"
+            styleClass="solutions__action-button"
+            (onClick)="viewDetails(solution)"
+            data-testid="view-details-button"
+          />
+          <p-button
+            *ngIf="canSelect(solution)"
+            label="Select"
+            icon="pi pi-check"
+            severity="success"
+            size="small"
+            styleClass="solutions__action-button"
+            (onClick)="selectSolution(solution)"
+            [attr.data-testid]="'select-button-' + getSolId(solution)"
+          />
+          <p-button
+            *ngIf="canReject(solution)"
+            label="Reject"
+            icon="pi pi-times"
+            severity="danger"
+            [outlined]="true"
+            size="small"
+            styleClass="solutions__action-button"
+            (onClick)="rejectSolution(solution)"
+            [attr.data-testid]="'reject-button-' + getSolId(solution)"
+          />
+        </div>
+      </ng-template>
+
+      <ng-template pTemplate="footer" *ngIf="solution.evaluation">
+        <div class="solutions__card-footer">
+          <!-- Effort Estimate -->
+          <div class="solutions__evaluation-item">
+            <span class="solutions__evaluation-label">
+              <i class="pi pi-clock solutions__evaluation-icon"></i>
+              Effort:
+            </span>
+            <span class="solutions__evaluation-value">
+              {{ formatEffort(solution.evaluation.effortEstimate) }}
+            </span>
+            <p-tag
+              [value]="solution.evaluation.effortEstimate.confidence.toUpperCase()"
+              [severity]="getConfidenceSeverity(solution.evaluation.effortEstimate.confidence)"
+              styleClass="solutions__evaluation-confidence"
+            />
+          </div>
+
+          <!-- Technical Feasibility -->
+          <div class="solutions__evaluation-item">
+            <span class="solutions__evaluation-label">
+              <i class="pi pi-wrench solutions__evaluation-icon"></i>
+              Feasibility:
+            </span>
+            <p-tag
+              [value]="solution.evaluation.technicalFeasibility.toUpperCase()"
+              [severity]="getFeasibilitySeverity(solution.evaluation.technicalFeasibility)"
+              styleClass="solutions__evaluation-feasibility"
+            />
+          </div>
+
+          <!-- Risk Assessment -->
+          <div class="solutions__evaluation-item solutions__evaluation-item--full" *ngIf="solution.evaluation.riskAssessment">
+            <span class="solutions__evaluation-label">
+              <i class="pi pi-exclamation-triangle solutions__evaluation-icon"></i>
+              Risk:
+            </span>
+            <span class="solutions__evaluation-text">{{ solution.evaluation.riskAssessment }}</span>
+          </div>
+
+          <!-- Dependencies -->
+          <div class="solutions__evaluation-item solutions__evaluation-item--full" *ngIf="solution.evaluation.dependencies && solution.evaluation.dependencies.length > 0">
+            <span class="solutions__evaluation-label">
+              <i class="pi pi-link solutions__evaluation-icon"></i>
+              Dependencies:
+            </span>
+            <div class="solutions__evaluation-dependencies">
+              <p-tag
+                *ngFor="let dep of solution.evaluation.dependencies"
+                [value]="dep"
+                severity="secondary"
+                styleClass="solutions__evaluation-dependency"
+              />
+            </div>
+          </div>
+
+          <!-- Performance Impact -->
+          <div class="solutions__evaluation-item solutions__evaluation-item--full" *ngIf="solution.evaluation.performanceImpact">
+            <span class="solutions__evaluation-label">
+              <i class="pi pi-chart-line solutions__evaluation-icon"></i>
+              Performance:
+            </span>
+            <span class="solutions__evaluation-text">{{ solution.evaluation.performanceImpact }}</span>
+          </div>
+        </div>
+      </ng-template>
+    </p-card>
+  </div>
+
+  <!-- Toast for notifications -->
+  <p-toast />
 </div>

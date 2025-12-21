@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { type Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { ApiService } from './api.service';
 import type {
@@ -11,6 +12,12 @@ import type {
   SolutionComparison,
   VersionHistory
 } from '../../../models';
+
+interface SolutionsListResponse {
+  solutions: Solution[];
+  total: number;
+  hasMore: boolean;
+}
 
 /**
  * Service for Solution API operations
@@ -25,9 +32,11 @@ export class SolutionService {
    * List solutions for plan
    */
   public list(planId: string, params?: ListSolutionsParams): Observable<Solution[]> {
-    return this.api.get<Solution[]>(
+    return this.api.get<SolutionsListResponse>(
       `/plans/${planId}/solutions`,
       params as Record<string, unknown>
+    ).pipe(
+      map(response => response.solutions)
     );
   }
 
