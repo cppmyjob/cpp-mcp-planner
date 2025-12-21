@@ -56,9 +56,13 @@ export const VERSION_HISTORY_SERVICE = 'VERSION_HISTORY_SERVICE';
           baseDir: storagePath,
           lockManager,
           cacheOptions: {
-            enabled: true,
-            ttl: 60000, // 1 minute cache TTL
-            maxSize: 1000,
+            // IMPORTANT: Cache disabled for web-server to ensure cross-process consistency
+            // MCP server and Web server run as separate processes with independent caches
+            // Without cache, web-server always reads fresh data from disk
+            // NOTE: MCP server keeps cache enabled (TTL=5s) - it's acceptable for CLI sessions
+            enabled: false,
+            ttl: 0,
+            maxSize: 0,
           },
         });
 
