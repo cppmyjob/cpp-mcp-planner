@@ -152,24 +152,63 @@
     min-height: 0; // Allow shrinking below content size
     overflow-y: auto; // Cards container scrolls, not column
     overflow-x: hidden;
+    position: relative; // For ::before/::after gradient positioning
 
-    // Custom scrollbar for cards
+    // Custom scrollbar for better visibility
     &::-webkit-scrollbar {
-      width: 6px;
+      width: 10px;
     }
 
     &::-webkit-scrollbar-track {
-      background: var(--surface-100);
-      border-radius: 3px;
+      background: var(--app-scrollbar-track);
+      border-radius: 5px;
     }
 
     &::-webkit-scrollbar-thumb {
-      background: var(--surface-300);
-      border-radius: 3px;
+      background: var(--app-scrollbar-thumb);
+      border-radius: 5px;
 
       &:hover {
-        background: var(--surface-400);
+        background: var(--app-scrollbar-thumb-hover);
       }
+    }
+
+    // Top gradient indicator (when scrolled down)
+    &.has-overflow-top::before {
+      content: '';
+      position: sticky;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 30px;
+      background: linear-gradient(
+        to bottom,
+        var(--surface-50) 0%,
+        transparent 100%
+      );
+      pointer-events: none;
+      z-index: 10;
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+
+    // Bottom gradient indicator (when content overflows)
+    &.has-overflow-bottom::after {
+      content: '';
+      position: sticky;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 30px;
+      background: linear-gradient(
+        to top,
+        var(--surface-50) 0%,
+        transparent 100%
+      );
+      pointer-events: none;
+      z-index: 10;
+      opacity: 1;
+      transition: opacity 0.3s ease;
     }
   }
 
@@ -378,17 +417,24 @@
     }
 
     &__cards {
-      // Cards scrollbar in dark theme
-      &::-webkit-scrollbar-track {
-        background: var(--surface-200);
+      // Cards scrollbar colors inherited from :root.dark-theme variables
+      // (no override needed - --app-scrollbar-* variables handle theme switching)
+
+      // Gradients dark theme
+      &.has-overflow-top::before {
+        background: linear-gradient(
+          to bottom,
+          var(--surface-100) 0%,
+          transparent 100%
+        );
       }
 
-      &::-webkit-scrollbar-thumb {
-        background: var(--surface-400);
-
-        &:hover {
-          background: var(--surface-500);
-        }
+      &.has-overflow-bottom::after {
+        background: linear-gradient(
+          to top,
+          var(--surface-100) 0%,
+          transparent 100%
+        );
       }
     }
 

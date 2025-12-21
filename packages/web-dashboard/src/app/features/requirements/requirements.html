@@ -77,7 +77,11 @@
           </div>
 
           <!-- Column Cards -->
-          <div class="kanban-column__cards">
+          <div
+            class="kanban-column__cards"
+            #cardsContainer
+            [attr.data-testid]="'column-cards-' + column.status"
+          >
             @for (requirement of column.requirements; track requirement.id) {
               <div
                 class="requirement-card requirement-card--{{ requirement.priority }}"

@@ -55,6 +55,9 @@ body {
   --app-highlight-bg: #e2e8f0;       /* slate-200 - for highlighted content */
   --app-border-color: #e2e8f0;       /* slate-200 - for table borders */
   --app-hover-bg: #f8fafc;           /* slate-50 - for row hover */
+  --app-scrollbar-track: #f1f5f9;    /* slate-100 - for scrollbar track */
+  --app-scrollbar-thumb: #94a3b8;    /* slate-400 - for scrollbar thumb (muted) */
+  --app-scrollbar-thumb-hover: #64748b; /* slate-500 - for scrollbar thumb hover */
 }
 
 :root.dark-theme {
@@ -64,6 +67,9 @@ body {
   --app-highlight-bg: #334155;       /* slate-700 */
   --app-border-color: #334155;       /* slate-700 - for table borders */
   --app-hover-bg: #334155;           /* slate-700 - for row hover */
+  --app-scrollbar-track: #334155;    /* slate-700 - for scrollbar track */
+  --app-scrollbar-thumb: #64748b;    /* slate-500 - for scrollbar thumb (muted) */
+  --app-scrollbar-thumb-hover: #94a3b8; /* slate-400 - for scrollbar thumb hover (lighter) */
 }
 
 /* PrimeNG TreeTable: Prevent unwanted highlight on header after navigation */

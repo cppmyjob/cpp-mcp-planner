@@ -1,6 +1,7 @@
-import { Component, ViewEncapsulation, inject, signal, computed, effect, OnInit } from '@angular/core';
+import { Component, ViewEncapsulation, inject, signal, computed, effect, OnInit, AfterViewInit, ViewChildren, QueryList, ElementRef, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { throttle } from '../../shared/utils/throttle';
 
 // PrimeNG
 import { CardModule } from 'primeng/card';
@@ -47,6 +48,11 @@ interface CategoryOption {
   value: RequirementCategory;
 }
 
+interface ScrollState {
+  hasOverflowTop: boolean;
+  hasOverflowBottom: boolean;
+}
+
 @Component({
   selector: 'app-requirements',
   imports: [
@@ -68,7 +74,7 @@ interface CategoryOption {
   styleUrl: './requirements.scss',
   encapsulation: ViewEncapsulation.None
 })
-export class RequirementsComponent implements OnInit {
+export class RequirementsComponent implements OnInit, AfterViewInit {
   // Public fields
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
@@ -136,11 +142,16 @@ export class RequirementsComponent implements OnInit {
   // Private fields
   private readonly allRequirements = signal<RequirementWithCoverage[]>([]);
   private readonly solutionsMap = signal<Map<string, Solution>>(new Map());
+  private readonly scrollStates = signal<Map<string, ScrollState>>(new Map());
   private readonly requirementService = inject(RequirementService);
   private readonly linkService = inject(LinkService);
   private readonly solutionService = inject(SolutionService);
   private readonly planState = inject(PlanStateService);
   private readonly messageService = inject(MessageService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  @ViewChildren('cardsContainer', { read: ElementRef })
+  private cardsContainers!: QueryList<ElementRef<HTMLElement>>;
 
   constructor() {
     effect(() => {
@@ -153,6 +164,16 @@ export class RequirementsComponent implements OnInit {
 
   public ngOnInit(): void {
     // Initial load handled by effect
+  }
+
+  public ngAfterViewInit(): void {
+    // Initialize scroll tracking for all columns
+    this.cardsContainers.forEach((container, index) => {
+      const column = this.kanbanColumns()[index];
+      if (column) {
+        this.trackScroll(container.nativeElement, column.status);
+      }
+    });
   }
 
   // Public methods
@@ -327,7 +348,39 @@ export class RequirementsComponent implements OnInit {
     return `SOL-${shortId}`;
   }
 
+  /**
+   * Get scroll state for column
+   */
+  public getScrollState(columnId: string): ScrollState {
+    return this.scrollStates().get(columnId) ?? {
+      hasOverflowTop: false,
+      hasOverflowBottom: false
+    };
+  }
+
   // Private methods
+
+  /**
+   * Re-check scroll states for all columns
+   */
+  private recheckScrollStates(): void {
+    this.cardsContainers.forEach((container, index) => {
+      const column = this.kanbanColumns()[index];
+      if (column) {
+        const element = container.nativeElement;
+        const state: ScrollState = {
+          hasOverflowTop: element.scrollTop > 10,
+          hasOverflowBottom:
+            element.scrollHeight - element.scrollTop - element.clientHeight > 10
+        };
+
+        this.scrollStates.update(map => {
+          map.set(column.status, state);
+          return new Map(map);
+        });
+      }
+    });
+  }
 
   /**
    * Load all data for active plan
@@ -374,6 +427,8 @@ export class RequirementsComponent implements OnInit {
           // No implemented requirements, just set data
           this.allRequirements.set(requirements as RequirementWithCoverage[]);
           this.loading.set(false);
+          // Recheck scroll states after DOM updates
+          setTimeout(() => this.recheckScrollStates(), 100);
           return;
         }
 
@@ -384,6 +439,8 @@ export class RequirementsComponent implements OnInit {
         // If solutions fail, still show requirements without coverage
         this.allRequirements.set(requirements as RequirementWithCoverage[]);
         this.loading.set(false);
+        // Recheck scroll states after DOM updates
+        setTimeout(() => this.recheckScrollStates(), 100);
       }
     });
   }
@@ -418,6 +475,8 @@ export class RequirementsComponent implements OnInit {
     if (totalCount === 0) {
       this.allRequirements.set(requirementsWithCoverage);
       this.loading.set(false);
+      // Recheck scroll states after DOM updates
+      setTimeout(() => this.recheckScrollStates(), 100);
       return;
     }
 
@@ -437,6 +496,8 @@ export class RequirementsComponent implements OnInit {
           if (completedCount === totalCount) {
             this.allRequirements.set(requirementsWithCoverage);
             this.loading.set(false);
+            // Recheck scroll states after DOM updates
+            setTimeout(() => this.recheckScrollStates(), 100);
           }
         },
         error: () => {
@@ -444,9 +505,80 @@ export class RequirementsComponent implements OnInit {
           if (completedCount === totalCount) {
             this.allRequirements.set(requirementsWithCoverage);
             this.loading.set(false);
+            // Recheck scroll states after DOM updates
+            setTimeout(() => this.recheckScrollStates(), 100);
           }
         }
       });
     }
+  }
+
+  /**
+   * Track scroll state for a cards container
+   */
+  private trackScroll(element: HTMLElement, columnId: string): void {
+    // Update scroll state function - uses direct DOM manipulation for performance and reliability
+    const updateScrollState = () => {
+      const hasOverflowTop = element.scrollTop > 10; // 10px threshold
+      const hasOverflowBottom =
+        element.scrollHeight - element.scrollTop - element.clientHeight > 10;
+
+      // Update DOM classes directly (bypasses Angular change detection for performance)
+      if (hasOverflowTop) {
+        element.classList.add('has-overflow-top');
+      } else {
+        element.classList.remove('has-overflow-top');
+      }
+
+      if (hasOverflowBottom) {
+        element.classList.add('has-overflow-bottom');
+      } else {
+        element.classList.remove('has-overflow-bottom');
+      }
+
+      // Also update signal for programmatic access
+      this.scrollStates.update(map => {
+        map.set(columnId, { hasOverflowTop, hasOverflowBottom });
+        return new Map(map);
+      });
+    };
+
+    // Throttled version для performance (16ms = 60fps)
+    const handleScroll = throttle(updateScrollState, 16);
+
+    element.addEventListener('scroll', handleScroll, { passive: true });
+
+    // ResizeObserver для window resize
+    const resizeObserver = new ResizeObserver(() => handleScroll());
+    resizeObserver.observe(element);
+
+    // MutationObserver для детектирования добавления/удаления cards
+    const mutationObserver = new MutationObserver(() => {
+      // Wait for layout recalc using requestAnimationFrame
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          updateScrollState();
+        });
+      });
+    });
+    mutationObserver.observe(element, {
+      childList: true,
+      subtree: true
+    });
+
+    // Initial check immediately and after small delay for initial render
+    updateScrollState();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateScrollState();
+      });
+    });
+
+    // Cleanup
+    this.destroyRef.onDestroy(() => {
+      element.removeEventListener('scroll', handleScroll);
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    });
   }
 }
