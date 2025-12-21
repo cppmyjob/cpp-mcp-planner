@@ -4,10 +4,11 @@
  */
 
 .requirements {
-  padding: 2rem;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 
   // Toolbar
   &__toolbar {
@@ -78,12 +79,15 @@
 
   // Kanban Board
   &__kanban {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 1.5rem;
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    grid-template-rows: 1fr !important; // Constrain row height for sticky headers to work
+    gap: 1.5rem !important;
     flex: 1;
-    overflow-x: auto;
+    overflow-x: auto;  // Horizontal scroll for narrow screens
+    overflow-y: hidden !important; // Columns scroll, not the grid
     min-height: 0;
+    align-items: stretch; // Force columns to fill grid cell height
   }
 }
 
@@ -93,9 +97,11 @@
   flex-direction: column;
   background: var(--surface-50);
   border-radius: var(--border-radius);
-  padding: 1rem;
+  padding: 0;
   min-width: 240px;
-  min-height: 400px;
+  height: 100%; // Fill grid cell height
+  min-height: 0; // Allow flex children to shrink
+  overflow: hidden; // Column does NOT scroll - only cards scroll
   transition: background-color 0.2s, border-color 0.2s;
 
   // PrimeNG drop hover state
@@ -108,9 +114,11 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
+    margin-bottom: 0;
+    padding: 1rem 1rem 0.75rem 1rem;
     border-bottom: 2px solid var(--surface-200);
+    background: var(--surface-50);
+    flex-shrink: 0; // Don't shrink header - stays at top
   }
 
   &__title {
@@ -139,12 +147,13 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.25rem;
-    scroll-behavior: smooth;
+    padding: 1rem;
+    flex: 1; // Take all remaining space after header
+    min-height: 0; // Allow shrinking below content size
+    overflow-y: auto; // Cards container scrolls, not column
+    overflow-x: hidden;
 
-    // Custom scrollbar
+    // Custom scrollbar for cards
     &::-webkit-scrollbar {
       width: 6px;
     }
@@ -171,7 +180,8 @@
     justify-content: center;
     gap: 0.5rem;
     min-height: 80px;
-    padding: 1rem;
+    margin: 1rem; // Use margin instead of padding (padding is on cards container)
+    padding: 1rem; // Internal padding for text
     background: var(--surface-card);
     border: 1px dashed var(--surface-300);
     border-radius: var(--border-radius);
@@ -202,6 +212,7 @@
   cursor: grab;
   transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, border-color 0.2s ease-out;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  // No position/z-index - let sticky header win stacking
 
   &:active {
     cursor: grabbing;
@@ -358,6 +369,7 @@
 
     &__header {
       border-bottom-color: var(--surface-300);
+      background: var(--surface-100);
     }
 
     &.p-draggable-enter {
@@ -366,6 +378,7 @@
     }
 
     &__cards {
+      // Cards scrollbar in dark theme
       &::-webkit-scrollbar-track {
         background: var(--surface-200);
       }
@@ -434,6 +447,7 @@
   .requirements {
     &__kanban {
       grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: 1fr; // Preserve single row constraint
     }
   }
 }
@@ -457,16 +471,21 @@
 
     &__kanban {
       grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: 1fr; // Preserve single row constraint
     }
   }
 }
 
 @media (max-width: 768px) {
   .requirements {
-    padding: 1rem;
-
     &__kanban {
       grid-template-columns: 1fr;
+      grid-template-rows: auto; // On mobile, columns auto-size vertically
     }
+  }
+
+  .kanban-column {
+    min-height: 250px;
+    max-height: 60vh; // Limit height on mobile for better UX
   }
 }

@@ -1,8 +1,13 @@
 .dashboard {
-  padding: 1.5rem;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
   &__header {
     margin-bottom: 2rem;
+    flex-shrink: 0;
   }
 
   &__title {
@@ -22,6 +27,9 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
   }
 
   &__row {
@@ -38,8 +46,6 @@
 // Responsive adjustments
 @media (max-width: 768px) {
   .dashboard {
-    padding: 1rem;
-
     &__row {
       grid-template-columns: 1fr;
     }

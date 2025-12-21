@@ -15,6 +15,6 @@ import { API_BASE_URL } from './constants.js';
 export const CLIENT_API_BASE_URL = API_BASE_URL;
 
 /**
- * Re-export ports for Playwright and test configuration
+ * Re-export ports and API URL for Playwright and test configuration
  */
-export { WEB_SERVER_PORT, WEB_DASHBOARD_PORT } from './constants.js';
+export { WEB_SERVER_PORT, WEB_DASHBOARD_PORT, API_BASE_URL } from './constants.js';

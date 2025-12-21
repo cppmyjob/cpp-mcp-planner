@@ -1,6 +1,7 @@
 .app-shell {
   display: flex;
   flex-direction: column;
+  height: 100vh;  // Constrain to viewport height
   min-height: 100vh;
   background-color: var(--p-surface-ground);
 
@@ -12,8 +13,23 @@
 
   &__main {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
     padding: 1.5rem;
-    overflow-y: auto;
+    overflow: hidden;
     background-color: var(--p-surface-ground);
   }
+}
+
+// Component host elements must be flex containers
+app-dashboard,
+app-requirements,
+app-phases,
+app-solutions,
+app-decisions,
+app-artifacts {
+  display: flex;
+  flex: 1;
+  min-height: 0;
 }
