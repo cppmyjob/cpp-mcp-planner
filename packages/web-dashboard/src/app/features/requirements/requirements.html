@@ -72,7 +72,7 @@
           <div class="kanban-column__header" [attr.data-testid]="'column-header-' + column.status">
             <span class="kanban-column__title">{{ column.title }}</span>
             <span class="kanban-column__count" [attr.data-testid]="'column-count-' + column.status">
-              ({{ column.requirements.length }})
+              {{ column.requirements.length }}
             </span>
           </div>
 
@@ -80,7 +80,7 @@
           <div class="kanban-column__cards">
             @for (requirement of column.requirements; track requirement.id) {
               <div
-                class="requirement-card"
+                class="requirement-card requirement-card--{{ requirement.priority }}"
                 pDraggable="requirements"
                 (onDragStart)="onDragStart(requirement)"
                 (onDragEnd)="onDragEnd()"
@@ -147,6 +147,7 @@
             <!-- Empty state -->
             @if (column.requirements.length === 0) {
               <div class="kanban-column__empty" [attr.data-testid]="'column-empty-' + column.status">
+                <i class="pi pi-inbox kanban-column__empty-icon"></i>
                 <span class="kanban-column__empty-text">No {{ column.title.toLowerCase() }} requirements</span>
               </div>
             }
