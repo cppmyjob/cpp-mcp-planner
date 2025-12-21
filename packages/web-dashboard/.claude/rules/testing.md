@@ -62,6 +62,24 @@ Use `data-testid` attributes only:
 ### Page Object Model
 Encapsulate locators and actions in page classes.
 
+### Screenshots (MANDATORY)
+**ALWAYS use `screenshotPath()` helper from `e2e/test-paths.ts`:**
+
+```typescript
+import { screenshotPath } from './test-paths';
+
+// ✅ CORRECT - uses helper, saves to .test-output/screenshots/
+await page.screenshot({ path: screenshotPath('my-test.png'), fullPage: true });
+
+// ❌ WRONG - hardcoded path, saves to wrong directory
+await page.screenshot({ path: 'screenshots/my-test.png', fullPage: true });
+```
+
+**Why:**
+- Centralized location: `.test-output/screenshots/` (monorepo root)
+- Gitignored automatically
+- Consistent with other test artifacts (reports, coverage)
+
 ---
 
 ## Mocking Principles

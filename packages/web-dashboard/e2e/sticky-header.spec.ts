@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { screenshotPath } from './test-paths';
 
 test.describe('Kanban Sticky Header', () => {
   test('column headers should remain visible when scrolling cards', async ({ page }) => {
@@ -9,7 +10,7 @@ test.describe('Kanban Sticky Header', () => {
     await page.waitForSelector('[data-testid="requirements-kanban"]', { timeout: 10000 });
 
     // Take screenshot of initial state
-    await page.screenshot({ path: 'screenshots/sticky-header-before-scroll.png', fullPage: true });
+    await page.screenshot({ path: screenshotPath('sticky-header-before-scroll.png'), fullPage: true });
 
     // Get the draft column elements
     const draftColumn = page.locator('[data-testid="kanban-column-draft"]');
@@ -32,7 +33,7 @@ test.describe('Kanban Sticky Header', () => {
     await page.waitForTimeout(300);
 
     // Take screenshot after scroll
-    await page.screenshot({ path: 'screenshots/sticky-header-after-scroll.png', fullPage: true });
+    await page.screenshot({ path: screenshotPath('sticky-header-after-scroll.png'), fullPage: true });
 
     // Get header position after scroll
     const headerBoundsAfter = await header.boundingBox();
@@ -119,7 +120,7 @@ test.describe('Kanban Sticky Header', () => {
     await page.waitForTimeout(300);
 
     // Take screenshot of bottom state
-    await page.screenshot({ path: 'screenshots/sticky-header-bottom-scroll.png', fullPage: true });
+    await page.screenshot({ path: screenshotPath('sticky-header-bottom-scroll.png'), fullPage: true });
 
     // Analyze bottom spacing
     const bottomAnalysis = await cardsContainer.evaluate((el) => {

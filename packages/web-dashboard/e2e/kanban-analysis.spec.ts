@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { screenshotPath } from './test-paths';
 
 test.describe('Kanban Board Visual Analysis', () => {
   test('capture kanban board screenshot for analysis', async ({ page }) => {
@@ -10,7 +11,7 @@ test.describe('Kanban Board Visual Analysis', () => {
 
     // Take full page screenshot
     await page.screenshot({
-      path: 'screenshots/kanban-current-state.png',
+      path: screenshotPath('kanban-current-state.png'),
       fullPage: true
     });
 
@@ -20,7 +21,7 @@ test.describe('Kanban Board Visual Analysis', () => {
       const column = page.locator(`[data-testid="kanban-column-${status}"]`);
       if (await column.isVisible()) {
         await column.screenshot({
-          path: `screenshots/kanban-column-${status}.png`
+          path: screenshotPath(`kanban-column-${status}.png`)
         });
       }
     }
@@ -29,7 +30,7 @@ test.describe('Kanban Board Visual Analysis', () => {
     const firstCard = page.locator('[data-testid^="requirement-card-"]').first();
     if (await firstCard.count() > 0) {
       await firstCard.screenshot({
-        path: 'screenshots/kanban-card-detail.png'
+        path: screenshotPath('kanban-card-detail.png')
       });
     }
 
