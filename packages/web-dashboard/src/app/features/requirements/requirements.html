@@ -60,7 +60,13 @@
 
   <!-- Kanban Board -->
   @if (!loading() && !error()) {
-    <div class="requirements__kanban" data-testid="requirements-kanban">
+    <div
+      class="requirements__kanban"
+      data-testid="requirements-kanban"
+      scrollContainer
+      [enableHorizontal]="true"
+      [enableVertical]="false"
+    >
       @for (column of kanbanColumns(); track column.status) {
         <div
           class="kanban-column"

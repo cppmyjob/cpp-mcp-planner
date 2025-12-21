@@ -1,5 +1,6 @@
 import { Component, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ScrollContainerDirective } from '../../shared/directives/scroll-container';
 
 import { StatisticsCardsComponent } from './components/statistics-cards/statistics-cards';
 import { RequirementsChartComponent } from './components/requirements-chart/requirements-chart';
@@ -10,6 +11,7 @@ import { BlockersPanelComponent } from './components/blockers-panel/blockers-pan
   selector: 'app-dashboard',
   imports: [
     CommonModule,
+    ScrollContainerDirective,
     StatisticsCardsComponent,
     RequirementsChartComponent,
     ActivePhasesComponent,
