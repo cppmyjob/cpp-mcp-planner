@@ -9,7 +9,7 @@
         <input
           pInputText
           type="text"
-          placeholder="Search requirements..."
+          placeholder="Search..."
           [ngModel]="searchTerm()"
           (ngModelChange)="searchTerm.set($event)"
           data-testid="requirements-search"
@@ -45,102 +45,109 @@
   <!-- Loading state -->
   @if (loading()) {
     <div class="requirements__loading" data-testid="requirements-loading">
-      <i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i>
-      <p>Loading requirements...</p>
+      <i class="pi pi-spin pi-spinner requirements__loading-icon"></i>
+      <p class="requirements__loading-text">Loading requirements...</p>
     </div>
   }
 
   <!-- Error state -->
   @if (error()) {
     <div class="requirements__error" data-testid="requirements-error">
-      <i class="pi pi-exclamation-triangle"></i>
-      <p>{{ error() }}</p>
+      <i class="pi pi-exclamation-triangle requirements__error-icon"></i>
+      <p class="requirements__error-text">{{ error() }}</p>
     </div>
   }
 
   <!-- Kanban Board -->
   @if (!loading() && !error()) {
-    <div class="requirements__kanban">
+    <div class="requirements__kanban" data-testid="requirements-kanban">
       @for (column of kanbanColumns(); track column.status) {
         <div
           class="kanban-column"
           [attr.data-testid]="'kanban-column-' + column.status"
-          (drop)="onDrop(column.status)"
-          (dragover)="onDragOver($event)"
+          pDroppable="requirements"
+          (onDrop)="onDrop(column.status)"
         >
           <!-- Column Header -->
           <div class="kanban-column__header" [attr.data-testid]="'column-header-' + column.status">
             <span class="kanban-column__title">{{ column.title }}</span>
-            <span class="kanban-column__count">({{ column.requirements.length }})</span>
+            <span class="kanban-column__count" [attr.data-testid]="'column-count-' + column.status">
+              ({{ column.requirements.length }})
+            </span>
           </div>
 
           <!-- Column Cards -->
           <div class="kanban-column__cards">
             @for (requirement of column.requirements; track requirement.id) {
-              <p-card
+              <div
                 class="requirement-card"
-                [draggable]="true"
-                (dragstart)="onDragStart(requirement)"
-                (dragend)="onDragEnd()"
+                pDraggable="requirements"
+                (onDragStart)="onDragStart(requirement)"
+                (onDragEnd)="onDragEnd()"
                 [attr.data-testid]="'requirement-card-' + requirement.id"
               >
-                <!-- Card Header -->
-                <ng-template pTemplate="header">
-                  <div class="requirement-card__header">
-                    <p-tag
-                      [value]="requirement.priority"
-                      [severity]="getPrioritySeverity(requirement.priority)"
-                      data-testid="requirement-priority"
-                    />
-                  </div>
-                </ng-template>
-
-                <!-- Card Content -->
-                <div class="requirement-card__content">
-                  <h4 class="requirement-card__title" data-testid="requirement-title">
-                    {{ requirement.title }}
-                  </h4>
-
-                  @if (requirement.description) {
-                    <p class="requirement-card__description">
-                      {{ requirement.description }}
-                    </p>
-                  }
-
-                  <!-- Tags -->
-                  @if (getTags(requirement).length > 0) {
-                    <div class="requirement-card__tags" data-testid="requirement-tags">
-                      @for (tag of getTags(requirement); track tag) {
-                        <p-chip [label]="tag" />
-                      }
-                    </div>
-                  }
+                <!-- Card Header: REQ-ID -->
+                <div class="requirement-card__id" data-testid="requirement-id">
+                  {{ getReqId(requirement) }}
                 </div>
 
-                <!-- Card Footer -->
-                <ng-template pTemplate="footer">
-                  <div class="requirement-card__footer">
-                    <div class="requirement-card__votes" data-testid="requirement-votes">
-                      <i class="pi pi-thumbs-up"></i>
-                      <span>{{ requirement.votes }} votes</span>
-                    </div>
+                <!-- Separator -->
+                <div class="requirement-card__separator"></div>
 
-                    @if (requirement.source.type) {
-                      <p-tag
-                        [value]="requirement.source.type"
-                        [rounded]="true"
-                        severity="info"
-                      />
+                <!-- Title -->
+                <h4 class="requirement-card__title" data-testid="requirement-title">
+                  {{ requirement.title }}
+                </h4>
+
+                <!-- Description (truncated) -->
+                @if (requirement.description) {
+                  <p class="requirement-card__description" data-testid="requirement-description">
+                    {{ requirement.description }}
+                  </p>
+                }
+
+                <!-- Covered by (only for implemented) -->
+                @if (getCoveredBy(requirement).length > 0) {
+                  <div class="requirement-card__coverage" data-testid="requirement-coverage">
+                    @for (solution of getCoveredBy(requirement); track solution.id) {
+                      <span class="requirement-card__covered-by">
+                        Covered by {{ getSolutionId(solution) }}
+                      </span>
                     }
                   </div>
-                </ng-template>
-              </p-card>
+                }
+
+                <!-- Footer: Priority, Votes, Tags -->
+                <div class="requirement-card__footer">
+                  <!-- Priority -->
+                  <p-tag
+                    [value]="requirement.priority"
+                    [severity]="getPrioritySeverity(requirement.priority)"
+                    data-testid="requirement-priority"
+                    class="requirement-card__priority"
+                  />
+
+                  <!-- Votes -->
+                  <span class="requirement-card__votes" data-testid="requirement-votes">
+                    {{ requirement.votes }} votes
+                  </span>
+                </div>
+
+                <!-- Tags -->
+                @if (getTags(requirement).length > 0) {
+                  <div class="requirement-card__tags" data-testid="requirement-tags">
+                    @for (tag of getTags(requirement); track tag) {
+                      <p-chip [label]="tag" class="requirement-card__tag" />
+                    }
+                  </div>
+                }
+              </div>
             }
 
             <!-- Empty state -->
             @if (column.requirements.length === 0) {
-              <div class="kanban-column__empty">
-                <p>No {{ column.title.toLowerCase() }} requirements</p>
+              <div class="kanban-column__empty" [attr.data-testid]="'column-empty-' + column.status">
+                <span class="kanban-column__empty-text">No {{ column.title.toLowerCase() }} requirements</span>
               </div>
             }
           </div>
@@ -161,8 +168,10 @@
   >
     <div class="add-requirement-form">
       <!-- Title -->
-      <div class="form-field">
-        <label for="req-title">Title <span class="required">*</span></label>
+      <div class="add-requirement-form__field">
+        <label for="req-title" class="add-requirement-form__label">
+          Title <span class="add-requirement-form__required">*</span>
+        </label>
         <input
           id="req-title"
           pInputText
@@ -175,8 +184,8 @@
       </div>
 
       <!-- Description -->
-      <div class="form-field">
-        <label for="req-description">Description</label>
+      <div class="add-requirement-form__field">
+        <label for="req-description" class="add-requirement-form__label">Description</label>
         <textarea
           id="req-description"
           pTextarea
@@ -189,8 +198,8 @@
       </div>
 
       <!-- Priority -->
-      <div class="form-field">
-        <label for="req-priority">Priority</label>
+      <div class="add-requirement-form__field">
+        <label for="req-priority" class="add-requirement-form__label">Priority</label>
         <p-select
           id="req-priority"
           [(ngModel)]="newRequirement().priority"
@@ -204,8 +213,8 @@
       </div>
 
       <!-- Category -->
-      <div class="form-field">
-        <label for="req-category">Category</label>
+      <div class="add-requirement-form__field">
+        <label for="req-category" class="add-requirement-form__label">Category</label>
         <p-select
           id="req-category"
           [(ngModel)]="newRequirement().category"
