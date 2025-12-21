@@ -14,6 +14,7 @@ import { MessageService } from 'primeng/api';
 // Services and Models
 import { SolutionService, RequirementService, PlanStateService } from '../../core/services';
 import type { Solution, SolutionStatus, Requirement } from '../../models';
+import { ScrollContainerDirective } from '../../shared/directives/scroll-container';
 
 @Component({
   selector: 'app-solutions',
@@ -25,7 +26,8 @@ import type { Solution, SolutionStatus, Requirement } from '../../models';
     TagModule,
     ProgressBarModule,
     SelectModule,
-    ToastModule
+    ToastModule,
+    ScrollContainerDirective
   ],
   providers: [MessageService],
   templateUrl: './solutions.html',

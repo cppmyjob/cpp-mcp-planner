@@ -37,8 +37,16 @@
     <p class="solutions__empty-hint" *ngIf="selectedRequirementId()">Try clearing the filter or selecting a different requirement</p>
   </div>
 
-  <!-- Solutions Grid -->
-  <div class="solutions__grid" *ngIf="!loading() && !error() && filteredSolutions().length > 0" data-testid="solutions-grid">
+  <!-- Solutions Grid Container with Scroll -->
+  <div
+    class="solutions__content"
+    *ngIf="!loading() && !error() && filteredSolutions().length > 0"
+    scrollContainer
+    [enableVertical]="true"
+    [enableHorizontal]="false"
+    data-testid="solutions-content"
+  >
+    <div class="solutions__grid" data-testid="solutions-grid">
     <p-card
       *ngFor="let solution of filteredSolutions()"
       class="solutions__card"
@@ -244,6 +252,7 @@
         </div>
       </ng-template>
     </p-card>
+    </div>
   </div>
 
   <!-- Toast for notifications -->
