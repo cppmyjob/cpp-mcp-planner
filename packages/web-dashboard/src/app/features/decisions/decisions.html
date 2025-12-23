@@ -1,4 +1,174 @@
 <div class="decisions" data-testid="decisions-page">
   <h2 class="decisions__title">Decisions</h2>
-  <p class="decisions__description">Decisions timeline will appear here.</p>
+
+  <!-- Loading State -->
+  @if (loading()) {
+    <div class="decisions__loading" data-testid="decisions-loading">
+      <p-progressSpinner strokeWidth="4" />
+      <p class="decisions__loading-text">Loading decisions...</p>
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error()) {
+    <div class="decisions__error" data-testid="decisions-error">
+      <p-message severity="error" [text]="error()!" />
+    </div>
+  }
+
+  <!-- Empty State -->
+  @if (!loading() && !error() && decisions().length === 0) {
+    <div class="decisions__empty" data-testid="decisions-empty">
+      <i class="pi pi-lightbulb decisions__empty-icon"></i>
+      <p class="decisions__empty-text">No decisions recorded yet.</p>
+      <p class="decisions__empty-hint">Architectural decisions (ADRs) will appear here.</p>
+    </div>
+  }
+
+  <!-- Content -->
+  @if (!loading() && !error() && decisions().length > 0) {
+    <div class="decisions__content" data-testid="decisions-content">
+
+      <!-- Status Filter -->
+      <div class="decisions__filter" data-testid="decisions-filter">
+        <label for="status-filter" class="decisions__filter-label">Filter by Status:</label>
+        <p-multiselect
+          inputId="status-filter"
+          [options]="statusOptions"
+          [(ngModel)]="selectedStatuses"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Select statuses"
+          [showClear]="false"
+          styleClass="decisions__filter-select"
+          data-testid="status-filter-multiselect"
+        />
+        <span class="decisions__filter-count" data-testid="filter-count">
+          Showing {{ filteredDecisions().length }} of {{ decisions().length }} decisions
+        </span>
+      </div>
+      <p class="decisions__description">
+        Timeline of {{ filteredDecisions().length }} filtered architectural decision(s).
+      </p>
+
+      <!-- Timeline -->
+      <p-timeline [value]="filteredDecisions()" data-testid="decisions-timeline">
+        <!-- Custom marker with status color -->
+        <ng-template #marker let-decision>
+          <span
+            class="decisions__marker"
+            [class.decisions__marker--active]="decision.status === 'active'"
+            [class.decisions__marker--superseded]="decision.status === 'superseded'"
+            [class.decisions__marker--reversed]="decision.status === 'reversed'"
+          >
+            <i class="pi pi-check" *ngIf="decision.status === 'active'"></i>
+            <i class="pi pi-arrow-right" *ngIf="decision.status === 'superseded'"></i>
+            <i class="pi pi-times" *ngIf="decision.status === 'reversed'"></i>
+          </span>
+        </ng-template>
+
+        <!-- Opposite side: date -->
+        <ng-template #opposite let-decision>
+          <span class="decisions__date">{{ formatDate(decision.createdAt) }}</span>
+        </ng-template>
+
+        <!-- Content: decision card (basic layout, detailed in Phase 3) -->
+        <ng-template #content let-decision>
+          <p-card
+            class="decisions__card"
+            [attr.data-testid]="'decision-card-' + decision.id"
+          >
+            <ng-template #header>
+              <div class="decisions__card-header">
+                <span class="decisions__card-id">{{ getDecId(decision) }}</span>
+                <p-tag
+                  [value]="decision.status"
+                  [severity]="getStatusSeverity(decision.status)"
+                />
+              </div>
+            </ng-template>
+
+            <div class="decisions__card-body">
+              <h4 class="decisions__card-title">{{ decision.title }}</h4>
+              @if (decision.question) {
+                <p class="decisions__card-question">{{ decision.question }}</p>
+              }
+              @if (decision.decision) {
+                <p class="decisions__card-decision">
+                  <strong>Decision:</strong> {{ decision.decision }}
+                </p>
+              }
+
+              <!-- Context Section -->
+              @if (hasContext(decision)) {
+                <div class="decisions__card-section" data-testid="decision-context">
+                  <h5 class="decisions__card-section-title">Context</h5>
+                  <p class="decisions__card-section-text">{{ decision.context }}</p>
+                </div>
+              }
+
+              <!-- Consequences Section -->
+              @if (hasConsequences(decision)) {
+                <div class="decisions__card-section" data-testid="decision-consequences">
+                  <h5 class="decisions__card-section-title">Consequences</h5>
+                  <p class="decisions__card-section-text">{{ decision.consequences }}</p>
+                </div>
+              }
+
+              <!-- Impact Scope Chips -->
+              @if (hasImpactScope(decision)) {
+                <div class="decisions__card-section" data-testid="decision-impact-scope">
+                  <h5 class="decisions__card-section-title">Impact Scope</h5>
+                  <div class="decisions__card-chips">
+                    @for (scope of decision.impactScope; track scope) {
+                      <p-chip [label]="scope" styleClass="decisions__chip" />
+                    }
+                  </div>
+                </div>
+              }
+
+              <!-- Alternatives Considered -->
+              @if (hasAlternatives(decision)) {
+                <div class="decisions__card-section" data-testid="decision-alternatives">
+                  <h5 class="decisions__card-section-title">Alternatives Considered</h5>
+                  <ul class="decisions__card-alternatives">
+                    @for (alt of decision.alternativesConsidered; track alt.option) {
+                      <li class="decisions__card-alternative">
+                        <span class="decisions__card-alternative-option">{{ alt.option }}</span>
+                        <span class="decisions__card-alternative-reasoning">{{ alt.reasoning }}</span>
+                        @if (alt.whyNotChosen) {
+                          <span class="decisions__card-alternative-why">Why not: {{ alt.whyNotChosen }}</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+
+              <!-- Supersession Chain -->
+              @if (isSuperseded(decision) || doesSupersede(decision)) {
+                <div class="decisions__card-section decisions__supersession" data-testid="decision-supersession">
+                  <h5 class="decisions__card-section-title">Supersession Chain</h5>
+                  @if (isSuperseded(decision)) {
+                    <div class="decisions__supersession-badge decisions__supersession-badge--superseded" data-testid="superseded-by-badge">
+                      <i class="pi pi-arrow-right"></i>
+                      <span>Superseded by: </span>
+                      <strong>{{ getSupersedingDecisionTitle(decision) ?? decision.supersededBy }}</strong>
+                    </div>
+                  }
+                  @if (doesSupersede(decision)) {
+                    <div class="decisions__supersession-badge decisions__supersession-badge--supersedes" data-testid="supersedes-badge">
+                      <i class="pi pi-arrow-left"></i>
+                      <span>Supersedes: </span>
+                      <strong>{{ getSupersededDecisionTitle(decision) ?? decision.supersedes }}</strong>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </p-card>
+        </ng-template>
+      </p-timeline>
+    </div>
+  }
 </div>

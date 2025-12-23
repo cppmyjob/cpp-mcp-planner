@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { type Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { ApiService } from './api.service';
 import type {
@@ -10,6 +11,12 @@ import type {
   SupersedeDecisionDto,
   VersionHistory
 } from '../../../models';
+
+interface DecisionsListResponse {
+  decisions: Decision[];
+  total: number;
+  hasMore: boolean;
+}
 
 /**
  * Service for Decision API operations (ADR pattern)
@@ -24,9 +31,11 @@ export class DecisionService {
    * List decisions for plan
    */
   public list(planId: string, params?: ListDecisionsParams): Observable<Decision[]> {
-    return this.api.get<Decision[]>(
+    return this.api.get<DecisionsListResponse>(
       `/plans/${planId}/decisions`,
       params as Record<string, unknown>
+    ).pipe(
+      map(response => response.decisions)
     );
   }
 

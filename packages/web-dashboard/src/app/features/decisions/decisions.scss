@@ -1,4 +1,6 @@
 .decisions {
+  padding: 1rem;
+
   &__title {
     margin: 0 0 1rem;
     font-size: 1.5rem;
@@ -8,5 +10,274 @@
 
   &__description {
     color: var(--p-text-muted-color);
+    margin-bottom: 1rem;
+  }
+
+  // Phase 5: Status Filter
+  &__filter {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: var(--p-surface-50);
+    border-radius: 6px;
+    border: 1px solid var(--p-surface-200);
+  }
+
+  &__filter-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--p-text-color);
+    white-space: nowrap;
+  }
+
+  &__filter-select {
+    flex: 0 0 auto;
+    min-width: 250px;
+  }
+
+  &__filter-count {
+    margin-left: auto;
+    font-size: 0.875rem;
+    color: var(--p-text-muted-color);
+    font-weight: 500;
+  }
+
+  &__loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    gap: 1rem;
+  }
+
+  &__loading-text {
+    color: var(--p-text-muted-color);
+    margin: 0;
+  }
+
+  &__error {
+    padding: 1rem 0;
+  }
+
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    text-align: center;
+  }
+
+  &__empty-icon {
+    font-size: 3rem;
+    color: var(--p-text-muted-color);
+    margin-bottom: 1rem;
+  }
+
+  &__empty-text {
+    font-size: 1.125rem;
+    font-weight: 500;
+    color: var(--p-text-color);
+    margin: 0 0 0.5rem;
+  }
+
+  &__empty-hint {
+    color: var(--p-text-muted-color);
+    margin: 0;
+  }
+
+  &__content {
+    margin-top: 1rem;
+  }
+
+  // Timeline marker styles
+  &__marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background-color: var(--p-surface-200);
+    color: var(--p-text-color);
+
+    &--active {
+      background-color: var(--p-green-500);
+      color: white;
+    }
+
+    &--superseded {
+      background-color: var(--p-yellow-500);
+      color: white;
+    }
+
+    &--reversed {
+      background-color: var(--p-red-500);
+      color: white;
+    }
+  }
+
+  // Timeline date on opposite side
+  &__date {
+    font-size: 0.875rem;
+    color: var(--p-text-muted-color);
+    white-space: nowrap;
+  }
+
+  // Decision card styles (basic for Phase 2, detailed in Phase 3)
+  &__card {
+    max-width: 500px;
+  }
+
+  &__card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--p-surface-200);
+  }
+
+  &__card-id {
+    font-family: monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--p-text-muted-color);
+  }
+
+  &__card-body {
+    padding: 0;
+  }
+
+  &__card-title {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--p-text-color);
+  }
+
+  &__card-question {
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
+    color: var(--p-text-muted-color);
+    font-style: italic;
+  }
+
+  &__card-decision {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--p-text-color);
+  }
+
+  // Phase 3: Enhanced card sections
+  &__card-section {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--p-surface-200);
+  }
+
+  &__card-section-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--p-text-muted-color);
+  }
+
+  &__card-section-text {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--p-text-color);
+    line-height: 1.5;
+  }
+
+  &__card-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  &__chip {
+    font-size: 0.75rem;
+  }
+
+  &__card-alternatives {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__card-alternative {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--p-surface-100);
+
+    &:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+  }
+
+  &__card-alternative-option {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--p-text-color);
+  }
+
+  &__card-alternative-reasoning {
+    font-size: 0.8125rem;
+    color: var(--p-text-color);
+    line-height: 1.4;
+  }
+
+  &__card-alternative-why {
+    font-size: 0.75rem;
+    color: var(--p-text-muted-color);
+    font-style: italic;
+  }
+
+  // Phase 4: Supersession Chain
+  &__supersession {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  &__supersession-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+
+    &--superseded {
+      background-color: var(--p-yellow-100);
+      color: var(--p-yellow-700);
+      border: 1px solid var(--p-yellow-300);
+    }
+
+    &--supersedes {
+      background-color: var(--p-green-100);
+      color: var(--p-green-700);
+      border: 1px solid var(--p-green-300);
+    }
+  }
+
+  &__supersession-icon {
+    font-size: 0.875rem;
+  }
+
+  &__supersession-text {
+    font-size: 0.875rem;
+  }
+
+  &__supersession-title {
+    font-weight: 600;
   }
 }
