@@ -3,7 +3,7 @@
 # MCP Planning Server - Development Start Script (Linux/macOS)
 # ============================================================================
 # This script will:
-#   1. Check Node.js installation
+#   1. Check Node.js and pnpm installation
 #   2. Install dependencies
 #   3. Build all packages
 #   4. Start Web Server (REST API) on port 8790
@@ -28,22 +28,47 @@ fi
 
 NODE_VERSION=$(node --version)
 echo "  Node.js version: $NODE_VERSION"
+echo ""
 
-# Check if npm is installed
-if ! command -v npm &> /dev/null; then
-    echo "ERROR: npm is not installed!"
+# Check if pnpm is installed
+echo "Checking pnpm installation..."
+if ! command -v pnpm &> /dev/null; then
+    echo ""
+    echo "========================================"
+    echo "  ERROR: pnpm is NOT installed!"
+    echo "========================================"
+    echo ""
+    echo "This project requires pnpm package manager."
+    echo ""
+    echo "To install pnpm, run ONE of these commands:"
+    echo ""
+    echo "  Option 1 - Using npm:"
+    echo "  npm install -g pnpm"
+    echo ""
+    echo "  Option 2 - Using curl (recommended):"
+    echo "  curl -fsSL https://get.pnpm.io/install.sh | sh -"
+    echo ""
+    echo "  Option 3 - Using wget:"
+    echo "  wget -qO- https://get.pnpm.io/install.sh | sh -"
+    echo ""
+    echo "  Option 4 - Using Homebrew (macOS):"
+    echo "  brew install pnpm"
+    echo ""
+    echo "After installation, restart your terminal and run this script again."
+    echo "========================================"
+    echo ""
     exit 1
 fi
 
-NPM_VERSION=$(npm --version)
-echo "  npm version: $NPM_VERSION"
+PNPM_VERSION=$(pnpm --version)
+echo "  pnpm version: $PNPM_VERSION"
 echo ""
 
 # Check if node_modules exists
 if [ ! -d "node_modules" ]; then
     echo "[2/5] Installing dependencies (first time setup)..."
     echo "  This may take a few minutes..."
-    npm install
+    pnpm install
     echo "  Dependencies installed successfully!"
 else
     echo "[2/5] Dependencies already installed. Skipping..."
@@ -59,11 +84,11 @@ NEED_BUILD=0
 if [ $NEED_BUILD -eq 1 ]; then
     echo "[3/5] Building all packages..."
     echo "  This may take a minute..."
-    npm run build
+    pnpm run build
     echo "  Build completed successfully!"
 else
     echo "[3/5] Packages already built. Skipping..."
-    echo "  (Run 'npm run build' manually if you made changes)"
+    echo "  (Run 'pnpm run build' manually if you made changes)"
 fi
 echo ""
 
@@ -71,7 +96,7 @@ echo "[4/5] Starting Web Server (REST API)..."
 echo "  URL: http://localhost:8790"
 
 # Start web server in background
-npm run dev:web &
+pnpm run dev:web &
 WEB_SERVER_PID=$!
 echo "  Web Server started (PID: $WEB_SERVER_PID)"
 sleep 2
@@ -81,7 +106,7 @@ echo "[5/5] Starting Web Dashboard (Angular)..."
 echo "  URL: http://localhost:8791"
 
 # Start dashboard in background
-npm run dev:dashboard &
+pnpm run dev:dashboard &
 DASHBOARD_PID=$!
 echo "  Web Dashboard started (PID: $DASHBOARD_PID)"
 sleep 2
@@ -101,7 +126,7 @@ echo "  To stop servers:"
 echo "    kill $WEB_SERVER_PID $DASHBOARD_PID"
 echo ""
 echo "  Or press Ctrl+C and run:"
-echo "    pkill -f 'npm run dev'"
+echo "    pkill -f 'pnpm run dev'"
 echo "========================================"
 echo ""
 

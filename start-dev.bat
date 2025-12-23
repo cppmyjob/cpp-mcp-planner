@@ -3,7 +3,7 @@ REM ============================================================================
 REM MCP Planning Server - Development Start Script
 REM ============================================================================
 REM This script will:
-REM   1. Check Node.js installation
+REM   1. Check Node.js and pnpm installation
 REM   2. Install dependencies
 REM   3. Build all packages
 REM   4. Start Web Server (REST API) on port 8790
@@ -31,25 +31,47 @@ if %ERRORLEVEL% neq 0 (
 REM Display Node.js version
 for /f "tokens=*" %%i in ('node --version') do set NODE_VERSION=%%i
 echo   Node.js version: %NODE_VERSION%
+echo.
 
-REM Check if npm is installed
-where npm >nul 2>&1
+REM Check if pnpm is installed
+echo Checking pnpm installation...
+where pnpm >nul 2>&1
 if %ERRORLEVEL% neq 0 (
-    echo ERROR: npm is not installed!
+    echo.
+    echo ========================================
+    echo   ERROR: pnpm is NOT installed!
+    echo ========================================
+    echo.
+    echo This project requires pnpm package manager.
+    echo.
+    echo To install pnpm, run ONE of these commands:
+    echo.
+    echo   Option 1 - Using npm:
+    echo   npm install -g pnpm
+    echo.
+    echo   Option 2 - Using PowerShell:
+    echo   iwr https://get.pnpm.io/install.ps1 -useb ^| iex
+    echo.
+    echo   Option 3 - Using standalone script:
+    echo   https://pnpm.io/installation
+    echo.
+    echo After installation, run this script again.
+    echo ========================================
+    echo.
     pause
     exit /b 1
 )
 
-REM Display npm version
-for /f "tokens=*" %%i in ('npm --version') do set NPM_VERSION=%%i
-echo   npm version: %NPM_VERSION%
+REM Display pnpm version
+for /f "tokens=*" %%i in ('pnpm --version') do set PNPM_VERSION=%%i
+echo   pnpm version: %PNPM_VERSION%
 echo.
 
 REM Check if node_modules exists
 if not exist "node_modules" (
     echo [2/5] Installing dependencies ^(first time setup^)...
     echo   This may take a few minutes...
-    call npm install
+    call pnpm install
     if %ERRORLEVEL% neq 0 (
         echo ERROR: Failed to install dependencies!
         pause
@@ -70,7 +92,7 @@ if not exist "packages\web-server\dist" set NEED_BUILD=1
 if %NEED_BUILD%==1 (
     echo [3/5] Building all packages...
     echo   This may take a minute...
-    call npm run build
+    call pnpm run build
     if %ERRORLEVEL% neq 0 (
         echo ERROR: Build failed!
         pause
@@ -79,14 +101,14 @@ if %NEED_BUILD%==1 (
     echo   Build completed successfully!
 ) else (
     echo [3/5] Packages already built. Skipping...
-    echo   ^(Run "npm run build" manually if you made changes^)
+    echo   ^(Run "pnpm run build" manually if you made changes^)
 )
 echo.
 
 echo [4/5] Starting Web Server ^(REST API^)...
 echo   URL: http://localhost:8790
 echo   Opening in new window...
-start "MCP Web Server (API)" cmd /k "npm run dev:web"
+start "MCP Web Server (API)" cmd /k "pnpm run dev:web"
 timeout /t 2 /nobreak >nul
 echo   Web Server started!
 echo.
@@ -94,7 +116,7 @@ echo.
 echo [5/5] Starting Web Dashboard ^(Angular^)...
 echo   URL: http://localhost:8791
 echo   Opening in new window...
-start "MCP Web Dashboard (UI)" cmd /k "npm run dev:dashboard"
+start "MCP Web Dashboard (UI)" cmd /k "pnpm run dev:dashboard"
 timeout /t 2 /nobreak >nul
 echo   Web Dashboard starting...
 echo.
