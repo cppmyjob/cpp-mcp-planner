@@ -1,5 +1,6 @@
 import { Component, ViewEncapsulation, inject, signal, effect, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 // PrimeNG
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
@@ -9,7 +10,9 @@ import { CardModule } from 'primeng/card';
 import { TagModule } from 'primeng/tag';
 import { ChipModule } from 'primeng/chip';
 import { MultiSelectModule } from 'primeng/multiselect';
-import { FormsModule } from '@angular/forms';
+
+// Shared
+import { ScrollContainerDirective } from '../../shared/directives/scroll-container';
 
 // Services and Models
 import { DecisionService, PlanStateService } from '../../core/services';
@@ -26,7 +29,8 @@ import type { Decision, DecisionStatus } from '../../models';
     CardModule,
     TagModule,
     ChipModule,
-    MultiSelectModule
+    MultiSelectModule,
+    ScrollContainerDirective
   ],
   templateUrl: './decisions.html',
   styleUrl: './decisions.scss',

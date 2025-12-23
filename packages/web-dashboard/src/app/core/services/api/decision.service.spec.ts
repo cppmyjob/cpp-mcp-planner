@@ -54,14 +54,14 @@ describe('DecisionService', () => {
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/decisions`);
       expect(req.request.method).toBe('GET');
-      req.flush([mockDecision]);
+      req.flush({ decisions: [mockDecision], total: 1, hasMore: false });
     });
 
     it('should filter by status', () => {
       service.list(planId, { status: 'active' }).subscribe();
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/decisions?status=active`);
-      req.flush([]);
+      req.flush({ decisions: [], total: 0, hasMore: false });
     });
   });
 

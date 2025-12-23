@@ -59,14 +59,14 @@ describe('SolutionService', () => {
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/solutions`);
       expect(req.request.method).toBe('GET');
-      req.flush([mockSolution]);
+      req.flush({ solutions: [mockSolution], total: 1, hasMore: false });
     });
 
     it('should filter by status', () => {
       service.list(planId, { status: 'selected' }).subscribe();
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/solutions?status=selected`);
-      req.flush([]);
+      req.flush({ solutions: [], total: 0, hasMore: false });
     });
   });
 

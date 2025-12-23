@@ -1,55 +1,55 @@
 <div class="decisions" data-testid="decisions-page">
-  <h2 class="decisions__title">Decisions</h2>
+  <!-- Header -->
+  <div class="decisions__header">
+    <h2 class="decisions__title">Decisions</h2>
+
+    <!-- Status Filter -->
+    <div class="decisions__filter" *ngIf="!loading() && decisions().length > 0" data-testid="decisions-filter">
+      <label class="decisions__filter-label" for="status-filter">Filter by status:</label>
+      <p-multiselect
+        inputId="status-filter"
+        [options]="statusOptions"
+        [(ngModel)]="selectedStatuses"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Select statuses"
+        [showClear]="false"
+        styleClass="decisions__filter-dropdown"
+        data-testid="status-filter-multiselect"
+      />
+    </div>
+  </div>
 
   <!-- Loading State -->
-  @if (loading()) {
-    <div class="decisions__loading" data-testid="decisions-loading">
-      <p-progressSpinner strokeWidth="4" />
-      <p class="decisions__loading-text">Loading decisions...</p>
-    </div>
-  }
+  <div class="decisions__loading" *ngIf="loading()" data-testid="decisions-loading">
+    <p-progressSpinner strokeWidth="4" />
+    <p class="decisions__loading-text">Loading decisions...</p>
+  </div>
 
   <!-- Error State -->
-  @if (error()) {
-    <div class="decisions__error" data-testid="decisions-error">
-      <p-message severity="error" [text]="error()!" />
-    </div>
-  }
+  <div class="decisions__error" *ngIf="error() && !loading()" data-testid="decisions-error">
+    <p-message severity="error" [text]="error()!" />
+  </div>
 
   <!-- Empty State -->
-  @if (!loading() && !error() && decisions().length === 0) {
-    <div class="decisions__empty" data-testid="decisions-empty">
-      <i class="pi pi-lightbulb decisions__empty-icon"></i>
-      <p class="decisions__empty-text">No decisions recorded yet.</p>
-      <p class="decisions__empty-hint">Architectural decisions (ADRs) will appear here.</p>
-    </div>
-  }
+  <div class="decisions__empty" *ngIf="!loading() && !error() && decisions().length === 0" data-testid="decisions-empty">
+    <i class="pi pi-lightbulb decisions__empty-icon"></i>
+    <p class="decisions__empty-text">No decisions found</p>
+    <p class="decisions__empty-hint">Architectural decisions (ADRs) will appear here</p>
+  </div>
 
-  <!-- Content -->
-  @if (!loading() && !error() && decisions().length > 0) {
-    <div class="decisions__content" data-testid="decisions-content">
-
-      <!-- Status Filter -->
-      <div class="decisions__filter" data-testid="decisions-filter">
-        <label for="status-filter" class="decisions__filter-label">Filter by Status:</label>
-        <p-multiselect
-          inputId="status-filter"
-          [options]="statusOptions"
-          [(ngModel)]="selectedStatuses"
-          optionLabel="label"
-          optionValue="value"
-          placeholder="Select statuses"
-          [showClear]="false"
-          styleClass="decisions__filter-select"
-          data-testid="status-filter-multiselect"
-        />
-        <span class="decisions__filter-count" data-testid="filter-count">
-          Showing {{ filteredDecisions().length }} of {{ decisions().length }} decisions
-        </span>
-      </div>
-      <p class="decisions__description">
-        Timeline of {{ filteredDecisions().length }} filtered architectural decision(s).
-      </p>
+  <!-- Content with Scroll -->
+  <div
+    class="decisions__content"
+    *ngIf="!loading() && !error() && decisions().length > 0"
+    scrollContainer
+    [enableVertical]="true"
+    [enableHorizontal]="false"
+    data-testid="decisions-content"
+  >
+    <p class="decisions__description" data-testid="filter-count">
+      Showing {{ filteredDecisions().length }} of {{ decisions().length }} architectural decisions
+    </p>
 
       <!-- Timeline -->
       <p-timeline [value]="filteredDecisions()" data-testid="decisions-timeline">
@@ -169,6 +169,5 @@
           </p-card>
         </ng-template>
       </p-timeline>
-    </div>
-  }
+  </div>
 </div>
