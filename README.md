@@ -16,12 +16,16 @@ start-dev.bat
 
 ### Linux/macOS
 ```bash
+chmod +x start-dev.sh
 ./start-dev.sh
 ```
 
 Then open http://localhost:8791 in your browser.
 
-📖 **Full setup guide:** [SETUP.md](SETUP.md)
+The startup scripts will automatically check:
+- Node.js version (18.19.1+ required for Angular 21)
+- pnpm installation (with installation instructions if missing)
+- Dependencies and build status
 
 ---
 
@@ -50,11 +54,13 @@ A plugin for Claude Code (Anthropic's AI coding assistant) that helps:
 ## Prerequisites
 
 Before installing, make sure you have:
-- **Node.js** (version 18 or higher) - download from https://nodejs.org
-- **pnpm** (recommended package manager for this monorepo)
-- **Claude Code** - the CLI tool from Anthropic
+- **Node.js** 18.19.1 or higher (required for Angular 21)
+  - Recommended: Node.js 20.11.1+ or 22.0.0+
+  - Download from https://nodejs.org
+- **pnpm** (required - this is a pnpm workspace monorepo)
+- **Claude Code** - the CLI tool from Anthropic (for MCP server usage)
 
-To check if Node.js is installed, run in terminal:
+To check if Node.js is installed:
 ```bash
 node --version
 ```
@@ -63,6 +69,8 @@ To install pnpm globally:
 ```bash
 npm install -g pnpm
 ```
+
+**Note:** The startup scripts (`start-dev.bat` / `start-dev.sh`) will automatically check these requirements and provide installation instructions if needed.
 
 ## Installation
 
@@ -77,7 +85,7 @@ pnpm install
 
 4. Build the project:
 ```bash
-npm run build
+pnpm run build
 ```
 
 After build, you should see a `dist` folder with compiled files.

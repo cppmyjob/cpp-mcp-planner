@@ -28,6 +28,48 @@ fi
 
 NODE_VERSION=$(node --version)
 echo "  Node.js version: $NODE_VERSION"
+
+# Check Node.js version (requires 18.19.1+ for Angular 21)
+NODE_VERSION_NUM=$(echo $NODE_VERSION | sed 's/v//')
+NODE_MAJOR=$(echo $NODE_VERSION_NUM | cut -d. -f1)
+NODE_MINOR=$(echo $NODE_VERSION_NUM | cut -d. -f2)
+NODE_PATCH=$(echo $NODE_VERSION_NUM | cut -d. -f3)
+
+if [ "$NODE_MAJOR" -lt 18 ]; then
+    echo ""
+    echo "========================================"
+    echo "  ERROR: Node.js version too old!"
+    echo "========================================"
+    echo ""
+    echo "This project requires Node.js 18.19.1 or higher."
+    echo "Your version: $NODE_VERSION"
+    echo ""
+    echo "Recommended versions:"
+    echo "  - Node.js 18.19.1 or higher"
+    echo "  - Node.js 20.11.1 or higher"
+    echo "  - Node.js 22.0.0 or higher"
+    echo ""
+    echo "Download from: https://nodejs.org/"
+    echo "========================================"
+    echo ""
+    exit 1
+fi
+
+if [ "$NODE_MAJOR" -eq 18 ] && [ "$NODE_MINOR" -lt 19 ]; then
+    echo ""
+    echo "========================================"
+    echo "  WARNING: Node.js version outdated!"
+    echo "========================================"
+    echo ""
+    echo "Angular 21 requires Node.js 18.19.1 or higher."
+    echo "Your version: $NODE_VERSION"
+    echo ""
+    echo "Recommended: Update to 18.19.1+ or 20.11.1+"
+    echo "Download from: https://nodejs.org/"
+    echo "========================================"
+    echo ""
+    exit 1
+fi
 echo ""
 
 # Check if pnpm is installed

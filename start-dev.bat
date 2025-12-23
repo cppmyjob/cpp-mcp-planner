@@ -31,6 +31,53 @@ if %ERRORLEVEL% neq 0 (
 REM Display Node.js version
 for /f "tokens=*" %%i in ('node --version') do set NODE_VERSION=%%i
 echo   Node.js version: %NODE_VERSION%
+
+REM Check Node.js version (requires 18.19.1+ for Angular 21)
+for /f "tokens=1,2,3 delims=.v" %%a in ("%NODE_VERSION%") do (
+    set NODE_MAJOR=%%a
+    set NODE_MINOR=%%b
+    set NODE_PATCH=%%c
+)
+
+if %NODE_MAJOR% LSS 18 (
+    echo.
+    echo ========================================
+    echo   ERROR: Node.js version too old!
+    echo ========================================
+    echo.
+    echo This project requires Node.js 18.19.1 or higher.
+    echo Your version: %NODE_VERSION%
+    echo.
+    echo Recommended versions:
+    echo   - Node.js 18.19.1 or higher
+    echo   - Node.js 20.11.1 or higher
+    echo   - Node.js 22.0.0 or higher
+    echo.
+    echo Download from: https://nodejs.org/
+    echo ========================================
+    echo.
+    pause
+    exit /b 1
+)
+
+if %NODE_MAJOR% EQU 18 (
+    if %NODE_MINOR% LSS 19 (
+        echo.
+        echo ========================================
+        echo   WARNING: Node.js version outdated!
+        echo ========================================
+        echo.
+        echo Angular 21 requires Node.js 18.19.1 or higher.
+        echo Your version: %NODE_VERSION%
+        echo.
+        echo Recommended: Update to 18.19.1+ or 20.11.1+
+        echo Download from: https://nodejs.org/
+        echo ========================================
+        echo.
+        pause
+        exit /b 1
+    )
+)
 echo.
 
 REM Check if pnpm is installed
