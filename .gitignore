@@ -48,3 +48,4 @@ PLAN.md
 # Monorepo packages build artifacts (explicit for clarity)
 packages/*/dist/
 packages/*/node_modules/
+nul
