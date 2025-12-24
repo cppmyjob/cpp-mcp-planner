@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { type Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { ApiService } from './api.service';
 import type {
@@ -9,6 +10,12 @@ import type {
   ListArtifactsParams,
   VersionHistory
 } from '../../../models';
+
+interface ArtifactsListResponse {
+  artifacts: Artifact[];
+  total: number;
+  hasMore: boolean;
+}
 
 /**
  * Service for Artifact API operations
@@ -23,9 +30,11 @@ export class ArtifactService {
    * List artifacts for plan
    */
   public list(planId: string, params?: ListArtifactsParams): Observable<Artifact[]> {
-    return this.api.get<Artifact[]>(
+    return this.api.get<ArtifactsListResponse>(
       `/plans/${planId}/artifacts`,
       params as Record<string, unknown>
+    ).pipe(
+      map(response => response.artifacts)
     );
   }
 

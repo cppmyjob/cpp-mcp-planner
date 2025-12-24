@@ -1,4 +1,192 @@
 <div class="artifacts" data-testid="artifacts-page">
-  <h2 class="artifacts__title">Artifacts</h2>
-  <p class="artifacts__description">Artifacts list and preview will appear here.</p>
+  <div class="artifacts__header">
+    <h2 class="artifacts__title">Artifacts</h2>
+    @if (!loading() && artifacts().length > 0) {
+      <div class="artifacts__filters">
+        <p-select
+          [options]="typeOptions"
+          [(ngModel)]="selectedType"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="All Types"
+          data-testid="type-filter"
+          class="artifacts__filter"
+        />
+        <p-select
+          [options]="statusOptions"
+          [(ngModel)]="selectedStatus"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="All Statuses"
+          data-testid="status-filter"
+          class="artifacts__filter"
+        />
+      </div>
+    }
+  </div>
+
+  <!-- Loading State -->
+  @if (loading()) {
+    <div class="artifacts__loading" data-testid="artifacts-loading">
+      <p-progressSpinner strokeWidth="4" />
+      <p class="artifacts__loading-text">Loading artifacts...</p>
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error() && !loading()) {
+    <div class="artifacts__error" data-testid="artifacts-error">
+      <p-message severity="error" [text]="error()!" />
+    </div>
+  }
+
+  <!-- Empty State -->
+  @if (!loading() && !error() && artifacts().length === 0) {
+    <div class="artifacts__empty" data-testid="artifacts-empty">
+      <i class="pi pi-inbox artifacts__empty-icon"></i>
+      <p class="artifacts__empty-text">No artifacts found</p>
+      <p class="artifacts__empty-hint">Artifacts will appear here when added to the plan.</p>
+    </div>
+  }
+
+  <!-- Content: Table + Preview Splitter -->
+  @if (!loading() && !error() && artifacts().length > 0) {
+    <p-splitter
+      class="artifacts__splitter"
+      [panelSizes]="[60, 40]"
+      layout="horizontal"
+      data-testid="artifacts-content"
+    >
+      <!-- Table Panel -->
+      <ng-template pTemplate>
+        <div class="artifacts__table-panel" scrollContainer [enableVertical]="true">
+          <p-table
+            [value]="filteredArtifacts()"
+            [scrollable]="true"
+            selectionMode="single"
+            dataKey="id"
+            [rowHover]="true"
+            data-testid="artifacts-table"
+          >
+            <ng-template pTemplate="header">
+              <tr>
+                <th class="artifacts__th artifacts__th--type">Type</th>
+                <th class="artifacts__th artifacts__th--title">Title</th>
+                <th class="artifacts__th artifacts__th--status">Status</th>
+                <th class="artifacts__th artifacts__th--phase">Phase</th>
+                <th class="artifacts__th artifacts__th--targets">Targets</th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-artifact>
+              <tr
+                class="artifacts__row"
+                [class.artifacts__row--selected]="selectedArtifact()?.id === artifact.id"
+                (click)="selectArtifact(artifact)"
+                [attr.data-testid]="'artifact-row-' + getArtifactId(artifact)"
+              >
+                <td class="artifacts__td artifacts__td--type">
+                  <i [class]="'pi ' + getTypeIcon(artifact.artifactType)" class="artifacts__type-icon"></i>
+                  <span class="artifacts__type-label">{{ artifact.artifactType }}</span>
+                </td>
+                <td class="artifacts__td artifacts__td--title">
+                  <span class="artifacts__title-cell">{{ artifact.title }}</span>
+                </td>
+                <td class="artifacts__td artifacts__td--status">
+                  <p-tag [value]="artifact.status" [severity]="getStatusSeverity(artifact.status)" />
+                </td>
+                <td class="artifacts__td artifacts__td--phase">
+                  {{ formatPhaseId(artifact) }}
+                </td>
+                <td class="artifacts__td artifacts__td--targets">
+                  {{ artifact.targets?.length ?? 0 }} targets
+                </td>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="5" class="artifacts__empty-row">
+                  No artifacts match current filters.
+                </td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </div>
+      </ng-template>
+
+      <!-- Preview Panel -->
+      <ng-template pTemplate>
+        <div class="artifacts__preview-panel" data-testid="artifacts-preview">
+          <!-- Empty Preview State -->
+          @if (!selectedArtifact() && !loadingContent()) {
+            <div class="artifacts__preview-empty">
+              <i class="pi pi-eye artifacts__preview-empty-icon"></i>
+              <p class="artifacts__preview-empty-text">Select an artifact to preview</p>
+            </div>
+          }
+
+          <!-- Loading Content -->
+          @if (loadingContent()) {
+            <div class="artifacts__preview-loading">
+              <p-progressSpinner strokeWidth="4" />
+            </div>
+          }
+
+          <!-- Preview Content -->
+          @if (selectedArtifact() && !loadingContent()) {
+            <div class="artifacts__preview-content">
+              <div class="artifacts__preview-header">
+                <h3 class="artifacts__preview-title">{{ selectedArtifact()!.title }}</h3>
+                <p-tag [value]="selectedArtifact()!.artifactType" />
+              </div>
+
+              @if (hasDescription(selectedArtifact()!)) {
+                <div class="artifacts__preview-description">
+                  {{ selectedArtifact()!.description }}
+                </div>
+              }
+
+              @if (hasContent(selectedArtifact()!)) {
+                <div class="artifacts__preview-code">
+                  <div class="artifacts__preview-code-header">
+                    <span class="artifacts__preview-filename">
+                      {{ selectedArtifact()!.content?.filename ?? 'source' }}
+                    </span>
+                    <p-button
+                      icon="pi pi-copy"
+                      [text]="true"
+                      (onClick)="copyCode()"
+                      pTooltip="Copy code"
+                      tooltipPosition="left"
+                    />
+                  </div>
+                  <pre class="artifacts__preview-code-block"><code>{{ selectedArtifact()!.content?.sourceCode }}</code></pre>
+                </div>
+              }
+
+              @if (hasTargets(selectedArtifact()!)) {
+                <div class="artifacts__preview-targets">
+                  <h4 class="artifacts__preview-section-title">Targets</h4>
+                  @for (target of selectedArtifact()!.targets; track target.path) {
+                    <div class="artifacts__target">
+                      <span class="artifacts__target-path">{{ target.path }}</span>
+                      <p-tag [value]="target.action" size="small" />
+                    </div>
+                  }
+                </div>
+              }
+
+              @if (selectedArtifact()!.relatedPhaseId) {
+                <div class="artifacts__preview-phase">
+                  <span class="artifacts__preview-phase-label">Related Phase:</span>
+                  <span class="artifacts__preview-phase-id">{{ selectedArtifact()!.relatedPhaseId }}</span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </ng-template>
+    </p-splitter>
+  }
+
+  <p-toast />
 </div>
