@@ -71,7 +71,7 @@
     transition: background-color 0.15s ease;
 
     &:hover {
-      background: var(--p-surface-50);
+      background: var(--app-hover-bg);
     }
 
     &--selected {

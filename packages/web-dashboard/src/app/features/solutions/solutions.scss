@@ -154,7 +154,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem 1.25rem;
-    background-color: var(--p-surface-100);
+    background-color: var(--app-card-bg);
     border-bottom: 1px solid var(--p-surface-200);
   }
 
@@ -280,7 +280,7 @@
 
   // Tradeoffs
   &__tradeoffs {
-    background-color: var(--p-surface-50);
+    background-color: var(--app-card-bg-subtle);
     padding: 1rem;
     border-radius: var(--p-border-radius);
   }
@@ -310,9 +310,10 @@
     font-size: 0.875rem;
     font-weight: 700;
     color: var(--p-primary-color);
-    background-color: var(--p-primary-50);
+    background-color: var(--app-highlight-bg);
     padding: 0.25rem 0.5rem;
     border-radius: var(--p-border-radius);
+    border: 1px solid var(--p-primary-color);
   }
 
   &__tradeoff-progress {
@@ -374,7 +375,7 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
     padding: 1rem 1.25rem;
-    background-color: var(--p-surface-50);
+    background-color: var(--app-card-bg-subtle);
     border-top: 1px solid var(--p-surface-200);
   }
 
