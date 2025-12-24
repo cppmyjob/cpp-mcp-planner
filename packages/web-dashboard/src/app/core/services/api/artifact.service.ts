@@ -17,6 +17,10 @@ interface ArtifactsListResponse {
   hasMore: boolean;
 }
 
+interface ArtifactResponse {
+  artifact: Artifact;
+}
+
 /**
  * Service for Artifact API operations
  */
@@ -46,9 +50,11 @@ export class ArtifactService {
     artifactId: string,
     options?: { includeContent?: boolean }
   ): Observable<Artifact> {
-    return this.api.get<Artifact>(
+    return this.api.get<ArtifactResponse>(
       `/plans/${planId}/artifacts/${artifactId}`,
       options as Record<string, unknown>
+    ).pipe(
+      map(response => response.artifact)
     );
   }
 

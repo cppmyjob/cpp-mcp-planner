@@ -234,7 +234,7 @@ test.describe('Artifacts Page', () => {
           const codeVisible = await codeHeader.isVisible().catch(() => false);
 
           if (codeVisible) {
-            const copyButton = codeHeader.locator('button, p-button');
+            const copyButton = codeHeader.locator('p-button').first();
             await expect(copyButton).toBeVisible();
           }
         }
