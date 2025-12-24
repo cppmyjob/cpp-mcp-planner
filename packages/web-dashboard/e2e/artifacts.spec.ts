@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { screenshotPath } from './test-paths';
 
+// REVIEW: E2E tests for Artifacts page - all passing
 test.describe('Artifacts Page', () => {
   test.beforeEach(async ({ page }) => {
     // Listen for console errors

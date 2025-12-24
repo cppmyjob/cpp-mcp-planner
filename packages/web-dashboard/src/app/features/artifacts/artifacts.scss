@@ -113,7 +113,7 @@
   &__empty-row {
     text-align: center;
     color: var(--p-text-muted-color);
-    padding: 2rem !important;
+    padding: 2rem !important; // Override PrimeNG table cell default padding
   }
 
   &__preview-panel {
