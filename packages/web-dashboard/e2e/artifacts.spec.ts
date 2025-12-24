@@ -25,12 +25,14 @@ test.describe('Artifacts Page', () => {
     });
 
     test('should display filter controls when artifacts exist', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
+      // Wait for content to load - either table, empty, or error state
       const content = page.locator('[data-testid="artifacts-content"]');
-      const contentVisible = await content.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
+      const error = page.locator('[data-testid="artifacts-error"]');
 
-      if (contentVisible) {
+      await content.or(empty).or(error).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await content.isVisible()) {
         const typeFilter = page.locator('[data-testid="type-filter"]');
         const statusFilter = page.locator('[data-testid="status-filter"]');
         await expect(typeFilter).toBeVisible();
@@ -54,26 +56,27 @@ test.describe('Artifacts Page', () => {
 
   test.describe('Content Display', () => {
     test('should display table or empty state', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
       const empty = page.locator('[data-testid="artifacts-empty"]');
       const error = page.locator('[data-testid="artifacts-error"]');
 
-      const tableVisible = await table.isVisible().catch(() => false);
-      const emptyVisible = await empty.isVisible().catch(() => false);
-      const errorVisible = await error.isVisible().catch(() => false);
+      // Wait for one of the states to be visible
+      await table.or(empty).or(error).waitFor({ state: 'visible', timeout: 5000 });
+
+      const tableVisible = await table.isVisible();
+      const emptyVisible = await empty.isVisible();
+      const errorVisible = await error.isVisible();
 
       expect(tableVisible || emptyVisible || errorVisible).toBe(true);
     });
 
     test('should display artifact rows with proper structure', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
-      const tableVisible = await table.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (tableVisible) {
+      await table.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await table.isVisible()) {
         const rows = table.locator('tbody tr');
         const rowCount = await rows.count();
 
@@ -89,12 +92,12 @@ test.describe('Artifacts Page', () => {
     });
 
     test('should display type icons in first column', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
-      const tableVisible = await table.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (tableVisible) {
+      await table.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await table.isVisible()) {
         const typeIcons = table.locator('.artifacts__type-icon');
         const iconCount = await typeIcons.count();
 
@@ -112,12 +115,12 @@ test.describe('Artifacts Page', () => {
     });
 
     test('should display status tags', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
-      const tableVisible = await table.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (tableVisible) {
+      await table.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await table.isVisible()) {
         const statusTags = table.locator('p-tag');
         const tagCount = await statusTags.count();
 
@@ -130,38 +133,40 @@ test.describe('Artifacts Page', () => {
 
   test.describe('Preview Panel', () => {
     test('should show empty preview initially', async ({ page }) => {
-      await page.waitForTimeout(1000);
+      const content = page.locator('[data-testid="artifacts-content"]');
+      const empty = page.locator('[data-testid="artifacts-empty"]');
+
+      await content.or(empty).waitFor({ state: 'visible', timeout: 5000 });
 
       const preview = page.locator('[data-testid="artifacts-preview"]');
-      const previewVisible = await preview.isVisible().catch(() => false);
-
-      if (previewVisible) {
+      if (await preview.isVisible()) {
         const emptyPreview = preview.locator('.artifacts__preview-empty');
         await expect(emptyPreview).toBeVisible();
       }
     });
 
     test('should show preview when artifact selected', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
-      const tableVisible = await table.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (tableVisible) {
+      await table.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await table.isVisible()) {
         const rows = table.locator('tbody tr');
         const rowCount = await rows.count();
 
         if (rowCount > 0) {
           // Click first row
           await rows.first().click();
-          await page.waitForTimeout(500);
 
-          // Preview should show content
+          // Wait for preview content or loading state
           const previewContent = page.locator('.artifacts__preview-content');
           const previewLoading = page.locator('.artifacts__preview-loading');
 
-          const hasContent = await previewContent.isVisible().catch(() => false);
-          const isLoading = await previewLoading.isVisible().catch(() => false);
+          await previewContent.or(previewLoading).waitFor({ state: 'visible', timeout: 5000 });
+
+          const hasContent = await previewContent.isVisible();
+          const isLoading = await previewLoading.isVisible();
 
           expect(hasContent || isLoading).toBe(true);
         }
@@ -169,23 +174,24 @@ test.describe('Artifacts Page', () => {
     });
 
     test('should display artifact title in preview', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
-      const tableVisible = await table.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (tableVisible) {
+      await table.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await table.isVisible()) {
         const rows = table.locator('tbody tr');
         const rowCount = await rows.count();
 
         if (rowCount > 0) {
           await rows.first().click();
-          await page.waitForTimeout(1000);
+
+          // Wait for preview content to load
+          const previewContent = page.locator('.artifacts__preview-content');
+          await previewContent.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
           const previewTitle = page.locator('.artifacts__preview-title');
-          const titleVisible = await previewTitle.isVisible().catch(() => false);
-
-          if (titleVisible) {
+          if (await previewTitle.isVisible()) {
             const text = await previewTitle.textContent();
             expect(text?.length).toBeGreaterThan(0);
           }
@@ -194,21 +200,24 @@ test.describe('Artifacts Page', () => {
     });
 
     test('should display code block when artifact has content', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
-      const tableVisible = await table.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (tableVisible) {
+      await table.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await table.isVisible()) {
         const rows = table.locator('tbody tr');
         const rowCount = await rows.count();
 
         if (rowCount > 0) {
           await rows.first().click();
-          await page.waitForTimeout(1500);
+
+          // Wait for preview to load
+          const previewContent = page.locator('.artifacts__preview-content');
+          await previewContent.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
           const codeBlock = page.locator('.artifacts__preview-code-block');
-          const codeVisible = await codeBlock.isVisible().catch(() => false);
+          const codeVisible = await codeBlock.isVisible();
 
           // Code block may or may not be visible depending on artifact content
           expect(typeof codeVisible).toBe('boolean');
@@ -217,23 +226,24 @@ test.describe('Artifacts Page', () => {
     });
 
     test('should have copy button in code preview', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
-      const tableVisible = await table.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (tableVisible) {
+      await table.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await table.isVisible()) {
         const rows = table.locator('tbody tr');
         const rowCount = await rows.count();
 
         if (rowCount > 0) {
           await rows.first().click();
-          await page.waitForTimeout(1500);
+
+          // Wait for preview to load
+          const previewContent = page.locator('.artifacts__preview-content');
+          await previewContent.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
           const codeHeader = page.locator('.artifacts__preview-code-header');
-          const codeVisible = await codeHeader.isVisible().catch(() => false);
-
-          if (codeVisible) {
+          if (await codeHeader.isVisible()) {
             const copyButton = codeHeader.locator('p-button').first();
             await expect(copyButton).toBeVisible();
           }
@@ -244,23 +254,26 @@ test.describe('Artifacts Page', () => {
 
   test.describe('Filters', () => {
     test('should filter by artifact type', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const content = page.locator('[data-testid="artifacts-content"]');
-      const contentVisible = await content.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (contentVisible) {
+      await content.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await content.isVisible()) {
         const typeFilter = page.locator('[data-testid="type-filter"]');
         await typeFilter.click();
-        await page.waitForTimeout(300);
+
+        // Wait for dropdown options to appear
+        const options = page.locator('.p-select-option');
+        await options.first().waitFor({ state: 'visible', timeout: 3000 });
 
         // Select "Code" option if available
-        const codeOption = page.locator('.p-select-option').filter({ hasText: 'Code' }).first();
-        const codeVisible = await codeOption.isVisible().catch(() => false);
-
-        if (codeVisible) {
+        const codeOption = options.filter({ hasText: 'Code' }).first();
+        if (await codeOption.isVisible()) {
           await codeOption.click();
-          await page.waitForTimeout(300);
+
+          // Wait for filter to apply
+          await page.waitForLoadState('networkidle');
 
           // All visible rows should have type "code"
           const typeLabels = page.locator('.artifacts__type-label');
@@ -277,23 +290,26 @@ test.describe('Artifacts Page', () => {
     });
 
     test('should filter by status', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const content = page.locator('[data-testid="artifacts-content"]');
-      const contentVisible = await content.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (contentVisible) {
+      await content.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await content.isVisible()) {
         const statusFilter = page.locator('[data-testid="status-filter"]');
         await statusFilter.click();
-        await page.waitForTimeout(300);
+
+        // Wait for dropdown options to appear
+        const options = page.locator('.p-select-option');
+        await options.first().waitFor({ state: 'visible', timeout: 3000 });
 
         // Select "Draft" option if available
-        const draftOption = page.locator('.p-select-option').filter({ hasText: 'Draft' }).first();
-        const draftVisible = await draftOption.isVisible().catch(() => false);
-
-        if (draftVisible) {
+        const draftOption = options.filter({ hasText: 'Draft' }).first();
+        if (await draftOption.isVisible()) {
           await draftOption.click();
-          await page.waitForTimeout(300);
+
+          // Wait for filter to apply
+          await page.waitForLoadState('networkidle');
 
           // All visible status tags should be "draft"
           const statusTags = page.locator('[data-testid="artifacts-table"] p-tag');
@@ -310,23 +326,26 @@ test.describe('Artifacts Page', () => {
     });
 
     test('should reset filter when selecting "All" option', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const content = page.locator('[data-testid="artifacts-content"]');
-      const contentVisible = await content.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (contentVisible) {
+      await content.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await content.isVisible()) {
         const typeFilter = page.locator('[data-testid="type-filter"]');
         await typeFilter.click();
-        await page.waitForTimeout(300);
+
+        // Wait for dropdown options to appear
+        const options = page.locator('.p-select-option');
+        await options.first().waitFor({ state: 'visible', timeout: 3000 });
 
         // Select "All Types" option
-        const allOption = page.locator('.p-select-option').filter({ hasText: 'All Types' }).first();
-        const allVisible = await allOption.isVisible().catch(() => false);
-
-        if (allVisible) {
+        const allOption = options.filter({ hasText: 'All Types' }).first();
+        if (await allOption.isVisible()) {
           await allOption.click();
-          await page.waitForTimeout(300);
+
+          // Wait for filter to apply
+          await page.waitForLoadState('networkidle');
 
           // Should show all artifacts
           const rows = page.locator('[data-testid="artifacts-table"] tbody tr');
@@ -338,12 +357,12 @@ test.describe('Artifacts Page', () => {
 
   test.describe('Targets Display', () => {
     test('should display target count in table', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
-      const tableVisible = await table.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (tableVisible) {
+      await table.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await table.isVisible()) {
         const rows = table.locator('tbody tr');
         const rowCount = await rows.count();
 
@@ -357,21 +376,24 @@ test.describe('Artifacts Page', () => {
     });
 
     test('should display targets list in preview', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
-      const tableVisible = await table.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (tableVisible) {
+      await table.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await table.isVisible()) {
         const rows = table.locator('tbody tr');
         const rowCount = await rows.count();
 
         if (rowCount > 0) {
           await rows.first().click();
-          await page.waitForTimeout(1500);
+
+          // Wait for preview to load
+          const previewContent = page.locator('.artifacts__preview-content');
+          await previewContent.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
           const targetsSection = page.locator('.artifacts__preview-targets');
-          const targetsVisible = await targetsSection.isVisible().catch(() => false);
+          const targetsVisible = await targetsSection.isVisible();
 
           // Targets section may or may not exist depending on artifact
           expect(typeof targetsVisible).toBe('boolean');
@@ -382,7 +404,12 @@ test.describe('Artifacts Page', () => {
 
   test.describe('Visual Regression', () => {
     test('should match full page screenshot', async ({ page }) => {
-      await page.waitForTimeout(1500);
+      // Wait for content to fully load
+      const content = page.locator('[data-testid="artifacts-content"]');
+      const empty = page.locator('[data-testid="artifacts-empty"]');
+      const error = page.locator('[data-testid="artifacts-error"]');
+
+      await content.or(empty).or(error).waitFor({ state: 'visible', timeout: 5000 });
 
       await page.screenshot({
         path: screenshotPath('artifacts-full-page.png'),
@@ -393,12 +420,12 @@ test.describe('Artifacts Page', () => {
     });
 
     test('should match table screenshot', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
-      const tableVisible = await table.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (tableVisible) {
+      await table.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await table.isVisible()) {
         await table.screenshot({
           path: screenshotPath('artifacts-table.png')
         });
@@ -408,18 +435,21 @@ test.describe('Artifacts Page', () => {
     });
 
     test('should match preview screenshot with content', async ({ page }) => {
-      await page.waitForTimeout(1000);
-
       const table = page.locator('[data-testid="artifacts-table"]');
-      const tableVisible = await table.isVisible().catch(() => false);
+      const empty = page.locator('[data-testid="artifacts-empty"]');
 
-      if (tableVisible) {
+      await table.or(empty).waitFor({ state: 'visible', timeout: 5000 });
+
+      if (await table.isVisible()) {
         const rows = table.locator('tbody tr');
         const rowCount = await rows.count();
 
         if (rowCount > 0) {
           await rows.first().click();
-          await page.waitForTimeout(1500);
+
+          // Wait for preview to load
+          const previewContent = page.locator('.artifacts__preview-content');
+          await previewContent.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
           const preview = page.locator('[data-testid="artifacts-preview"]');
           await preview.screenshot({

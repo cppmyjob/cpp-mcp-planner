@@ -35,35 +35,35 @@ describe('ArtifactsComponent', () => {
   });
 
   describe('Initial State', () => {
-    it('RED: should have loading signal initially true', () => {
+    it('should have loading signal initially true', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.loading()).toBe(true);
     });
 
-    it('RED: should have empty artifacts array initially', () => {
+    it('should have empty artifacts array initially', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.artifacts()).toEqual([]);
     });
 
-    it('RED: should have null error initially', () => {
+    it('should have null error initially', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.error()).toBeNull();
     });
 
-    it('RED: should have null selectedArtifact initially', () => {
+    it('should have null selectedArtifact initially', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.selectedArtifact()).toBeNull();
     });
 
-    it('RED: should have loadingContent signal initially false', () => {
+    it('should have loadingContent signal initially false', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -72,14 +72,14 @@ describe('ArtifactsComponent', () => {
   });
 
   describe('Filter State', () => {
-    it('RED: should have null selectedType initially', () => {
+    it('should have null selectedType initially', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.selectedType()).toBeNull();
     });
 
-    it('RED: should have null selectedStatus initially', () => {
+    it('should have null selectedStatus initially', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -88,7 +88,7 @@ describe('ArtifactsComponent', () => {
   });
 
   describe('Filtering', () => {
-    it('RED: should have filteredArtifacts computed signal', () => {
+    it('should have filteredArtifacts computed signal', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -96,7 +96,7 @@ describe('ArtifactsComponent', () => {
       expect(typeof component.filteredArtifacts).toBe('function');
     });
 
-    it('RED: should filter artifacts by type', () => {
+    it('should filter artifacts by type', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -114,7 +114,7 @@ describe('ArtifactsComponent', () => {
       expect(filtered.every(a => a.artifactType === 'code')).toBe(true);
     });
 
-    it('RED: should filter artifacts by status', () => {
+    it('should filter artifacts by status', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -132,7 +132,7 @@ describe('ArtifactsComponent', () => {
       expect(filtered.every(a => a.status === 'draft')).toBe(true);
     });
 
-    it('RED: should filter artifacts by both type and status', () => {
+    it('should filter artifacts by both type and status', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -151,7 +151,7 @@ describe('ArtifactsComponent', () => {
       expect(filtered[0].id).toBe('art-1');
     });
 
-    it('RED: should return all artifacts when no filter selected', () => {
+    it('should return all artifacts when no filter selected', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -170,7 +170,7 @@ describe('ArtifactsComponent', () => {
   });
 
   describe('Helper Methods', () => {
-    it('RED: should generate short artifact ID from UUID', () => {
+    it('should generate short artifact ID from UUID', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -178,35 +178,35 @@ describe('ArtifactsComponent', () => {
       expect(component.getArtifactId(mockArtifact)).toBe('ART-ABC');
     });
 
-    it('RED: should return success severity for implemented status', () => {
+    it('should return success severity for implemented status', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.getStatusSeverity('implemented' as ArtifactStatus)).toBe('success');
     });
 
-    it('RED: should return info severity for approved status', () => {
+    it('should return info severity for approved status', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.getStatusSeverity('approved' as ArtifactStatus)).toBe('info');
     });
 
-    it('RED: should return info severity for reviewed status', () => {
+    it('should return info severity for reviewed status', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.getStatusSeverity('reviewed' as ArtifactStatus)).toBe('info');
     });
 
-    it('RED: should return secondary severity for draft status', () => {
+    it('should return secondary severity for draft status', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.getStatusSeverity('draft' as ArtifactStatus)).toBe('secondary');
     });
 
-    it('RED: should return warn severity for outdated status', () => {
+    it('should return warn severity for outdated status', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -215,49 +215,49 @@ describe('ArtifactsComponent', () => {
   });
 
   describe('Type Icons', () => {
-    it('RED: should return pi-code icon for code type', () => {
+    it('should return pi-code icon for code type', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.getTypeIcon('code' as ArtifactType)).toBe('pi-code');
     });
 
-    it('RED: should return pi-cog icon for config type', () => {
+    it('should return pi-cog icon for config type', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.getTypeIcon('config' as ArtifactType)).toBe('pi-cog');
     });
 
-    it('RED: should return pi-database icon for migration type', () => {
+    it('should return pi-database icon for migration type', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.getTypeIcon('migration' as ArtifactType)).toBe('pi-database');
     });
 
-    it('RED: should return pi-file icon for documentation type', () => {
+    it('should return pi-file icon for documentation type', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.getTypeIcon('documentation' as ArtifactType)).toBe('pi-file');
     });
 
-    it('RED: should return pi-check-circle icon for test type', () => {
+    it('should return pi-check-circle icon for test type', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.getTypeIcon('test' as ArtifactType)).toBe('pi-check-circle');
     });
 
-    it('RED: should return pi-bolt icon for script type', () => {
+    it('should return pi-bolt icon for script type', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
       expect(component.getTypeIcon('script' as ArtifactType)).toBe('pi-bolt');
     });
 
-    it('RED: should return pi-folder icon for other type', () => {
+    it('should return pi-folder icon for other type', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -266,7 +266,7 @@ describe('ArtifactsComponent', () => {
   });
 
   describe('Filter Options', () => {
-    it('RED: should have typeOptions array with all types', () => {
+    it('should have typeOptions array with all types', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -277,7 +277,7 @@ describe('ArtifactsComponent', () => {
       expect(component.typeOptions.some(o => o.value === 'config')).toBe(true);
     });
 
-    it('RED: should have statusOptions array with all statuses', () => {
+    it('should have statusOptions array with all statuses', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -290,7 +290,7 @@ describe('ArtifactsComponent', () => {
   });
 
   describe('Selection', () => {
-    it('RED: should have selectArtifact method', () => {
+    it('should have selectArtifact method', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -298,7 +298,7 @@ describe('ArtifactsComponent', () => {
       expect(typeof component.selectArtifact).toBe('function');
     });
 
-    it('RED: should deselect when clicking same artifact', () => {
+    it('should deselect when clicking same artifact', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -312,7 +312,7 @@ describe('ArtifactsComponent', () => {
   });
 
   describe('Code Preview Helpers', () => {
-    it('RED: should check if artifact has content', () => {
+    it('should check if artifact has content', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -325,7 +325,7 @@ describe('ArtifactsComponent', () => {
       expect(component.hasContent(emptyContent)).toBe(false);
     });
 
-    it('RED: should check if artifact has targets', () => {
+    it('should check if artifact has targets', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -338,7 +338,7 @@ describe('ArtifactsComponent', () => {
       expect(component.hasTargets(noTargets)).toBe(false);
     });
 
-    it('RED: should check if artifact has description', () => {
+    it('should check if artifact has description', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -353,7 +353,7 @@ describe('ArtifactsComponent', () => {
   });
 
   describe('Phase Display', () => {
-    it('RED: should format phase ID for display', () => {
+    it('should format phase ID for display', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 
@@ -361,7 +361,7 @@ describe('ArtifactsComponent', () => {
       expect(component.formatPhaseId(mockArtifact)).toBe('abc1');
     });
 
-    it('RED: should return dash when no phase', () => {
+    it('should return dash when no phase', () => {
       const fixture = TestBed.createComponent(ArtifactsComponent);
       const component = fixture.componentInstance;
 

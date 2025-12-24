@@ -53,14 +53,14 @@ describe('ArtifactService', () => {
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/artifacts`);
       expect(req.request.method).toBe('GET');
-      req.flush([mockArtifact]);
+      req.flush({ artifacts: [mockArtifact], total: 1, hasMore: false });
     });
 
     it('should filter by artifactType', () => {
       service.list(planId, { artifactType: 'code' }).subscribe();
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/artifacts?artifactType=code`);
-      req.flush([]);
+      req.flush({ artifacts: [], total: 0, hasMore: false });
     });
   });
 
@@ -72,14 +72,14 @@ describe('ArtifactService', () => {
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/artifacts/art-1`);
       expect(req.request.method).toBe('GET');
-      req.flush(mockArtifact);
+      req.flush({ artifact: mockArtifact });
     });
 
     it('should include content when requested', () => {
       service.get(planId, 'art-1', { includeContent: true }).subscribe();
 
       const req = httpMock.expectOne(`${baseUrl}/plans/${planId}/artifacts/art-1?includeContent=true`);
-      req.flush(mockArtifact);
+      req.flush({ artifact: mockArtifact });
     });
   });
 

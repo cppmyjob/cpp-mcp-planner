@@ -212,6 +212,7 @@
     white-space: pre;
     overflow-y: auto;
 
+    // Exception: bare `code` selector - reset browser defaults for nested <code> element
     code {
       color: inherit;
       background: transparent;

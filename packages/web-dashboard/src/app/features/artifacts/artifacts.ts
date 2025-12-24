@@ -1,5 +1,4 @@
-import { Component, ViewEncapsulation, signal, computed, effect, inject, type OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, ViewEncapsulation, signal, computed, effect, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
@@ -24,7 +23,6 @@ interface SelectOption {
 @Component({
   selector: 'app-artifacts',
   imports: [
-    CommonModule,
     FormsModule,
     TableModule,
     TagModule,
@@ -42,7 +40,7 @@ interface SelectOption {
   styleUrl: './artifacts.scss',
   encapsulation: ViewEncapsulation.None
 })
-export class ArtifactsComponent implements OnInit {
+export class ArtifactsComponent {
   // State signals
   public readonly loading = signal(true);
   public readonly error = signal<string | null>(null);
@@ -108,10 +106,6 @@ export class ArtifactsComponent implements OnInit {
         this.selectedArtifact.set(null);
       }
     });
-  }
-
-  public ngOnInit(): void {
-    // Initial load handled by effect
   }
 
   // Selection with lazy-load content
