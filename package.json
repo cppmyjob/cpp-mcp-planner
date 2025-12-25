@@ -7,9 +7,6 @@
   "workspaces": [
     "packages/*"
   ],
-  "bin": {
-    "mcp-planning-server": "./packages/mcp-server/dist/cli.js"
-  },
   "scripts": {
     "build": "tsc --build",
     "build:config": "npm run build -w @mcp-planner/config",
