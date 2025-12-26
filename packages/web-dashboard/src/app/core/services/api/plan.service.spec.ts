@@ -14,6 +14,7 @@ describe('PlanService', () => {
 
   const mockPlan: PlanManifest = {
     id: 'plan-1',
+    projectId: 'test-project',
     name: 'Test Plan',
     description: 'Test description',
     status: 'active',

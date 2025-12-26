@@ -8,14 +8,16 @@
  * - Unified cache configuration
  */
 
-import type { Repository, LinkRepository, UnitOfWork, PlanRepository, StorageBackend } from '../../domain/repositories/interfaces.js';
+import type { Repository, LinkRepository, UnitOfWork, PlanRepository, ConfigRepository, StorageBackend } from '../../domain/repositories/interfaces.js';
 import type { Entity, EntityType } from '../../domain/entities/types.js';
 import { FileRepository } from '../repositories/file/file-repository.js';
 import { FileLinkRepository } from '../repositories/file/file-link-repository.js';
 import { FileUnitOfWork } from '../repositories/file/file-unit-of-work.js';
 import { FilePlanRepository } from '../repositories/file/file-plan-repository.js';
+import { FileConfigRepository } from '../repositories/file/file-config-repository.js';
 import type { FileLockManager } from '../repositories/file/file-lock-manager.js';
 import type { CacheOptions } from '../repositories/file/types.js';
+import { isValidProjectId } from '../../domain/services/validators.js';
 
 /**
  * Configuration for RepositoryFactory initialization
@@ -43,6 +45,9 @@ export interface RepositoryFactoryConfig {
 
   /** Base directory for file storage */
   baseDir: string;
+
+  /** Project ID for plan storage isolation */
+  projectId: string;
 
   /** Shared FileLockManager instance for cross-process safety */
   lockManager: FileLockManager;
@@ -105,6 +110,7 @@ export class FileRepositoryFactory {
   private readonly linkRepositoryCache = new Map<string, LinkRepository>();
   private readonly uowCache = new Map<string, UnitOfWork>();
   private planRepository?: PlanRepository;
+  private configRepository?: ConfigRepository;
 
   constructor(config: RepositoryFactoryConfig) {
     // Runtime validation for config parameter (TypeScript types don't prevent null/undefined at runtime)
@@ -116,6 +122,17 @@ export class FileRepositoryFactory {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (config.type !== 'file') {
       throw new Error(`Unsupported storage type: ${String(config.type)}. Only 'file' is currently supported.`);
+    }
+
+    // Validate projectId
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (config.projectId === undefined || config.projectId === null || typeof config.projectId !== 'string') {
+      throw new Error('projectId is required in factory config');
+    }
+
+    // Allow __legacy__ for read-only access to old plans
+    if (config.projectId !== '__legacy__' && !isValidProjectId(config.projectId)) {
+      throw new Error(`Invalid projectId in factory config: "${config.projectId}"`);
     }
 
     this.config = config;
@@ -159,6 +176,7 @@ export class FileRepositoryFactory {
     // Create new repository
     const repository = new FileRepository<T>(
       this.config.baseDir,
+      this.config.projectId,
       planId,
       entityType,
       this.config.cacheOptions,
@@ -208,6 +226,7 @@ export class FileRepositoryFactory {
     // Factory pattern ensures shared lock manager across all repositories for cross-process safety.
     const linkRepo = new FileLinkRepository(
       this.config.baseDir,
+      this.config.projectId,
       planId,
       this.config.lockManager, // Required - factory provides shared instance
       this.config.cacheOptions
@@ -240,10 +259,38 @@ export class FileRepositoryFactory {
       return this.planRepository;
     }
 
-    // Create new PlanRepository
-    this.planRepository = new FilePlanRepository(this.config.baseDir);
+    // Create new PlanRepository with projectId from config
+    this.planRepository = new FilePlanRepository(this.config.baseDir, this.config.projectId);
 
     return this.planRepository;
+  }
+
+  /**
+   * Create or retrieve cached Config Repository
+   *
+   * Returns singleton instance - only one ConfigRepository per factory.
+   * Repository is lazily initialized - call configRepo.initialize() before use.
+   *
+   * @returns ConfigRepository instance (cached if already created)
+   *
+   * @example
+   * ```typescript
+   * const configRepo = factory.createConfigRepository();
+   * await configRepo.initialize();
+   *
+   * const config = await configRepo.loadConfig('/path/to/workspace');
+   * await configRepo.saveConfig('/path/to/workspace', { projectId: 'my-project' });
+   * ```
+   */
+  public createConfigRepository(): ConfigRepository {
+    if (this.configRepository !== undefined) {
+      return this.configRepository;
+    }
+
+    // Create new ConfigRepository
+    this.configRepository = new FileConfigRepository();
+
+    return this.configRepository;
   }
 
   /**
@@ -285,6 +332,7 @@ export class FileRepositoryFactory {
     // Create new UoW
     const uow = new FileUnitOfWork(
       this.config.baseDir,
+      this.config.projectId,
       planId,
       this.config.lockManager,
       this.config.cacheOptions
@@ -346,6 +394,12 @@ export class FileRepositoryFactory {
     }
     this.planRepository = undefined;
 
+    // Dispose config repository if exists
+    if (this.configRepository && 'close' in this.configRepository && typeof this.configRepository.close === 'function') {
+      await this.configRepository.close();
+    }
+    this.configRepository = undefined;
+
     // DO NOT dispose shared lock manager - caller owns it
     // The FileLockManager is injected via constructor and should be disposed by the caller
   }
@@ -355,6 +409,14 @@ export class FileRepositoryFactory {
    */
   public getBackend(): StorageBackend {
     return this.config.type as StorageBackend;
+  }
+
+  /**
+   * Get projectId from factory configuration
+   * @returns The projectId configured for this factory
+   */
+  public getProjectId(): string {
+    return this.config.projectId;
   }
 
   /**

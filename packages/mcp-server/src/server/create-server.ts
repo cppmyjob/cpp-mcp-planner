@@ -19,6 +19,9 @@ import {
   queryToolDescription,
   batchSchema,
   batchToolDescription,
+  // GREEN: Phase 4.14 - Import project schema
+  projectSchema,
+  projectToolDescription,
 } from './schemas/index.js';
 import {
   handlePlan,
@@ -30,6 +33,8 @@ import {
   handleLink,
   handleQuery,
   handleBatch,
+  // GREEN: Phase 4.14 - Import project handler
+  handleProject,
 } from './handlers/index.js';
 
 export interface McpServerResult {
@@ -43,7 +48,7 @@ export function createMcpServer(services: Services): McpServerResult {
     version: '1.0.0',
   });
 
-  // Register all 9 tools with Zod schemas
+  // Register all 10 tools with Zod schemas
   // BUG FIX: Remove try-catch blocks to allow errors to propagate naturally to MCP SDK
   server.registerTool('plan', { description: planToolDescription, inputSchema: planSchema }, async (args) => {
     return await handlePlan(args as unknown as { action: string; [key: string]: unknown }, services);
@@ -79,6 +84,11 @@ export function createMcpServer(services: Services): McpServerResult {
 
   server.registerTool('batch', { description: batchToolDescription, inputSchema: batchSchema }, async (args) => {
     return await handleBatch(args as unknown as { planId: string; operations: unknown[] }, services);
+  });
+
+  // GREEN: Phase 4.14 - Register project tool
+  server.registerTool('project', { description: projectToolDescription, inputSchema: projectSchema }, async (args) => {
+    return await handleProject(args as unknown as { action: string; [key: string]: unknown }, services);
   });
 
   return { server, services };

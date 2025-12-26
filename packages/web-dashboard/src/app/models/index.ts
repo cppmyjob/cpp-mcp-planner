@@ -7,6 +7,7 @@
 export * from './common.model';
 
 // Entity models
+export * from './project.model';
 export * from './plan.model';
 export * from './requirement.model';
 export * from './solution.model';

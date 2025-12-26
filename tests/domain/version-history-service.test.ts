@@ -55,6 +55,7 @@ describe('Version History Service (Sprint 7)', () => {
     repositoryFactory = new FileRepositoryFactory({
       type: 'file',
       baseDir: testDir,
+      projectId: 'test-project',
       lockManager,
       cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
     });

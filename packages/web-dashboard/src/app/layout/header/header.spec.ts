@@ -3,8 +3,8 @@ import { signal } from '@angular/core';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { HeaderComponent } from './header';
-import { PlanService, PlanStateService } from '../../core/services';
-import type { PlanManifest } from '../../models';
+import { PlanService, PlanStateService, ProjectService, ProjectStateService } from '../../core/services';
+import type { PlanManifest, ProjectInfo } from '../../models';
 
 // Mock window.matchMedia for ThemeService
 Object.defineProperty(window, 'matchMedia', {
@@ -22,9 +22,21 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 describe('HeaderComponent', () => {
+  const mockProjects: ProjectInfo[] = [
+    {
+      id: 'test-project',
+      name: 'Test Project',
+      path: '/test/path',
+      plansCount: 2,
+      createdAt: '2025-01-01T00:00:00Z',
+      updatedAt: '2025-01-01T00:00:00Z'
+    }
+  ];
+
   const mockPlans: PlanManifest[] = [
     {
       id: 'plan-1',
+      projectId: 'test-project',
       name: 'Test Plan 1',
       description: 'Description 1',
       status: 'active',
@@ -44,6 +56,7 @@ describe('HeaderComponent', () => {
     },
     {
       id: 'plan-2',
+      projectId: 'test-project',
       name: 'Test Plan 2',
       description: 'Description 2',
       status: 'active',
@@ -63,8 +76,22 @@ describe('HeaderComponent', () => {
     }
   ];
 
+  const mockProjectService = {
+    list: vi.fn(() => of(mockProjects))
+  };
+
   const mockPlanService = {
     list: vi.fn(() => of(mockPlans))
+  };
+
+  const activeProjectIdSignal = signal('test-project');
+  const mockProjectStateService = {
+    activeProjectId: activeProjectIdSignal.asReadonly(),
+    setActiveProject: vi.fn((projectId: string) => {
+      activeProjectIdSignal.set(projectId);
+    }),
+    clearActiveProject: vi.fn(),
+    hasActiveProject: vi.fn(() => true)
   };
 
   const activePlanIdSignal = signal('plan-1');
@@ -79,11 +106,14 @@ describe('HeaderComponent', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    activeProjectIdSignal.set('test-project');
     activePlanIdSignal.set('plan-1');
 
     await TestBed.configureTestingModule({
       imports: [HeaderComponent],
       providers: [
+        { provide: ProjectService, useValue: mockProjectService },
+        { provide: ProjectStateService, useValue: mockProjectStateService },
         { provide: PlanService, useValue: mockPlanService },
         { provide: PlanStateService, useValue: mockPlanStateService }
       ]
@@ -161,7 +191,7 @@ describe('HeaderComponent', () => {
 
       expect(mockPlanService.list).toHaveBeenCalled();
       expect(component.plans()).toEqual(mockPlans);
-      expect(component.loading()).toBe(false);
+      expect(component.loadingPlans()).toBe(false);
     });
 
     it('RED: should display plan selector dropdown in header', () => {
@@ -205,7 +235,7 @@ describe('HeaderComponent', () => {
       fixture.detectChanges(); // Trigger ngOnInit
 
       // After plans loaded, loading should be false
-      expect(component.loading()).toBe(false);
+      expect(component.loadingPlans()).toBe(false);
       expect(component.plans().length).toBeGreaterThan(0);
     });
 
@@ -217,7 +247,7 @@ describe('HeaderComponent', () => {
 
       fixture.detectChanges();
 
-      expect(component.loading()).toBe(false);
+      expect(component.loadingPlans()).toBe(false);
       expect(component.plans()).toEqual([]);
     });
 

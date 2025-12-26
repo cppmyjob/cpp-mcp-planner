@@ -9,6 +9,8 @@ import { handleArtifact } from './artifact-handler.js';
 import { handleLink } from './link-handler.js';
 import { handleQuery } from './query-handler.js';
 import { handleBatch } from './batch-handler.js';
+// GREEN: Phase 4.14 - Import project handler
+import { handleProject } from './project-handler.js';
 
 // Re-export types and utilities
 export { ToolError, createSuccessResponse, type ToolResult, type HandlerFn } from './types.js';
@@ -23,6 +25,8 @@ export { handleArtifact } from './artifact-handler.js';
 export { handleLink } from './link-handler.js';
 export { handleQuery } from './query-handler.js';
 export { handleBatch } from './batch-handler.js';
+// GREEN: Phase 4.14 - Export project handler
+export { handleProject } from './project-handler.js';
 
 // Unified handleToolCall for backward compatibility with tests
 export async function handleToolCall(
@@ -50,6 +54,9 @@ export async function handleToolCall(
         return await handleQuery(args as { action: string; [key: string]: unknown }, services);
       case 'batch':
         return await handleBatch(args as { planId: string; operations: unknown[] }, services);
+      // GREEN: Phase 4.14 - Add project handler
+      case 'project':
+        return await handleProject(args as { action: string; [key: string]: unknown }, services);
       default:
         throw new ToolError('MethodNotFound', `Unknown tool: ${name}`);
     }

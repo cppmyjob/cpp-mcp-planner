@@ -50,6 +50,7 @@ export class PlansController {
   @ApiResponse({ status: 200, description: 'Plans retrieved successfully' })
   public async list(@Query() query: ListPlansQueryDto): Promise<unknown> {
     return this.planService.listPlans({
+      projectId: query.projectId,
       status: query.status,
       limit: query.limit,
       offset: query.offset,

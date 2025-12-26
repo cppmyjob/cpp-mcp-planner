@@ -257,11 +257,30 @@ export interface Link {
 // Plan types
 export type PlanStatus = 'active' | 'archived' | 'completed';
 
+// Project types
+export interface ProjectConfig {
+  /** @required - Must be provided when creating project config */
+  projectId: string;
+  name?: string;
+  description?: string;
+}
+
+export interface ProjectInfo {
+  id: string;
+  name?: string;
+  path?: string;
+  plansCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PlanManifest {
   id: string;
   /** @required - Must be provided when creating plan */
-  name: string;
-  description: string;
+  projectId: string;
+  projectPath?: string; // Optional - path to project directory
+  name?: string;
+  description?: string;
   status: PlanStatus;
   author: string;
   createdAt: string;
@@ -295,6 +314,7 @@ export interface Plan {
 // Active plan mapping
 export interface ActivePlanMapping {
   planId: string;
+  projectId: string; // GREEN: Phase 3.4 - Track projectId for multi-workspace support
   lastUpdated: string;
 }
 

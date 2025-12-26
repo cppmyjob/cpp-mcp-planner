@@ -18,7 +18,8 @@ export interface TestContext {
 
 export async function createTestContext(prefix = 'mcp-test'): Promise<TestContext> {
   const testDir = path.join(os.tmpdir(), `${prefix}-${String(Date.now())}`);
-  const services = await createServices(testDir);
+  // GREEN: Phase 4.10 - Pass projectId to createServices
+  const services = await createServices(testDir, 'test-project');
 
   const plan = await services.planService.createPlan({
     name: 'Test Plan',

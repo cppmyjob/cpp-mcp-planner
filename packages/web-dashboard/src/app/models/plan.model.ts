@@ -22,6 +22,8 @@ export interface PlanStatistics {
 
 export interface PlanManifest {
   id: string;
+  projectId: string;
+  projectPath?: string;
   name: string;
   description: string;
   status: PlanStatus;
@@ -49,6 +51,7 @@ export interface Plan {
 
 export interface ActivePlanMapping {
   planId: string;
+  projectId: string;
   lastUpdated: string;
 }
 
@@ -70,6 +73,7 @@ export interface UpdatePlanDto {
 }
 
 export interface ListPlansParams {
+  projectId?: string;
   status?: PlanStatus;
   limit?: number;
   offset?: number;

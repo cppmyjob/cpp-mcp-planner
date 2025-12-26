@@ -177,6 +177,82 @@ describe('Plans API (e2e)', () => {
         .query({ offset: -1 })
         .expect(HttpStatus.BAD_REQUEST);
     });
+
+    it('RED: should filter plans by projectId', async () => {
+      const response = await request(getServer())
+        .get('/api/v1/plans')
+        .query({ projectId: 'default' })
+        .expect(HttpStatus.OK);
+
+      const body = response.body as ApiResponse<ListPlansData>;
+      expect(body.success).toBe(true);
+      expect(Array.isArray(body.data?.plans)).toBe(true);
+    });
+
+    it('RED: should reject projectId with path traversal attempt', async () => {
+      const response = await request(getServer())
+        .get('/api/v1/plans')
+        .query({ projectId: '../malicious' })
+        .expect(HttpStatus.BAD_REQUEST);
+
+      const body = response.body as ApiResponse;
+      expect(body.success).toBe(false);
+      expect(body.error?.message).toContain('projectId');
+    });
+
+    it('RED: should reject projectId with special characters', async () => {
+      const response = await request(getServer())
+        .get('/api/v1/plans')
+        .query({ projectId: 'project/with/slashes' })
+        .expect(HttpStatus.BAD_REQUEST);
+
+      const body = response.body as ApiResponse;
+      expect(body.success).toBe(false);
+      expect(body.error?.message).toContain('projectId');
+    });
+
+    it('RED: should reject projectId with spaces', async () => {
+      const response = await request(getServer())
+        .get('/api/v1/plans')
+        .query({ projectId: 'my project' })
+        .expect(HttpStatus.BAD_REQUEST);
+
+      const body = response.body as ApiResponse;
+      expect(body.success).toBe(false);
+      expect(body.error?.message).toContain('projectId');
+    });
+
+    it('RED: should accept projectId with valid characters (alphanumeric, dots, dashes, underscores)', async () => {
+      const response = await request(getServer())
+        .get('/api/v1/plans')
+        .query({ projectId: 'my-project_v1.0' })
+        .expect(HttpStatus.OK);
+
+      const body = response.body as ApiResponse<ListPlansData>;
+      expect(body.success).toBe(true);
+    });
+
+    it('RED: should reject projectId starting with special character', async () => {
+      const response = await request(getServer())
+        .get('/api/v1/plans')
+        .query({ projectId: '-invalid-start' })
+        .expect(HttpStatus.BAD_REQUEST);
+
+      const body = response.body as ApiResponse;
+      expect(body.success).toBe(false);
+      expect(body.error?.message).toContain('projectId');
+    });
+
+    it('RED: should reject empty projectId', async () => {
+      const response = await request(getServer())
+        .get('/api/v1/plans')
+        .query({ projectId: '' })
+        .expect(HttpStatus.BAD_REQUEST);
+
+      const body = response.body as ApiResponse;
+      expect(body.success).toBe(false);
+      expect(body.error?.message).toContain('projectId');
+    });
   });
 
   describe('GET /api/v1/plans/:id', () => {

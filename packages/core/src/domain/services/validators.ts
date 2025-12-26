@@ -2,6 +2,8 @@
  * Common validation functions for entity fields
  */
 
+import { ValidationError } from '../repositories/errors.js';
+
 const VALID_EFFORT_UNITS = ['minutes', 'hours', 'days', 'weeks', 'story-points'] as const;
 const VALID_CONFIDENCE_LEVELS = ['low', 'medium', 'high'] as const;
 const VALID_ARTIFACT_TYPES = ['code', 'config', 'migration', 'documentation', 'test', 'script', 'other'] as const;
@@ -148,6 +150,75 @@ export function sanitizePath(path: string, fieldName: string): void {
   // Reject absolute paths on Unix (/path)
   if (path.startsWith('/')) {
     throw new Error(`${fieldName} must be a relative path (absolute paths not allowed)`);
+  }
+}
+
+// GREEN: Phase 4.20 - Workspace path validation
+/**
+ * Validates a workspace path for project initialization
+ *
+ * Requirements:
+ * - Must be an absolute path (not relative)
+ * - Must not contain path traversal sequences
+ * - Must not be empty or whitespace-only
+ *
+ * @param workspacePath - The workspace path to validate
+ * @param fieldName - Field name for error messages (default: 'workspacePath')
+ * @throws ValidationError if path is invalid
+ */
+export function validateWorkspacePath(workspacePath: string, fieldName = 'workspacePath'): void {
+  // Check for empty or whitespace-only paths
+  const trimmed = workspacePath.trim();
+  if (trimmed === '') {
+    throw new ValidationError(`${fieldName} cannot be empty or whitespace-only`);
+  }
+
+  // Require absolute paths
+  const isAbsolute = workspacePath.startsWith('/') || /^[a-zA-Z]:/.test(workspacePath);
+  if (!isAbsolute) {
+    throw new ValidationError(`${fieldName} must be an absolute path (got: ${workspacePath})`);
+  }
+
+  // Check for null bytes
+  if (workspacePath.includes('\0')) {
+    throw new ValidationError(`${fieldName} contains null bytes which are not allowed`);
+  }
+
+  // Check for path traversal patterns
+  const traversalPatterns = [
+    '../',
+    '..\\',
+    '/../',
+    '\\..\\',
+    '/..',
+    '\\..',
+  ];
+
+  for (const pattern of traversalPatterns) {
+    if (workspacePath.includes(pattern)) {
+      throw new ValidationError(`${fieldName} contains path traversal sequence '${pattern}' which is not allowed`);
+    }
+  }
+
+  // Check for URL-encoded path traversal
+  let decodedPath = workspacePath;
+  try {
+    decodedPath = decodeURIComponent(workspacePath);
+    try {
+      decodedPath = decodeURIComponent(decodedPath);
+    } catch {
+      // Double-decode failed, use single-decoded version
+    }
+  } catch {
+    // Invalid encoding - use raw path
+    decodedPath = workspacePath;
+  }
+
+  // Check decoded path for traversal patterns
+  for (const pattern of traversalPatterns) {
+    if (decodedPath !== workspacePath && decodedPath.includes(pattern)) {
+      throw new ValidationError(`${fieldName} contains encoded path traversal which is not allowed`);
+    }
   }
 }
 
@@ -726,6 +797,9 @@ export function validateListParams(limit?: number, offset?: number): void {
 const VALID_REQUIREMENT_CATEGORIES = ['functional', 'non-functional', 'technical', 'business'] as const;
 const VALID_REQUIREMENT_STATUSES = ['draft', 'approved', 'implemented', 'deferred', 'rejected'] as const;
 
+// Project validation constants
+const MAX_PROJECT_ID_LENGTH = 50;
+
 /**
  * Validates filter priority value.
  * BUG-022 FIX: Rejects invalid priority filter values.
@@ -784,6 +858,64 @@ export function validateFilterStatus(status: unknown): void {
       `filters.status must be one of: ${VALID_REQUIREMENT_STATUSES.join(', ')} (got: '${status}')`
     );
   }
+}
+
+/**
+ * Validates projectId format with enhanced security checks.
+ * ProjectId must be alphanumeric with dots, underscores, and hyphens.
+ * Must start with alphanumeric character.
+ * Cannot contain: /, \, :, *, ?, ", spaces, and other special characters.
+ * Enhanced checks: consecutive dots, reserved Windows names, length limit, trailing dot/hyphen.
+ * @param projectId - The project ID to validate
+ * @throws Error if projectId format is invalid
+ */
+export function isValidProjectId(projectId: unknown): boolean {
+  // Must be a string
+  if (typeof projectId !== 'string') {
+    return false;
+  }
+
+  // Must not be empty
+  if (projectId === '') {
+    return false;
+  }
+
+  // Enhanced check: Max length (Windows MAX_PATH consideration)
+  if (projectId.length > MAX_PROJECT_ID_LENGTH) {
+    return false;
+  }
+
+  // Pattern: starts with alphanumeric, then allows alphanumeric + dots + underscores + hyphens
+  // Regex: /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
+  const pattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+
+  if (!pattern.test(projectId)) {
+    return false;
+  }
+
+  // Enhanced check: Reject consecutive dots (..) - path traversal bypass
+  if (projectId.includes('..')) {
+    return false;
+  }
+
+  // Enhanced check: Reject trailing dot or hyphen
+  if (projectId.endsWith('.') || projectId.endsWith('-')) {
+    return false;
+  }
+
+  // Enhanced check: Reserved Windows names (case-insensitive)
+  const reservedNames = [
+    'CON', 'PRN', 'AUX', 'NUL',
+    'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+    'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9',
+  ];
+
+  const upperProjectId = projectId.toUpperCase();
+  if (reservedNames.includes(upperProjectId)) {
+    return false;
+  }
+
+  return true;
 }
 
 // Export length constants for use in services

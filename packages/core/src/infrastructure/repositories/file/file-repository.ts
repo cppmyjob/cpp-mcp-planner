@@ -45,6 +45,7 @@ export class FileRepository<T extends Entity>
 {
   public readonly entityType: EntityType;
 
+  private readonly projectId: string;
   private readonly planId: string;
   private readonly entitiesDir: string;
   private readonly indexManager: IndexManager;
@@ -54,17 +55,19 @@ export class FileRepository<T extends Entity>
 
   constructor(
     baseDir: string,
+    projectId: string,
     planId: string,
     entityType: EntityType,
     cacheOptions?: Partial<CacheOptions>,
     fileLockManager?: FileLockManager
   ) {
     super(baseDir, cacheOptions);
+    this.projectId = projectId;
     this.planId = planId;
     this.entityType = entityType;
 
-    // Setup paths
-    const planDir = path.join(baseDir, 'plans', planId);
+    // Setup paths with projectId
+    const planDir = path.join(baseDir, projectId, 'plans', planId);
     this.entitiesDir = path.join(planDir, 'entities');
     const indexesDir = path.join(planDir, 'indexes');
     const indexPath = path.join(indexesDir, `${entityType}-index.json`);
@@ -85,8 +88,8 @@ export class FileRepository<T extends Entity>
       return; // Already initialized
     }
 
-    // Create directories
-    const planDir = path.join(this.baseDir, 'plans', this.planId);
+    // Create directories with projectId
+    const planDir = path.join(this.baseDir, this.projectId, 'plans', this.planId);
     const indexesDir = path.join(planDir, 'indexes');
 
     await fs.mkdir(this.entitiesDir, { recursive: true });

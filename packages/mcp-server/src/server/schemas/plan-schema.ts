@@ -31,6 +31,8 @@ const basePlanSchema = z
     includeEntities: z.boolean().optional(),
     limit: z.number().optional(),
     offset: z.number().optional(),
+    // GREEN: Phase 4.3 - Add projectId for list filtering
+    projectId: z.string().optional(),
     // Sprint 7: Version history settings
     enableHistory: z.boolean().optional(),
     maxHistoryDepth: z.number().optional(),

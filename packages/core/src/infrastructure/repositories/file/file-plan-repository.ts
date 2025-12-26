@@ -18,33 +18,36 @@ import * as path from 'path';
 import type { PlanRepository } from '../../../domain/repositories/interfaces.js';
 import type { PlanManifest, ActivePlansIndex, VersionHistory } from '../../../domain/entities/types.js';
 import { BaseFileRepository } from './base-file-repository.js';
+import { ValidationError } from '../../../domain/repositories/errors.js';
+import { isValidProjectId } from '../../../domain/services/validators.js';
 
 /**
  * File-based implementation of PlanRepository
  *
  * Extends BaseFileRepository for common file operations.
  *
- * Directory structure:
+ * Directory structure (NEW - with projectId):
+ * ```
+ * baseDir/
+ *   {projectId}/
+ *     plans/
+ *       {planId}/
+ *         manifest.json
+ *         entities/
+ *         links.json
+ *         history/
+ *         versions/
+ *         exports/
+ *     active-plans.json
+ * ```
+ *
+ * Legacy structure (read-only, accessed via __legacy__ projectId):
  * ```
  * baseDir/
  *   plans/
  *     {planId}/
  *       manifest.json
- *       entities/
- *         requirements.json
- *         solutions.json
- *         decisions.json
- *         phases.json
- *         artifacts.json
- *       links.json
- *       history/
- *         requirement/
- *         solution/
- *         decision/
- *         phase/
- *         artifact/
- *       versions/
- *       exports/
+ *       ...
  *   active-plans.json
  * ```
  */
@@ -52,13 +55,44 @@ export class FilePlanRepository
   extends BaseFileRepository
   implements PlanRepository
 {
+  private readonly projectId: string;
   private readonly plansDir: string;
   private readonly activePlansPath: string;
+  private readonly isLegacyMode: boolean;
 
-  constructor(baseDir: string) {
+  private static readonly legacyProjectId = '__legacy__';
+
+  constructor(baseDir: string, projectId: string) {
     super(baseDir);
-    this.plansDir = path.join(baseDir, 'plans');
-    this.activePlansPath = path.join(baseDir, 'active-plans.json');
+
+    // Validate projectId
+    if (typeof projectId !== 'string' || projectId === '') {
+      throw new ValidationError('Invalid projectId: must be a non-empty string');
+    }
+
+    // Special handling for legacy mode
+    this.isLegacyMode = projectId === FilePlanRepository.legacyProjectId;
+
+    // Validate projectId for non-legacy mode
+    if (!this.isLegacyMode && !isValidProjectId(projectId)) {
+      throw new ValidationError(
+        `Invalid projectId "${projectId}": contains invalid characters or security violations`
+      );
+    }
+
+    this.projectId = projectId;
+
+    // Setup paths based on mode
+    if (this.isLegacyMode) {
+      // Legacy mode: baseDir/plans/
+      this.plansDir = path.join(baseDir, 'plans');
+      this.activePlansPath = path.join(baseDir, 'active-plans.json');
+    } else {
+      // New mode: baseDir/{projectId}/plans/
+      const projectDir = path.join(baseDir, projectId);
+      this.plansDir = path.join(projectDir, 'plans');
+      this.activePlansPath = path.join(projectDir, 'active-plans.json');
+    }
   }
 
   /**
@@ -88,9 +122,18 @@ export class FilePlanRepository
    * - exports/ (for exported files)
    *
    * @param planId - Plan ID
+   * @throws ValidationError if attempting to create plan in legacy mode
    */
   public async createPlan(planId: string): Promise<void> {
     await this.ensureInitialized();
+
+    // Prevent creating new plans in legacy mode (read-only)
+    if (this.isLegacyMode) {
+      throw new ValidationError(
+        'Cannot create new plans in legacy mode. Use a valid projectId to create plans.'
+      );
+    }
+
     const planDir = path.join(this.plansDir, planId);
 
     // Create main directories

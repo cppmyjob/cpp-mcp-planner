@@ -1,0 +1,396 @@
+/**
+ * RED: ProjectService Tests
+ *
+ * Tests for domain service that manages projects (CRUD, initialization, listing)
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { promises as fs } from 'fs';
+import path from 'path';
+import os from 'os';
+import { ProjectService } from '../../packages/core/src/domain/services/project-service.js';
+import { ConfigService } from '../../packages/core/src/domain/services/config-service.js';
+import { PlanService } from '../../packages/core/src/domain/services/plan-service.js';
+import { FileRepositoryFactory } from '../../packages/core/src/infrastructure/factory/repository-factory.js';
+import { FileLockManager } from '../../packages/core/src/infrastructure/repositories/file/file-lock-manager.js';
+import type { ProjectConfig } from '../../packages/core/src/domain/entities/types.js';
+
+describe('ProjectService', () => {
+  let testDir: string;
+  let lockManager: FileLockManager;
+  let factory: FileRepositoryFactory;
+  let configService: ConfigService;
+  let planService: PlanService;
+  let projectService: ProjectService;
+  const defaultProjectId = 'test-project';
+
+  beforeEach(async () => {
+    // Create test directory
+    testDir = path.join(os.tmpdir(), `project-service-test-${Date.now().toString()}`);
+    await fs.mkdir(testDir, { recursive: true });
+
+    // Initialize infrastructure
+    lockManager = new FileLockManager(testDir);
+    await lockManager.initialize();
+
+    factory = new FileRepositoryFactory({
+      type: 'file',
+      baseDir: testDir,
+      projectId: defaultProjectId,
+      lockManager,
+    });
+
+    // RED: ProjectService depends on ConfigService and PlanService
+    configService = new ConfigService(factory);
+    planService = new PlanService(factory);
+    projectService = new ProjectService(configService, planService);
+  });
+
+  afterEach(async () => {
+    // Cleanup
+    await factory.dispose();
+    await lockManager.dispose();
+    await fs.rm(testDir, { recursive: true, force: true });
+  });
+
+  describe('RED: initProject', () => {
+    it('should initialize project with config file', async () => {
+      const workspacePath = path.join(testDir, 'workspace1');
+      await fs.mkdir(workspacePath, { recursive: true });
+
+      const config: ProjectConfig = {
+        projectId: 'my-project',
+        name: 'My Project',
+        description: 'Test project',
+      };
+
+      const result = await projectService.initProject(workspacePath, config);
+
+      expect(result.success).toBe(true);
+      expect(result.projectId).toBe('my-project');
+      expect(result.configPath).toBe(path.join(workspacePath, '.mcp-config.json'));
+
+      // Verify config file was created
+      const savedConfig = await configService.loadConfig(workspacePath);
+      expect(savedConfig).toEqual(config);
+    });
+
+    it('should validate workspacePath is required', async () => {
+      const config: ProjectConfig = { projectId: 'test' };
+
+      await expect(projectService.initProject('', config)).rejects.toThrow('workspacePath is required');
+    });
+
+    it('should validate config is required', async () => {
+      const workspacePath = path.join(testDir, 'workspace2');
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await expect(projectService.initProject(workspacePath, null as any)).rejects.toThrow('config is required');
+    });
+
+    it('should prevent reinitializing existing project', async () => {
+      const workspacePath = path.join(testDir, 'workspace3');
+      await fs.mkdir(workspacePath, { recursive: true });
+
+      const config: ProjectConfig = { projectId: 'existing' };
+      await projectService.initProject(workspacePath, config);
+
+      await expect(projectService.initProject(workspacePath, config)).rejects.toThrow('already initialized');
+    });
+
+    it('should validate projectId format', async () => {
+      const workspacePath = path.join(testDir, 'workspace4');
+      await fs.mkdir(workspacePath, { recursive: true });
+
+      const config: ProjectConfig = { projectId: 'Invalid ID!' };
+
+      await expect(projectService.initProject(workspacePath, config)).rejects.toThrow('Invalid projectId');
+    });
+  });
+
+  // RED: Phase 3.7 - Case-insensitive projectId conflict detection
+  describe('RED: Phase 3.7 - Case-insensitive projectId conflicts', () => {
+    it('should detect case-insensitive conflict when listing projects', async () => {
+      // Create two different workspaces with projectIds that differ only in case
+      const workspace1 = path.join(testDir, 'workspace-case-1');
+      const workspace2 = path.join(testDir, 'workspace-case-2');
+      await fs.mkdir(workspace1, { recursive: true });
+      await fs.mkdir(workspace2, { recursive: true });
+
+      // Initialize first project with lowercase
+      await projectService.initProject(workspace1, { projectId: 'my-project' });
+
+      // Initialize second project with different case
+      await projectService.initProject(workspace2, { projectId: 'My-Project' });
+
+      // Create a plan for lowercase projectId
+      const factory1 = new FileRepositoryFactory({
+        type: 'file',
+        baseDir: testDir,
+        projectId: 'my-project',
+        lockManager,
+      });
+      const planService1 = new PlanService(factory1);
+      await planService1.createPlan({ name: 'Plan 1', description: 'Test' });
+      await factory1.dispose();
+
+      // List projects - should detect the conflict
+      const result = await projectService.listProjects();
+
+      // Should detect that my-project and My-Project are the same (case-insensitive)
+      // Expect error or warning about case conflict
+      expect(result.projects.length).toBe(1); // Should be deduplicated
+      expect(result.projects[0].id.toLowerCase()).toBe('my-project');
+    });
+
+    it('should prevent creating plans with case-variant projectIds', async () => {
+      // GREEN: Phase 3.8 - Changed test to check initProject instead of factory constructor
+      // Factory constructor is synchronous and cannot check file system for conflicts
+
+      // Create first workspace with lowercase projectId
+      const workspace1 = path.join(testDir, 'workspace-case-3a');
+      await fs.mkdir(workspace1, { recursive: true });
+      await projectService.initProject(workspace1, { projectId: 'test-project-case' });
+
+      // Create a plan to establish the project
+      const factory1 = new FileRepositoryFactory({
+        type: 'file',
+        baseDir: testDir,
+        projectId: 'test-project-case',
+        lockManager,
+      });
+      const planService1 = new PlanService(factory1);
+      await planService1.createPlan({ name: 'Plan 1', description: 'Test' });
+      await factory1.dispose();
+
+      // Attempt to create second workspace with uppercase variant
+      const workspace2 = path.join(testDir, 'workspace-case-3b');
+      await fs.mkdir(workspace2, { recursive: true });
+
+      // Should throw error about case conflict with existing projectId
+      await expect(
+        projectService.initProject(workspace2, { projectId: 'Test-Project-Case' })
+      ).rejects.toThrow(/conflict/i);
+    });
+
+    it('should validate projectId uniqueness case-insensitively during init', async () => {
+      const workspace1 = path.join(testDir, 'workspace-case-4');
+      const workspace2 = path.join(testDir, 'workspace-case-5');
+      await fs.mkdir(workspace1, { recursive: true });
+      await fs.mkdir(workspace2, { recursive: true });
+
+      // Initialize first project
+      await projectService.initProject(workspace1, { projectId: 'unique-project' });
+
+      // Create a plan to establish the project
+      const factory1 = new FileRepositoryFactory({
+        type: 'file',
+        baseDir: testDir,
+        projectId: 'unique-project',
+        lockManager,
+      });
+      const planService1 = new PlanService(factory1);
+      await planService1.createPlan({ name: 'Plan', description: 'Test' });
+      await factory1.dispose();
+
+      // Attempt to initialize second project with same ID (different case)
+      await expect(
+        projectService.initProject(workspace2, { projectId: 'Unique-Project' })
+      ).rejects.toThrow(/conflict|exists|duplicate/i);
+    });
+  });
+
+  describe('RED: getProject', () => {
+    it('should get project from workspace', async () => {
+      const workspacePath = path.join(testDir, 'workspace5');
+      await fs.mkdir(workspacePath, { recursive: true });
+
+      const config: ProjectConfig = {
+        projectId: 'get-test',
+        name: 'Get Test',
+        description: 'Test getting project',
+      };
+      await projectService.initProject(workspacePath, config);
+
+      const result = await projectService.getProject(workspacePath);
+
+      expect(result).toEqual(config);
+    });
+
+    it('should return null for workspace without config', async () => {
+      const workspacePath = path.join(testDir, 'workspace6');
+      await fs.mkdir(workspacePath, { recursive: true });
+
+      const result = await projectService.getProject(workspacePath);
+
+      expect(result).toBeNull();
+    });
+
+    it('should validate workspacePath is required', async () => {
+      await expect(projectService.getProject('')).rejects.toThrow('workspacePath is required');
+    });
+  });
+
+  describe('RED: listProjects', () => {
+    it('should list all projects from plans', async () => {
+      // Create projects and plans
+      const workspace1 = path.join(testDir, 'workspace7');
+      const workspace2 = path.join(testDir, 'workspace8');
+      await fs.mkdir(workspace1, { recursive: true });
+      await fs.mkdir(workspace2, { recursive: true });
+
+      await projectService.initProject(workspace1, {
+        projectId: 'project1',
+        name: 'Project 1',
+      });
+      await projectService.initProject(workspace2, {
+        projectId: 'project2',
+        name: 'Project 2',
+      });
+
+      // Create plans for these projects
+      // Note: This requires a factory per project, which we'll handle in the implementation
+      const factory1 = new FileRepositoryFactory({
+        type: 'file',
+        baseDir: testDir,
+        projectId: 'project1',
+        lockManager,
+      });
+      const planService1 = new PlanService(factory1);
+      await planService1.createPlan({ name: 'Plan 1', description: 'Test' });
+      await factory1.dispose();
+
+      const factory2 = new FileRepositoryFactory({
+        type: 'file',
+        baseDir: testDir,
+        projectId: 'project2',
+        lockManager,
+      });
+      const planService2 = new PlanService(factory2);
+      await planService2.createPlan({ name: 'Plan 2a', description: 'Test' });
+      await planService2.createPlan({ name: 'Plan 2b', description: 'Test' });
+      await factory2.dispose();
+
+      const result = await projectService.listProjects();
+
+      expect(result.projects).toHaveLength(2);
+      expect(result.projects[0]?.id).toBe('project1');
+      expect(result.projects[0]?.plansCount).toBe(1);
+      expect(result.projects[1]?.id).toBe('project2');
+      expect(result.projects[1]?.plansCount).toBe(2);
+    });
+
+    it('should return empty list when no projects exist', async () => {
+      const result = await projectService.listProjects();
+
+      expect(result.projects).toHaveLength(0);
+    });
+
+    it('should support pagination', async () => {
+      // Create 3 projects with plans
+      for (let i = 1; i <= 3; i++) {
+        const workspace = path.join(testDir, `workspace-page-${String(i)}`);
+        await fs.mkdir(workspace, { recursive: true });
+        await projectService.initProject(workspace, {
+          projectId: `project-page-${String(i)}`,
+          name: `Project ${String(i)}`,
+        });
+
+        // Create a plan to make the project valid
+        const factoryPage = new FileRepositoryFactory({
+          type: 'file',
+          baseDir: testDir,
+          projectId: `project-page-${String(i)}`,
+          lockManager,
+        });
+        const planServicePage = new PlanService(factoryPage);
+        await planServicePage.createPlan({ name: `Plan ${String(i)}`, description: 'Test' });
+        await factoryPage.dispose();
+      }
+
+      const result = await projectService.listProjects({ limit: 2, offset: 0 });
+
+      expect(result.projects).toHaveLength(2);
+      expect(result.total).toBe(3);
+      expect(result.hasMore).toBe(true);
+    });
+  });
+
+  describe('RED: getProjectInfo', () => {
+    it('should get project info with plan count', async () => {
+      const workspace = path.join(testDir, 'workspace9');
+      await fs.mkdir(workspace, { recursive: true });
+
+      await projectService.initProject(workspace, {
+        projectId: 'info-test',
+        name: 'Info Test',
+        description: 'Test project info',
+      });
+
+      // Create plans
+      const factoryInfo = new FileRepositoryFactory({
+        type: 'file',
+        baseDir: testDir,
+        projectId: 'info-test',
+        lockManager,
+      });
+      const planServiceInfo = new PlanService(factoryInfo);
+      await planServiceInfo.createPlan({ name: 'Plan A', description: 'Test' });
+      await planServiceInfo.createPlan({ name: 'Plan B', description: 'Test' });
+      await factoryInfo.dispose();
+
+      const result = await projectService.getProjectInfo('info-test');
+
+      expect(result).toBeDefined();
+      expect(result?.id).toBe('info-test');
+      // Note: name is undefined because getProjectInfo only has projectId, not workspace path
+      // The config file (which contains the name) is in the workspace, not in storage
+      expect(result?.plansCount).toBe(2);
+      expect(result?.createdAt).toBeDefined();
+      expect(result?.updatedAt).toBeDefined();
+    });
+
+    it('should return null for non-existent project', async () => {
+      const result = await projectService.getProjectInfo('non-existent');
+
+      expect(result).toBeNull();
+    });
+
+    it('should validate projectId is required', async () => {
+      await expect(projectService.getProjectInfo('')).rejects.toThrow('projectId is required');
+    });
+  });
+
+  describe('RED: deleteProject', () => {
+    it('should delete project config file', async () => {
+      const workspace = path.join(testDir, 'workspace10');
+      await fs.mkdir(workspace, { recursive: true });
+
+      await projectService.initProject(workspace, {
+        projectId: 'delete-test',
+        name: 'Delete Test',
+      });
+
+      const result = await projectService.deleteProject(workspace);
+
+      expect(result.success).toBe(true);
+
+      // Verify config was deleted
+      const config = await configService.loadConfig(workspace);
+      expect(config).toBeNull();
+    });
+
+    it('should not throw error if project does not exist', async () => {
+      const workspace = path.join(testDir, 'workspace11');
+      await fs.mkdir(workspace, { recursive: true });
+
+      const result = await projectService.deleteProject(workspace);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate workspacePath is required', async () => {
+      await expect(projectService.deleteProject('')).rejects.toThrow('workspacePath is required');
+    });
+  });
+});

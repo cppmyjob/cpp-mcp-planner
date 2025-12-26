@@ -11,6 +11,8 @@ import {
   QueryService,
   BatchService,
   VersionHistoryService,
+  ConfigService,
+  ProjectService,
   type RepositoryFactory,
 } from '@mcp-planner/core';
 
@@ -27,17 +29,22 @@ export interface Services {
   linkingService: LinkingService;
   queryService: QueryService;
   batchService: BatchService;
+  // GREEN: Phase 4.14 - Add project services
+  configService: ConfigService;
+  projectService: ProjectService;
 }
 
-export async function createServices(storagePath: string): Promise<Services> {
+export async function createServices(storagePath: string, projectId: string): Promise<Services> {
   // Create shared FileLockManager
   const lockManager = new FileLockManager(storagePath);
   await lockManager.initialize();
 
   // Create FileRepositoryFactory
+  // GREEN: Phase 4.10 - projectId now loaded from .mcp-config.json at startup
   const repositoryFactory = new FileRepositoryFactory({
     type: 'file',
     baseDir: storagePath,
+    projectId,
     lockManager,
     cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
   });
@@ -67,6 +74,10 @@ export async function createServices(storagePath: string): Promise<Services> {
     artifactService
   );
 
+  // GREEN: Phase 4.14 - Instantiate project services
+  const configService = new ConfigService(repositoryFactory);
+  const projectService = new ProjectService(configService, planService);
+
   return {
     repositoryFactory,
     lockManager,
@@ -80,5 +91,7 @@ export async function createServices(storagePath: string): Promise<Services> {
     linkingService,
     queryService,
     batchService,
+    configService,
+    projectService,
   };
 }

@@ -8,6 +8,7 @@ import { FileLinkRepository, FileLockManager } from '@mcp-planner/core';
 describe('FileLinkRepository', () => {
   // FIX M-4: Use os.tmpdir() instead of process.cwd()
   const testDir = path.join(os.tmpdir(), `test-${Date.now().toString()}-file-link-repository`);
+  const projectId = 'test-project';
   const planId = 'test-plan-1';
 
   let repository: FileLinkRepository;
@@ -17,7 +18,7 @@ describe('FileLinkRepository', () => {
     await fs.mkdir(testDir, { recursive: true });
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
-    repository = new FileLinkRepository(testDir, planId, lockManager);
+    repository = new FileLinkRepository(testDir, projectId, planId, lockManager);
     await repository.initialize();
   });
 

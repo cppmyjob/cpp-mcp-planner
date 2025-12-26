@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from './config/index.js';
 import { CoreModule } from './modules/core/index.js';
+import { ProjectsModule } from './modules/projects/index.js';
 import { PlansModule } from './modules/plans/index.js';
 import { RequirementsModule } from './modules/requirements/index.js';
 import { SolutionsModule } from './modules/solutions/index.js';
@@ -14,6 +15,7 @@ import { QueryModule } from './modules/query/index.js';
   imports: [
     AppConfigModule,
     CoreModule,
+    ProjectsModule,
     PlansModule,
     RequirementsModule,
     SolutionsModule,

@@ -27,6 +27,7 @@ describe('RED: RepositoryFactory', () => {
     factory = new FileRepositoryFactory({
       type: 'file',
       baseDir: testDir,
+      projectId: 'test-project',
       lockManager,
     });
   });
@@ -63,6 +64,7 @@ describe('RED: RepositoryFactory', () => {
           new FileRepositoryFactory({
             type: 'invalid' as 'file',
             baseDir: testDir,
+      projectId: 'test-project',
             lockManager,
           })
       ).toThrow(/storage type/i);
@@ -328,6 +330,7 @@ describe('RED: RepositoryFactory', () => {
       const factoryWithCache = new FileRepositoryFactory({
         type: 'file',
         baseDir: testDir,
+      projectId: 'test-project',
         lockManager,
         cacheOptions: {
           enabled: true,

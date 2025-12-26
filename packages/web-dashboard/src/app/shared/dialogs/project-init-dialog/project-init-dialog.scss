@@ -1,0 +1,48 @@
+.project-init-dialog {
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1rem 0;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  &__label {
+    font-weight: 500;
+    color: var(--p-text-color);
+    font-size: 0.875rem;
+  }
+
+  &__input {
+    width: 100%;
+  }
+
+  &__hint {
+    color: var(--p-text-muted-color);
+    font-size: 0.75rem;
+  }
+
+  &__error {
+    padding: 0.75rem;
+    background-color: var(--p-red-50);
+    color: var(--p-red-700);
+    border-radius: 4px;
+    font-size: 0.875rem;
+
+    :root.dark-theme & {
+      background-color: var(--p-red-900);
+      color: var(--p-red-200);
+    }
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+}

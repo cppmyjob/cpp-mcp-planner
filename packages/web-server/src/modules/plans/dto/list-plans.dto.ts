@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, Min, Max, IsIn } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, Max, IsIn, Matches, IsNotEmpty } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import type { PlanStatus } from '@mcp-planner/core';
@@ -10,6 +10,18 @@ const VALID_SORT_BY = ['created_at', 'updated_at', 'name'] as const;
 const VALID_SORT_ORDER = ['asc', 'desc'] as const;
 
 export class ListPlansQueryDto {
+  @ApiPropertyOptional({
+    description: 'Filter by project ID (alphanumeric, dots, dashes, underscores)',
+    example: 'my-project',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/, {
+    message: 'projectId must start with alphanumeric and contain only letters, numbers, dots, dashes, underscores',
+  })
+  @IsOptional()
+  public projectId?: string;
+
   @ApiPropertyOptional({ description: 'Filter by status', enum: VALID_STATUSES })
   @IsString()
   @IsIn(VALID_STATUSES)

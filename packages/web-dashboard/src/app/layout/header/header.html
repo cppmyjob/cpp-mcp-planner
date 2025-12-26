@@ -13,12 +13,27 @@
 
   <div class="header__center">
     <p-select
+      [options]="projects()"
+      [(ngModel)]="selectedProjectId"
+      optionLabel="id"
+      optionValue="id"
+      [placeholder]="'Select Project'"
+      [loading]="loadingProjects()"
+      [filter]="true"
+      filterBy="id"
+      filterPlaceholder="Search projects..."
+      [showClear]="true"
+      (onChange)="onProjectChange($event.value)"
+      [styleClass]="'project-selector'"
+      data-testid="project-selector"
+    />
+    <p-select
       [options]="plans()"
       [(ngModel)]="selectedPlanId"
       optionLabel="name"
       optionValue="id"
       [placeholder]="'Select Plan'"
-      [loading]="loading()"
+      [loading]="loadingPlans()"
       [filter]="true"
       filterBy="name"
       filterPlaceholder="Search plans..."
@@ -31,6 +46,15 @@
 
   <div class="header__right">
     <p-button
+      icon="pi pi-plus"
+      label="New Project"
+      [text]="true"
+      [rounded]="true"
+      severity="secondary"
+      data-testid="new-project-button"
+      (onClick)="showProjectInitDialog()"
+    />
+    <p-button
       [icon]="isDarkTheme ? 'pi pi-sun' : 'pi pi-moon'"
       [text]="true"
       [rounded]="true"
@@ -40,3 +64,8 @@
     />
   </div>
 </header>
+
+<app-project-init-dialog
+  #projectInitDialog
+  (projectCreated)="onProjectCreated($event)"
+/>

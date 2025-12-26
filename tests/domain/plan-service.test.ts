@@ -20,6 +20,7 @@ describe('PlanService', () => {
     repositoryFactory = new FileRepositoryFactory({
       type: 'file',
       baseDir: testDir,
+      projectId: 'test-project',
       lockManager,
       cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
     });
@@ -74,6 +75,18 @@ describe('PlanService', () => {
       expect(plan.manifest.statistics.totalRequirements).toBe(0);
       expect(plan.manifest.statistics.totalSolutions).toBe(0);
       expect(plan.manifest.statistics.completionPercentage).toBe(0);
+    });
+
+    // RED: Phase 3.3 - Auto-determine projectId from factory
+    it('should automatically set projectId from factory config', async () => {
+      const result = await service.createPlan({
+        name: 'Multi-Workspace Plan',
+        description: 'Testing auto projectId',
+      });
+
+      // Verify projectId is set automatically
+      const { plan } = await service.getPlan({ planId: result.planId });
+      expect(plan.manifest.projectId).toBe('test-project');
     });
   });
 
@@ -240,6 +253,24 @@ describe('PlanService', () => {
 
       const result = await service.getActivePlan({ workspacePath: '/test' });
       expect(result.activePlan?.planId).toBe(plan2.planId);
+    });
+
+    // RED: Phase 3.4 - ActivePlanMapping should include projectId
+    it('should store and retrieve projectId in active plan mapping', async () => {
+      const created = await service.createPlan({ name: 'Multi-Workspace Test', description: 'Test' });
+
+      await service.setActivePlan({
+        planId: created.planId,
+        workspacePath: '/test/workspace-multi',
+      });
+
+      // Verify projectId is stored in the mapping
+      const activePlans = await (service as { planRepo: { loadActivePlans: () => Promise<Record<string, { planId: string; projectId: string; lastUpdated: string }>> } }).planRepo.loadActivePlans();
+      const mapping = activePlans['/test/workspace-multi'];
+
+      expect(mapping).toBeDefined();
+      expect(mapping.projectId).toBe('test-project');
+      expect(mapping.planId).toBe(created.planId);
     });
   });
 

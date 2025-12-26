@@ -32,7 +32,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
 
   it('should persist active plan mapping across server restart', async () => {
     // === PHASE 1: Create server, create plan, set active ===
-    const services1 = await createServices(storagePath);
+    const services1 = await createServices(storagePath, 'test-project');
     const { server: server1 } = createMcpServer(services1);
     const [clientTransport1, serverTransport1] = InMemoryTransport.createLinkedPair();
 
@@ -81,7 +81,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
     await server1.close();
 
     // === PHASE 2: Create NEW server with SAME storagePath ===
-    const services2 = await createServices(storagePath);
+    const services2 = await createServices(storagePath, 'test-project');
     const { server: server2 } = createMcpServer(services2);
     const [clientTransport2, serverTransport2] = InMemoryTransport.createLinkedPair();
 

@@ -29,6 +29,8 @@ export interface CreatePlanInput {
 }
 
 export interface ListPlansInput {
+  // GREEN: Phase 4.3 - Add projectId filtering
+  projectId?: string;
   status?: PlanStatus;
   limit?: number;
   offset?: number;
@@ -80,8 +82,8 @@ export interface CreatePlanResult {
 export interface ListPlansResult {
   plans: {
     id: string;
-    name: string;
-    description: string;
+    name?: string;
+    description?: string;
     status: PlanStatus;
     createdAt: string;
     updatedAt: string;
@@ -119,7 +121,7 @@ export interface SetActivePlanResult {
   success: boolean;
   activePlan: {
     planId: string;
-    planName: string;
+    planName?: string;
     workspacePath: string;
   };
 }
@@ -145,8 +147,8 @@ export interface PhaseSummaryItem {
 export interface GetSummaryResult {
   plan: {
     id: string;
-    name: string;
-    description: string;
+    name?: string;
+    description?: string;
     status: PlanStatus;
     createdAt: string;
     updatedAt: string;
@@ -179,8 +181,12 @@ export class PlanService {
       }
     }
 
+    // GREEN: Phase 3.3 - Auto-determine projectId from factory
+    const projectId = this.repositoryFactory.getProjectId();
+
     const manifest: PlanManifest = {
       id: planId,
+      projectId,
       name: input.name,
       description: input.description,
       status: 'active',
@@ -245,9 +251,14 @@ export class PlanService {
     }
 
     // Filter by status
-    const filtered = input.status !== undefined
+    let filtered = input.status !== undefined
       ? manifests.filter((m) => m.status === input.status)
       : manifests;
+
+    // GREEN: Phase 4.3 - Filter by projectId
+    filtered = input.projectId !== undefined
+      ? filtered.filter((m) => m.projectId === input.projectId)
+      : filtered;
 
     // Sort
     const sortBy = input.sortBy ?? 'updated_at';
@@ -258,8 +269,8 @@ export class PlanService {
       let valueB: string | number;
 
       if (sortBy === 'name') {
-        valueA = a.name.toLowerCase();
-        valueB = b.name.toLowerCase();
+        valueA = (a.name ?? '').toLowerCase();
+        valueB = (b.name ?? '').toLowerCase();
       } else if (sortBy === 'created_at') {
         valueA = a.createdAt;
         valueB = b.createdAt;
@@ -425,9 +436,11 @@ export class PlanService {
     const workspacePath = input.workspacePath ?? process.cwd();
     const now = new Date().toISOString();
 
+    // GREEN: Phase 3.4 - Include projectId in active plan mapping
     const activePlans = await this.planRepo.loadActivePlans();
     activePlans[workspacePath] = {
       planId: input.planId,
+      projectId: manifest.projectId,
       lastUpdated: now,
     };
 

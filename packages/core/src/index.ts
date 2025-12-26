@@ -26,6 +26,8 @@ export * from './domain/repositories/interfaces.js';
 // ============================================================================
 // Services - Business logic (includes service classes and input types)
 // ============================================================================
+export * from './domain/services/config-service.js';
+export * from './domain/services/project-service.js';
 export * from './domain/services/plan-service.js';
 export * from './domain/services/requirement-service.js';
 export * from './domain/services/solution-service.js';

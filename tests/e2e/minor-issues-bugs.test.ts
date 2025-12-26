@@ -72,7 +72,7 @@ describe('E2E: Minor Issues Bug Fixes (RED Phase)', () => {
     );
     await fs.mkdir(storagePath, { recursive: true });
 
-    const services = await createServices(storagePath);
+    const services = await createServices(storagePath, 'test-project');
     const { server } = createMcpServer(services);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 

@@ -13,6 +13,8 @@ import {
   QueryService,
   BatchService,
   VersionHistoryService,
+  ProjectService,
+  ConfigService as CoreConfigService,
   type RepositoryFactory,
 } from '@mcp-planner/core';
 
@@ -29,6 +31,8 @@ export const LINKING_SERVICE = 'LINKING_SERVICE';
 export const QUERY_SERVICE = 'QUERY_SERVICE';
 export const BATCH_SERVICE = 'BATCH_SERVICE';
 export const VERSION_HISTORY_SERVICE = 'VERSION_HISTORY_SERVICE';
+export const PROJECT_SERVICE = 'PROJECT_SERVICE';
+export const CONFIG_SERVICE = 'CONFIG_SERVICE';
 
 @Module({
   providers: [
@@ -54,6 +58,7 @@ export const VERSION_HISTORY_SERVICE = 'VERSION_HISTORY_SERVICE';
         const factory = new FileRepositoryFactory({
           type: 'file',
           baseDir: storagePath,
+          projectId: 'default', // TODO: Step 5 - Multi-project support for REST API
           lockManager,
           cacheOptions: {
             // IMPORTANT: Cache disabled for web-server to ensure cross-process consistency
@@ -251,6 +256,27 @@ export const VERSION_HISTORY_SERVICE = 'VERSION_HISTORY_SERVICE';
       ],
     },
     { provide: BatchService, useExisting: BATCH_SERVICE },
+    // ConfigService
+    {
+      provide: CONFIG_SERVICE,
+      useFactory: (repositoryFactory: RepositoryFactory): CoreConfigService => {
+        return new CoreConfigService(repositoryFactory);
+      },
+      inject: [REPOSITORY_FACTORY],
+    },
+    { provide: CoreConfigService, useExisting: CONFIG_SERVICE },
+    // ProjectService
+    {
+      provide: PROJECT_SERVICE,
+      useFactory: (
+        configService: CoreConfigService,
+        planService: PlanService
+      ): ProjectService => {
+        return new ProjectService(configService, planService);
+      },
+      inject: [CONFIG_SERVICE, PLAN_SERVICE],
+    },
+    { provide: ProjectService, useExisting: PROJECT_SERVICE },
   ],
   exports: [
     LOCK_MANAGER,
@@ -265,6 +291,8 @@ export const VERSION_HISTORY_SERVICE = 'VERSION_HISTORY_SERVICE';
     QUERY_SERVICE,
     BATCH_SERVICE,
     VERSION_HISTORY_SERVICE,
+    PROJECT_SERVICE,
+    CONFIG_SERVICE,
     // Also export class tokens for backwards compatibility
     PlanService,
     RequirementService,
@@ -276,6 +304,8 @@ export const VERSION_HISTORY_SERVICE = 'VERSION_HISTORY_SERVICE';
     QueryService,
     BatchService,
     VersionHistoryService,
+    ProjectService,
+    CoreConfigService,
   ],
 })
  

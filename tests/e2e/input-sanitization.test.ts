@@ -62,7 +62,7 @@ describe('E2E: Input Sanitization Security Fixes (GREEN Phase)', () => {
     );
     await fs.mkdir(storagePath, { recursive: true });
 
-    const services = await createServices(storagePath);
+    const services = await createServices(storagePath, 'test-project');
     const { server } = createMcpServer(services);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 

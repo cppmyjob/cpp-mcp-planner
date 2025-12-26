@@ -24,7 +24,8 @@ describe('E2E: MCP Server Discovery & Errors', () => {
     storagePath = path.join(process.cwd(), '.test-temp', 'mcp-server-' + String(Date.now()) + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
 
-    const services = await createServices(storagePath);
+    // GREEN: Phase 4.10 - Pass projectId to createServices
+    const services = await createServices(storagePath, 'test-project');
     const { server } = createMcpServer(services);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
@@ -48,10 +49,11 @@ describe('E2E: MCP Server Discovery & Errors', () => {
   });
 
   describe('Tool Discovery', () => {
-    it('should list all 9 tools', async () => {
+    // RED: Phase 4.14 - Expect 10 tools (added project tool)
+    it('should list all 10 tools', async () => {
       const result = await client.listTools();
 
-      expect(result.tools).toHaveLength(9);
+      expect(result.tools).toHaveLength(10);
 
       const toolNames = result.tools.map(t => t.name).sort();
       expect(toolNames).toEqual([
@@ -61,6 +63,7 @@ describe('E2E: MCP Server Discovery & Errors', () => {
         'link',
         'phase',
         'plan',
+        'project',
         'query',
         'requirement',
         'solution',
@@ -89,6 +92,9 @@ describe('E2E: MCP Server Discovery & Errors', () => {
         artifact: ['add', 'get', 'update', 'list', 'delete', 'get_history', 'diff', 'list_fields'],
         link: ['create', 'get', 'delete'],
         query: ['search', 'trace', 'validate', 'export', 'health'],
+        // RED: Phase 4.14 - Project tool with init action
+        // GREEN: Phase 4.15 - Added CRUD actions
+        project: ['delete', 'get', 'init', 'list'],
       };
 
       for (const tool of result.tools) {

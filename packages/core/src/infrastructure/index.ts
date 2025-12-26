@@ -16,6 +16,7 @@ export type { RepositoryFactoryConfig } from './factory/repository-factory.js';
 export { FilePlanRepository } from './repositories/file/file-plan-repository.js';
 export { FileRepository } from './repositories/file/file-repository.js';
 export { FileLinkRepository } from './repositories/file/file-link-repository.js';
+export { FileConfigRepository } from './repositories/file/file-config-repository.js';
 export { FileUnitOfWork } from './repositories/file/file-unit-of-work.js';
 export { BaseFileRepository } from './repositories/file/base-file-repository.js';
 

@@ -40,6 +40,7 @@ export class FileLinkRepository
   extends BaseFileRepository
   implements LinkRepository
 {
+  private readonly projectId: string;
   private readonly planId: string;
   private readonly linksDir: string;
   private readonly indexManager: IndexManager<LinkIndexMetadata>;
@@ -48,16 +49,18 @@ export class FileLinkRepository
 
   constructor(
     baseDir: string,
+    projectId: string,
     planId: string,
     fileLockManager: FileLockManager,
     cacheOptions?: Partial<CacheOptions>
   ) {
     super(baseDir, cacheOptions);
+    this.projectId = projectId;
     this.planId = planId;
     this.fileLockManager = fileLockManager;
 
-    // Setup paths
-    const planDir = path.join(baseDir, 'plans', planId);
+    // Setup paths with projectId
+    const planDir = path.join(baseDir, projectId, 'plans', planId);
     this.linksDir = path.join(planDir, 'links');
     const indexesDir = path.join(planDir, 'indexes');
     const indexPath = path.join(indexesDir, 'link-index.json');
@@ -74,8 +77,8 @@ export class FileLinkRepository
       return; // Already initialized
     }
 
-    // Create directories
-    const planDir = path.join(this.baseDir, 'plans', this.planId);
+    // Create directories with projectId
+    const planDir = path.join(this.baseDir, this.projectId, 'plans', this.planId);
     const indexesDir = path.join(planDir, 'indexes');
 
     await fs.mkdir(this.linksDir, { recursive: true });

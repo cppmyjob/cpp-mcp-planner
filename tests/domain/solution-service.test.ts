@@ -33,6 +33,7 @@ describe('SolutionService', () => {
     repositoryFactory = new FileRepositoryFactory({
       type: 'file',
       baseDir: testDir,
+      projectId: 'test-project',
       lockManager,
       cacheOptions: { enabled: true, ttl: 5000, maxSize: 1000 }
     });

@@ -10,6 +10,8 @@ export { artifactSchema, artifactToolDescription } from './artifact-schema.js';
 export { linkSchema, linkToolDescription } from './link-schema.js';
 export { querySchema, queryToolDescription } from './query-schema.js';
 export { batchSchema, batchToolDescription } from './batch-schema.js';
+// GREEN: Phase 4.14 - Export project schema
+export { projectSchema, projectToolDescription } from './project-schema.js';
 
 // Import for tools array generation
 import { planSchema, planToolDescription } from './plan-schema.js';
@@ -21,6 +23,7 @@ import { artifactSchema, artifactToolDescription } from './artifact-schema.js';
 import { linkSchema, linkToolDescription } from './link-schema.js';
 import { querySchema, queryToolDescription } from './query-schema.js';
 import { batchSchema, batchToolDescription } from './batch-schema.js';
+import { projectSchema, projectToolDescription } from './project-schema.js';
 
 // Tool definition type for backward compatibility
 interface ToolDefinition {
@@ -75,5 +78,11 @@ export const tools: ToolDefinition[] = [
     name: 'batch',
     description: batchToolDescription,
     inputSchema: z.toJSONSchema(batchSchema) as Record<string, unknown>,
+  },
+  // GREEN: Phase 4.14 - Add project tool
+  {
+    name: 'project',
+    description: projectToolDescription,
+    inputSchema: z.toJSONSchema(projectSchema) as Record<string, unknown>,
   },
 ];

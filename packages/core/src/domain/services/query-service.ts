@@ -810,10 +810,12 @@ export class QueryService {
   ): string {
     const lines: string[] = [];
 
-    lines.push(`# ${manifest.name}`);
+    lines.push(`# ${manifest.name ?? 'Untitled Plan'}`);
     lines.push('');
-    lines.push(manifest.description);
-    lines.push('');
+    if (manifest.description !== undefined && manifest.description !== '') {
+      lines.push(manifest.description);
+      lines.push('');
+    }
     lines.push(`**Status**: ${manifest.status}`);
     lines.push(`**Progress**: ${String(manifest.statistics.completionPercentage)}%`);
     lines.push('');

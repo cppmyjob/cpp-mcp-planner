@@ -65,7 +65,7 @@ describe('E2E: All MCP Tools Validation', () => {
     storagePath = path.join(process.cwd(), '.test-temp', 'all-tools-' + String(Date.now()) + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
 
-    const services = await createServices(storagePath);
+    const services = await createServices(storagePath, 'test-project');
     const { server } = createMcpServer(services);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 

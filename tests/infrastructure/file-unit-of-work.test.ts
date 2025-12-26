@@ -8,6 +8,7 @@ import { FileUnitOfWork, FileLockManager } from '@mcp-planner/core';
 describe('FileUnitOfWork', () => {
   // FIX M-4: Use os.tmpdir() instead of process.cwd()
   const testDir = path.join(os.tmpdir(), `test-${Date.now().toString()}-file-unit-of-work`);
+  const projectId = 'test-project';
   const planId = 'test-plan-1';
 
   let uow: FileUnitOfWork;
@@ -17,7 +18,7 @@ describe('FileUnitOfWork', () => {
     await fs.mkdir(testDir, { recursive: true });
     lockManager = new FileLockManager(testDir);
     await lockManager.initialize();
-    uow = new FileUnitOfWork(testDir, planId, lockManager);
+    uow = new FileUnitOfWork(testDir, projectId, planId, lockManager);
     await uow.initialize();
   });
 

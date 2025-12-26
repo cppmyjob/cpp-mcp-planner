@@ -1,0 +1,72 @@
+<p-dialog
+  [(visible)]="visible"
+  [modal]="true"
+  [closable]="!loading()"
+  [closeOnEscape]="!loading()"
+  [dismissableMask]="!loading()"
+  [draggable]="false"
+  [resizable]="false"
+  styleClass="project-init-dialog"
+  header="Initialize New Project"
+  data-testid="project-init-dialog"
+>
+  <div class="project-init-dialog__content">
+    <div class="project-init-dialog__field">
+      <label for="projectId" class="project-init-dialog__label">Project ID *</label>
+      <input
+        pInputText
+        id="projectId"
+        [(ngModel)]="projectId"
+        [disabled]="loading()"
+        placeholder="my-project"
+        class="project-init-dialog__input"
+        data-testid="project-id-input"
+      />
+      <small class="project-init-dialog__hint">
+        Alphanumeric characters, dots, dashes, and underscores only
+      </small>
+    </div>
+
+    <div class="project-init-dialog__field">
+      <label for="workspacePath" class="project-init-dialog__label">Workspace Path *</label>
+      <input
+        pInputText
+        id="workspacePath"
+        [(ngModel)]="workspacePath"
+        [disabled]="loading()"
+        placeholder="/path/to/workspace"
+        class="project-init-dialog__input"
+        data-testid="workspace-path-input"
+      />
+      <small class="project-init-dialog__hint">
+        Absolute path to project workspace directory
+      </small>
+    </div>
+
+    @if (error()) {
+      <div class="project-init-dialog__error" data-testid="project-init-error">
+        {{ error() }}
+      </div>
+    }
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="project-init-dialog__footer">
+      <p-button
+        label="Cancel"
+        severity="secondary"
+        [text]="true"
+        [disabled]="loading()"
+        data-testid="cancel-button"
+        (onClick)="hide()"
+      />
+      <p-button
+        label="Create Project"
+        [loading]="loading()"
+        [disabled]="!isValid()"
+        data-testid="submit-button"
+        (onClick)="onSubmit()"
+      />
+    </div>
+  </ng-template>
+</p-dialog>

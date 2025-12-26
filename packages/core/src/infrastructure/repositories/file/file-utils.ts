@@ -7,6 +7,7 @@
 
 import * as fs from 'fs/promises';
 import writeFileAtomic from 'write-file-atomic';
+import { ValidationError } from '../../../domain/repositories/errors.js';
 
 /**
  * Write JSON data to file atomically
@@ -31,11 +32,62 @@ export async function atomicWriteJSON(filePath: string, data: unknown): Promise<
 /**
  * Load JSON data from file
  *
+ * GREEN: Phase 4.18 - Enhanced error handling with descriptive messages
+ *
  * @param filePath - File path to read
  * @returns Parsed JSON data
- * @throws If file doesn't exist or JSON is invalid
+ * @throws ValidationError if file is empty or JSON is invalid
+ * @throws ENOENT if file doesn't exist (propagated from fs.readFile)
  */
 export async function loadJSON<T>(filePath: string): Promise<T> {
   const content = await fs.readFile(filePath, 'utf-8');
-  return JSON.parse(content) as T;
+
+  // GREEN: Phase 4.18 - Handle empty or whitespace-only files
+  if (content.trim() === '') {
+    throw new ValidationError(
+      `Invalid JSON in ${filePath}: file is empty or contains only whitespace`,
+      [
+        {
+          field: 'content',
+          message: 'File is empty or contains only whitespace',
+        },
+      ],
+      { filePath }
+    );
+  }
+
+  // GREEN: Phase 4.18 - Wrap JSON.parse errors with position information
+  try {
+    return JSON.parse(content) as T;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      // Extract position info from SyntaxError message (e.g., "Unexpected token } in JSON at position 42")
+      const positionMatch = /at position (\d+)/i.exec(error.message);
+      const position = positionMatch !== null ? positionMatch[1] : 'unknown';
+
+      // Try to determine line number from position
+      let lineInfo = '';
+      if (positionMatch !== null) {
+        const pos = Number.parseInt(positionMatch[1], 10);
+        const lines = content.substring(0, pos).split('\n');
+        const line = lines.length;
+        const column = lines[lines.length - 1]?.length ?? 0;
+        lineInfo = ` (line ${String(line)}, column ${String(column)})`;
+      }
+
+      throw new ValidationError(
+        `Invalid JSON in ${filePath}: ${error.message}${lineInfo}`,
+        [
+          {
+            field: 'content',
+            message: `JSON parse error: ${error.message}`,
+            value: position,
+          },
+        ],
+        { filePath, parseError: error.message, position }
+      );
+    }
+    // Re-throw non-SyntaxError errors
+    throw error;
+  }
 }

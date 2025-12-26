@@ -27,7 +27,7 @@ describe('E2E: Requirement Voting via MCP Tool', () => {
     storagePath = path.join(process.cwd(), '.test-temp', 'mcp-vote-' + String(Date.now()) + '-' + crypto.randomUUID());
     await fs.mkdir(storagePath, { recursive: true });
 
-    const services = await createServices(storagePath);
+    const services = await createServices(storagePath, 'test-project');
     const { server } = createMcpServer(services);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 

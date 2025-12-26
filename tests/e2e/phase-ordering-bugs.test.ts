@@ -71,7 +71,7 @@ describe('E2E: Phase Ordering Bugs (REQ-4)', () => {
     );
     await fs.mkdir(storagePath, { recursive: true });
 
-    const services = await createServices(storagePath);
+    const services = await createServices(storagePath, 'test-project');
     const { server } = createMcpServer(services);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 

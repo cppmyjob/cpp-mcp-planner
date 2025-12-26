@@ -57,7 +57,7 @@ export class NotFoundError extends RepositoryError {
 export class ValidationError extends RepositoryError {
   constructor(
     message: string,
-    public readonly errors: ValidationErrorDetail[],
+    public readonly errors: ValidationErrorDetail[] = [],
     details?: Record<string, unknown>
   ) {
     super(message, 'VALIDATION_ERROR', { errors, ...details });

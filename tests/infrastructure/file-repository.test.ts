@@ -8,6 +8,7 @@ import { FileRepository } from '@mcp-planner/core';
 describe('FileRepository', () => {
   // FIX M-4: Use os.tmpdir() instead of process.cwd()
   const testDir = path.join(os.tmpdir(), `test-${Date.now().toString()}-file-repository`);
+  const projectId = 'test-project'; // RED: Added for new path structure
   const planId = 'test-plan-1';
   const entityType: EntityType = 'requirement';
 
@@ -15,7 +16,7 @@ describe('FileRepository', () => {
 
   beforeEach(async () => {
     await fs.mkdir(testDir, { recursive: true });
-    repository = new FileRepository<Requirement>(testDir, planId, entityType);
+    repository = new FileRepository<Requirement>(testDir, projectId, planId, entityType);
     await repository.initialize();
   });
 
@@ -52,8 +53,9 @@ describe('FileRepository', () => {
       expect(repository.entityType).toBe('requirement');
     });
 
-    it('should initialize storage directories', async () => {
-      const planDir = path.join(testDir, 'plans', planId);
+    it('RED: should initialize storage directories with projectId path', async () => {
+      // RED: Expect new path structure: baseDir/projectId/plans/planId/
+      const planDir = path.join(testDir, projectId, 'plans', planId);
       const entitiesDir = path.join(planDir, 'entities');
       const indexesDir = path.join(planDir, 'indexes');
 
@@ -66,6 +68,26 @@ describe('FileRepository', () => {
       expect(planExists).toBe(true);
       expect(entitiesExists).toBe(true);
       expect(indexesExists).toBe(true);
+    });
+
+    it('RED: should use projectId in file paths', async () => {
+      // RED: Create an entity and verify it's stored at the correct path
+      const requirement = createTestRequirement('req-path-test', 'Path Test');
+      await repository.create(requirement);
+
+      // Expected path: baseDir/projectId/plans/planId/entities/requirement-req-path-test.json
+      const expectedEntityPath = path.join(
+        testDir,
+        projectId,
+        'plans',
+        planId,
+        'entities',
+        `${String(entityType)}-req-path-test.json`
+      );
+
+      // Verify file exists at expected path
+      const fileExists = await fs.access(expectedEntityPath).then(() => true).catch(() => false);
+      expect(fileExists).toBe(true);
     });
   });
 
@@ -565,7 +587,7 @@ describe('FileRepository', () => {
   describe('REVIEW: Lazy Initialization', () => {
     it('should auto-initialize on create() without explicit initialize() call', async () => {
       // Create fresh repository WITHOUT calling initialize()
-      const lazyRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-1', entityType);
+      const lazyRepo = new FileRepository<Requirement>(testDir, projectId, 'lazy-plan-1', entityType);
 
       const requirement = createTestRequirement('req-lazy-1', 'Lazy Created');
 
@@ -578,13 +600,13 @@ describe('FileRepository', () => {
 
     it('should auto-initialize on update() without explicit initialize() call', async () => {
       // First create with initialized repo
-      const initRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-2', entityType);
+      const initRepo = new FileRepository<Requirement>(testDir, projectId, 'lazy-plan-2', entityType);
       await initRepo.initialize();
       await initRepo.create(createTestRequirement('req-lazy-2', 'Original'));
       await initRepo.dispose();
 
       // Create fresh repository WITHOUT calling initialize()
-      const lazyRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-2', entityType);
+      const lazyRepo = new FileRepository<Requirement>(testDir, projectId, 'lazy-plan-2', entityType);
 
       // Should work - update() should call ensureInitialized() internally
       // REVIEW: This currently FAILS because update() doesn't call ensureInitialized()
@@ -596,13 +618,13 @@ describe('FileRepository', () => {
 
     it('should auto-initialize on delete() without explicit initialize() call', async () => {
       // First create with initialized repo
-      const initRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-3', entityType);
+      const initRepo = new FileRepository<Requirement>(testDir, projectId, 'lazy-plan-3', entityType);
       await initRepo.initialize();
       await initRepo.create(createTestRequirement('req-lazy-3', 'To Delete'));
       await initRepo.dispose();
 
       // Create fresh repository WITHOUT calling initialize()
-      const lazyRepo = new FileRepository<Requirement>(testDir, 'lazy-plan-3', entityType);
+      const lazyRepo = new FileRepository<Requirement>(testDir, projectId, 'lazy-plan-3', entityType);
 
       // Should work - delete() should call ensureInitialized() internally
       // REVIEW: This currently FAILS because delete() doesn't call ensureInitialized()
@@ -613,7 +635,7 @@ describe('FileRepository', () => {
     });
 
     it('should be idempotent - multiple initialize() calls should be safe', async () => {
-      const repo = new FileRepository<Requirement>(testDir, 'idempotent-plan', entityType);
+      const repo = new FileRepository<Requirement>(testDir, projectId, 'idempotent-plan', entityType);
 
       // Multiple initialize calls should not throw
       await repo.initialize();
@@ -635,12 +657,13 @@ describe('FileRepository', () => {
     it('should use injected FileLockManager', async () => {
       const { FileLockManager: fileLockManagerClass } = await import('@mcp-planner/core');
 
-      const sharedLockManager = new fileLockManagerClass(path.join(testDir, 'plans', 'shared-plan'));
+      const sharedLockManager = new fileLockManagerClass(path.join(testDir, projectId, 'plans', 'shared-plan'));
       await sharedLockManager.initialize();
 
       // Create repository with shared lock manager
       const repo = new FileRepository<Requirement>(
         testDir,
+        projectId,
         'shared-plan',
         entityType,
         undefined,
@@ -660,12 +683,13 @@ describe('FileRepository', () => {
     it('should NOT dispose shared FileLockManager when repository disposes', async () => {
       const { FileLockManager: fileLockManagerClass } = await import('@mcp-planner/core');
 
-      const sharedLockManager = new fileLockManagerClass(path.join(testDir, 'plans', 'shared-plan-2'));
+      const sharedLockManager = new fileLockManagerClass(path.join(testDir, projectId, 'plans', 'shared-plan-2'));
       await sharedLockManager.initialize();
 
       // Create first repository with shared lock manager
       const repo1 = new FileRepository<Requirement>(
         testDir,
+        projectId,
         'shared-plan-2',
         entityType,
         undefined,
@@ -677,6 +701,7 @@ describe('FileRepository', () => {
       // Create second repository with SAME shared lock manager
       const repo2 = new FileRepository<Requirement>(
         testDir,
+        projectId,
         'shared-plan-2',
         'solution' as EntityType, // Different entity type, same lock manager
         undefined,
@@ -703,7 +728,7 @@ describe('FileRepository', () => {
 
     it('should dispose owned FileLockManager when repository disposes', async () => {
       // Create repository WITHOUT injected lock manager (owns its own)
-      const repo = new FileRepository<Requirement>(testDir, 'owned-plan', entityType);
+      const repo = new FileRepository<Requirement>(testDir, projectId, 'owned-plan', entityType);
       await repo.initialize();
       await repo.create(createTestRequirement('req-owned', 'Owned Lock Test'));
 

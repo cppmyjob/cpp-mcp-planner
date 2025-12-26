@@ -8,7 +8,7 @@
  * - MongoDB (future)
  */
 
-import type { Entity, Link, EntityType, PlanManifest, ActivePlansIndex, VersionHistory } from '../entities/types.js';
+import type { Entity, Link, EntityType, PlanManifest, ActivePlansIndex, VersionHistory, ProjectConfig } from '../entities/types.js';
 
 // ============================================================================
 // Query Types
@@ -414,6 +414,52 @@ export interface PlanRepository {
 }
 
 // ============================================================================
+// Config Repository
+// ============================================================================
+
+/**
+ * Config Repository
+ * Manages .mcp-config.json files in project directories
+ */
+export interface ConfigRepository {
+  /**
+   * Initialize repository
+   */
+  initialize(): Promise<void>;
+
+  /**
+   * Load project config from .mcp-config.json
+   * @param workspacePath - Path to workspace directory
+   * @returns ProjectConfig or null if not found
+   */
+  loadConfig(workspacePath: string): Promise<ProjectConfig | null>;
+
+  /**
+   * Save project config to .mcp-config.json
+   * @param workspacePath - Path to workspace directory
+   * @param config - Project configuration
+   */
+  saveConfig(workspacePath: string, config: ProjectConfig): Promise<void>;
+
+  /**
+   * Delete project config file
+   * @param workspacePath - Path to workspace directory
+   */
+  deleteConfig(workspacePath: string): Promise<void>;
+
+  /**
+   * Check if config file exists
+   * @param workspacePath - Path to workspace directory
+   */
+  configExists(workspacePath: string): Promise<boolean>;
+
+  /**
+   * Close repository and cleanup
+   */
+  close(): Promise<void>;
+}
+
+// ============================================================================
 // Repository Factory
 // ============================================================================
 
@@ -452,6 +498,11 @@ export interface RepositoryFactory {
   createPlanRepository(): PlanRepository;
 
   /**
+   * Create config repository (for .mcp-config.json management)
+   */
+  createConfigRepository(): ConfigRepository;
+
+  /**
    * Create unit of work
    */
   createUnitOfWork(planId: string): UnitOfWork;
@@ -460,6 +511,12 @@ export interface RepositoryFactory {
    * Get storage backend type
    */
   getBackend(): StorageBackend;
+
+  /**
+   * Get projectId from factory configuration
+   * @returns The projectId configured for this factory
+   */
+  getProjectId(): string;
 
   /**
    * Close all connections and cleanup

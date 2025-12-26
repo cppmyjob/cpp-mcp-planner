@@ -523,6 +523,15 @@ class InMemoryRepositoryFactory implements RepositoryFactory {
     return 'file';
   }
 
+  // GREEN: Phase 4.10 - Add missing RepositoryFactory methods
+  public createConfigRepository(): never {
+    throw new Error('ConfigRepository not supported in batch mode');
+  }
+
+  public getProjectId(): string {
+    return this.planId;
+  }
+
   public async close(): Promise<void> {
     // No-op for in-memory
   }

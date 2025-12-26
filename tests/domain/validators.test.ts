@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { validateTargets, validateSlug } from '@mcp-planner/core';
+import { validateTargets, validateSlug, isValidProjectId } from '@mcp-planner/core';
 
 describe('validateTargets', () => {
   describe('basic validation', () => {
@@ -273,6 +273,152 @@ describe('validateSlug', () => {
     it('RED: should accept slug at max length (100)', () => {
       const maxSlug = 'a'.repeat(100);
       expect(() => { validateSlug(maxSlug); }).not.toThrow();
+    });
+  });
+});
+
+describe('isValidProjectId', () => {
+  describe('basic validation', () => {
+    it('RED: should accept valid alphanumeric projectId', () => {
+      expect(isValidProjectId('myproject')).toBe(true);
+      expect(isValidProjectId('MyProject123')).toBe(true);
+      expect(isValidProjectId('project1')).toBe(true);
+    });
+
+    it('RED: should accept projectId with dots', () => {
+      expect(isValidProjectId('my.project')).toBe(true);
+      expect(isValidProjectId('com.example.app')).toBe(true);
+    });
+
+    it('RED: should accept projectId with underscores', () => {
+      expect(isValidProjectId('my_project')).toBe(true);
+      expect(isValidProjectId('test_app_v2')).toBe(true);
+    });
+
+    it('RED: should accept projectId with hyphens', () => {
+      expect(isValidProjectId('my-project')).toBe(true);
+      expect(isValidProjectId('test-app-v2')).toBe(true);
+    });
+
+    it('RED: should accept mixed alphanumeric with dots, underscores, and hyphens', () => {
+      expect(isValidProjectId('my-project_v1.0')).toBe(true);
+      expect(isValidProjectId('app123.test-beta')).toBe(true);
+    });
+
+    it('RED: should reject empty string', () => {
+      expect(isValidProjectId('')).toBe(false);
+    });
+
+    it('RED: should reject non-string values', () => {
+      expect(isValidProjectId(null)).toBe(false);
+      expect(isValidProjectId(undefined)).toBe(false);
+      expect(isValidProjectId(123)).toBe(false);
+      expect(isValidProjectId({})).toBe(false);
+    });
+
+    it('RED: should reject projectId starting with dot', () => {
+      expect(isValidProjectId('.myproject')).toBe(false);
+    });
+
+    it('RED: should reject projectId starting with hyphen', () => {
+      expect(isValidProjectId('-myproject')).toBe(false);
+    });
+
+    it('RED: should reject projectId starting with underscore', () => {
+      expect(isValidProjectId('_myproject')).toBe(false);
+    });
+
+    it('RED: should reject projectId with spaces', () => {
+      expect(isValidProjectId('my project')).toBe(false);
+      expect(isValidProjectId('my project 123')).toBe(false);
+    });
+
+    it('RED: should reject projectId with forward slash', () => {
+      expect(isValidProjectId('my/project')).toBe(false);
+      expect(isValidProjectId('path/to/project')).toBe(false);
+    });
+
+    it('RED: should reject projectId with backslash', () => {
+      expect(isValidProjectId('my\\project')).toBe(false);
+      expect(isValidProjectId('path\\to\\project')).toBe(false);
+    });
+
+    it('RED: should reject projectId with special characters', () => {
+      expect(isValidProjectId('my:project')).toBe(false);
+      expect(isValidProjectId('my*project')).toBe(false);
+      expect(isValidProjectId('my?project')).toBe(false);
+      expect(isValidProjectId('my"project')).toBe(false);
+      expect(isValidProjectId('my<project')).toBe(false);
+      expect(isValidProjectId('my>project')).toBe(false);
+      expect(isValidProjectId('my|project')).toBe(false);
+    });
+  });
+
+  describe('enhanced validation - consecutive dots', () => {
+    it('RED: should reject consecutive dots (..) - path traversal bypass', () => {
+      expect(isValidProjectId('project..id')).toBe(false);
+      expect(isValidProjectId('my..project')).toBe(false);
+      expect(isValidProjectId('test...app')).toBe(false);
+    });
+  });
+
+  describe('enhanced validation - reserved Windows names', () => {
+    it('RED: should reject reserved Windows names (CON, PRN, AUX, NUL)', () => {
+      expect(isValidProjectId('CON')).toBe(false);
+      expect(isValidProjectId('PRN')).toBe(false);
+      expect(isValidProjectId('AUX')).toBe(false);
+      expect(isValidProjectId('NUL')).toBe(false);
+      expect(isValidProjectId('COM1')).toBe(false);
+      expect(isValidProjectId('COM9')).toBe(false);
+      expect(isValidProjectId('LPT1')).toBe(false);
+      expect(isValidProjectId('LPT9')).toBe(false);
+    });
+
+    it('RED: should reject reserved names case-insensitively', () => {
+      expect(isValidProjectId('con')).toBe(false);
+      expect(isValidProjectId('Con')).toBe(false);
+      expect(isValidProjectId('prn')).toBe(false);
+      expect(isValidProjectId('Prn')).toBe(false);
+    });
+
+    it('RED: should accept reserved names as part of longer name', () => {
+      expect(isValidProjectId('my-con-app')).toBe(true);
+      expect(isValidProjectId('config')).toBe(true);
+      expect(isValidProjectId('console')).toBe(true);
+    });
+  });
+
+  describe('enhanced validation - length limits', () => {
+    it('RED: should reject projectId exceeding 50 characters', () => {
+      const longId = 'a'.repeat(51);
+      expect(isValidProjectId(longId)).toBe(false);
+    });
+
+    it('RED: should accept projectId at max length (50 chars)', () => {
+      const maxId = 'a'.repeat(50);
+      expect(isValidProjectId(maxId)).toBe(true);
+    });
+
+    it('RED: should accept projectId below max length', () => {
+      const validId = 'my-project-with-long-name-but-within-limit';
+      expect(isValidProjectId(validId)).toBe(true);
+    });
+  });
+
+  describe('enhanced validation - trailing characters', () => {
+    it('RED: should reject trailing dot', () => {
+      expect(isValidProjectId('project.')).toBe(false);
+      expect(isValidProjectId('my.project.')).toBe(false);
+    });
+
+    it('RED: should reject trailing hyphen', () => {
+      expect(isValidProjectId('project-')).toBe(false);
+      expect(isValidProjectId('my-project-')).toBe(false);
+    });
+
+    it('RED: should accept dot or hyphen in middle', () => {
+      expect(isValidProjectId('my.project.name')).toBe(true);
+      expect(isValidProjectId('my-project-name')).toBe(true);
     });
   });
 });

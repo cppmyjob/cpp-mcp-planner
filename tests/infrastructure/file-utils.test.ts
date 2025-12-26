@@ -12,6 +12,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { atomicWriteJSON, loadJSON } from '@mcp-planner/core';
+import { ValidationError } from '../../packages/core/src/domain/repositories/errors.js';
 
 describe('file-utils', () => {
   let testDir: string;
@@ -196,11 +197,13 @@ describe('file-utils', () => {
       }
     });
 
-    it('should throw SyntaxError for invalid JSON', async () => {
+    it('should throw ValidationError for invalid JSON', async () => {
       const filePath = path.join(testDir, 'invalid.json');
       await fs.writeFile(filePath, 'not valid json { missing quotes }', 'utf-8');
 
-      await expect(loadJSON(filePath)).rejects.toThrow(SyntaxError);
+      // GREEN: Phase 4.18 - loadJSON now wraps SyntaxError in ValidationError
+      await expect(loadJSON(filePath)).rejects.toThrow(ValidationError);
+      await expect(loadJSON(filePath)).rejects.toThrow(/Invalid JSON/i);
     });
 
     it('should handle empty JSON object', async () => {

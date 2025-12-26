@@ -46,6 +46,7 @@ export type WarningCallback = (message: string) => void;
  */
 export class FileUnitOfWork implements UnitOfWork {
   private readonly baseDir: string;
+  private readonly projectId: string;
   private readonly planId: string;
   private readonly fileLockManager: FileLockManager;
   private readonly cacheOptions?: Partial<CacheOptions>;
@@ -65,11 +66,13 @@ export class FileUnitOfWork implements UnitOfWork {
 
   constructor(
     baseDir: string,
+    projectId: string,
     planId: string,
     fileLockManager: FileLockManager,
     cacheOptions?: Partial<CacheOptions>
   ) {
     this.baseDir = baseDir;
+    this.projectId = projectId;
     this.planId = planId;
     this.fileLockManager = fileLockManager;
     this.cacheOptions = cacheOptions;
@@ -192,9 +195,10 @@ export class FileUnitOfWork implements UnitOfWork {
       return this.repositories.get(entityType) as FileRepository<T>;
     }
 
-    // Create new repository with shared FileLockManager
+    // Create new repository with shared FileLockManager and projectId
     const repository = new FileRepository<T>(
       this.baseDir,
+      this.projectId,
       this.planId,
       entityType,
       this.cacheOptions,
@@ -207,9 +211,10 @@ export class FileUnitOfWork implements UnitOfWork {
   }
 
   public getLinkRepository(): FileLinkRepository {
-    // Create with shared FileLockManager
+    // Create with shared FileLockManager and projectId
     this.linkRepository ??= new FileLinkRepository(
       this.baseDir,
+      this.projectId,
       this.planId,
       this.fileLockManager,
       this.cacheOptions
