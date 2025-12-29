@@ -149,7 +149,7 @@
                 <div class="artifacts__preview-code">
                   <div class="artifacts__preview-code-header">
                     <span class="artifacts__preview-filename">
-                      {{ selectedArtifact()!.content?.filename ?? 'source' }}
+                      {{ selectedArtifact()!.content.filename ?? 'source' }}
                     </span>
                     <p-button
                       icon="pi pi-copy"
@@ -159,7 +159,7 @@
                       tooltipPosition="left"
                     />
                   </div>
-                  <pre class="artifacts__preview-code-block"><code>{{ selectedArtifact()!.content?.sourceCode }}</code></pre>
+                  <pre class="artifacts__preview-code-block"><code>{{ selectedArtifact()!.content.sourceCode }}</code></pre>
                 </div>
               }
 
