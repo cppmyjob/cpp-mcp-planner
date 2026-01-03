@@ -98,12 +98,7 @@ export class ProjectService {
    */
   public async initProject(workspacePath: string, config: ProjectConfig): Promise<InitProjectResult> {
     this.validateWorkspacePath(workspacePath);
-    this.validateConfig(config);
-
-    // Validate projectId format
-    if (!isValidProjectId(config.projectId)) {
-      throw new ValidationError(`Invalid projectId: "${config.projectId}". Must be lowercase alphanumeric with hyphens, 3-50 chars.`);
-    }
+    this.validateConfig(config); // Now includes comprehensive projectId format validation
 
     // Check if project already exists in this workspace
     const existing = await this.configService.loadConfig(workspacePath);
@@ -323,6 +318,13 @@ export class ProjectService {
     }
 
     validateNonEmptyString(config.projectId, 'config.projectId');
+
+    // Validate projectId format (comprehensive check)
+    if (!isValidProjectId(config.projectId)) {
+      throw new ValidationError(
+        `Invalid projectId: "${config.projectId}". Must be lowercase alphanumeric with hyphens, 3-50 chars.`
+      );
+    }
   }
 
   private validateProjectId(projectId: string): void {

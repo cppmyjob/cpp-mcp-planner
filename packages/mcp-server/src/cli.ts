@@ -42,7 +42,13 @@ export async function loadProjectId(): Promise<string> {
     }
     throw error;
   } finally {
-    await configRepo.close();
+    // Ensure close() is idempotent and handles errors gracefully
+    try {
+      await configRepo.close();
+    } catch (closeError) {
+      // Log but don't throw - we're already in error state or successful exit
+      console.error('Warning: Error closing ConfigRepository:', closeError instanceof Error ? closeError.message : String(closeError));
+    }
   }
 }
 

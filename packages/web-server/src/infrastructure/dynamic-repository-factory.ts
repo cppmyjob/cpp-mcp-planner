@@ -140,6 +140,8 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
     // Return cached factory if exists and initialized
     if (this.factoryCache.has(projectId) && this.initializedMap.get(projectId) === true) {
       const cached = this.factoryCache.get(projectId);
+      // Defensive check: should never be null since has() returned true
+      // Protects against Map corruption or concurrent modification bugs
       if (cached == null) {
         throw new Error(`Factory cache inconsistency for ${projectId}`);
       }
@@ -160,6 +162,8 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
       // Double-check: another concurrent request may have initialized
       if (this.factoryCache.has(projectId) && this.initializedMap.get(projectId) === true) {
         const cached = this.factoryCache.get(projectId);
+        // Defensive check: should never be null since has() returned true
+        // Protects against Map corruption or concurrent modification bugs
         if (cached == null) {
           throw new Error(`Factory cache inconsistency for ${projectId}`);
         }
@@ -185,8 +189,13 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
         // Failed initialization: remove factory from cache
         this.factoryCache.delete(projectId);
         this.initializedMap.delete(projectId);
-        // Propagate error
-        throw error;
+        // Propagate error with projectId context
+        throw new Error(
+          `Failed to initialize PlanRepository for projectId "${projectId}": ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          { cause: error }
+        );
       }
 
       // Cache factory and mark as initialized

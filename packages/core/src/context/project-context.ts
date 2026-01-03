@@ -73,6 +73,10 @@ export function setFallbackProjectId(projectId: string): void {
  * Run callback with projectId scoped to AsyncLocalStorage context.
  *
  * Uses run() method (NOT enterWith()) for proper context isolation.
+ * The run() method creates a new isolated context for each callback execution,
+ * ensuring no context leakage across concurrent requests. In contrast,
+ * enterWith() would leak context across requests in multi-tenant scenarios.
+ *
  * Context is automatically propagated through async boundaries.
  *
  * @param projectId - Project ID for this execution context

@@ -44,8 +44,9 @@ export class ProjectContextMiddleware implements NestMiddleware {
 
     // GREEN: Phase 2.11.4 - Context propagation through AsyncLocalStorage
     // Run next() within the project context
-    // AsyncLocalStorage automatically propagates context through all async operations
-    // initiated within this callback, including NestJS controller methods and services
+    // AsyncLocalStorage propagates context through the continuation chain initiated by next(),
+    // even though the callback completes synchronously. The context is preserved for all
+    // async operations in controllers and services via AsyncLocalStorage's internal tracking.
     // Note: void operator is intentional - middleware pattern doesn't wait for request completion
     void runWithProjectContext(trimmedId, () => {
       next();
