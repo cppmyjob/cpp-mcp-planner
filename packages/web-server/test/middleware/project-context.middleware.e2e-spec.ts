@@ -74,6 +74,27 @@ describe('ProjectContextMiddleware', () => {
       .expect(400);
   });
 
+  it('should return 400 Bad Request if X-Project-Id header has invalid format (uppercase)', async () => {
+    // Validate projectId format before setting context
+    const response = await request(app.getHttpServer())
+      .get('/test')
+      .set('X-Project-Id', 'Invalid-Project-ID')
+      .expect(400);
+
+    expect(response.body.message).toContain('Invalid X-Project-Id header');
+    expect(response.body.message).toContain('lowercase alphanumeric');
+  });
+
+  it('should return 400 Bad Request if X-Project-Id header has invalid format (special chars)', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/test')
+      .set('X-Project-Id', 'invalid!@#project')
+      .expect(400);
+
+    expect(response.body.message).toContain('Invalid X-Project-Id header');
+    expect(response.body.message).toContain('lowercase alphanumeric');
+  });
+
   it('should propagate context through async operations', async () => {
     // RED: This verifies AsyncLocalStorage context propagation
     @Controller('async-test')

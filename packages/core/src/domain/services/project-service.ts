@@ -80,6 +80,12 @@ export class ProjectService {
     private readonly baseDir: string,
     options?: ProjectServiceOptions
   ) {
+    // Validate baseDir parameter
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (baseDir === undefined || baseDir === null || typeof baseDir !== 'string' || baseDir.trim() === '') {
+      throw new ValidationError('baseDir is required and must be a non-empty string');
+    }
+
     this.defaultProjectsLimit = options?.defaultProjectsLimit ?? DEFAULT_PROJECTS_LIMIT;
   }
 

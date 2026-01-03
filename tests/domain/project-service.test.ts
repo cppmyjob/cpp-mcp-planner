@@ -53,6 +53,40 @@ describe('ProjectService', () => {
     await fs.rm(testDir, { recursive: true, force: true });
   });
 
+  describe('RED: constructor validation', () => {
+    it('should throw ValidationError when baseDir is undefined', () => {
+      expect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        new ProjectService(configService, planService, undefined as any);
+      }).toThrow('baseDir is required');
+    });
+
+    it('should throw ValidationError when baseDir is null', () => {
+      expect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        new ProjectService(configService, planService, null as any);
+      }).toThrow('baseDir is required');
+    });
+
+    it('should throw ValidationError when baseDir is empty string', () => {
+      expect(() => {
+        new ProjectService(configService, planService, '');
+      }).toThrow('baseDir is required');
+    });
+
+    it('should throw ValidationError when baseDir is whitespace only', () => {
+      expect(() => {
+        new ProjectService(configService, planService, '   ');
+      }).toThrow('baseDir is required');
+    });
+
+    it('should accept valid baseDir', () => {
+      expect(() => {
+        new ProjectService(configService, planService, testDir);
+      }).not.toThrow();
+    });
+  });
+
   describe('RED: initProject', () => {
     it('should initialize project with config file', async () => {
       const workspacePath = path.join(testDir, 'workspace1');
@@ -105,6 +139,27 @@ describe('ProjectService', () => {
       const config: ProjectConfig = { projectId: 'Invalid ID!' };
 
       await expect(projectService.initProject(workspacePath, config)).rejects.toThrow('Invalid projectId');
+    });
+
+    it('should create project directory structure in baseDir', async () => {
+      const workspacePath = path.join(testDir, 'workspace-dir-structure');
+      await fs.mkdir(workspacePath, { recursive: true });
+
+      const config: ProjectConfig = { projectId: 'test-project-dirs' };
+
+      await projectService.initProject(workspacePath, config);
+
+      // Verify directory structure: {baseDir}/{projectId}/plans
+      const projectDir = path.join(testDir, 'test-project-dirs');
+      const plansDir = path.join(projectDir, 'plans');
+
+      // Check that directories exist
+      await expect(fs.access(projectDir)).resolves.toBeUndefined();
+      await expect(fs.access(plansDir)).resolves.toBeUndefined();
+
+      // Verify plansDir is actually a directory
+      const plansDirStat = await fs.stat(plansDir);
+      expect(plansDirStat.isDirectory()).toBe(true);
     });
   });
 

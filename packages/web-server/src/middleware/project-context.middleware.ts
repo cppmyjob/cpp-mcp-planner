@@ -17,7 +17,7 @@
 
 import { Injectable, type NestMiddleware, BadRequestException } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
-import { runWithProjectContext } from '@mcp-planner/core';
+import { runWithProjectContext, isValidProjectId } from '@mcp-planner/core';
 
 /**
  * Middleware that extracts projectId from X-Project-Id header and sets AsyncLocalStorage context
@@ -32,12 +32,22 @@ export class ProjectContextMiddleware implements NestMiddleware {
       throw new BadRequestException('X-Project-Id header is required');
     }
 
+    const trimmedId = projectId.trim();
+
+    // Validate projectId format before setting context
+    if (!isValidProjectId(trimmedId)) {
+      throw new BadRequestException(
+        `Invalid X-Project-Id header: "${trimmedId}". ` +
+        `Must be lowercase alphanumeric with hyphens, 3-50 chars.`
+      );
+    }
+
     // GREEN: Phase 2.11.4 - Context propagation through AsyncLocalStorage
     // Run next() within the project context
     // AsyncLocalStorage automatically propagates context through all async operations
     // initiated within this callback, including NestJS controller methods and services
     // Note: callback is synchronous, so runWithProjectContext returns synchronously (not a Promise)
-    void runWithProjectContext(projectId.trim(), () => {
+    void runWithProjectContext(trimmedId, () => {
       next();
     });
   }

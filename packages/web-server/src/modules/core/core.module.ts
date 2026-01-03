@@ -48,7 +48,6 @@ export const CONFIG_SERVICE = 'CONFIG_SERVICE';
       inject: [ConfigService],
     },
     // GREEN: Phase 2.4.3 - DynamicRepositoryFactory with multi-project support
-    // DynamicRepositoryFactory - depends on FileLockManager
     {
       provide: REPOSITORY_FACTORY,
       useFactory: (
