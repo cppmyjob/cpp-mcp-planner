@@ -76,7 +76,7 @@ export async function createServices(storagePath: string, projectId: string): Pr
 
   // GREEN: Phase 4.14 - Instantiate project services
   const configService = new ConfigService(repositoryFactory);
-  const projectService = new ProjectService(configService, planService);
+  const projectService = new ProjectService(configService, planService, storagePath);
 
   return {
     repositoryFactory,

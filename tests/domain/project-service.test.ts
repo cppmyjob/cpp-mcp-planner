@@ -121,59 +121,26 @@ describe('ProjectService', () => {
       ).rejects.toThrow('Invalid projectId');
     });
 
-    it('should prevent creating duplicate projectIds', async () => {
-      // GREEN: Phase 4.21 - Test duplicate detection with lowercase-only projectIds
+    it('should allow same projectId in different workspaces', async () => {
+      // Duplicate projectIds across different workspaces are allowed
+      // Conflicts only occur at storage level when creating plans
 
-      // Create first workspace with lowercase projectId
-      const workspace1 = path.join(testDir, 'workspace-case-3a');
-      await fs.mkdir(workspace1, { recursive: true });
-      await projectService.initProject(workspace1, { projectId: 'test-project-case' });
-
-      // Create a plan to establish the project
-      const factory1 = new FileRepositoryFactory({
-        type: 'file',
-        baseDir: testDir,
-        projectId: 'test-project-case',
-        lockManager,
-      });
-      const planService1 = new PlanService(factory1);
-      await planService1.createPlan({ name: 'Plan 1', description: 'Test' });
-      await factory1.dispose();
-
-      // Attempt to create second workspace with same projectId
-      const workspace2 = path.join(testDir, 'workspace-case-3b');
-      await fs.mkdir(workspace2, { recursive: true });
-
-      // Should throw error about conflict with existing projectId
-      await expect(
-        projectService.initProject(workspace2, { projectId: 'test-project-case' })
-      ).rejects.toThrow(/conflict/i);
-    });
-
-    it('should validate projectId uniqueness during init', async () => {
-      const workspace1 = path.join(testDir, 'workspace-case-4');
-      const workspace2 = path.join(testDir, 'workspace-case-5');
+      const workspace1 = path.join(testDir, 'workspace-dup-1');
+      const workspace2 = path.join(testDir, 'workspace-dup-2');
       await fs.mkdir(workspace1, { recursive: true });
       await fs.mkdir(workspace2, { recursive: true });
 
       // Initialize first project
-      await projectService.initProject(workspace1, { projectId: 'unique-project' });
+      await projectService.initProject(workspace1, { projectId: 'shared-id' });
 
-      // Create a plan to establish the project
-      const factory1 = new FileRepositoryFactory({
-        type: 'file',
-        baseDir: testDir,
-        projectId: 'unique-project',
-        lockManager,
-      });
-      const planService1 = new PlanService(factory1);
-      await planService1.createPlan({ name: 'Plan', description: 'Test' });
-      await factory1.dispose();
+      // Initialize second project with same ID (should succeed)
+      await projectService.initProject(workspace2, { projectId: 'shared-id' });
 
-      // Attempt to initialize second project with same ID
-      await expect(
-        projectService.initProject(workspace2, { projectId: 'unique-project' })
-      ).rejects.toThrow(/conflict|exists|duplicate/i);
+      // Verify both projects exist
+      const config1 = await projectService.getProject(workspace1);
+      const config2 = await projectService.getProject(workspace2);
+      expect(config1?.projectId).toBe('shared-id');
+      expect(config2?.projectId).toBe('shared-id');
     });
   });
 

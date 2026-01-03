@@ -63,7 +63,8 @@ const DEFAULT_PROJECTS_LIMIT = 50;
 export class ProjectService {
   constructor(
     private readonly configService: ConfigService,
-    private readonly planService: PlanService
+    private readonly planService: PlanService,
+    private readonly baseDir?: string
   ) {}
 
   /**
@@ -85,22 +86,14 @@ export class ProjectService {
       throw new ValidationError(`Invalid projectId: "${config.projectId}". Must be lowercase alphanumeric with hyphens, 3-50 chars.`);
     }
 
-    // Check if project already exists
+    // Check if project already exists in this workspace
     const existing = await this.configService.loadConfig(workspacePath);
     if (existing !== null) {
       throw new ValidationError(`Project already initialized at ${workspacePath}`);
     }
 
-    // GREEN: Phase 4.21 - Check for duplicate projectId (lowercase-only, simple equality check)
-    const existingProjects = await this.discoverProjects();
-
-    const conflict = existingProjects.find((p) => p.id === config.projectId);
-
-    if (conflict !== undefined) {
-      throw new ValidationError(
-        `Project ID conflict: "${config.projectId}" already exists`
-      );
-    }
+    // Note: Duplicate projectIds across different workspaces are allowed
+    // Conflicts are handled at storage level when creating plans
 
     // Save config
     await this.configService.saveConfig(workspacePath, config);
@@ -108,12 +101,12 @@ export class ProjectService {
     const configPath = path.join(workspacePath, '.mcp-config.json');
 
     // GREEN: Phase 4.21 - Create project directory structure for discoverability
-    // Create baseDir/projectId/plans/ so the project is discoverable by list action
-    const planRepo = (this.planService as unknown as { planRepo: { baseDir: string } }).planRepo;
-    const baseDir = planRepo.baseDir;
-    const projectDir = path.join(baseDir, config.projectId);
-    const plansDir = path.join(projectDir, 'plans');
-    await fs.mkdir(plansDir, { recursive: true });
+    // Only create if baseDir is provided (web-server and mcp-server)
+    if (this.baseDir !== undefined) {
+      const projectDir = path.join(this.baseDir, config.projectId);
+      const plansDir = path.join(projectDir, 'plans');
+      await fs.mkdir(plansDir, { recursive: true });
+    }
 
     return {
       success: true,
@@ -225,9 +218,15 @@ export class ProjectService {
   private async discoverProjects(): Promise<ProjectInfo[]> {
     const projects: ProjectInfo[] = [];
 
-    // Get planRepo to access baseDir
-    const planRepo = (this.planService as unknown as { planRepo: { baseDir: string } }).planRepo;
-    const baseDir = planRepo.baseDir;
+    // Get baseDir (from constructor if provided, otherwise from planRepo for backwards compatibility)
+    let baseDir: string;
+    if (this.baseDir !== undefined) {
+      baseDir = this.baseDir;
+    } else {
+      // Fallback for backwards compatibility (mcp-server)
+      const planRepo = (this.planService as unknown as { planRepo: { baseDir: string } }).planRepo;
+      baseDir = planRepo.baseDir;
+    }
 
     // Check if baseDir exists
     try {

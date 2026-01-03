@@ -110,7 +110,7 @@ describe('CoreModule with DynamicRepositoryFactory (e2e)', () => {
 
       // Create plan in project-A
       let planIdA: string;
-      await runWithProjectContext('integration-project-A', async () => {
+      await runWithProjectContext('integration-project-a', async () => {
         const createResult = await planService.createPlan({
           name: 'Plan A',
           description: 'Plan for project A',
@@ -124,7 +124,7 @@ describe('CoreModule with DynamicRepositoryFactory (e2e)', () => {
 
       // Create plan in project-B
       let planIdB: string;
-      await runWithProjectContext('integration-project-B', async () => {
+      await runWithProjectContext('integration-project-b', async () => {
         const createResult = await planService.createPlan({
           name: 'Plan B',
           description: 'Plan for project B',
@@ -137,7 +137,7 @@ describe('CoreModule with DynamicRepositoryFactory (e2e)', () => {
       });
 
       // Verify isolation - project-A still has only plan-A
-      await runWithProjectContext('integration-project-A', async () => {
+      await runWithProjectContext('integration-project-a', async () => {
         const result = await planService.listPlans({});
         expect(result.plans).toHaveLength(1);
         expect(result.plans[0]?.id).toBe(planIdA);

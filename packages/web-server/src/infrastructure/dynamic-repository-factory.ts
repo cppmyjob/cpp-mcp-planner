@@ -24,6 +24,7 @@ import { Mutex } from 'async-mutex';
 import { getProjectId } from '@mcp-planner/core';
 import {
   FileRepositoryFactory,
+  FileConfigRepository,
   type RepositoryFactoryConfig,
   type FileLockManager,
   type Repository,
@@ -403,8 +404,8 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
   /**
    * Create or retrieve cached Config Repository
    *
-   * Delegates to FileRepositoryFactory for current projectId.
-   * Uses getProjectId() from AsyncLocalStorage.
+   * ConfigRepository is workspace-level (uses workspacePath, not projectId storage).
+   * It doesn't require factory initialization since it operates independently.
    *
    * @returns ConfigRepository instance
    */
@@ -413,19 +414,9 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
       throw new Error('DynamicRepositoryFactory is closed');
     }
 
-    const projectId = getProjectId();
-    if (projectId == null || projectId === '') {
-      throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
-    }
-
-    const factory = this.factoryCache.get(projectId);
-    if (factory == null || this.initializedMap.get(projectId) !== true) {
-      throw new Error(
-        `FileRepositoryFactory for projectId "${projectId}" is not initialized. Call createPlanRepository() first.`
-      );
-    }
-
-    return factory.createConfigRepository();
+    // ConfigRepository is workspace-level and doesn't need projectId context
+    // Create directly without requiring factory initialization
+    return new FileConfigRepository();
   }
 
   /**

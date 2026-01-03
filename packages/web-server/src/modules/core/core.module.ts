@@ -268,12 +268,14 @@ export const CONFIG_SERVICE = 'CONFIG_SERVICE';
     {
       provide: PROJECT_SERVICE,
       useFactory: (
-        configService: CoreConfigService,
+        configService: ConfigService,
+        coreConfigService: CoreConfigService,
         planService: PlanService
       ): ProjectService => {
-        return new ProjectService(configService, planService);
+        const storagePath = configService.getOrThrow<string>('storagePath');
+        return new ProjectService(coreConfigService, planService, storagePath);
       },
-      inject: [CONFIG_SERVICE, PLAN_SERVICE],
+      inject: [ConfigService, CONFIG_SERVICE, PLAN_SERVICE],
     },
     { provide: ProjectService, useExisting: PROJECT_SERVICE },
   ],
