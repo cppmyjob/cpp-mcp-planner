@@ -299,8 +299,8 @@ export class ProjectService {
   private validateWorkspacePath(workspacePath: string): void {
     // Runtime validation (TypeScript types don't prevent null/undefined at runtime)
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (workspacePath === undefined || workspacePath === null || typeof workspacePath !== 'string') {
-      throw new ValidationError('workspacePath is required and must be a string');
+    if (workspacePath === undefined || workspacePath === null || typeof workspacePath !== 'string' || workspacePath.trim() === '') {
+      throw new ValidationError('workspacePath is required and must be a non-empty string');
     }
 
     // GREEN: Phase 4.20 - Use validateWorkspacePath for comprehensive validation
