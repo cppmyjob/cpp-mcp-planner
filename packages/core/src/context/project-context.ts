@@ -1,8 +1,10 @@
 /**
- * GREEN: Phase 2.2.3 - Project Context using AsyncLocalStorage
+ * Project Context using AsyncLocalStorage
  *
  * Provides framework-agnostic project context isolation for multi-tenant architecture.
  * Uses native Node.js AsyncLocalStorage with run() method (NOT enterWith()).
+ *
+ * Phase: 2.2.3 - Multi-project context isolation
  *
  * Architecture:
  * - MCP Server: Uses setFallbackProjectId() at startup (single-project mode)
@@ -21,10 +23,16 @@ interface ProjectContext {
   projectId: string;
 }
 
-// AsyncLocalStorage instance for projectId context
+/**
+ * AsyncLocalStorage instance for projectId context.
+ * Provides request-scoped isolation in multi-project mode.
+ */
 const asyncLocalStorage = new AsyncLocalStorage<ProjectContext>();
 
-// Fallback projectId for MCP Server single-project mode
+/**
+ * Fallback projectId for MCP Server single-project mode.
+ * Used when no AsyncLocalStorage context exists.
+ */
 let fallbackProjectId: string | undefined;
 
 /**

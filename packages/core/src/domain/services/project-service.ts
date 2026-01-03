@@ -11,7 +11,7 @@ import type { ConfigService } from './config-service.js';
 import type { PlanService } from './plan-service.js';
 import type { ProjectConfig, ProjectInfo } from '../entities/types.js';
 import { ValidationError } from '../repositories/errors.js';
-import { isValidProjectId, validateWorkspacePath } from './validators.js';
+import { isValidProjectId, validateWorkspacePath, validateNonEmptyString } from './validators.js';
 
 // ============================================================================
 // Input/Output Types
@@ -81,10 +81,7 @@ export class ProjectService {
     options?: ProjectServiceOptions
   ) {
     // Validate baseDir parameter
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (baseDir === undefined || baseDir === null || typeof baseDir !== 'string' || baseDir.trim() === '') {
-      throw new ValidationError('baseDir is required and must be a non-empty string');
-    }
+    validateNonEmptyString(baseDir, 'baseDir');
 
     this.defaultProjectsLimit = options?.defaultProjectsLimit ?? DEFAULT_PROJECTS_LIMIT;
   }
@@ -312,10 +309,7 @@ export class ProjectService {
 
   private validateWorkspacePath(workspacePath: string): void {
     // Runtime validation (TypeScript types don't prevent null/undefined at runtime)
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (workspacePath === undefined || workspacePath === null || typeof workspacePath !== 'string' || workspacePath.trim() === '') {
-      throw new ValidationError('workspacePath is required and must be a non-empty string');
-    }
+    validateNonEmptyString(workspacePath, 'workspacePath');
 
     // GREEN: Phase 4.20 - Use validateWorkspacePath for comprehensive validation
     validateWorkspacePath(workspacePath);
@@ -328,17 +322,11 @@ export class ProjectService {
       throw new ValidationError('config is required');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (config.projectId === undefined || config.projectId === null || typeof config.projectId !== 'string' || config.projectId.trim() === '') {
-      throw new ValidationError('projectId is required in config and must be a non-empty string');
-    }
+    validateNonEmptyString(config.projectId, 'config.projectId');
   }
 
   private validateProjectId(projectId: string): void {
     // Runtime validation (TypeScript types don't prevent null/undefined at runtime)
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (projectId === undefined || projectId === null || typeof projectId !== 'string' || projectId.trim() === '') {
-      throw new ValidationError('projectId is required and must be a non-empty string');
-    }
+    validateNonEmptyString(projectId, 'projectId');
   }
 }

@@ -918,5 +918,23 @@ export function isValidProjectId(projectId: unknown): boolean {
   return true;
 }
 
+/**
+ * Validates that a value is a non-empty string.
+ * Performs runtime validation to catch null/undefined that TypeScript types don't prevent.
+ *
+ * @param value - The value to validate
+ * @param paramName - Name of the parameter for error messages
+ * @throws {ValidationError} If value is not a non-empty string
+ */
+export function validateNonEmptyString(
+  value: unknown,
+  paramName: string
+): asserts value is string {
+  // Runtime validation (TypeScript types don't prevent null/undefined at runtime)
+  if (value === undefined || value === null || typeof value !== 'string' || value.trim() === '') {
+    throw new ValidationError(`${paramName} is required and must be a non-empty string`);
+  }
+}
+
 // Export length constants for use in services
 export { MAX_TITLE_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_RATIONALE_LENGTH };

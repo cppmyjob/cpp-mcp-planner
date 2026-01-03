@@ -142,6 +142,11 @@ export class QueryService {
     private readonly linkingService: LinkingService
   ) {}
 
+  /**
+   * Lazy PlanRepository access via DynamicRepositoryFactory.
+   * Creates new wrapper on each access but wrapper caches underlying repo per projectId.
+   * This pattern supports multi-project mode via AsyncLocalStorage context.
+   */
   private get planRepo(): PlanRepository {
     return this.repositoryFactory.createPlanRepository();
   }

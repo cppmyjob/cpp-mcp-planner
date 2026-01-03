@@ -7,13 +7,13 @@ import { FileConfigRepository, setFallbackProjectId } from '@mcp-planner/core';
 const storagePath = process.env.MCP_PLANNING_STORAGE_PATH ?? './.mcp-plans';
 
 /**
- * GREEN: Phase 1.1.3 - Load project config from workspace
+ * Load project config from workspace.
  *
  * Reads .mcp-config.json from current working directory to get projectId.
  * Throws error if config is not found or invalid - no fallback to 'default'.
  *
  * @throws {Error} If .mcp-config.json is not found or cannot be parsed
- * @internal - Exported for testing only
+ * @internal
  */
 export async function loadProjectId(): Promise<string> {
   const configRepo = new FileConfigRepository();
