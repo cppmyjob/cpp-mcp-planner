@@ -116,20 +116,20 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
 
   describe('Parallel operations isolation', () => {
     it('should isolate contexts in parallel operations', async () => {
-      const operation1 = runWithProjectContext('project-A', async () => {
+      const operation1 = runWithProjectContext('project-a', async () => {
         await new Promise<void>(resolve => setTimeout(resolve, 20));
         return getProjectId();
       });
 
-      const operation2 = runWithProjectContext('project-B', async () => {
+      const operation2 = runWithProjectContext('project-b', async () => {
         await new Promise<void>(resolve => setTimeout(resolve, 10));
         return getProjectId();
       });
 
       const [result1, result2] = await Promise.all([operation1, operation2]);
 
-      expect(result1).toBe('project-A');
-      expect(result2).toBe('project-B');
+      expect(result1).toBe('project-a');
+      expect(result2).toBe('project-b');
     });
 
     it('should not have cross-contamination in concurrent requests', async () => {

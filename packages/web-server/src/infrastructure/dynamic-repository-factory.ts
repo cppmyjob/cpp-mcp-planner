@@ -133,7 +133,7 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
     }
 
     const projectId = getProjectId();
-    if (projectId == null || projectId === '') {
+    if (projectId == null) {
       throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
     }
 
@@ -215,7 +215,7 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
     }
 
     const projectId = getProjectId();
-    if (projectId == null || projectId === '') {
+    if (projectId == null) {
       throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
     }
 
@@ -244,7 +244,7 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
     }
 
     const projectId = getProjectId();
-    if (projectId == null || projectId === '') {
+    if (projectId == null) {
       throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
     }
 
@@ -303,7 +303,7 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
     // Helper to get or create cached real repo for current project context
     const getOrCreateRealRepo = async (): Promise<PlanRepository> => {
       const projectId = getProjectId();
-      if (projectId == null || projectId === '') {
+      if (projectId == null) {
         throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
       }
 
@@ -434,7 +434,7 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
     }
 
     const projectId = getProjectId();
-    if (projectId == null || projectId === '') {
+    if (projectId == null) {
       throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
     }
 
@@ -458,7 +458,7 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
    */
   public getProjectId(): string {
     const projectId = getProjectId();
-    if (projectId == null || projectId === '') {
+    if (projectId == null) {
       throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
     }
     return projectId;

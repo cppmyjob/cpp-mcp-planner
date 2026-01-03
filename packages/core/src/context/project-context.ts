@@ -15,6 +15,7 @@
  */
 
 import { AsyncLocalStorage } from 'async_hooks';
+import { isValidProjectId } from '../domain/services/validators.js';
 
 interface ProjectContext {
   projectId: string;
@@ -48,8 +49,15 @@ export function getProjectId(): string | undefined {
  * Web Server does NOT use this - it uses runWithProjectContext() instead.
  *
  * @param projectId - The fallback project ID
+ * @throws Error if projectId format is invalid
  */
 export function setFallbackProjectId(projectId: string): void {
+  if (!isValidProjectId(projectId)) {
+    throw new Error(
+      `Invalid projectId: "${projectId}". ` +
+      `Must be lowercase alphanumeric with hyphens, 3-50 chars.`
+    );
+  }
   fallbackProjectId = projectId;
 }
 
@@ -62,11 +70,18 @@ export function setFallbackProjectId(projectId: string): void {
  * @param projectId - Project ID for this execution context
  * @param callback - Sync or async function to execute with context
  * @returns Result of callback execution
+ * @throws Error if projectId format is invalid
  */
 export function runWithProjectContext<T>(
   projectId: string,
   callback: () => T | Promise<T>
 ): T | Promise<T> {
+  if (!isValidProjectId(projectId)) {
+    throw new Error(
+      `Invalid projectId: "${projectId}". ` +
+      `Must be lowercase alphanumeric with hyphens, 3-50 chars.`
+    );
+  }
   return asyncLocalStorage.run({ projectId }, callback);
 }
 

@@ -51,6 +51,17 @@ export interface DeleteProjectResult {
 const DEFAULT_PROJECTS_LIMIT = 50;
 
 /**
+ * Options for configuring ProjectService behavior
+ */
+export interface ProjectServiceOptions {
+  /**
+   * Default limit for project pagination when not specified in listProjects()
+   * @default 50
+   */
+  defaultProjectsLimit?: number;
+}
+
+/**
  * ProjectService - Manages project lifecycle
  *
  * Features:
@@ -61,11 +72,16 @@ const DEFAULT_PROJECTS_LIMIT = 50;
  * - Delete project config
  */
 export class ProjectService {
+  private readonly defaultProjectsLimit: number;
+
   constructor(
     private readonly configService: ConfigService,
     private readonly planService: PlanService,
-    private readonly baseDir?: string
-  ) {}
+    private readonly baseDir: string,
+    options?: ProjectServiceOptions
+  ) {
+    this.defaultProjectsLimit = options?.defaultProjectsLimit ?? DEFAULT_PROJECTS_LIMIT;
+  }
 
   /**
    * Initialize project in workspace
@@ -101,12 +117,9 @@ export class ProjectService {
     const configPath = path.join(workspacePath, '.mcp-config.json');
 
     // GREEN: Phase 4.21 - Create project directory structure for discoverability
-    // Only create if baseDir is provided (web-server and mcp-server)
-    if (this.baseDir !== undefined) {
-      const projectDir = path.join(this.baseDir, config.projectId);
-      const plansDir = path.join(projectDir, 'plans');
-      await fs.mkdir(plansDir, { recursive: true });
-    }
+    const projectDir = path.join(this.baseDir, config.projectId);
+    const plansDir = path.join(projectDir, 'plans');
+    await fs.mkdir(plansDir, { recursive: true });
 
     return {
       success: true,
@@ -139,7 +152,7 @@ export class ProjectService {
    * @returns ListProjectsResult with projects and metadata
    */
   public async listProjects(input?: ListProjectsInput): Promise<ListProjectsResult> {
-    const limit = input?.limit ?? DEFAULT_PROJECTS_LIMIT;
+    const limit = input?.limit ?? this.defaultProjectsLimit;
     const offset = input?.offset ?? 0;
 
     // Get all project directories
@@ -217,16 +230,7 @@ export class ProjectService {
    */
   private async discoverProjects(): Promise<ProjectInfo[]> {
     const projects: ProjectInfo[] = [];
-
-    // Get baseDir (from constructor if provided, otherwise from planRepo for backwards compatibility)
-    let baseDir: string;
-    if (this.baseDir !== undefined) {
-      baseDir = this.baseDir;
-    } else {
-      // Fallback for backwards compatibility (mcp-server)
-      const planRepo = (this.planService as unknown as { planRepo: { baseDir: string } }).planRepo;
-      baseDir = planRepo.baseDir;
-    }
+    const baseDir = this.baseDir;
 
     // Check if baseDir exists
     try {

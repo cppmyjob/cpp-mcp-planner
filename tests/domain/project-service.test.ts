@@ -43,7 +43,7 @@ describe('ProjectService', () => {
     // RED: ProjectService depends on ConfigService and PlanService
     configService = new ConfigService(factory);
     planService = new PlanService(factory);
-    projectService = new ProjectService(configService, planService);
+    projectService = new ProjectService(configService, planService, testDir);
   });
 
   afterEach(async () => {

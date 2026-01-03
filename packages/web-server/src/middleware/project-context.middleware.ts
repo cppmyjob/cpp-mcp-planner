@@ -32,9 +32,11 @@ export class ProjectContextMiddleware implements NestMiddleware {
       throw new BadRequestException('X-Project-Id header is required');
     }
 
-    // Set AsyncLocalStorage context and call next() within it
-    // This ensures all async operations in the request lifecycle have access to projectId
-    // Note: callback is synchronous, so runWithProjectContext returns synchronously
+    // GREEN: Phase 2.11.4 - Context propagation through AsyncLocalStorage
+    // Run next() within the project context
+    // AsyncLocalStorage automatically propagates context through all async operations
+    // initiated within this callback, including NestJS controller methods and services
+    // Note: callback is synchronous, so runWithProjectContext returns synchronously (not a Promise)
     void runWithProjectContext(projectId.trim(), () => {
       next();
     });
