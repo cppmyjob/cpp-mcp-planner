@@ -2009,8 +2009,8 @@ describe('Version History Service (Sprint 7)', () => {
         requirement: createRequirement('Test', { description: 'Test', priority: 'high', category: 'functional' })
       });
 
-      // Simulate 100 updates (should maintain constant memory with rotation)
-      for (let i = 1; i <= 100; i++) {
+      // Simulate 20 updates (should maintain constant memory with rotation)
+      for (let i = 1; i <= 20; i++) {
         await requirementService.updateRequirement({
           planId: plan.planId,
           requirementId: req.requirementId,

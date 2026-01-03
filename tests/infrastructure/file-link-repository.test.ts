@@ -49,7 +49,7 @@ describe('FileLinkRepository', () => {
     });
 
     it('should initialize storage directories', async () => {
-      const planDir = path.join(testDir, 'plans', planId);
+      const planDir = path.join(testDir, projectId, 'plans', planId);
       const linksDir = path.join(planDir, 'links');
       const indexesDir = path.join(planDir, 'indexes');
 
