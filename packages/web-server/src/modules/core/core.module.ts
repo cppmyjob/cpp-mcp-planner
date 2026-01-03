@@ -2,7 +2,6 @@ import { Module, type OnModuleDestroy, Logger, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   FileLockManager,
-  FileRepositoryFactory,
   PlanService,
   RequirementService,
   SolutionService,
@@ -17,6 +16,7 @@ import {
   ConfigService as CoreConfigService,
   type RepositoryFactory,
 } from '@mcp-planner/core';
+import { DynamicRepositoryFactory } from '../../infrastructure/dynamic-repository-factory.js';
 
 // Token constants for DI - string tokens for reliable injection across ESM boundaries
 export const LOCK_MANAGER = 'LOCK_MANAGER';
@@ -47,20 +47,22 @@ export const CONFIG_SERVICE = 'CONFIG_SERVICE';
       },
       inject: [ConfigService],
     },
-    // FileRepositoryFactory - depends on FileLockManager
+    // GREEN: Phase 2.4.3 - DynamicRepositoryFactory with multi-project support
+    // DynamicRepositoryFactory - depends on FileLockManager
     {
       provide: REPOSITORY_FACTORY,
-      useFactory: async (
+      useFactory: (
         configService: ConfigService,
         lockManager: FileLockManager
-      ): Promise<FileRepositoryFactory> => {
+      ): DynamicRepositoryFactory => {
         const storagePath = configService.getOrThrow<string>('storagePath');
-        const factory = new FileRepositoryFactory({
-          type: 'file',
-          baseDir: storagePath,
-          projectId: 'default', // TODO: Step 5 - Multi-project support for REST API
+
+        // DynamicRepositoryFactory handles multi-project support using AsyncLocalStorage
+        // No hardcoded projectId - uses getProjectId() from project context
+        const factory = new DynamicRepositoryFactory(
+          storagePath,
           lockManager,
-          cacheOptions: {
+          {
             // IMPORTANT: Cache disabled for web-server to ensure cross-process consistency
             // MCP server and Web server run as separate processes with independent caches
             // Without cache, web-server always reads fresh data from disk
@@ -68,13 +70,10 @@ export const CONFIG_SERVICE = 'CONFIG_SERVICE';
             enabled: false,
             ttl: 0,
             maxSize: 0,
-          },
-        });
+          }
+        );
 
-        // Initialize plan repository
-        const planRepo = factory.createPlanRepository();
-        await planRepo.initialize();
-
+        // No manual initialization needed - DynamicRepositoryFactory handles it lazily
         return factory;
       },
       inject: [ConfigService, LOCK_MANAGER],
@@ -314,7 +313,7 @@ export class CoreModule implements OnModuleDestroy {
 
   constructor(
     @Inject(LOCK_MANAGER) private readonly lockManager: FileLockManager,
-    @Inject(REPOSITORY_FACTORY) private readonly repositoryFactory: FileRepositoryFactory
+    @Inject(REPOSITORY_FACTORY) private readonly repositoryFactory: DynamicRepositoryFactory
   ) {}
 
   public async onModuleDestroy(): Promise<void> {

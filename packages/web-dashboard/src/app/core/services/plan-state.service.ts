@@ -1,21 +1,21 @@
 import { Injectable, signal, computed } from '@angular/core';
 
 /**
- * Global state service for active plan management.
+ * GREEN: Phase 4.2.3 - Global state service for active plan management.
  * Uses Angular Signals for reactive state.
+ *
+ * BREAKING CHANGE: activePlanId() now returns string | null instead of string.
+ * All consumers must add null-guards before accessing.
  */
 @Injectable({
   providedIn: 'root'
 })
 export class PlanStateService {
-  public readonly activePlanId = computed(() => this.activePlanIdSignal() ?? this.defaultPlanId);
+  public readonly activePlanId = computed(() => this.activePlanIdSignal());
   public readonly hasActivePlan = computed(() => this.activePlanIdSignal() !== null);
 
   private readonly activePlanIdSignal = signal<string | null>(null);
   private readonly planStorageKey = 'active-plan-id';
-
-  // Default plan for development/testing
-  private readonly defaultPlanId = '261825f1-cef0-4227-873c-a20c7e81a9de';
 
   constructor() {
     this.loadActivePlan();

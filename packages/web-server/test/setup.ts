@@ -11,6 +11,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { WEB_SERVER_PORT } from '@mcp-planner/config/server';
+import { setFallbackProjectId } from '@mcp-planner/core';
 import { CoreModule } from '../src/modules/core/core.module.js';
 import { ProjectsModule } from '../src/modules/projects/projects.module.js';
 import { PlansModule } from '../src/modules/plans/plans.module.js';
@@ -39,6 +40,9 @@ export interface TestContext {
 export async function createTestApp(): Promise<TestContext> {
   // Create unique temp directory for test isolation
   const storagePath = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-planner-test-'));
+
+  // GREEN: Phase 2.4.3 - Set fallback projectId for single-project mode in tests
+  setFallbackProjectId('default');
 
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [

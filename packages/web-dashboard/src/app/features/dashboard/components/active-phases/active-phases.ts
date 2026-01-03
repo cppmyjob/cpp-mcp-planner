@@ -24,9 +24,12 @@ export class ActivePhasesComponent {
   private readonly planState = inject(PlanStateService);
 
   constructor() {
+    // GREEN: Phase 4.2.3 - Add null-guard for activePlanId
     effect(() => {
       const planId = this.planState.activePlanId();
-      this.loadActivePhases(planId);
+      if (planId !== null) {
+        this.loadActivePhases(planId);
+      }
     });
   }
 

@@ -6,13 +6,16 @@ import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
 
 import { routes } from './app.routes';
-import { apiResponseInterceptor } from './core';
+import { apiResponseInterceptor, projectIdInterceptor } from './core';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([apiResponseInterceptor])),
+    provideHttpClient(withInterceptors([
+      projectIdInterceptor,  // GREEN: Phase 4.3 - Add X-Project-Id header
+      apiResponseInterceptor
+    ])),
     provideAnimations(),
     providePrimeNG({
       theme: {

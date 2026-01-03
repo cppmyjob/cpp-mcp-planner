@@ -136,14 +136,14 @@ export interface ExportPlanResult {
 }
 
 export class QueryService {
-  private readonly planRepo: PlanRepository;
-
   constructor(
     private readonly repositoryFactory: RepositoryFactory,
     private readonly planService: PlanService,
     private readonly linkingService: LinkingService
-  ) {
-    this.planRepo = repositoryFactory.createPlanRepository();
+  ) {}
+
+  private get planRepo(): PlanRepository {
+    return this.repositoryFactory.createPlanRepository();
   }
 
   public async searchEntities(input: SearchEntitiesInput): Promise<SearchEntitiesResult> {

@@ -158,10 +158,10 @@ export interface GetSummaryResult {
 }
 
 export class PlanService {
-  private readonly planRepo: PlanRepository;
+  constructor(private readonly repositoryFactory: RepositoryFactory) {}
 
-  constructor(private readonly repositoryFactory: RepositoryFactory) {
-    this.planRepo = repositoryFactory.createPlanRepository();
+  private get planRepo(): PlanRepository {
+    return this.repositoryFactory.createPlanRepository();
   }
 
   public async createPlan(input: CreatePlanInput): Promise<CreatePlanResult> {

@@ -45,16 +45,22 @@ export class HeaderComponent {
     // Load projects once on initialization
     this.loadProjects();
 
-    // Sync selectedProjectId with activeProjectId changes
+    // GREEN: Phase 4.1.3 - Sync selectedProjectId with activeProjectId changes
+    // TODO Phase 4.7: Improve null handling for better UX
     effect(() => {
       const activeProjectId = this.projectState.activeProjectId();
-      this.selectedProjectId.set(activeProjectId);
+      if (activeProjectId !== null) {
+        this.selectedProjectId.set(activeProjectId);
+      }
     });
 
-    // Sync selectedPlanId with activePlanId changes
+    // GREEN: Phase 4.2.3 - Sync selectedPlanId with activePlanId changes
+    // TODO Phase 4.7: Improve null handling for better UX
     effect(() => {
       const activePlanId = this.planState.activePlanId();
-      this.selectedPlanId.set(activePlanId);
+      if (activePlanId !== null) {
+        this.selectedPlanId.set(activePlanId);
+      }
     });
 
     // Reload plans when project changes

@@ -64,9 +64,12 @@ export class RequirementsChartComponent {
   };
 
   constructor() {
+    // GREEN: Phase 4.2.3 - Add null-guard for activePlanId
     effect(() => {
       const planId = this.planState.activePlanId();
-      this.loadRequirements(planId);
+      if (planId !== null) {
+        this.loadRequirements(planId);
+      }
     });
   }
 

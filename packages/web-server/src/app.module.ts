@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, type MiddlewareConsumer } from '@nestjs/common';
 import { AppConfigModule } from './config/index.js';
 import { CoreModule } from './modules/core/index.js';
 import { ProjectsModule } from './modules/projects/index.js';
@@ -10,6 +10,7 @@ import { PhasesModule } from './modules/phases/index.js';
 import { ArtifactsModule } from './modules/artifacts/index.js';
 import { LinksModule } from './modules/links/index.js';
 import { QueryModule } from './modules/query/index.js';
+import { ProjectContextMiddleware } from './middleware/project-context.middleware.js';
 
 @Module({
   imports: [
@@ -28,5 +29,12 @@ import { QueryModule } from './modules/query/index.js';
   controllers: [],
   providers: [],
 })
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class -- NestJS module pattern requires class with decorator
-export class AppModule {}
+export class AppModule {
+  /**
+   * GREEN: Phase 2.12.1 - Configure ProjectContextMiddleware for all routes
+   * Extracts X-Project-Id header and sets AsyncLocalStorage context
+   */
+  public configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(ProjectContextMiddleware).forRoutes('*');
+  }
+}

@@ -40,7 +40,7 @@ export async function createServices(storagePath: string, projectId: string): Pr
   await lockManager.initialize();
 
   // Create FileRepositoryFactory
-  // GREEN: Phase 4.10 - projectId now loaded from .mcp-config.json at startup
+  // GREEN: Phase 1.1 - projectId loaded from .mcp-config.json at startup (no default fallback)
   const repositoryFactory = new FileRepositoryFactory({
     type: 'file',
     baseDir: storagePath,

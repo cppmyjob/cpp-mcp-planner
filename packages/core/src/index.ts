@@ -50,6 +50,11 @@ export * from './domain/utils/temp-id-resolver.js';
 export * from './domain/utils/bulk-operations.js';
 
 // ============================================================================
+// Context - Project context management (AsyncLocalStorage)
+// ============================================================================
+export * from './context/project-context.js';
+
+// ============================================================================
 // Infrastructure - File-based repository implementations
 // ============================================================================
 export * from './infrastructure/index.js';

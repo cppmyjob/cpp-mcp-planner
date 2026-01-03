@@ -1,289 +1,147 @@
+/**
+ * RED: Phase 4.2.2 - Tests for PlanStateService without defaultPlanId
+ *
+ * These tests verify the new behavior after removing defaultPlanId:
+ * - activePlanId() returns null when no plan is set (not default UUID)
+ * - hasActivePlan() returns false when activePlanId is null
+ * - clearActivePlan() results in null activePlanId (not default UUID)
+ * - localStorage integration works correctly
+ */
+
 import { TestBed } from '@angular/core/testing';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PlanStateService } from './plan-state.service';
 
 describe('PlanStateService', () => {
   let service: PlanStateService;
-  let localStorageMock: Map<string, string>;
-  let getItemSpy: ReturnType<typeof vi.spyOn>;
-  let setItemSpy: ReturnType<typeof vi.spyOn>;
-  let removeItemSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    // Mock localStorage
-    localStorageMock = new Map<string, string>();
+    // Clear localStorage before each test
+    localStorage.clear();
 
-    getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
-      return localStorageMock.get(key) ?? null;
-    });
-
-    setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string, value: string) => {
-      localStorageMock.set(key, value);
-    });
-
-    removeItemSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key: string) => {
-      localStorageMock.delete(key);
-    });
-
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [PlanStateService]
-    });
-
+    TestBed.configureTestingModule({});
     service = TestBed.inject(PlanStateService);
   });
 
   afterEach(() => {
-    // Clean up
-    localStorageMock.clear();
-    vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   describe('initialization', () => {
-    it('should create the service', () => {
-      // Assert
+    it('should be created', () => {
       expect(service).toBeTruthy();
     });
 
-    it('should load saved plan ID from localStorage on construction when available', () => {
-      // Arrange
-      const savedPlanId = 'test-plan-123';
-      localStorageMock.set('active-plan-id', savedPlanId);
-
-      // Act
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        providers: [PlanStateService]
-      });
-      const newService = TestBed.inject(PlanStateService);
-
-      // Assert
-      expect(newService.activePlanId()).toBe(savedPlanId);
+    it('RED: should return null when no plan is set (not default UUID)', () => {
+      // RED: Currently returns '261825f1-cef0-4227-873c-a20c7e81a9de', should return null
+      expect(service.activePlanId()).toBeNull();
     });
 
-    it('should use default plan ID when localStorage is empty on construction', () => {
-      // Arrange - localStorage is empty by default in beforeEach
-
-      // Act
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        providers: [PlanStateService]
-      });
-      const newService = TestBed.inject(PlanStateService);
-
-      // Assert
-      expect(newService.activePlanId()).toBe('261825f1-cef0-4227-873c-a20c7e81a9de');
+    it('RED: should return false for hasActivePlan when no plan is set', () => {
+      // RED: Currently returns true (because of defaultPlanId), should return false
+      expect(service.hasActivePlan()).toBe(false);
     });
   });
 
   describe('setActivePlan', () => {
-    it('should update activePlanId signal when plan is set', () => {
-      // Arrange
-      const testPlanId = 'new-plan-456';
+    it('should set active plan ID', () => {
+      const planId = 'test-plan-123';
 
-      // Act
-      service.setActivePlan(testPlanId);
+      service.setActivePlan(planId);
 
-      // Assert
-      expect(service.activePlanId()).toBe(testPlanId);
+      expect(service.activePlanId()).toBe(planId);
+      expect(service.hasActivePlan()).toBe(true);
     });
 
-    it('should persist plan ID to localStorage when plan is set', () => {
-      // Arrange
-      const testPlanId = 'persistent-plan-789';
+    it('should persist active plan to localStorage', () => {
+      const planId = 'test-plan-456';
 
-      // Act
-      service.setActivePlan(testPlanId);
+      service.setActivePlan(planId);
 
-      // Assert
-      expect(setItemSpy).toHaveBeenCalledWith('active-plan-id', testPlanId);
-      expect(localStorageMock.get('active-plan-id')).toBe(testPlanId);
+      const saved = localStorage.getItem('active-plan-id');
+      expect(saved).toBe(planId);
     });
 
-    it('should update hasActivePlan to true when plan is set', () => {
-      // Arrange
-      const testPlanId = 'has-plan-abc';
+    it('should update hasActivePlan to true', () => {
+      service.setActivePlan('plan-789');
 
-      // Act
-      service.setActivePlan(testPlanId);
-
-      // Assert
       expect(service.hasActivePlan()).toBe(true);
     });
   });
 
   describe('clearActivePlan', () => {
-    it('should set activePlanId signal to null when plan is cleared', () => {
-      // Arrange
-      service.setActivePlan('some-plan-id');
+    it('RED: should set activePlanId to null (not default UUID)', () => {
+      service.setActivePlan('test-plan');
 
-      // Act
       service.clearActivePlan();
 
-      // Assert
-      expect(service.activePlanId()).toBe('261825f1-cef0-4227-873c-a20c7e81a9de'); // Should return default
+      // RED: Currently returns '261825f1-cef0-4227-873c-a20c7e81a9de', should return null
+      expect(service.activePlanId()).toBeNull();
     });
 
-    it('should remove plan ID from localStorage when plan is cleared', () => {
-      // Arrange
-      service.setActivePlan('plan-to-remove');
+    it('should set hasActivePlan to false', () => {
+      service.setActivePlan('test-plan');
 
-      // Act
       service.clearActivePlan();
 
-      // Assert
-      expect(removeItemSpy).toHaveBeenCalledWith('active-plan-id');
-      expect(localStorageMock.has('active-plan-id')).toBe(false);
-    });
-
-    it('should update hasActivePlan to false when plan is cleared', () => {
-      // Arrange
-      service.setActivePlan('temporary-plan');
-
-      // Act
-      service.clearActivePlan();
-
-      // Assert
-      expect(service.hasActivePlan()).toBe(false);
-    });
-  });
-
-  describe('activePlanId computed', () => {
-    it('should return current plan ID when explicitly set', () => {
-      // Arrange
-      const explicitPlanId = 'explicit-123';
-
-      // Act
-      service.setActivePlan(explicitPlanId);
-
-      // Assert
-      expect(service.activePlanId()).toBe(explicitPlanId);
-    });
-
-    it('should return default plan ID when no plan is set', () => {
-      // Arrange - service initialized with empty localStorage
-
-      // Act
-      service.clearActivePlan();
-
-      // Assert
-      expect(service.activePlanId()).toBe('261825f1-cef0-4227-873c-a20c7e81a9de');
-    });
-
-    it('should reactively update when underlying signal changes', () => {
-      // Arrange
-      const firstPlanId = 'first-plan';
-      const secondPlanId = 'second-plan';
-
-      // Act
-      service.setActivePlan(firstPlanId);
-      const firstValue = service.activePlanId();
-
-      service.setActivePlan(secondPlanId);
-      const secondValue = service.activePlanId();
-
-      // Assert
-      expect(firstValue).toBe(firstPlanId);
-      expect(secondValue).toBe(secondPlanId);
-    });
-  });
-
-  describe('hasActivePlan computed', () => {
-    it('should return true when a plan ID is explicitly set', () => {
-      // Arrange
-      const planId = 'has-plan-true';
-
-      // Act
-      service.setActivePlan(planId);
-
-      // Assert
-      expect(service.hasActivePlan()).toBe(true);
-    });
-
-    it('should return false when plan is cleared', () => {
-      // Arrange
-      service.setActivePlan('will-be-cleared');
-
-      // Act
-      service.clearActivePlan();
-
-      // Assert
       expect(service.hasActivePlan()).toBe(false);
     });
 
-    it('should return false on initial state with empty localStorage', () => {
-      // Arrange - clean service initialization
-      TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        providers: [PlanStateService]
-      });
-      const cleanService = TestBed.inject(PlanStateService);
-
-      // Assert
-      expect(cleanService.hasActivePlan()).toBe(false);
-    });
-
-    it('should reactively update when plan state changes', () => {
-      // Arrange
-      const planId = 'reactive-plan';
-
-      // Act & Assert
-      expect(service.hasActivePlan()).toBe(false);
-
-      service.setActivePlan(planId);
-      expect(service.hasActivePlan()).toBe(true);
+    it('should remove plan from localStorage', () => {
+      service.setActivePlan('test-plan');
+      expect(localStorage.getItem('active-plan-id')).toBeTruthy();
 
       service.clearActivePlan();
-      expect(service.hasActivePlan()).toBe(false);
+
+      expect(localStorage.getItem('active-plan-id')).toBeNull();
     });
   });
 
   describe('localStorage persistence', () => {
-    it('should persist plan ID across service instances', () => {
-      // Arrange
-      const persistentPlanId = 'cross-instance-plan';
+    it('should load activePlanId from localStorage on initialization', () => {
+      const planId = 'persisted-plan';
+      localStorage.setItem('active-plan-id', planId);
 
-      // Act
-      service.setActivePlan(persistentPlanId);
-
-      // Create new service instance
+      // Reset TestBed and create new service instance to trigger loadActivePlan()
       TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        providers: [PlanStateService]
-      });
+      TestBed.configureTestingModule({});
       const newService = TestBed.inject(PlanStateService);
 
-      // Assert
-      expect(newService.activePlanId()).toBe(persistentPlanId);
+      expect(newService.activePlanId()).toBe(planId);
+      expect(newService.hasActivePlan()).toBe(true);
     });
 
-    it('should handle missing localStorage entry gracefully', () => {
-      // Arrange - localStorage is empty
+    it('RED: should return null when localStorage is empty (not default UUID)', () => {
+      localStorage.clear();
 
-      // Act
+      // Reset TestBed and create new service instance
       TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        providers: [PlanStateService]
-      });
+      TestBed.configureTestingModule({});
       const newService = TestBed.inject(PlanStateService);
 
-      // Assert
-      expect(newService.activePlanId()).toBe('261825f1-cef0-4227-873c-a20c7e81a9de');
+      // RED: Currently returns '261825f1-cef0-4227-873c-a20c7e81a9de', should return null
+      expect(newService.activePlanId()).toBeNull();
       expect(newService.hasActivePlan()).toBe(false);
     });
+  });
 
-    it('should overwrite existing localStorage value when setting new plan', () => {
-      // Arrange
-      const oldPlanId = 'old-plan';
-      const newPlanId = 'new-plan';
+  describe('signal reactivity', () => {
+    it('should update computed signal when activePlanId changes', () => {
+      const planId1 = 'plan-1';
+      const planId2 = 'plan-2';
 
-      // Act
-      service.setActivePlan(oldPlanId);
-      service.setActivePlan(newPlanId);
+      service.setActivePlan(planId1);
+      expect(service.activePlanId()).toBe(planId1);
 
-      // Assert
-      expect(localStorageMock.get('active-plan-id')).toBe(newPlanId);
-      expect(service.activePlanId()).toBe(newPlanId);
+      service.setActivePlan(planId2);
+      expect(service.activePlanId()).toBe(planId2);
+    });
+
+    it('should update hasActivePlan when clearing plan', () => {
+      service.setActivePlan('test-plan');
+      expect(service.hasActivePlan()).toBe(true);
+
+      service.clearActivePlan();
+      expect(service.hasActivePlan()).toBe(false);
     });
   });
 });

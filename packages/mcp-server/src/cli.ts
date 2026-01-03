@@ -2,36 +2,45 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createMcpServer, createServices } from './server/index.js';
 import type { Services } from './server/services.js';
-import { FileConfigRepository } from '@mcp-planner/core';
+import { FileConfigRepository, setFallbackProjectId } from '@mcp-planner/core';
 
 const storagePath = process.env.MCP_PLANNING_STORAGE_PATH ?? './.mcp-plans';
 
 /**
- * GREEN: Phase 4.10 - Load project config from workspace
+ * GREEN: Phase 1.1.3 - Load project config from workspace
  *
  * Reads .mcp-config.json from current working directory to get projectId.
- * If no config found, logs warning and returns 'default' as projectId.
+ * Throws error if config is not found or invalid - no fallback to 'default'.
+ *
+ * @throws {Error} If .mcp-config.json is not found or cannot be parsed
+ * @internal - Exported for testing only
  */
-async function loadProjectId(): Promise<string> {
+export async function loadProjectId(): Promise<string> {
   const configRepo = new FileConfigRepository();
+  const cwd = process.cwd();
+
   await configRepo.initialize();
 
   try {
-    const config = await configRepo.loadConfig(process.cwd());
+    const config = await configRepo.loadConfig(cwd);
 
     if (config === null) {
-      console.error('⚠️  Warning: No .mcp-config.json found in current directory');
-      console.error('   Run "mcp init-project" to initialize a project with a unique ID');
-      console.error('   Using "default" as project ID');
-      return 'default';
+      throw new Error(
+        `No .mcp-config.json found in current directory: ${cwd}\n` +
+        `Run "mcp init-project" to initialize a project with a unique ID`
+      );
     }
 
     console.error(`📦 Loaded project: ${config.projectId}${config.name !== undefined ? ` (${config.name})` : ''}`);
     return config.projectId;
   } catch (error) {
-    console.error('⚠️  Error loading .mcp-config.json:', error instanceof Error ? error.message : String(error));
-    console.error('   Using "default" as project ID');
-    return 'default';
+    // Re-throw with cwd context if not already added
+    if (error instanceof Error && !error.message.includes(cwd)) {
+      throw new Error(
+        `Error loading .mcp-config.json in ${cwd}: ${error.message}`
+      );
+    }
+    throw error;
   } finally {
     await configRepo.close();
   }
@@ -52,8 +61,12 @@ async function cleanup(services: Services): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  // GREEN: Phase 4.10 - Load projectId from .mcp-config.json
+  // GREEN: Phase 1.1.3 - Load projectId from .mcp-config.json (no default fallback)
   const projectId = await loadProjectId();
+
+  // GREEN: Phase 2.9.3 - Set fallback projectId for single-project mode
+  // This allows getProjectId() to work without AsyncLocalStorage context
+  setFallbackProjectId(projectId);
 
   const services = await createServices(storagePath, projectId);
   const { server } = createMcpServer(services);
@@ -83,7 +96,10 @@ async function main(): Promise<void> {
   console.error('MCP Planning Server started');
 }
 
-main().catch((error: unknown) => {
-  console.error('Fatal error:', error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
+// Only run main() when file is executed directly, not when imported for testing
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error: unknown) => {
+    console.error('Fatal error:', error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+}

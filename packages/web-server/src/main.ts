@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { getServerConfig } from '@mcp-planner/config/server';
+import { setFallbackProjectId } from '@mcp-planner/core';
 import { AppModule } from './app.module.js';
 import {
   GlobalExceptionFilter,
@@ -14,6 +15,10 @@ import {
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const serverConfig = getServerConfig();
+
+  // GREEN: Phase 2.4.3 - Set fallback projectId for single-project mode
+  // Web-server uses 'default' project until multi-project middleware is implemented
+  setFallbackProjectId('default');
 
   // Enable CORS for development (Angular)
   app.enableCors({

@@ -22,9 +22,12 @@ export class BlockersPanelComponent {
   private readonly planState = inject(PlanStateService);
 
   constructor() {
+    // GREEN: Phase 4.2.3 - Add null-guard for activePlanId
     effect(() => {
       const planId = this.planState.activePlanId();
-      this.loadBlockedPhases(planId);
+      if (planId !== null) {
+        this.loadBlockedPhases(planId);
+      }
     });
   }
 

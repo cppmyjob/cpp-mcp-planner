@@ -727,8 +727,6 @@ class InMemoryStorage {
  * All operations execute in memory, then flush atomically to disk.
  */
 export class BatchService {
-  private readonly planRepo: PlanRepository;
-
   constructor(
     private readonly repositoryFactory: RepositoryFactory,
     private readonly planService: PlanService,
@@ -738,8 +736,10 @@ export class BatchService {
     private readonly linkingService: LinkingService,
     private readonly decisionService: DecisionService,
     private readonly artifactService: ArtifactService
-  ) {
-    this.planRepo = repositoryFactory.createPlanRepository();
+  ) {}
+
+  private get planRepo(): PlanRepository {
+    return this.repositoryFactory.createPlanRepository();
   }
 
   public async executeBatch(input: ExecuteBatchInput): Promise<BatchResult> {

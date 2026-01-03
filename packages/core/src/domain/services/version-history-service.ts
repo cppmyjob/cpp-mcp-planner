@@ -26,10 +26,10 @@ export interface DiffInput {
 }
 
 export class VersionHistoryService {
-  private readonly planRepo: PlanRepository;
+  constructor(private readonly repositoryFactory: RepositoryFactory) {}
 
-  constructor(private readonly repositoryFactory: RepositoryFactory) {
-    this.planRepo = repositoryFactory.createPlanRepository();
+  private get planRepo(): PlanRepository {
+    return this.repositoryFactory.createPlanRepository();
   }
 
   /**
