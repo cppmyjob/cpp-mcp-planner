@@ -91,17 +91,14 @@ export class ProjectService {
       throw new ValidationError(`Project already initialized at ${workspacePath}`);
     }
 
-    // GREEN: Phase 3.8 - Check for case-insensitive conflicts with existing projects
+    // GREEN: Phase 4.21 - Check for duplicate projectId (lowercase-only, simple equality check)
     const existingProjects = await this.discoverProjects();
-    const normalizedProjectId = config.projectId.toLowerCase();
 
-    const conflict = existingProjects.find(
-      (p) => p.id.toLowerCase() === normalizedProjectId && p.id !== config.projectId
-    );
+    const conflict = existingProjects.find((p) => p.id === config.projectId);
 
     if (conflict !== undefined) {
       throw new ValidationError(
-        `Project ID conflict: "${config.projectId}" conflicts with existing project "${conflict.id}" (case-insensitive match)`
+        `Project ID conflict: "${config.projectId}" already exists`
       );
     }
 
@@ -109,6 +106,14 @@ export class ProjectService {
     await this.configService.saveConfig(workspacePath, config);
 
     const configPath = path.join(workspacePath, '.mcp-config.json');
+
+    // GREEN: Phase 4.21 - Create project directory structure for discoverability
+    // Create baseDir/projectId/plans/ so the project is discoverable by list action
+    const planRepo = (this.planService as unknown as { planRepo: { baseDir: string } }).planRepo;
+    const baseDir = planRepo.baseDir;
+    const projectDir = path.join(baseDir, config.projectId);
+    const plansDir = path.join(projectDir, 'plans');
+    await fs.mkdir(plansDir, { recursive: true });
 
     return {
       success: true,

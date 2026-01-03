@@ -862,9 +862,9 @@ export function validateFilterStatus(status: unknown): void {
 
 /**
  * Validates projectId format with enhanced security checks.
- * ProjectId must be alphanumeric with dots, underscores, and hyphens.
- * Must start with alphanumeric character.
- * Cannot contain: /, \, :, *, ?, ", spaces, and other special characters.
+ * ProjectId must be lowercase alphanumeric with dots, underscores, and hyphens.
+ * Must start with lowercase alphanumeric character.
+ * Cannot contain: /, \, :, *, ?, ", spaces, uppercase letters, and other special characters.
  * Enhanced checks: consecutive dots, reserved Windows names, length limit, trailing dot/hyphen.
  * @param projectId - The project ID to validate
  * @throws Error if projectId format is invalid
@@ -885,9 +885,9 @@ export function isValidProjectId(projectId: unknown): boolean {
     return false;
   }
 
-  // Pattern: starts with alphanumeric, then allows alphanumeric + dots + underscores + hyphens
-  // Regex: /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
-  const pattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+  // Pattern: starts with lowercase alphanumeric, then allows lowercase alphanumeric + dots + underscores + hyphens
+  // Regex: /^[a-z0-9][a-z0-9._-]*$/
+  const pattern = /^[a-z0-9][a-z0-9._-]*$/;
 
   if (!pattern.test(projectId)) {
     return false;

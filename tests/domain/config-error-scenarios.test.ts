@@ -143,18 +143,16 @@ describe('RED: Phase 4.17 - Config File Error Scenarios', () => {
       await expect(repository.loadConfig(workspacePath)).rejects.toThrow(ValidationError);
     });
 
-    it('should ALLOW projectId with uppercase letters', async () => {
-      // GREEN: Phase 4.18 - Uppercase letters are valid in projectId
-      // Case-insensitive conflict detection happens at ProjectService level
+    it('should REJECT projectId with uppercase letters', async () => {
+      // GREEN: Phase 4.21 - ProjectId must be lowercase only for consistency
+      // Aligns with npm, docker, kubernetes naming conventions
       const workspacePath = path.join(testDir, 'uppercase');
       await fs.mkdir(workspacePath, { recursive: true });
 
       const configPath = path.join(workspacePath, '.mcp-config.json');
       await fs.writeFile(configPath, JSON.stringify({ projectId: 'MyProject' }), 'utf-8');
 
-      const result = await repository.loadConfig(workspacePath);
-      expect(result).not.toBeNull();
-      expect(result?.projectId).toBe('MyProject');
+      await expect(repository.loadConfig(workspacePath)).rejects.toThrow(ValidationError);
     });
 
     it('should reject projectId with path traversal attempt', async () => {

@@ -115,7 +115,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
     const freshStoragePath = path.join(process.cwd(), '.test-temp', 'mcp-plan-persistence-null-' + String(Date.now()));
     await fs.mkdir(freshStoragePath, { recursive: true });
 
-    const services = await createServices(freshStoragePath);
+    const services = await createServices(freshStoragePath, 'test-project');
     const { server } = createMcpServer(services);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
@@ -146,7 +146,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
     const errorStoragePath = path.join(process.cwd(), '.test-temp', 'mcp-plan-persistence-error-' + String(Date.now()));
     await fs.mkdir(errorStoragePath, { recursive: true });
 
-    const services = await createServices(errorStoragePath);
+    const services = await createServices(errorStoragePath, 'test-project');
     const { server } = createMcpServer(services);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
@@ -176,7 +176,7 @@ describe('E2E: Plan set_active/get_active Persistence', () => {
     const overwriteStoragePath = path.join(process.cwd(), '.test-temp', 'mcp-plan-persistence-overwrite-' + String(Date.now()));
     await fs.mkdir(overwriteStoragePath, { recursive: true });
 
-    const services = await createServices(overwriteStoragePath);
+    const services = await createServices(overwriteStoragePath, 'test-project');
     const { server } = createMcpServer(services);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 

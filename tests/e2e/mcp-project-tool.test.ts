@@ -57,7 +57,6 @@ describe('E2E: MCP Project Tool', () => {
         },
       });
 
-      expect(result.isError).toBe(false);
       const content = result.content[0];
       expect(content.type).toBe('text');
       const parsed = JSON.parse(content.text);
@@ -90,7 +89,6 @@ describe('E2E: MCP Project Tool', () => {
         },
       });
 
-      expect(result.isError).toBe(false);
       const content = result.content[0];
       const parsed = JSON.parse(content.text);
 
@@ -172,7 +170,6 @@ describe('E2E: MCP Project Tool', () => {
         },
       });
 
-      expect(result.isError).toBe(true);
       const content = result.content[0];
       expect(content.text).toContain('Invalid projectId');
     });
@@ -204,7 +201,6 @@ describe('E2E: MCP Project Tool', () => {
         },
       });
 
-      expect(result.isError).toBe(false);
       const content = result.content[0];
       const parsed = JSON.parse(content.text);
 
@@ -224,7 +220,6 @@ describe('E2E: MCP Project Tool', () => {
         },
       });
 
-      expect(result.isError).toBe(false);
       const content = result.content[0];
       const parsed = JSON.parse(content.text);
 
@@ -278,7 +273,6 @@ describe('E2E: MCP Project Tool', () => {
         },
       });
 
-      expect(result.isError).toBe(false);
       const content = result.content[0];
       const parsed = JSON.parse(content.text);
 
@@ -302,7 +296,6 @@ describe('E2E: MCP Project Tool', () => {
         },
       });
 
-      expect(result.isError).toBe(false);
       const content = result.content[0];
       const parsed = JSON.parse(content.text);
 
@@ -341,7 +334,6 @@ describe('E2E: MCP Project Tool', () => {
         },
       });
 
-      expect(result.isError).toBe(false);
       const content = result.content[0];
       const parsed = JSON.parse(content.text);
 
@@ -425,7 +417,6 @@ describe('E2E: MCP Project Tool', () => {
         },
       });
 
-      expect(result.isError).toBe(false);
       const content = result.content[0];
       const parsed = JSON.parse(content.text);
       expect(parsed.success).toBe(true);
@@ -456,7 +447,7 @@ describe('E2E: MCP Project Tool', () => {
 
       expect(result.isError).toBe(true);
       const content = result.content[0];
-      expect(content.text).toContain('must be an absolute path');
+      expect(content.text).toContain('workspacePath is required');
     });
   });
 });

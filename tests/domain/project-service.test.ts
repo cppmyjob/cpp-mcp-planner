@@ -108,44 +108,21 @@ describe('ProjectService', () => {
     });
   });
 
-  // RED: Phase 3.7 - Case-insensitive projectId conflict detection
-  describe('RED: Phase 3.7 - Case-insensitive projectId conflicts', () => {
-    it('should detect case-insensitive conflict when listing projects', async () => {
-      // Create two different workspaces with projectIds that differ only in case
+  // GREEN: Phase 4.21 - Lowercase-only projectIds eliminate case-sensitivity issues
+  describe('GREEN: Phase 4.21 - Lowercase projectId enforcement', () => {
+    it('should reject projectId with uppercase letters', async () => {
+      // Uppercase letters are no longer valid in projectIds
       const workspace1 = path.join(testDir, 'workspace-case-1');
-      const workspace2 = path.join(testDir, 'workspace-case-2');
       await fs.mkdir(workspace1, { recursive: true });
-      await fs.mkdir(workspace2, { recursive: true });
 
-      // Initialize first project with lowercase
-      await projectService.initProject(workspace1, { projectId: 'my-project' });
-
-      // Initialize second project with different case
-      await projectService.initProject(workspace2, { projectId: 'My-Project' });
-
-      // Create a plan for lowercase projectId
-      const factory1 = new FileRepositoryFactory({
-        type: 'file',
-        baseDir: testDir,
-        projectId: 'my-project',
-        lockManager,
-      });
-      const planService1 = new PlanService(factory1);
-      await planService1.createPlan({ name: 'Plan 1', description: 'Test' });
-      await factory1.dispose();
-
-      // List projects - should detect the conflict
-      const result = await projectService.listProjects();
-
-      // Should detect that my-project and My-Project are the same (case-insensitive)
-      // Expect error or warning about case conflict
-      expect(result.projects.length).toBe(1); // Should be deduplicated
-      expect(result.projects[0].id.toLowerCase()).toBe('my-project');
+      // Attempt to initialize project with uppercase should fail validation
+      await expect(
+        projectService.initProject(workspace1, { projectId: 'My-Project' })
+      ).rejects.toThrow('Invalid projectId');
     });
 
-    it('should prevent creating plans with case-variant projectIds', async () => {
-      // GREEN: Phase 3.8 - Changed test to check initProject instead of factory constructor
-      // Factory constructor is synchronous and cannot check file system for conflicts
+    it('should prevent creating duplicate projectIds', async () => {
+      // GREEN: Phase 4.21 - Test duplicate detection with lowercase-only projectIds
 
       // Create first workspace with lowercase projectId
       const workspace1 = path.join(testDir, 'workspace-case-3a');
@@ -163,17 +140,17 @@ describe('ProjectService', () => {
       await planService1.createPlan({ name: 'Plan 1', description: 'Test' });
       await factory1.dispose();
 
-      // Attempt to create second workspace with uppercase variant
+      // Attempt to create second workspace with same projectId
       const workspace2 = path.join(testDir, 'workspace-case-3b');
       await fs.mkdir(workspace2, { recursive: true });
 
-      // Should throw error about case conflict with existing projectId
+      // Should throw error about conflict with existing projectId
       await expect(
-        projectService.initProject(workspace2, { projectId: 'Test-Project-Case' })
+        projectService.initProject(workspace2, { projectId: 'test-project-case' })
       ).rejects.toThrow(/conflict/i);
     });
 
-    it('should validate projectId uniqueness case-insensitively during init', async () => {
+    it('should validate projectId uniqueness during init', async () => {
       const workspace1 = path.join(testDir, 'workspace-case-4');
       const workspace2 = path.join(testDir, 'workspace-case-5');
       await fs.mkdir(workspace1, { recursive: true });
@@ -193,9 +170,9 @@ describe('ProjectService', () => {
       await planService1.createPlan({ name: 'Plan', description: 'Test' });
       await factory1.dispose();
 
-      // Attempt to initialize second project with same ID (different case)
+      // Attempt to initialize second project with same ID
       await expect(
-        projectService.initProject(workspace2, { projectId: 'Unique-Project' })
+        projectService.initProject(workspace2, { projectId: 'unique-project' })
       ).rejects.toThrow(/conflict|exists|duplicate/i);
     });
   });

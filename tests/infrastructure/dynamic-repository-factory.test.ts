@@ -54,7 +54,7 @@ describe('DynamicRepositoryFactory', () => {
     it('should create FileRepositoryFactory on first access', async () => {
       factory = new DynamicRepositoryFactory(testDir, lockManager);
 
-      await projectContext.runWithProjectContext('project-A', () => {
+      await projectContext.runWithProjectContext('project-a', () => {
         const planRepo = factory?.createPlanRepository();
 
         // PlanRepository should be created but not initialized yet
@@ -65,7 +65,7 @@ describe('DynamicRepositoryFactory', () => {
     it('should call planRepo.initialize() on first access per projectId', async () => {
       factory = new DynamicRepositoryFactory(testDir, lockManager);
 
-      await projectContext.runWithProjectContext('project-B', async () => {
+      await projectContext.runWithProjectContext('project-b', async () => {
         const planRepo = factory.createPlanRepository();
         await planRepo.initialize();
 
@@ -80,13 +80,13 @@ describe('DynamicRepositoryFactory', () => {
     it('should return cached factory for same projectId', async () => {
       factory = new DynamicRepositoryFactory(testDir, lockManager);
 
-      const repo1 = await projectContext.runWithProjectContext('project-C', async () => {
+      const repo1 = await projectContext.runWithProjectContext('project-c', async () => {
         const repo = factory.createPlanRepository();
         await repo.initialize();
         return repo;
       });
 
-      const repo2 = await projectContext.runWithProjectContext('project-C', async () => {
+      const repo2 = await projectContext.runWithProjectContext('project-c', async () => {
         const repo = factory.createPlanRepository();
         // Note: initialize() is idempotent - calling again does nothing
         await repo.initialize();
@@ -100,13 +100,13 @@ describe('DynamicRepositoryFactory', () => {
     it('should create different factory for different projectId', async () => {
       factory = new DynamicRepositoryFactory(testDir, lockManager);
 
-      const repo1 = await projectContext.runWithProjectContext('project-D', async () => {
+      const repo1 = await projectContext.runWithProjectContext('project-d', async () => {
         const repo = factory.createPlanRepository();
         await repo.initialize();
         return repo;
       });
 
-      const repo2 = await projectContext.runWithProjectContext('project-E', async () => {
+      const repo2 = await projectContext.runWithProjectContext('project-e', async () => {
         const repo = factory.createPlanRepository();
         await repo.initialize();
         return repo;
@@ -123,7 +123,7 @@ describe('DynamicRepositoryFactory', () => {
 
       // Simulate 5 concurrent requests for same projectId
       const promises: Promise<unknown>[] = Array.from({ length: 5 }, () =>
-        projectContext.runWithProjectContext('project-F', async () => {
+        projectContext.runWithProjectContext('project-f', async () => {
           const repo = factory?.createPlanRepository();
           if (repo != null) {
             await repo.initialize();
@@ -227,14 +227,14 @@ describe('DynamicRepositoryFactory', () => {
       factory = new DynamicRepositoryFactory(testDir, lockManager);
 
       // Create factories for multiple projectIds
-      await projectContext.runWithProjectContext('project-G', async () => {
+      await projectContext.runWithProjectContext('project-g', async () => {
         const repo = factory?.createPlanRepository();
         if (repo != null) {
           await repo.initialize();
         }
       });
 
-      await projectContext.runWithProjectContext('project-H', async () => {
+      await projectContext.runWithProjectContext('project-h', async () => {
         const repo = factory?.createPlanRepository();
         if (repo != null) {
           await repo.initialize();
@@ -246,7 +246,7 @@ describe('DynamicRepositoryFactory', () => {
 
       // After close, factory should be unusable
       await expect(
-        projectContext.runWithProjectContext('project-G', async () => {
+        projectContext.runWithProjectContext('project-g', async () => {
           await Promise.resolve(); // Satisfy require-await
           factory?.createPlanRepository();
         })

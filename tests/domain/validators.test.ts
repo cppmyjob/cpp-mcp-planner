@@ -279,10 +279,16 @@ describe('validateSlug', () => {
 
 describe('isValidProjectId', () => {
   describe('basic validation', () => {
-    it('RED: should accept valid alphanumeric projectId', () => {
+    it('RED: should accept valid lowercase alphanumeric projectId', () => {
       expect(isValidProjectId('myproject')).toBe(true);
-      expect(isValidProjectId('MyProject123')).toBe(true);
+      expect(isValidProjectId('myproject123')).toBe(true);
       expect(isValidProjectId('project1')).toBe(true);
+    });
+
+    it('RED: should reject projectId with uppercase letters', () => {
+      expect(isValidProjectId('MyProject')).toBe(false);
+      expect(isValidProjectId('MyProject123')).toBe(false);
+      expect(isValidProjectId('PROJECT')).toBe(false);
     });
 
     it('RED: should accept projectId with dots', () => {
