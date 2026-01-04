@@ -43,6 +43,8 @@ export async function loadProjectId(): Promise<string> {
     throw error;
   } finally {
     // Ensure close() is idempotent and handles errors gracefully
+    // Note: Close errors are logged but not thrown - cleanup failures should not fail the operation
+    // If the main operation succeeded, we return success; if it failed, we preserve that error
     try {
       await configRepo.close();
     } catch (closeError) {

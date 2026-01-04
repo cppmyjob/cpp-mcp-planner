@@ -272,7 +272,7 @@ export const CONFIG_SERVICE = 'CONFIG_SERVICE';
         planService: PlanService
       ): ProjectService => {
         const storagePath = configService.getOrThrow<string>('storagePath');
-        return new ProjectService(coreConfigService, planService, storagePath);
+        return new ProjectService(coreConfigService, planService, { baseDir: storagePath });
       },
       inject: [ConfigService, CONFIG_SERVICE, PLAN_SERVICE],
     },

@@ -55,6 +55,12 @@ const DEFAULT_PROJECTS_LIMIT = 50;
  */
 export interface ProjectServiceOptions {
   /**
+   * Base directory for project storage
+   * @default './.mcp-plans'
+   */
+  baseDir?: string;
+
+  /**
    * Default limit for project pagination when not specified in listProjects()
    * @default 50
    */
@@ -72,16 +78,27 @@ export interface ProjectServiceOptions {
  * - Delete project config
  */
 export class ProjectService {
+  private readonly baseDir: string;
   private readonly defaultProjectsLimit: number;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly planService: PlanService,
-    private readonly baseDir: string,
     options?: ProjectServiceOptions
   ) {
-    // Validate baseDir parameter
-    validateNonEmptyString(baseDir, 'baseDir');
+    // Extract baseDir from options with validation
+    if (options !== undefined && 'baseDir' in options) {
+      // baseDir was explicitly provided in options - validate it
+      const providedBaseDir = options.baseDir;
+      if (providedBaseDir === undefined || providedBaseDir === null || providedBaseDir === '') {
+        throw new ValidationError('baseDir is required and must be a non-empty string');
+      }
+      this.baseDir = providedBaseDir;
+      validateNonEmptyString(this.baseDir, 'baseDir');
+    } else {
+      // baseDir not provided - use default
+      this.baseDir = './.mcp-plans';
+    }
 
     this.defaultProjectsLimit = options?.defaultProjectsLimit ?? DEFAULT_PROJECTS_LIMIT;
   }
@@ -89,12 +106,17 @@ export class ProjectService {
   /**
    * Initialize project in workspace
    *
-   * Creates .mcp-config.json file in workspace directory.
-   * Validates projectId format and checks for existing projects.
+   * Creates:
+   * 1. .mcp-config.json file in workspace directory
+   * 2. Project directory structure: {baseDir}/{projectId}/plans/
+   *
+   * Validates projectId format and checks for existing projects in this workspace.
+   * Note: Duplicate projectIds across different workspaces are allowed.
    *
    * @param workspacePath - Path to workspace directory
    * @param config - Project configuration
    * @returns InitProjectResult with success status and paths
+   * @throws {ValidationError} If project already exists in workspace or projectId is invalid
    */
   public async initProject(workspacePath: string, config: ProjectConfig): Promise<InitProjectResult> {
     this.validateWorkspacePath(workspacePath);

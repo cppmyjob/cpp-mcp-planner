@@ -43,7 +43,7 @@ describe('ProjectService', () => {
     // RED: ProjectService depends on ConfigService and PlanService
     configService = new ConfigService(factory);
     planService = new PlanService(factory);
-    projectService = new ProjectService(configService, planService, testDir);
+    projectService = new ProjectService(configService, planService, { baseDir: testDir });
   });
 
   afterEach(async () => {
@@ -54,35 +54,47 @@ describe('ProjectService', () => {
   });
 
   describe('RED: constructor validation', () => {
-    it('should throw ValidationError when baseDir is undefined', () => {
+    it('should throw ValidationError when baseDir is undefined in options', () => {
       expect(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        new ProjectService(configService, planService, undefined as any);
+        new ProjectService(configService, planService, { baseDir: undefined as any });
       }).toThrow('baseDir is required');
     });
 
-    it('should throw ValidationError when baseDir is null', () => {
+    it('should throw ValidationError when baseDir is null in options', () => {
       expect(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        new ProjectService(configService, planService, null as any);
+        new ProjectService(configService, planService, { baseDir: null as any });
       }).toThrow('baseDir is required');
     });
 
     it('should throw ValidationError when baseDir is empty string', () => {
       expect(() => {
-        new ProjectService(configService, planService, '');
+        new ProjectService(configService, planService, { baseDir: '' });
       }).toThrow('baseDir is required');
     });
 
     it('should throw ValidationError when baseDir is whitespace only', () => {
       expect(() => {
-        new ProjectService(configService, planService, '   ');
+        new ProjectService(configService, planService, { baseDir: '   ' });
       }).toThrow('baseDir is required');
     });
 
     it('should accept valid baseDir', () => {
       expect(() => {
-        new ProjectService(configService, planService, testDir);
+        new ProjectService(configService, planService, { baseDir: testDir });
+      }).not.toThrow();
+    });
+
+    it('should use default baseDir when options not provided', () => {
+      expect(() => {
+        new ProjectService(configService, planService);
+      }).not.toThrow();
+    });
+
+    it('should use default baseDir when options is empty object', () => {
+      expect(() => {
+        new ProjectService(configService, planService, {});
       }).not.toThrow();
     });
   });

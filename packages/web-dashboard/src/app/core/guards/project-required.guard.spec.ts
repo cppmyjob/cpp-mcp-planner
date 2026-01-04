@@ -38,9 +38,11 @@ describe('projectRequiredGuard', () => {
     it('should allow navigation when hasActiveProject returns true', () => {
       // Arrange
       hasActiveProjectSignal.set(true);
+      const mockRoute = {} as any;
+      const mockState = { url: '/dashboard' } as any;
 
       // Act
-      const result = TestBed.runInInjectionContext(() => projectRequiredGuard({} as any, {} as any));
+      const result = TestBed.runInInjectionContext(() => projectRequiredGuard(mockRoute, mockState));
 
       // Assert
       expect(result).toBe(true);
@@ -52,31 +54,39 @@ describe('projectRequiredGuard', () => {
     it('should block navigation when hasActiveProject returns false', () => {
       // Arrange
       hasActiveProjectSignal.set(false);
+      const mockRoute = {} as any;
+      const mockState = { url: '/dashboard' } as any;
 
       // Act
-      const result = TestBed.runInInjectionContext(() => projectRequiredGuard({} as any, {} as any));
+      const result = TestBed.runInInjectionContext(() => projectRequiredGuard(mockRoute, mockState));
 
       // Assert
       expect(result).toBe(false);
     });
 
-    it('should redirect to root when hasActiveProject returns false', () => {
+    it('should redirect to root with returnUrl when hasActiveProject returns false', () => {
       // Arrange
       hasActiveProjectSignal.set(false);
+      const mockRoute = {} as any;
+      const mockState = { url: '/dashboard' } as any;
 
       // Act
-      TestBed.runInInjectionContext(() => projectRequiredGuard({} as any, {} as any));
+      TestBed.runInInjectionContext(() => projectRequiredGuard(mockRoute, mockState));
 
       // Assert
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/'], {
+        queryParams: { returnUrl: '/dashboard' }
+      });
     });
 
     it('should redirect exactly once when blocking navigation', () => {
       // Arrange
       hasActiveProjectSignal.set(false);
+      const mockRoute = {} as any;
+      const mockState = { url: '/phases' } as any;
 
       // Act
-      TestBed.runInInjectionContext(() => projectRequiredGuard({} as any, {} as any));
+      TestBed.runInInjectionContext(() => projectRequiredGuard(mockRoute, mockState));
 
       // Assert
       expect(mockRouter.navigate).toHaveBeenCalledTimes(1);
@@ -87,9 +97,11 @@ describe('projectRequiredGuard', () => {
     it('should allow navigation after project becomes active', () => {
       // Arrange - Start without project
       hasActiveProjectSignal.set(false);
+      const mockRoute = {} as any;
+      const mockState = { url: '/dashboard' } as any;
 
       // Act & Assert - First attempt blocked
-      let result1 = TestBed.runInInjectionContext(() => projectRequiredGuard({} as any, {} as any));
+      let result1 = TestBed.runInInjectionContext(() => projectRequiredGuard(mockRoute, mockState));
       expect(result1).toBe(false);
       expect(mockRouter.navigate).toHaveBeenCalledTimes(1);
 
@@ -98,7 +110,7 @@ describe('projectRequiredGuard', () => {
       mockRouter.navigate.mockClear();
 
       // Act & Assert - Second attempt allowed
-      let result2 = TestBed.runInInjectionContext(() => projectRequiredGuard({} as any, {} as any));
+      let result2 = TestBed.runInInjectionContext(() => projectRequiredGuard(mockRoute, mockState));
       expect(result2).toBe(true);
       expect(mockRouter.navigate).not.toHaveBeenCalled();
     });
@@ -106,9 +118,11 @@ describe('projectRequiredGuard', () => {
     it('should block navigation after project becomes inactive', () => {
       // Arrange - Start with project
       hasActiveProjectSignal.set(true);
+      const mockRoute = {} as any;
+      const mockState = { url: '/requirements' } as any;
 
       // Act & Assert - First attempt allowed
-      let result1 = TestBed.runInInjectionContext(() => projectRequiredGuard({} as any, {} as any));
+      let result1 = TestBed.runInInjectionContext(() => projectRequiredGuard(mockRoute, mockState));
       expect(result1).toBe(true);
       expect(mockRouter.navigate).not.toHaveBeenCalled();
 
@@ -116,9 +130,11 @@ describe('projectRequiredGuard', () => {
       hasActiveProjectSignal.set(false);
 
       // Act & Assert - Second attempt blocked
-      let result2 = TestBed.runInInjectionContext(() => projectRequiredGuard({} as any, {} as any));
+      let result2 = TestBed.runInInjectionContext(() => projectRequiredGuard(mockRoute, mockState));
       expect(result2).toBe(false);
-      expect(mockRouter.navigate).toHaveBeenCalledWith(['/']);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/'], {
+        queryParams: { returnUrl: '/requirements' }
+      });
     });
   });
 });

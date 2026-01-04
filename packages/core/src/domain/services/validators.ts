@@ -864,7 +864,7 @@ export function validateFilterStatus(status: unknown): void {
  * Validates projectId format with enhanced security checks.
  * ProjectId must be lowercase alphanumeric with dots, underscores, and hyphens.
  * Must start with lowercase alphanumeric character.
- * Cannot contain: /, \, :, *, ?, ", spaces, uppercase letters, and other special characters.
+ * Cannot contain: /, \, :, *, ?, ", spaces, or other special characters.
  * Enhanced checks: consecutive dots, reserved Windows names, length limit, trailing dot/hyphen.
  * @param projectId - The project ID to validate
  * @throws Error if projectId format is invalid

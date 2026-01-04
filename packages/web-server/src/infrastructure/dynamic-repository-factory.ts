@@ -141,15 +141,8 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
     }
 
     // Return cached factory if exists and initialized
-    if (this.factoryCache.has(projectId) && this.initializedMap.get(projectId) === true) {
-      const cached = this.factoryCache.get(projectId);
-      // Defensive check: Map.has() guarantees non-null, but protect against:
-      // - Concurrent modification bugs (should never happen with mutex)
-      // - Map.clear() called between has() and get() (race condition)
-      // - V8 engine bugs or memory corruption
-      if (cached == null) {
-        throw new Error(`Factory cache inconsistency for ${projectId}`);
-      }
+    const cached = this.factoryCache.get(projectId);
+    if (cached !== undefined && this.initializedMap.get(projectId) === true) {
       return cached;
     }
 
@@ -165,16 +158,9 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
 
     try {
       // Double-check: another concurrent request may have initialized
-      if (this.factoryCache.has(projectId) && this.initializedMap.get(projectId) === true) {
-        const cached = this.factoryCache.get(projectId);
-        // Defensive check: Map.has() guarantees non-null, but protect against:
-        // - Concurrent modification bugs (should never happen with mutex)
-        // - Map.clear() called between has() and get() (race condition)
-        // - V8 engine bugs or memory corruption
-        if (cached == null) {
-          throw new Error(`Factory cache inconsistency for ${projectId}`);
-        }
-        return cached;
+      const cachedFactory = this.factoryCache.get(projectId);
+      if (cachedFactory !== undefined && this.initializedMap.get(projectId) === true) {
+        return cachedFactory;
       }
 
       // Create FileRepositoryFactory for this projectId
@@ -309,16 +295,11 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
     }
 
     // If projectId is available and wrapper is cached, return cached wrapper
-    if (currentProjectId !== undefined && this.wrapperCache.has(currentProjectId)) {
-      const cached = this.wrapperCache.get(currentProjectId);
-      // Defensive check: Map.has() guarantees non-null, but protect against:
-      // - Concurrent modification bugs (unlikely in single-threaded JS)
-      // - Map.clear() called between has() and get() (race condition)
-      // - V8 engine bugs or memory corruption
-      if (cached == null) {
-        throw new Error(`Wrapper cache inconsistency for ${currentProjectId}`);
+    if (currentProjectId !== undefined) {
+      const cachedWrapper = this.wrapperCache.get(currentProjectId);
+      if (cachedWrapper !== undefined) {
+        return cachedWrapper;
       }
-      return cached;
     }
 
     // Create lazy wrapper that defers projectId lookup until method calls
@@ -336,17 +317,16 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
         );
       }
 
+      // Cache wrapper retroactively now that we have projectId
+      // This ensures wrappers created during service construction (no context) are cached on first use
+      if (!factoryInstance.wrapperCache.has(projectId)) {
+        factoryInstance.wrapperCache.set(projectId, wrapper);
+      }
+
       // Check if we have cached PlanRepository for this projectId
-      if (factoryInstance.planRepoCache.has(projectId)) {
-        const cached = factoryInstance.planRepoCache.get(projectId);
-        // Defensive check: Map.has() guarantees non-null, but protect against:
-        // - Concurrent modification bugs (unlikely in single-threaded JS)
-        // - Map.clear() called between has() and get() (race condition)
-        // - V8 engine bugs or memory corruption
-        if (cached == null) {
-          throw new Error(`PlanRepository cache inconsistency for ${projectId}`);
-        }
-        return cached;
+      const cachedRepo = factoryInstance.planRepoCache.get(projectId);
+      if (cachedRepo !== undefined) {
+        return cachedRepo;
       }
 
       // Get or create factory for this projectId (this handles initialization)

@@ -4,7 +4,7 @@ import { ProjectStateService } from '../services';
 
 /**
  * GREEN: Phase 4.14 - Route guard that requires an active project.
- * Redirects to root if no project is selected.
+ * Redirects to root if no project is selected, preserving returnUrl for better UX.
  *
  * Usage in routes:
  * {
@@ -13,15 +13,17 @@ import { ProjectStateService } from '../services';
  *   canActivate: [projectRequiredGuard]
  * }
  */
-export const projectRequiredGuard: CanActivateFn = () => {
+export const projectRequiredGuard: CanActivateFn = (route, state) => {
   const projectState = inject(ProjectStateService);
   const router = inject(Router);
 
   const hasProject = projectState.hasActiveProject();
 
   if (!hasProject) {
-    // Redirect to root if no project is selected
-    router.navigate(['/']);
+    // Redirect to root with returnUrl for better UX
+    router.navigate(['/'], {
+      queryParams: { returnUrl: state.url }
+    });
     return false;
   }
 

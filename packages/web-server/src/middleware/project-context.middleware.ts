@@ -47,13 +47,20 @@ export class ProjectContextMiddleware implements NestMiddleware {
     // The callback MUST be async to preserve context through the entire request lifecycle.
     // AsyncLocalStorage only propagates context through async continuations (Promise chains).
     // We wait for 'finish' or 'close' events to ensure context lives until response is sent.
-    // Note: void operator is intentional - middleware doesn't block, but context is preserved
-    void runWithProjectContext(trimmedId, async () => {
-      await new Promise<void>((resolve) => {
-        res.on('finish', resolve);
-        res.on('close', resolve);
-        next();
-      });
+    // Note: runWithProjectContext() is validated above (line 38-43) so errors should not occur,
+    // but we catch them defensively to prevent unhandled promise rejections
+    void Promise.resolve(
+      runWithProjectContext(trimmedId, async () => {
+        await new Promise<void>((resolve) => {
+          res.on('finish', resolve);
+          res.on('close', resolve);
+          next();
+        });
+      })
+    ).catch((error: unknown) => {
+      // This should never happen due to pre-validation, but handle defensively
+      const message = error instanceof Error ? error.message : String(error);
+      next(new Error(`Failed to set project context: ${message}`));
     });
   }
 }
