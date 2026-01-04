@@ -37,15 +37,15 @@ describe('E2E: MCP Server loadProjectId()', () => {
 
   // RED: This test should FAIL because loadProjectId() currently returns 'default' instead of throwing
   it('should throw error when .mcp-config.json is not found', async () => {
-    // Import loadProjectId - will be exported in Phase 1.1.3
-    const { loadProjectId } = await import('../../packages/mcp-server/src/cli.js');
+    // Import loadProjectId from config-loader module
+    const { loadProjectId } = await import('../../packages/mcp-server/src/config-loader.js');
 
     await expect(loadProjectId()).rejects.toThrow();
   });
 
   // RED: This test should FAIL because error message doesn't include cwd yet
   it('should include process.cwd() in error message when config not found', async () => {
-    const { loadProjectId } = await import('../../packages/mcp-server/src/cli.js');
+    const { loadProjectId } = await import('../../packages/mcp-server/src/config-loader.js');
 
     try {
       await loadProjectId();
@@ -70,7 +70,7 @@ describe('E2E: MCP Server loadProjectId()', () => {
       JSON.stringify(config, null, 2)
     );
 
-    const { loadProjectId } = await import('../../packages/mcp-server/src/cli.js');
+    const { loadProjectId } = await import('../../packages/mcp-server/src/config-loader.js');
     const result = await loadProjectId();
 
     expect(result).toBe('test-project-123');
@@ -84,7 +84,7 @@ describe('E2E: MCP Server loadProjectId()', () => {
       '{ invalid json }'
     );
 
-    const { loadProjectId } = await import('../../packages/mcp-server/src/cli.js');
+    const { loadProjectId } = await import('../../packages/mcp-server/src/config-loader.js');
 
     await expect(loadProjectId()).rejects.toThrow();
   });
@@ -97,7 +97,7 @@ describe('E2E: MCP Server loadProjectId()', () => {
       '{ invalid json }'
     );
 
-    const { loadProjectId } = await import('../../packages/mcp-server/src/cli.js');
+    const { loadProjectId } = await import('../../packages/mcp-server/src/config-loader.js');
 
     try {
       await loadProjectId();

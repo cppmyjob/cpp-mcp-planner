@@ -25,27 +25,27 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
   });
 
   describe('getProjectId() - no context', () => {
-    it('should return undefined when no context is set', () => {
+    it('RED: should return undefined when no context is set', () => {
       const result = getProjectId();
       expect(result).toBeUndefined();
     });
   });
 
   describe('setFallbackProjectId() - MCP Server mode', () => {
-    it('should set fallback projectId', () => {
+    it('RED: should set fallback projectId', () => {
       setFallbackProjectId('mcp-server-project');
       const result = getProjectId();
       expect(result).toBe('mcp-server-project');
     });
 
-    it('should return fallback when no async context exists', () => {
+    it('RED: should return fallback when no async context exists', () => {
       setFallbackProjectId('fallback-project');
 
       // Outside any runWithProjectContext
       expect(getProjectId()).toBe('fallback-project');
     });
 
-    it('should prefer async context over fallback', () => {
+    it('RED: should prefer async context over fallback', () => {
       setFallbackProjectId('fallback-project');
 
       return runWithProjectContext('context-project', () => {
@@ -55,14 +55,14 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
   });
 
   describe('runWithProjectContext() - Web Server mode', () => {
-    it('should set context within callback', () => {
+    it('RED: should set context within callback', () => {
       return runWithProjectContext('web-project-123', () => {
         const result = getProjectId();
         expect(result).toBe('web-project-123');
       });
     });
 
-    it('should clear context after callback completes', async () => {
+    it('RED: should clear context after callback completes', async () => {
       await runWithProjectContext('temp-project', () => {
         expect(getProjectId()).toBe('temp-project');
       });
@@ -71,7 +71,7 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
       expect(getProjectId()).toBeUndefined();
     });
 
-    it('should support async callbacks', async () => {
+    it('RED: should support async callbacks', async () => {
       const result = await runWithProjectContext('async-project', async () => {
         expect(getProjectId()).toBe('async-project');
 
@@ -85,7 +85,7 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
       expect(result).toBe('async-result');
     });
 
-    it('should propagate context through Promise chains', async () => {
+    it('RED: should propagate context through Promise chains', async () => {
       await runWithProjectContext('promise-project', async () => {
         const step1 = await Promise.resolve('step1');
         expect(getProjectId()).toBe('promise-project');
@@ -101,7 +101,7 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
   });
 
   describe('Nested contexts', () => {
-    it('should support nested contexts (inner shadows outer)', async () => {
+    it('RED: should support nested contexts (inner shadows outer)', async () => {
       await runWithProjectContext('outer-project', async () => {
         expect(getProjectId()).toBe('outer-project');
 
@@ -115,7 +115,7 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
   });
 
   describe('Parallel operations isolation', () => {
-    it('should isolate contexts in parallel operations', async () => {
+    it('RED: should isolate contexts in parallel operations', async () => {
       const operation1 = runWithProjectContext('project-a', async () => {
         await new Promise<void>(resolve => setTimeout(resolve, 20));
         return getProjectId();
@@ -132,7 +132,7 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
       expect(result2).toBe('project-b');
     });
 
-    it('should not have cross-contamination in concurrent requests', async () => {
+    it('RED: should not have cross-contamination in concurrent requests', async () => {
       const results: (string | undefined)[] = [];
 
       const requests: Promise<string | undefined>[] = Array.from({ length: 5 }, (_, i) =>
@@ -165,7 +165,7 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
       return helperFunction();
     }
 
-    it('should access context from nested function calls', () => {
+    it('RED: should access context from nested function calls', () => {
       return runWithProjectContext('helper-project', () => {
         expect(helperFunction()).toBe('helper-project');
         expect(nestedHelper()).toBe('helper-project');
@@ -174,7 +174,7 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
   });
 
   describe('disable() cleanup', () => {
-    it('should clear both context and fallback', () => {
+    it('RED: should clear both context and fallback', () => {
       setFallbackProjectId('to-be-cleared');
       expect(getProjectId()).toBe('to-be-cleared');
 
@@ -183,7 +183,7 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
       expect(getProjectId()).toBeUndefined();
     });
 
-    it('should clear context even inside runWithProjectContext', async () => {
+    it('RED: should clear context even inside runWithProjectContext', async () => {
       await runWithProjectContext('context-before-disable', () => {
         expect(getProjectId()).toBe('context-before-disable');
 
@@ -196,7 +196,7 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
   });
 
   describe('Error handling', () => {
-    it('should propagate errors from callback', async () => {
+    it('RED: should propagate errors from callback', async () => {
       await expect(
         runWithProjectContext('error-project', async () => {
           await Promise.resolve(); // Satisfy require-await
@@ -205,7 +205,7 @@ describe('ProjectContext (AsyncLocalStorage)', () => {
       ).rejects.toThrow('Test error');
     });
 
-    it('should clear context even if callback throws', async () => {
+    it('RED: should clear context even if callback throws', async () => {
       try {
         await runWithProjectContext('error-project', () => {
           throw new Error('Test error');

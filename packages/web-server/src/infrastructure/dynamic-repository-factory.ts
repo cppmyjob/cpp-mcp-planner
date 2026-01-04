@@ -134,14 +134,19 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
 
     const projectId = getProjectId();
     if (projectId == null) {
-      throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
+      throw new Error(
+        'projectId context is missing during factory initialization. ' +
+        'Ensure ProjectContextMiddleware is applied (Web Server) or setFallbackProjectId() was called (MCP Server).'
+      );
     }
 
     // Return cached factory if exists and initialized
     if (this.factoryCache.has(projectId) && this.initializedMap.get(projectId) === true) {
       const cached = this.factoryCache.get(projectId);
-      // Defensive check: should never be null since has() returned true
-      // Protects against Map corruption or concurrent modification bugs
+      // Defensive check: Map.has() guarantees non-null, but protect against:
+      // - Concurrent modification bugs (should never happen with mutex)
+      // - Map.clear() called between has() and get() (race condition)
+      // - V8 engine bugs or memory corruption
       if (cached == null) {
         throw new Error(`Factory cache inconsistency for ${projectId}`);
       }
@@ -162,8 +167,10 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
       // Double-check: another concurrent request may have initialized
       if (this.factoryCache.has(projectId) && this.initializedMap.get(projectId) === true) {
         const cached = this.factoryCache.get(projectId);
-        // Defensive check: should never be null since has() returned true
-        // Protects against Map corruption or concurrent modification bugs
+        // Defensive check: Map.has() guarantees non-null, but protect against:
+        // - Concurrent modification bugs (should never happen with mutex)
+        // - Map.clear() called between has() and get() (race condition)
+        // - V8 engine bugs or memory corruption
         if (cached == null) {
           throw new Error(`Factory cache inconsistency for ${projectId}`);
         }
@@ -225,7 +232,10 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
 
     const projectId = getProjectId();
     if (projectId == null) {
-      throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
+      throw new Error(
+        `projectId context is missing when creating ${entityType} repository. ` +
+        `Ensure ProjectContextMiddleware is applied (Web Server) or setFallbackProjectId() was called (MCP Server).`
+      );
     }
 
     const factory = this.factoryCache.get(projectId);
@@ -254,7 +264,10 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
 
     const projectId = getProjectId();
     if (projectId == null) {
-      throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
+      throw new Error(
+        'projectId context is missing when creating link repository. ' +
+        'Ensure ProjectContextMiddleware is applied (Web Server) or setFallbackProjectId() was called (MCP Server).'
+      );
     }
 
     const factory = this.factoryCache.get(projectId);
@@ -298,6 +311,10 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
     // If projectId is available and wrapper is cached, return cached wrapper
     if (currentProjectId !== undefined && this.wrapperCache.has(currentProjectId)) {
       const cached = this.wrapperCache.get(currentProjectId);
+      // Defensive check: Map.has() guarantees non-null, but protect against:
+      // - Concurrent modification bugs (unlikely in single-threaded JS)
+      // - Map.clear() called between has() and get() (race condition)
+      // - V8 engine bugs or memory corruption
       if (cached == null) {
         throw new Error(`Wrapper cache inconsistency for ${currentProjectId}`);
       }
@@ -313,12 +330,19 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
     const getOrCreateRealRepo = async (): Promise<PlanRepository> => {
       const projectId = getProjectId();
       if (projectId == null) {
-        throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
+        throw new Error(
+          'projectId context is missing when accessing PlanRepository. ' +
+          'Ensure ProjectContextMiddleware is applied (Web Server) or setFallbackProjectId() was called (MCP Server).'
+        );
       }
 
       // Check if we have cached PlanRepository for this projectId
       if (factoryInstance.planRepoCache.has(projectId)) {
         const cached = factoryInstance.planRepoCache.get(projectId);
+        // Defensive check: Map.has() guarantees non-null, but protect against:
+        // - Concurrent modification bugs (unlikely in single-threaded JS)
+        // - Map.clear() called between has() and get() (race condition)
+        // - V8 engine bugs or memory corruption
         if (cached == null) {
           throw new Error(`PlanRepository cache inconsistency for ${projectId}`);
         }
@@ -444,7 +468,10 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
 
     const projectId = getProjectId();
     if (projectId == null) {
-      throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
+      throw new Error(
+        'projectId context is missing when creating unit of work. ' +
+        'Ensure ProjectContextMiddleware is applied (Web Server) or setFallbackProjectId() was called (MCP Server).'
+      );
     }
 
     const factory = this.factoryCache.get(projectId);
@@ -468,7 +495,10 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
   public getProjectId(): string {
     const projectId = getProjectId();
     if (projectId == null) {
-      throw new Error('projectId context is missing. Ensure request is wrapped with runWithProjectContext()');
+      throw new Error(
+        'projectId context is missing. ' +
+        'Ensure ProjectContextMiddleware is applied (Web Server) or setFallbackProjectId() was called (MCP Server).'
+      );
     }
     return projectId;
   }
