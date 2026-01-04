@@ -87,14 +87,11 @@ export class ProjectService {
     options?: ProjectServiceOptions
   ) {
     // Extract baseDir from options with validation
-    if (options !== undefined && 'baseDir' in options) {
-      // baseDir was explicitly provided in options - validate it
-      const providedBaseDir = options.baseDir;
-      if (providedBaseDir === undefined || providedBaseDir === null || providedBaseDir === '') {
-        throw new ValidationError('baseDir is required and must be a non-empty string');
-      }
-      this.baseDir = providedBaseDir;
-      validateNonEmptyString(this.baseDir, 'baseDir');
+    // Distinguish between: not provided (use default) vs explicitly set to invalid value (throw)
+    if (options !== undefined && Object.hasOwn(options, 'baseDir')) {
+      // baseDir key exists in options - validate it (even if undefined/null, that's an error)
+      validateNonEmptyString(options.baseDir, 'baseDir');
+      this.baseDir = options.baseDir;
     } else {
       // baseDir not provided - use default
       this.baseDir = './.mcp-plans';

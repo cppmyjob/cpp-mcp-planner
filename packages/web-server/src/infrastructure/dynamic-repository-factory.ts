@@ -309,6 +309,12 @@ export class DynamicRepositoryFactory implements RepositoryFactory {
 
     // Helper to get or create cached real repo for current project context
     const getOrCreateRealRepo = async (): Promise<PlanRepository> => {
+      // CRITICAL: Check closed state BEFORE accessing cache to prevent using disposed resources
+      // This is necessary because cached repos reference disposed FileRepositoryFactory instances
+      if (factoryInstance.closed) {
+        throw new Error('DynamicRepositoryFactory is closed');
+      }
+
       const projectId = getProjectId();
       if (projectId == null) {
         throw new Error(

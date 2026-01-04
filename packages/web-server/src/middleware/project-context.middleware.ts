@@ -48,12 +48,28 @@ export class ProjectContextMiddleware implements NestMiddleware {
     // AsyncLocalStorage only propagates context through async continuations (Promise chains).
     // We wait for 'finish' or 'close' events to ensure context lives until response is sent.
     // Note: runWithProjectContext() is validated above (line 38-43) so errors should not occur,
-    // but we catch them defensively to prevent unhandled promise rejections
+    // but we catch them defensively to prevent unhandled promise rejections.
+    //
+    // IMPORTANT: We use a resolved flag and cleanup handlers to prevent:
+    // 1. Memory leaks from dangling event listeners on rapid request cycles
+    // 2. Double-resolution if both 'finish' and 'close' events fire
+    // 3. Resource leaks if response errors occur
     void Promise.resolve(
       runWithProjectContext(trimmedId, async () => {
         await new Promise<void>((resolve) => {
-          res.on('finish', resolve);
-          res.on('close', resolve);
+          let resolved = false;
+
+          const cleanup = (): void => {
+            if (!resolved) {
+              resolved = true;
+              res.removeListener('finish', cleanup);
+              res.removeListener('close', cleanup);
+              resolve();
+            }
+          };
+
+          res.on('finish', cleanup);
+          res.on('close', cleanup);
           next();
         });
       })

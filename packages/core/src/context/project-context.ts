@@ -100,8 +100,21 @@ export function runWithProjectContext<T>(
 /**
  * Disable AsyncLocalStorage and clear fallback.
  *
- * Used for cleanup and garbage collection.
- * After calling disable(), getProjectId() returns undefined even inside context.
+ * Used for cleanup and garbage collection, primarily in tests.
+ *
+ * Behavior:
+ * - Clears fallbackProjectId immediately
+ * - Calls AsyncLocalStorage.disable() which prevents new context creation
+ * - After calling disable(), getProjectId() returns undefined even inside active contexts
+ *
+ * Note: AsyncLocalStorage.disable() behavior is implementation-dependent in Node.js.
+ * The method disables the storage and clears any existing store data. Any code running
+ * in an async context after disable() will see undefined. This is verified by tests
+ * in tests/infrastructure/project-context.test.ts.
+ *
+ * WARNING: After disable(), the AsyncLocalStorage instance is unusable.
+ * To re-enable, a new AsyncLocalStorage instance must be created.
+ * This function is intended for cleanup during shutdown or test teardown.
  */
 export function disable(): void {
   fallbackProjectId = undefined;
